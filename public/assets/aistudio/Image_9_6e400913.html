@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><title>AuraMeme</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"surface-bright":"#383842","tertiary-fixed-dim":"#adc6ff","outline-variant":"#494454","on-error":"#690005","on-tertiary-fixed-variant":"#004395","surface-tint":"#d0bcff","surface-container-high":"#292932","on-surface":"#e3e1ed","surface-variant":"#33343d","secondary-fixed-dim":"#4cd7f6","surface-container":"#1e1f27","inverse-on-surface":"#2f3039","error-container":"#93000a","on-secondary-fixed":"#001f26","secondary":"#4cd7f6","inverse-surface":"#e3e1ed","tertiary-container":"#4d8eff","primary-container":"#a078ff","on-tertiary":"#002e6a","surface-container-lowest":"#0d0e15","on-primary":"#3c0091","primary-fixed":"#e9ddff","secondary-fixed":"#acedff","on-tertiary-container":"#00285d","tertiary-fixed":"#d8e2ff","surface-container-highest":"#33343d","background":"#12131b","inverse-primary":"#6d3bd7","surface":"#12131b","outline":"#958ea0","on-tertiary-fixed":"#001a42","on-surface-variant":"#cbc3d7","on-error-container":"#ffdad6","error":"#ffb4ab","on-background":"#e3e1ed","surface-container-low":"#1a1b23","primary":"#d0bcff","tertiary":"#adc6ff","on-primary-fixed-variant":"#5516be","primary-fixed-dim":"#d0bcff","on-primary-container":"#340080","on-secondary-container":"#00424e","on-secondary-fixed-variant":"#004e5c","secondary-container":"#03b5d3","on-secondary":"#003640","surface-dim":"#12131b","on-primary-fixed":"#23005c"},"borderRadius":{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},"spacing":{"margin":"1rem","space-xl":"2rem","margin-md":"1.5rem","space-sm":"0.5rem","space-xs":"0.25rem","space-md":"0.75rem","gutter-lg":"1.5rem","margin-lg":"2rem","gutter":"1rem","space-lg":"1.25rem"},"fontFamily":{"body-sm":["Inter"],"headline-lg":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"],"headline-xl":["Plus Jakarta Sans"],"headline-xl-mobile":["Plus Jakarta Sans"],"headline-md":["Plus Jakarta Sans"],"body-md":["Inter"],"label-md":["Inter"],"label-sm":["Inter"],"code-sm":["JetBrains Mono"],"headline-lg-mobile":["Plus Jakarta Sans"],"body-lg":["Inter"]},"fontSize":{"body-sm":["12px",{"lineHeight":"18px","fontWeight":"400"}],"headline-lg":["28px",{"lineHeight":"36px","letterSpacing":"-0.02em","fontWeight":"700"}],"headline-sm":["16px",{"lineHeight":"24px","fontWeight":"600"}],"headline-xl":["36px",{"lineHeight":"44px","letterSpacing":"-0.02em","fontWeight":"800"}],"headline-xl-mobile":["28px",{"lineHeight":"36px","letterSpacing":"-0.015em","fontWeight":"800"}],"headline-md":["20px",{"lineHeight":"28px","letterSpacing":"-0.01em","fontWeight":"700"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"label-md":["13px",{"lineHeight":"16px","letterSpacing":"0.01em","fontWeight":"600"}],"label-sm":["11px",{"lineHeight":"14px","letterSpacing":"0.04em","fontWeight":"700"}],"code-sm":["12px",{"lineHeight":"16px","fontWeight":"500"}],"headline-lg-mobile":["22px",{"lineHeight":"30px","letterSpacing":"-0.01em","fontWeight":"700"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}]}}}}</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased"><header class="fixed top-0 left-0 right-0 z-50 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.35)]"><div class="h-16 w-full px-gutter-lg flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-lg shrink-0"><a class="flex items-center gap-space-sm group" data-path="home" href="#"><img alt="AuraMeme Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWoRMYIaBVINCL_MTf9Zk3GzutX04010cTJLx92wBCAIGRdeTiu1I1cEKT8HDw4ZCuAm6n3Rr3RS4Ze7b6T1E3TTY9S2b9p-1Blr6jI5t4jDyr38F4poOB7UQnZEmtYXWoi1j9Bd1sGljpfCxbzpj2K7FMqdYHJOzEC_wxs_gqY54cJ7bNcDQR5MSD3OnHXhwth61N76thr9k5NpM6zK-vfwsEaPjfaOAbnTSEWUZUshYHsJwR2gg"/><span class="font-headline-md text-headline-md bg-gradient-to-r from-primary via-primary-container to-secondary bg-clip-text text-transparent group-hover:opacity-90 transition-opacity">AuraMeme</span></a><div class="hidden sm:inline-flex items-center px-space-sm py-space-xs rounded-full bg-surface-container-high text-secondary font-label-sm text-label-sm tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"><span class="material-symbols-outlined text-[14px] mr-1 text-secondary">bolt</span>LVL 7</div><nav class="hidden xl:flex items-center gap-space-xs pl-space-sm" data-active-classes="bg-surface-container text-on-surface font-semibold rounded-lg"><a aria-current="page" class="px-space-md py-space-xs transition-all bg-surface-container text-on-surface font-semibold rounded-lg" data-path="home" href="#">Home</a><a class="px-space-md py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface font-label-md text-label-md transition-all" data-path="explore" href="#">Explore</a><a class="px-space-md py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface font-label-md text-label-md transition-all" data-path="about-us" href="#">About Us</a><a class="px-space-md py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface font-label-md text-label-md transition-all" data-path="team" href="#">Team</a><a class="px-space-md py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface font-label-md text-label-md transition-all" data-path="contact" href="#">Contact</a></nav></div><div class="flex-1 max-w-md hidden md:block"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-space-md text-outline text-[18px] pointer-events-none">search</span><input class="w-full h-9 pl-10 pr-16 bg-surface-container rounded-full text-on-surface placeholder:text-outline font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-primary focus:bg-surface-container-low transition-all" placeholder="Search memes, tags, aura creators..." type="text"/><kbd class="absolute right-space-sm px-space-xs py-0.5 rounded bg-surface-container-highest text-on-surface-variant font-code-sm text-code-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">Ctrl + K</kbd></div></div><div class="flex items-center gap-space-sm shrink-0"><button class="inline-flex items-center gap-space-xs h-9 px-space-md rounded-lg bg-gradient-to-r from-primary-container to-inverse-primary text-on-primary font-label-md text-label-md shadow-[0_0_12px_rgba(160,120,255,0.35)] hover:shadow-[0_0_16px_rgba(160,120,255,0.5)] transition-all" type="button"><span class="material-symbols-outlined text-[18px]">add</span><span class="hidden sm:inline">Create Post</span></button><button aria-label="Nitro Perks" class="w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container text-secondary hover:bg-surface-container-high hover:text-secondary-fixed transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">local_fire_department</span></button><div class="relative"><button aria-label="Notifications" class="w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span></button><span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-error text-on-error font-label-sm text-[10px] flex items-center justify-center font-bold">3</span></div><a class="hidden lg:inline-flex items-center h-9 px-space-md rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high hover:text-on-surface font-label-md text-label-md transition-colors" data-path="login" href="#">Login</a><a class="hidden lg:inline-flex items-center h-9 px-space-md rounded-lg bg-gradient-to-r from-secondary-container via-primary-container to-primary text-on-primary font-label-md text-label-md shadow-[0_0_12px_rgba(76,215,246,0.3)] hover:opacity-95 transition-all" data-path="signup" href="#">Sign Up</a><div class="relative ml-space-xs"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/40" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDASJ_-n0Ie3JNRBcsI-Ykvyj4g6PVZoAcz-fW-QrZE-7VJe9myauaV9pJ2igBq8KUB6FiA3QWbsGFdsQKc6x-5H5xxG7PeBg5oaGqK9azzw8eiSPGF-KPM-kHGq_cZxV6FC-C8XSfvqL4_jydXjekGAS98pxCxoQ5QhBtwrjl_WKNwumOKApP2hcUPBaU8deG8-AfMq9SQoIthDVBPpZ6mtqm3PgAyVUty2jB4ewypcGq_qelNbEo"/><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-secondary ring-2 ring-surface-container-lowest"></span></div></div></div></header><main class="w-full pt-16 bg-surface min-h-[calc(100vh-16rem)]"><div class="flex flex-col w-full">
+<!-- Dynamic Atmospheric Glow Backdrop -->
+<div class="relative w-full overflow-hidden">
+<div class="absolute -top-32 left-1/4 w-96 h-96 bg-primary-container/10 rounded-full blur-3xl pointer-events-none"></div>
+<div class="absolute top-48 right-1/4 w-80 h-80 bg-secondary/10 rounded-full blur-3xl pointer-events-none"></div>
+<!-- 3-Column Master Layout Frame -->
+<div class="w-full max-w-[1560px] mx-auto px-gutter sm:px-gutter-lg py-space-lg">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter-lg items-start">
+<!-- ========================================== -->
+<!-- LEFT COLUMN: Navigation & Subreddits Dock -->
+<!-- ========================================== -->
+<aside class="hidden lg:block lg:col-span-3 xl:col-span-3 sticky top-20 space-y-space-md">
+<!-- Primary Feed Nav Card -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-md">
+<div class="px-space-xs pb-space-sm">
+<span class="font-label-sm text-label-sm tracking-wider uppercase text-outline">Feeds Navigation</span>
+</div>
+<nav class="flex flex-col gap-1">
+<a class="flex items-center justify-between px-space-md py-space-sm rounded-lg bg-surface-container-high text-primary font-label-md text-label-md shadow-[0_0_12px_rgba(160,120,255,0.25)] transition-all" href="#">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[20px] text-primary" style="font-variation-settings: 'FILL' 1;">home</span>
+<span>Home Feed</span>
+</div>
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+</a>
+<a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-label-md text-label-md transition-colors group" href="#">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[20px] text-outline group-hover:text-secondary transition-colors" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span>Popular</span>
+</div>
+<span class="font-code-sm text-code-sm text-outline group-hover:text-secondary">HOT</span>
+</a>
+<a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-label-md text-label-md transition-colors group" href="#">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[20px] text-outline group-hover:text-on-surface transition-colors">public</span>
+<span>All Channels</span>
+</div>
+<span class="px-space-xs py-0.5 rounded-full bg-surface-container-highest font-code-sm text-[10px] text-on-surface-variant">SYNC</span>
+</a>
+</nav>
+</div>
+<!-- Categories Channel Hub -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-md">
+<div class="flex items-center justify-between px-space-xs pb-space-sm">
+<span class="font-label-sm text-label-sm tracking-wider uppercase text-outline">Categories</span>
+<button class="font-code-sm text-code-sm text-primary hover:text-primary-fixed transition-colors">Filter</button>
+</div>
+<div class="flex flex-col gap-1">
+<a class="flex items-center justify-between px-space-md py-2.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-on-surface font-body-md text-body-md transition-all group" href="#">
+<div class="flex items-center gap-space-sm">
+<span class="w-7 h-7 rounded-md bg-surface-container-high flex items-center justify-center text-primary group-hover:bg-primary-container group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">sports_esports</span>
+</span>
+<span class="font-medium text-on-surface">Gaming</span>
+</div>
+<span class="font-code-sm text-code-sm px-space-xs py-0.5 rounded bg-surface-container-highest text-outline">142k</span>
+</a>
+<a class="flex items-center justify-between px-space-md py-2.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-on-surface font-body-md text-body-md transition-all group" href="#">
+<div class="flex items-center gap-space-sm">
+<span class="w-7 h-7 rounded-md bg-surface-container-high flex items-center justify-center text-secondary group-hover:bg-secondary-container group-hover:text-on-secondary transition-colors">
+<span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+</span>
+<span class="font-medium text-on-surface">Anime</span>
+</div>
+<span class="font-code-sm text-code-sm px-space-xs py-0.5 rounded bg-surface-container-highest text-outline">98k</span>
+</a>
+<a class="flex items-center justify-between px-space-md py-2.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-on-surface font-body-md text-body-md transition-all group" href="#">
+<div class="flex items-center gap-space-sm">
+<span class="w-7 h-7 rounded-md bg-surface-container-high flex items-center justify-center text-tertiary group-hover:bg-tertiary-container group-hover:text-on-tertiary transition-colors">
+<span class="material-symbols-outlined text-[18px]">terminal</span>
+</span>
+<span class="font-medium text-on-surface">Technology</span>
+</div>
+<span class="font-code-sm text-code-sm px-space-xs py-0.5 rounded bg-surface-container-highest text-outline">87k</span>
+</a>
+<a class="flex items-center justify-between px-space-md py-2.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-on-surface font-body-md text-body-md transition-all group" href="#">
+<div class="flex items-center gap-space-sm">
+<span class="w-7 h-7 rounded-md bg-surface-container-high flex items-center justify-center text-primary group-hover:bg-primary-container group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">school</span>
+</span>
+<span class="font-medium text-on-surface">School</span>
+</div>
+<span class="font-code-sm text-code-sm px-space-xs py-0.5 rounded bg-surface-container-highest text-outline">45k</span>
+</a>
+<a class="flex items-center justify-between px-space-md py-2.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-on-surface font-body-md text-body-md transition-all group" href="#">
+<div class="flex items-center gap-space-sm">
+<span class="w-7 h-7 rounded-md bg-surface-container-high flex items-center justify-center text-secondary group-hover:bg-secondary-container group-hover:text-on-secondary transition-colors">
+<span class="material-symbols-outlined text-[18px]">casino</span>
+</span>
+<span class="font-medium text-on-surface">Random</span>
+</div>
+<span class="font-code-sm text-code-sm px-space-xs py-0.5 rounded bg-surface-container-highest text-outline">62k</span>
+</a>
+</div>
+</div>
+<!-- Quick Community Discord Card -->
+<div class="relative overflow-hidden rounded-xl bg-gradient-to-b from-surface-container to-surface-container-lowest p-space-lg shadow-md">
+<div class="absolute -top-10 -right-10 w-24 h-24 bg-primary/20 rounded-full blur-xl pointer-events-none"></div>
+<div class="flex items-center gap-space-sm mb-space-sm">
+<span class="material-symbols-outlined text-[26px] text-tertiary">forum</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Aura Central</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-space-md leading-relaxed">
+              24/7 live voice lounges, instant meme drops, code debug squads, and aura bot rewards.
+            </p>
+<a class="flex items-center justify-center gap-space-sm w-full py-2.5 px-space-md rounded-lg bg-surface-container-high hover:bg-primary text-on-surface hover:text-on-primary font-label-md text-label-md shadow-sm transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[18px]">rocket_launch</span>
+              Join Aura Discord
+            </a>
+</div>
+<!-- Footer Metadata Micro-Pill -->
+<div class="px-space-sm flex flex-wrap gap-x-space-md gap-y-1 font-body-sm text-[11px] text-outline">
+<a class="hover:text-on-surface transition-colors" href="#">Content Policy</a>
+<span>•</span>
+<a class="hover:text-on-surface transition-colors" href="#">Mod Tools</a>
+<span>•</span>
+<a class="hover:text-on-surface transition-colors" href="#">API Status</a>
+</div>
+</aside>
+<!-- ========================================== -->
+<!-- CENTER COLUMN: Primary Social Meme Feed     -->
+<!-- ========================================== -->
+<main class="col-span-1 lg:col-span-9 xl:col-span-6 space-y-space-md">
+<!-- Feed Header Banner HUD -->
+<div class="relative overflow-hidden rounded-xl bg-surface-container-low p-space-lg shadow-md">
+<div class="absolute -right-8 -top-8 w-44 h-44 bg-gradient-to-br from-primary-container/20 to-secondary/20 rounded-full blur-2xl pointer-events-none"></div>
+<div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+<div class="space-y-1">
+<div class="inline-flex items-center gap-space-xs px-2.5 py-0.5 rounded-full bg-surface-container-high font-label-sm text-label-sm text-secondary">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> Season 3 Live
+                </div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Level up your Aura, one meme at a time.</h1>
+<p class="font-body-md text-body-md text-primary font-medium">Share top-tier memes, earn Aura points, unlock perks.</p>
+</div>
+<!-- Quick Streak HUD Pill -->
+<div class="shrink-0 flex items-center gap-space-md px-space-md py-space-sm rounded-xl bg-surface-container shadow-inner">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">award_star</span>
+</div>
+<div>
+<div class="font-code-sm text-code-sm text-outline uppercase tracking-wider">Daily Bonus</div>
+<div class="font-headline-sm text-headline-sm text-on-surface font-bold">+150 XP Ready</div>
+</div>
+</div>
+</div>
+<!-- Interactive 'Create Post' Prompt Box -->
+<div class="mt-space-lg pt-space-md bg-surface-container rounded-xl p-space-md shadow-inner">
+<div class="flex items-center gap-space-md">
+<img alt="Profile Avatar" class="w-10 h-10 rounded-full object-cover shrink-0 ring-2 ring-primary/40" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDASJ_-n0Ie3JNRBcsI-Ykvyj4g6PVZoAcz-fW-QrZE-7VJe9myauaV9pJ2igBq8KUB6FiA3QWbsGFdsQKc6x-5H5xxG7PeBg5oaGqK9azzw8eiSPGF-KPM-kHGq_cZxV6FC-C8XSfvqL4_jydXjekGAS98pxCxoQ5QhBtwrjl_WKNwumOKApP2hcUPBaU8deG8-AfMq9SQoIthDVBPpZ6mtqm3PgAyVUty2jB4ewypcGq_qelNbEo"/>
+<div class="relative flex-1">
+<input class="w-full h-11 pl-space-md pr-space-md bg-surface-container-lowest rounded-lg text-on-surface placeholder:text-outline font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary/60 transition-all" placeholder="Draft a meme or drop an image link..." type="text"/>
+</div>
+</div>
+<div class="flex flex-wrap items-center justify-between gap-space-sm mt-space-md pt-space-sm">
+<div class="flex items-center gap-space-xs">
+<button class="inline-flex items-center gap-1.5 px-space-sm py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">image</span>
+<span class="hidden sm:inline">Image / GIF</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-space-sm py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-tertiary">how_to_vote</span>
+<span class="hidden sm:inline">Poll</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-space-sm py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-outline">link</span>
+<span class="hidden sm:inline">Link</span>
+</button>
+</div>
+<button class="inline-flex items-center gap-space-xs px-space-lg py-2 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md shadow-[0_0_12px_rgba(160,120,255,0.35)] transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">send</span>
+                  Create Post
+                </button>
+</div>
+</div>
+</div>
+<!-- Sorting Tabs Bar -->
+<div class="flex items-center justify-between bg-surface-container-low px-space-md py-space-xs rounded-xl shadow-sm">
+<div class="flex items-center gap-space-xs">
+<button class="flex items-center gap-1.5 px-space-md py-2 rounded-lg bg-surface-container text-secondary font-label-md text-label-md shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+                Hot
+              </button>
+<button class="flex items-center gap-1.5 px-space-md py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                New
+              </button>
+<div class="relative group">
+<button class="flex items-center gap-1.5 px-space-md py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">emoji_events</span>
+<span>Top</span>
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</button>
+</div>
+</div>
+<div class="flex items-center gap-space-xs text-outline">
+<button class="p-1.5 rounded-lg hover:bg-surface-container hover:text-on-surface transition-colors" title="Compact View">
+<span class="material-symbols-outlined text-[20px]">view_agenda</span>
+</button>
+<button class="p-1.5 rounded-lg hover:bg-surface-container hover:text-on-surface transition-colors" title="Card Density">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+</button>
+</div>
+</div>
+<!-- ===================================== -->
+<!-- MEME POST 1: u/SyntaxSamurai         -->
+<!-- ===================================== -->
+<article class="bg-surface-container-low rounded-xl p-space-lg shadow-md transition-all duration-200 hover:shadow-xl">
+<!-- Author Header -->
+<div class="flex items-center justify-between gap-space-sm mb-space-md">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="relative">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-bold text-headline-sm">
+                    SS
+                  </div>
+<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-secondary ring-2 ring-surface-container-low"></span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-space-xs flex-wrap">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold hover:underline cursor-pointer">u/SyntaxSamurai</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-container/20 text-primary font-label-sm text-[10px]">
+<span class="material-symbols-outlined text-[12px]">bolt</span> Level 14 • Aura Master
+                    </span>
+</div>
+<div class="flex items-center gap-space-xs font-body-sm text-body-sm text-outline">
+<span class="text-secondary font-medium hover:underline cursor-pointer">#Gaming</span>
+<span>•</span>
+<span>3h ago</span>
+</div>
+</div>
+</div>
+<!-- More Actions / Award Drop -->
+<div class="flex items-center gap-1">
+<button class="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_horiz</span>
+</button>
+</div>
+</div>
+<!-- Post Title -->
+<h2 class="font-headline-md text-headline-md text-on-surface mb-space-md font-bold leading-snug">
+              When your code compiles on the first try with zero warnings and zero errors
+            </h2>
+<!-- Meme Media Visual Representation -->
+<div class="relative w-full rounded-xl overflow-hidden bg-surface-container-lowest mb-space-md flex flex-col items-center justify-center p-space-lg">
+<div class="w-full max-w-xl aspect-[16/10] rounded-lg overflow-hidden relative shadow-lg">
+<img class="w-full h-full object-cover" data-alt="A cinematic dark neon humorous meme illustration featuring an ultra-powerful cyber warrior in glowing purple and cyan armor ascending peacefully into a beam of radiant divine digital light while robotic servers behind him run smoothly with holographic zero error logs glowing green, aesthetic digital art style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOsziLdcLKo7Xiz6iQSnXQo_kuXFvSjrxs0xP2p1P5l1C7s2ZNv5Zkk7bLOazl1Q1Adr97gqQUOYe379jeGS087GS8-UWihFz1R4O4W-8kKgD68Q1yIqEC8IlMiyKIzZyPfnIVKEU1ESzNt4apUoyd70-5MvUnXPj7MR83SM5kmGAgYYB65y3VRlUQ049bl9O0cbNQZ5EZS1_DkRU4JJk-DSTHpAe_7x17qHCdia0OFx4VclFEc10"/>
+<!-- Bottom Caption Scrim -->
+<div class="absolute inset-x-0 bottom-0 p-space-md bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/80 to-transparent flex items-center justify-between">
+<span class="font-code-sm text-code-sm text-secondary font-semibold">Exit Code 0: Godmode Activated</span>
+<span class="px-2 py-0.5 rounded bg-surface-container font-code-sm text-[11px] text-outline">0.04s build</span>
+</div>
+</div>
+</div>
+<!-- Interactive Reactions Dock -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-space-sm">
+<div class="flex flex-wrap items-center gap-1.5">
+<button class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span>👍</span>
+<span class="text-on-surface-variant font-code-sm">342</span>
+</button>
+<button class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container-high text-secondary font-label-md text-label-md shadow-[0_0_8px_rgba(76,215,246,0.2)]" type="button">
+<span>🤣</span>
+<span class="text-secondary font-code-sm font-semibold">1.2k</span>
+</button>
+<button class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span>🔥</span>
+<span class="text-on-surface-variant font-code-sm">890</span>
+</button>
+<button class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span>🤡</span>
+<span class="text-outline font-code-sm">45</span>
+</button>
+</div>
+<!-- Action Hub & Aura Award -->
+<div class="flex items-center gap-space-xs">
+<button class="flex items-center gap-1.5 px-space-md py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">chat_bubble</span>
+<span>284 Comments</span>
+</button>
+<button class="flex items-center gap-1 px-space-sm py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">share</span>
+<span class="hidden sm:inline">Share</span>
+</button>
+<button class="flex items-center gap-1 px-space-sm py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors" title="Bookmark" type="button">
+<span class="material-symbols-outlined text-[18px]">bookmark</span>
+</button>
+<button class="flex items-center gap-1 px-space-md py-1.5 rounded-lg bg-gradient-to-r from-primary-container to-secondary-container text-on-primary font-label-md text-label-md shadow-[0_0_12px_rgba(160,120,255,0.3)] hover:opacity-90 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">stars</span>
+<span>+50 Aura</span>
+</button>
+</div>
+</div>
+</article>
+<!-- ===================================== -->
+<!-- MEME POST 2: u/CyberNeko             -->
+<!-- ===================================== -->
+<article class="bg-surface-container-low rounded-xl p-space-lg shadow-md transition-all duration-200 hover:shadow-xl">
+<!-- Author Header -->
+<div class="flex items-center justify-between gap-space-sm mb-space-md">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="relative">
+<div class="w-10 h-10 rounded-full bg-secondary-container text-on-secondary flex items-center justify-center font-bold text-headline-sm">
+                    CN
+                  </div>
+<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-secondary ring-2 ring-surface-container-low"></span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-space-xs flex-wrap">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold hover:underline cursor-pointer">u/CyberNeko</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container/20 text-secondary font-label-sm text-[10px]">
+<span class="material-symbols-outlined text-[12px]">shield</span> Level 9 • Meme Knight
+                    </span>
+</div>
+<div class="flex items-center gap-space-xs font-body-sm text-body-sm text-outline">
+<span class="text-tertiary font-medium hover:underline cursor-pointer">#School</span>
+<span>•</span>
+<span>5h ago</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_horiz</span>
+</button>
+</div>
+</div>
+<!-- Post Title -->
+<h2 class="font-headline-md text-headline-md text-on-surface mb-space-md font-bold leading-snug">
+              Me promising myself I will finish the React project three weeks before the exam week
+            </h2>
+<!-- Meme Media Visual Representation -->
+<div class="relative w-full rounded-xl overflow-hidden bg-surface-container-lowest mb-space-md flex flex-col items-center justify-center p-space-lg">
+<div class="w-full max-w-xl aspect-[16/10] rounded-lg overflow-hidden relative shadow-lg">
+<img class="w-full h-full object-cover" data-alt="A dynamic humorous digital painting of a sleep-deprived computer science university student sitting in a dark neon-lit dorm room illuminated only by multiple glowing blue monitors, surrounded by empty coffee cups, surrounded by glowing ghost-like anime memes teasing the impending project deadline, vibrant atmospheric rendering" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvvXn4rjq1J8gC_TVenMi47igm0ctCa5jV133pE26SiwjRaA-VUJFskzipepF8G4Y_TEUHxTNzSmmmy9mDASiBFhDQyOf7aRbTMbS54y_iNsqeh9_MLdjeb67U2rc4IQa1Vjy4pnawAY9iS0rhLG_zI8eculX2LZc2B-TZM-kAjfdqqPT710t9PX80rwWWtA_JTVbNzhi_z4VkpE1FpsK-rxoh0MbSnQqGdpzDqQx8UXeTfKLjg2c"/>
+<div class="absolute inset-x-0 bottom-0 p-space-md bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/80 to-transparent flex items-center justify-between">
+<span class="font-code-sm text-code-sm text-error font-medium">Git Commit: 'please work final_v4_FINAL.tsx'</span>
+<span class="px-2 py-0.5 rounded bg-surface-container font-code-sm text-[11px] text-outline">2:47 AM</span>
+</div>
+</div>
+</div>
+<!-- Reactions Dock -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-space-sm">
+<div class="flex flex-wrap items-center gap-1.5">
+<button class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span>👍</span>
+<span class="text-on-surface-variant font-code-sm">512</span>
+</button>
+<button class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container-high text-secondary font-label-md text-label-md shadow-[0_0_8px_rgba(76,215,246,0.2)]" type="button">
+<span>🤣</span>
+<span class="text-secondary font-code-sm font-semibold">2.4k</span>
+</button>
+<button class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span>🔥</span>
+<span class="text-on-surface-variant font-code-sm">430</span>
+</button>
+<button class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span>🤡</span>
+<span class="text-outline font-code-sm">182</span>
+</button>
+</div>
+<!-- Action Hub & Aura Award -->
+<div class="flex items-center gap-space-xs">
+<button class="flex items-center gap-1.5 px-space-md py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">chat_bubble</span>
+<span>419 Comments</span>
+</button>
+<button class="flex items-center gap-1 px-space-sm py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">share</span>
+<span class="hidden sm:inline">Share</span>
+</button>
+<button class="flex items-center gap-1 px-space-md py-1.5 rounded-lg bg-gradient-to-r from-primary-container to-secondary-container text-on-primary font-label-md text-label-md shadow-[0_0_12px_rgba(160,120,255,0.3)] hover:opacity-90 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">stars</span>
+<span>+50 Aura</span>
+</button>
+</div>
+</div>
+</article>
+<!-- ===================================== -->
+<!-- MEME POST 3: u/DevDoge               -->
+<!-- ===================================== -->
+<article class="bg-surface-container-low rounded-xl p-space-lg shadow-md transition-all duration-200 hover:shadow-xl">
+<!-- Author Header -->
+<div class="flex items-center justify-between gap-space-sm mb-space-md">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="relative">
+<div class="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 to-primary text-surface-container-lowest flex items-center justify-center font-bold text-headline-sm">
+                    DD
+                  </div>
+<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-secondary ring-2 ring-surface-container-low"></span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-space-xs flex-wrap">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold hover:underline cursor-pointer">u/DevDoge</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400/20 to-primary/20 text-amber-300 font-label-sm text-[10px]">
+<span class="material-symbols-outlined text-[12px]">military_tech</span> Level 22 • Aura Legend
+                    </span>
+</div>
+<div class="flex items-center gap-space-xs font-body-sm text-body-sm text-outline">
+<span class="text-primary font-medium hover:underline cursor-pointer">#Technology</span>
+<span>•</span>
+<span>7h ago</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_horiz</span>
+</button>
+</div>
+</div>
+<!-- Post Title -->
+<h2 class="font-headline-md text-headline-md text-on-surface mb-space-md font-bold leading-snug">
+              CSS in real life: centering a div vs fixing a flexbox overflow bug at 3 AM
+            </h2>
+<!-- Meme Media Visual Representation -->
+<div class="relative w-full rounded-xl overflow-hidden bg-surface-container-lowest mb-space-md flex flex-col items-center justify-center p-space-lg">
+<div class="w-full max-w-xl aspect-[16/10] rounded-lg overflow-hidden relative shadow-lg">
+<img class="w-full h-full object-cover" data-alt="A split panel comedic tech meme illustration showing two contrasting scenarios: on the left side, a pristine glowing geometric cube centered perfectly in an ethereal void of neon purple light, and on the right side, an explosive chaotic tangle of neon cables and overflowing liquid code bursting out of a browser box at 3 AM with funny expressive cartoon mascot in panic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZx2-SddqIZOtVb19CIMqUVFtc72lXJiEU7uz5qpG4sZjZp-G2gzuX2PF1UMfBN9dBU6e36_28RIx-IOpH8vPaqaC7AK5YMqUsn_RJ3-3Qg1GGwjMR5YO0MXOxVBUPJTveSkAWL2mRnsPoyi4OVJy5uTBuevA-l7YmzdW0deNynZ1Tdkg_0uwF4v3fo5AqGLwjdFm3V5kriAle5jwT-FOrtkTT2CEGO8zTVBiEYDuR6m7D61vNF44"/>
+<div class="absolute inset-x-0 bottom-0 p-space-md bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/80 to-transparent flex items-center justify-between">
+<span class="font-code-sm text-code-sm text-primary font-mono">display: flex; justify-content: chaos;</span>
+<span class="px-2 py-0.5 rounded bg-surface-container font-code-sm text-[11px] text-outline">100vw broken</span>
+</div>
+</div>
+</div>
+<!-- Reactions Dock -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-space-sm">
+<div class="flex flex-wrap items-center gap-1.5">
+<button class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span>👍</span>
+<span class="text-on-surface-variant font-code-sm">1.8k</span>
+</button>
+<button class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container-high text-secondary font-label-md text-label-md shadow-[0_0_8px_rgba(76,215,246,0.2)]" type="button">
+<span>🤣</span>
+<span class="text-secondary font-code-sm font-semibold">3.9k</span>
+</button>
+<button class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span>🔥</span>
+<span class="text-on-surface-variant font-code-sm">940</span>
+</button>
+<button class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span>🤡</span>
+<span class="text-outline font-code-sm">88</span>
+</button>
+</div>
+<!-- Action Hub & Aura Award -->
+<div class="flex items-center gap-space-xs">
+<button class="flex items-center gap-1.5 px-space-md py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">chat_bubble</span>
+<span>573 Comments</span>
+</button>
+<button class="flex items-center gap-1 px-space-sm py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">share</span>
+<span class="hidden sm:inline">Share</span>
+</button>
+<button class="flex items-center gap-1 px-space-md py-1.5 rounded-lg bg-gradient-to-r from-primary-container to-secondary-container text-on-primary font-label-md text-label-md shadow-[0_0_12px_rgba(160,120,255,0.3)] hover:opacity-90 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">stars</span>
+<span>+50 Aura</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Feed Pagination / Stream Loader -->
+<div class="flex items-center justify-center py-space-md">
+<button class="flex items-center gap-space-sm px-space-lg py-space-sm rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-all shadow-sm" type="button">
+<span class="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin"></span>
+              Loading next batch of memes...
+            </button>
+</div>
+</main>
+<!-- ========================================== -->
+<!-- RIGHT COLUMN: Gamification & Mini Leaderboard -->
+<!-- ========================================== -->
+<aside class="col-span-1 lg:col-span-12 xl:col-span-3 sticky top-20 space-y-space-md">
+<!-- User Aura Gamification Showcase Card -->
+<div class="relative overflow-hidden rounded-xl bg-surface-container-low p-space-lg shadow-md">
+<div class="absolute -right-8 -top-8 w-32 h-32 bg-primary/20 rounded-full blur-2xl pointer-events-none"></div>
+<div class="flex items-center justify-between mb-space-md">
+<div class="flex items-center gap-space-sm">
+<!-- Glowing Purple Crest -->
+<div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-primary-container to-inverse-primary flex items-center justify-center text-on-primary shadow-[0_0_16px_rgba(160,120,255,0.4)]">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">shield_with_heart</span>
+</div>
+<div>
+<div class="font-headline-sm text-headline-sm text-on-surface font-bold">Level 7</div>
+<div class="font-body-sm text-body-sm text-secondary font-medium">Rank: Aura Apprentice</div>
+</div>
+</div>
+<span class="font-code-sm text-code-sm px-space-xs py-0.5 rounded bg-surface-container font-bold text-primary">LVL 7</span>
+</div>
+<!-- Stats Cluster -->
+<div class="grid grid-cols-2 gap-space-sm mb-space-md">
+<div class="p-space-sm rounded-lg bg-surface-container">
+<div class="font-body-sm text-[11px] text-outline uppercase tracking-wider">Aura Balance</div>
+<div class="font-headline-sm text-headline-sm text-on-surface font-bold mt-0.5">1,860 Aura</div>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container">
+<div class="font-body-sm text-[11px] text-outline uppercase tracking-wider">Upvote Multiplier</div>
+<div class="font-headline-sm text-headline-sm text-secondary font-bold mt-0.5">1.35x Active</div>
+</div>
+</div>
+<!-- Progress to Next Rank -->
+<div class="space-y-1.5 mb-space-md">
+<div class="flex items-center justify-between font-code-sm text-code-sm">
+<span class="text-on-surface-variant">Rank Progress</span>
+<span class="text-primary font-bold">1,860 / 2,500 XP</span>
+</div>
+<!-- Gamified XP Progress Bar (74.4%) -->
+<div class="w-full h-2.5 rounded-full bg-surface-container-highest overflow-hidden relative">
+<div class="h-full rounded-full bg-gradient-to-r from-primary via-primary-container to-secondary w-[74%] shadow-[0_0_8px_rgba(76,215,246,0.6)]"></div>
+</div>
+</div>
+<!-- Daily Streak Badge -->
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-high/60 shadow-inner">
+<div class="flex items-center gap-space-xs font-label-md text-label-md text-amber-300">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span>5 Day Streak</span>
+</div>
+<span class="font-code-sm text-[11px] text-outline">+15% Aura bonus</span>
+</div>
+</div>
+<!-- Upgrade to Aura Nitro Card -->
+<div class="relative overflow-hidden rounded-xl bg-gradient-to-b from-surface-container to-surface-container-lowest p-space-lg shadow-xl">
+<div class="absolute inset-0 bg-gradient-to-tr from-primary-container/10 via-transparent to-secondary/10 pointer-events-none"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-space-xs mb-space-xs">
+<span class="material-symbols-outlined text-secondary text-[22px]">diamond</span>
+<span class="font-label-sm text-label-sm uppercase tracking-widest text-secondary font-bold">Nitro Perks</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface font-extrabold mb-space-xs">
+                Upgrade to Aura Nitro
+              </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-space-md">
+                Elevate your presence across every channel with elite aesthetic modifiers.
+              </p>
+<ul class="space-y-2 mb-space-lg font-body-sm text-body-sm text-on-surface">
+<li class="flex items-center gap-space-sm">
+<span class="text-primary">✨</span>
+<span>Animated avatar frame</span>
+</li>
+<li class="flex items-center gap-space-sm">
+<span class="text-secondary">🎨</span>
+<span>Custom profile theme &amp; banner</span>
+</li>
+<li class="flex items-center gap-space-sm">
+<span class="text-tertiary">🔊</span>
+<span>Reaction sound effects</span>
+</li>
+<li class="flex items-center gap-space-sm">
+<span class="text-primary">💎</span>
+<span>Exclusive Nitro Aura badge</span>
+</li>
+</ul>
+<button class="w-full py-2.5 px-space-md rounded-lg bg-gradient-to-r from-primary-container via-primary to-secondary text-on-primary font-headline-sm text-headline-sm font-bold shadow-[0_0_16px_rgba(160,120,255,0.4)] hover:shadow-[0_0_24px_rgba(76,215,246,0.6)] hover:scale-[1.02] transition-all duration-200" type="button">
+                Upgrade to Nitro
+              </button>
+</div>
+</div>
+<!-- Trending Categories with Sparklines -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-md">
+<div class="flex items-center justify-between pb-space-sm px-space-xs">
+<span class="font-label-sm text-label-sm tracking-wider uppercase text-outline">Trending Tags</span>
+<span class="material-symbols-outlined text-[16px] text-outline">query_stats</span>
+</div>
+<div class="space-y-space-sm">
+<!-- Item 1 -->
+<div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface-container transition-colors">
+<div>
+<div class="font-label-md text-label-md text-on-surface font-bold">#Gaming</div>
+<div class="font-body-sm text-[11px] text-outline">18.4k posts today</div>
+</div>
+<!-- Inline Sparkline SVG Chart 1 -->
+<svg class="w-16 h-7 text-secondary" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 64 24">
+<path d="M0 18 L14 14 L28 17 L42 8 L54 11 L64 3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<!-- Item 2 -->
+<div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface-container transition-colors">
+<div>
+<div class="font-label-md text-label-md text-on-surface font-bold">#ReactDev</div>
+<div class="font-body-sm text-[11px] text-outline">9.2k posts today</div>
+</div>
+<!-- Inline Sparkline SVG Chart 2 -->
+<svg class="w-16 h-7 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 64 24">
+<path d="M0 20 L12 16 L24 10 L38 12 L50 4 L64 2" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<!-- Item 3 -->
+<div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface-container transition-colors">
+<div>
+<div class="font-label-md text-label-md text-on-surface font-bold">#FinalsWeek</div>
+<div class="font-body-sm text-[11px] text-outline">6.1k posts today</div>
+</div>
+<!-- Inline Sparkline SVG Chart 3 -->
+<svg class="w-16 h-7 text-tertiary" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 64 24">
+<path d="M0 12 L16 18 L30 11 L44 14 L54 6 L64 9" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+</div>
+<!-- Mini Aura Leaderboard -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-md">
+<div class="flex items-center justify-between pb-space-sm px-space-xs">
+<span class="font-label-sm text-label-sm tracking-wider uppercase text-outline">Top Aura Creators</span>
+<span class="font-code-sm text-code-sm text-secondary font-medium">This Week</span>
+</div>
+<div class="space-y-1">
+<!-- Rank 1 -->
+<div class="flex items-center justify-between p-2 rounded-lg bg-surface-container/60 hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-space-sm">
+<span class="text-[18px]">🥇</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">u/PixelWizard</span>
+<span class="font-body-sm text-[11px] text-outline">32 memes posted</span>
+</div>
+</div>
+<span class="font-code-sm text-code-sm text-primary font-bold">18,420 Aura</span>
+</div>
+<!-- Rank 2 -->
+<div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-space-sm">
+<span class="text-[18px]">🥈</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">u/SyntaxSamurai</span>
+<span class="font-body-sm text-[11px] text-outline">28 memes posted</span>
+</div>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant font-bold">14,890 Aura</span>
+</div>
+<!-- Rank 3 -->
+<div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-space-sm">
+<span class="text-[18px]">🥉</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">u/ByteQueen</span>
+<span class="font-body-sm text-[11px] text-outline">19 memes posted</span>
+</div>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant font-bold">12,350 Aura</span>
+</div>
+</div>
+<div class="pt-space-md text-center">
+<a class="inline-flex items-center gap-1 font-label-md text-label-md text-primary hover:text-primary-fixed transition-colors" href="#">
+<span>View Full Leaderboard</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+</aside>
+</div>
+</div>
+</div>
+</div>
+<script>
+  // Micro-interactions for reaction feedback simulation
+  document.querySelectorAll('article button').forEach(button => {
+    button.addEventListener('click', function(e) {
+      if (this.textContent.includes('Aura') || this.querySelector('span')?.textContent.includes('👍') || this.querySelector('span')?.textContent.includes('🤣')) {
+        this.classList.add('scale-105');
+        setTimeout(() => this.classList.remove('scale-105'), 150);
+      }
+    });
+  });
+</script></main><footer class="w-full bg-surface-container-lowest"><div class="w-full px-gutter-lg py-space-xl"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-gutter-lg pb-space-xl"><div class="lg:col-span-2 flex flex-col items-start gap-space-md"><div class="flex items-center gap-space-sm"><img alt="AuraMeme Logo" class="h-7 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWoRMYIaBVINCL_MTf9Zk3GzutX04010cTJLx92wBCAIGRdeTiu1I1cEKT8HDw4ZCuAm6n3Rr3RS4Ze7b6T1E3TTY9S2b9p-1Blr6jI5t4jDyr38F4poOB7UQnZEmtYXWoi1j9Bd1sGljpfCxbzpj2K7FMqdYHJOzEC_wxs_gqY54cJ7bNcDQR5MSD3OnHXhwth61N76thr9k5NpM6zK-vfwsEaPjfaOAbnTSEWUZUshYHsJwR2gg"/><span class="font-headline-md text-headline-md bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">AuraMeme</span></div><p class="font-body-md text-body-md text-on-surface-variant max-w-sm">The definitive web3 meme playground. Forge rare internet artifacts, boost your daily Aura streaks, and claim high-tier community status.</p><div class="inline-flex items-center gap-space-xs px-space-md py-space-xs rounded-full bg-surface-container-low text-on-surface-variant font-code-sm text-code-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"><span class="material-symbols-outlined text-[14px] text-primary">school</span>CS302 Web Dev Project • React + Vite</div></div><div class="flex flex-col gap-space-sm"><span class="font-label-md text-label-md uppercase tracking-wider text-on-surface">Quick Links</span><nav class="flex flex-col gap-space-xs" data-active-classes="text-primary font-semibold"><a aria-current="page" class="transition-colors text-primary font-semibold" data-path="home" href="#">Home</a><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="explore" href="#">Explore</a><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="leaderboard" href="#">Leaderboard</a><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="nitro" href="#">Nitro Perks</a><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="guidelines" href="#">Community Guidelines</a></nav></div><div class="flex flex-col gap-space-sm"><span class="font-label-md text-label-md uppercase tracking-wider text-on-surface">Platform</span><nav class="flex flex-col gap-space-xs" data-active-classes="text-primary font-semibold"><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="about-us" href="#">About Us</a><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="team" href="#">The Team</a><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="contact" href="#">Contact Support</a><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="privacy" href="#">Privacy Policy</a></nav></div><div class="flex flex-col gap-space-sm"><span class="font-label-md text-label-md uppercase tracking-wider text-on-surface">Community</span><nav class="flex flex-col gap-space-xs" data-active-classes="text-primary font-semibold"><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="discord" href="#">Discord Server</a><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="github" href="#">GitHub Repository</a><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="reddit" href="#">Reddit Sub</a></nav></div></div><div class="pt-space-lg flex flex-col sm:flex-row items-center justify-between gap-space-md text-center sm:text-left"><p class="font-body-sm text-body-sm text-outline">© 2025 AuraMeme. All rights reserved. Crafted for night owls and meme artisans.</p><div class="flex items-center gap-space-lg font-body-sm text-body-sm text-outline"><span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>All nodes operational</span></div></div></div></footer></body></html>

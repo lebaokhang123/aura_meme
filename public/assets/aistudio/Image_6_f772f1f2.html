@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_blank" name="shell-type"/><title>AuraMeme</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"surface-bright":"#383842","tertiary-fixed-dim":"#adc6ff","outline-variant":"#494454","on-error":"#690005","on-tertiary-fixed-variant":"#004395","surface-tint":"#d0bcff","surface-container-high":"#292932","on-surface":"#e3e1ed","surface-variant":"#33343d","secondary-fixed-dim":"#4cd7f6","surface-container":"#1e1f27","inverse-on-surface":"#2f3039","error-container":"#93000a","on-secondary-fixed":"#001f26","secondary":"#4cd7f6","inverse-surface":"#e3e1ed","tertiary-container":"#4d8eff","primary-container":"#a078ff","on-tertiary":"#002e6a","surface-container-lowest":"#0d0e15","on-primary":"#3c0091","primary-fixed":"#e9ddff","secondary-fixed":"#acedff","on-tertiary-container":"#00285d","tertiary-fixed":"#d8e2ff","surface-container-highest":"#33343d","background":"#12131b","inverse-primary":"#6d3bd7","surface":"#12131b","outline":"#958ea0","on-tertiary-fixed":"#001a42","on-surface-variant":"#cbc3d7","on-error-container":"#ffdad6","error":"#ffb4ab","on-background":"#e3e1ed","surface-container-low":"#1a1b23","primary":"#d0bcff","tertiary":"#adc6ff","on-primary-fixed-variant":"#5516be","primary-fixed-dim":"#d0bcff","on-primary-container":"#340080","on-secondary-container":"#00424e","on-secondary-fixed-variant":"#004e5c","secondary-container":"#03b5d3","on-secondary":"#003640","surface-dim":"#12131b","on-primary-fixed":"#23005c"},"borderRadius":{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},"spacing":{"margin":"1rem","space-xl":"2rem","margin-md":"1.5rem","space-sm":"0.5rem","space-xs":"0.25rem","space-md":"0.75rem","gutter-lg":"1.5rem","margin-lg":"2rem","gutter":"1rem","space-lg":"1.25rem"},"fontFamily":{"body-sm":["Inter"],"headline-lg":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"],"headline-xl":["Plus Jakarta Sans"],"headline-xl-mobile":["Plus Jakarta Sans"],"headline-md":["Plus Jakarta Sans"],"body-md":["Inter"],"label-md":["Inter"],"label-sm":["Inter"],"code-sm":["JetBrains Mono"],"headline-lg-mobile":["Plus Jakarta Sans"],"body-lg":["Inter"]},"fontSize":{"body-sm":["12px",{"lineHeight":"18px","fontWeight":"400"}],"headline-lg":["28px",{"lineHeight":"36px","letterSpacing":"-0.02em","fontWeight":"700"}],"headline-sm":["16px",{"lineHeight":"24px","fontWeight":"600"}],"headline-xl":["36px",{"lineHeight":"44px","letterSpacing":"-0.02em","fontWeight":"800"}],"headline-xl-mobile":["28px",{"lineHeight":"36px","letterSpacing":"-0.015em","fontWeight":"800"}],"headline-md":["20px",{"lineHeight":"28px","letterSpacing":"-0.01em","fontWeight":"700"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"label-md":["13px",{"lineHeight":"16px","letterSpacing":"0.01em","fontWeight":"600"}],"label-sm":["11px",{"lineHeight":"14px","letterSpacing":"0.04em","fontWeight":"700"}],"code-sm":["12px",{"lineHeight":"16px","fontWeight":"500"}],"headline-lg-mobile":["22px",{"lineHeight":"30px","letterSpacing":"-0.01em","fontWeight":"700"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}]}}}}</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased"><main class="w-full min-h-screen bg-surface flex flex-col justify-center items-center p-gutter-lg"><div class="flex flex-col w-full items-center justify-center relative py-6">
+<!-- Ambient glow backdrop blooms -->
+<div class="absolute -top-16 -left-20 w-80 h-80 rounded-full bg-primary-container/20 blur-3xl pointer-events-none -z-10"></div>
+<div class="absolute -bottom-20 -right-20 w-96 h-96 rounded-full bg-secondary-container/20 blur-3xl pointer-events-none -z-10"></div>
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full bg-tertiary-container/15 blur-2xl pointer-events-none -z-10"></div>
+<!-- Main Card Container -->
+<div class="w-full max-w-md bg-surface-container-low/95 backdrop-blur-xl rounded-xl p-space-xl shadow-2xl relative overflow-hidden transition-all duration-300">
+<!-- Top Glowing Accent Line -->
+<div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-secondary"></div>
+<!-- Live Status / Daily Bonus Pill Header -->
+<div class="flex items-center justify-between mb-space-lg">
+<div class="inline-flex items-center gap-space-xs bg-surface-container-high px-3 py-1 rounded-full text-secondary">
+<span class="material-symbols-outlined text-[15px] animate-pulse" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="font-label-sm text-label-sm tracking-wider uppercase">Daily Aura Drop Active</span>
+</div>
+<div class="inline-flex items-center gap-1 text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+<span class="material-symbols-outlined text-[14px]">local_fire_department</span>
+<span class="font-code-sm text-code-sm font-semibold">+250 XP</span>
+</div>
+</div>
+<!-- Logo & Title Section -->
+<div class="flex flex-col items-center text-center mb-space-xl">
+<div class="relative group cursor-pointer mb-space-md">
+<div class="absolute inset-0 bg-primary/30 rounded-xl blur-lg group-hover:blur-xl transition-all duration-300"></div>
+<div class="relative w-20 h-20 bg-surface-container-lowest rounded-xl flex items-center justify-center p-2 shadow-inner">
+<img alt="AuraMeme Logo" class="w-full h-full object-contain filter drop-shadow-[0_0_12px_rgba(208,188,255,0.7)]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWoRMYIaBVINCL_MTf9Zk3GzutX04010cTJLx92wBCAIGRdeTiu1I1cEKT8HDw4ZCuAm6n3Rr3RS4Ze7b6T1E3TTY9S2b9p-1Blr6jI5t4jDyr38F4poOB7UQnZEmtYXWoi1j9Bd1sGljpfCxbzpj2K7FMqdYHJOzEC_wxs_gqY54cJ7bNcDQR5MSD3OnHXhwth61N76thr9k5NpM6zK-vfwsEaPjfaOAbnTSEWUZUshYHsJwR2gg"/>
+</div>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight mb-space-xs">
+        Welcome Back to <span class="bg-gradient-to-r from-primary via-primary-fixed-dim to-secondary bg-clip-text text-transparent">AuraMeme</span>
+</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-xs">
+        Log in to claim your daily Aura bonus and react to the hottest memes.
+      </p>
+</div>
+<!-- Quick Credential Helper Pill -->
+<div class="mb-space-lg bg-surface-container-lowest rounded-lg p-space-sm flex items-center justify-between gap-2">
+<div class="flex items-center gap-2 min-w-0">
+<span class="material-symbols-outlined text-secondary text-[18px]">terminal</span>
+<div class="font-code-sm text-code-sm text-on-surface-variant truncate">
+          admin <span class="text-outline">/</span> aura123
+        </div>
+</div>
+<button class="bg-surface-container-high hover:bg-surface-bright text-secondary font-label-sm text-label-sm px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shrink-0" onclick="fillDemoCredentials()" title="Auto-fill credentials" type="button">
+<span>Auto-fill</span>
+<span class="material-symbols-outlined text-[13px]">play_arrow</span>
+</button>
+</div>
+<!-- Authentication Form -->
+<form class="space-y-space-md" id="loginForm" onsubmit="handleLoginSubmit(event)">
+<!-- Username / Email Field -->
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-space-xs" for="usernameInput">
+          Email or Username
+        </label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3.5 text-outline text-[18px] pointer-events-none">alternate_email</span>
+<input class="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest text-on-surface rounded-lg font-body-md text-body-md placeholder:text-outline-variant focus:outline-none focus:bg-surface-container-high focus:shadow-[0_0_0_2px_rgba(208,188,255,0.4)] transition-all" id="usernameInput" placeholder="Enter your username or college email" required="" type="text"/>
+</div>
+</div>
+<!-- Password Field -->
+<div>
+<div class="flex items-center justify-between mb-space-xs">
+<label class="font-label-md text-label-md text-on-surface" for="passwordInput">
+            Password
+          </label>
+<a class="font-label-sm text-label-sm text-secondary hover:text-secondary-fixed transition-colors" href="#">
+            Forgot password?
+          </a>
+</div>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3.5 text-outline text-[18px] pointer-events-none">lock</span>
+<input class="w-full pl-10 pr-11 py-2.5 bg-surface-container-lowest text-on-surface rounded-lg font-body-md text-body-md placeholder:text-outline-variant focus:outline-none focus:bg-surface-container-high focus:shadow-[0_0_0_2px_rgba(208,188,255,0.4)] transition-all" id="passwordInput" placeholder="••••••••" required="" type="password"/>
+<button aria-label="Toggle password view" class="absolute right-3 text-outline hover:text-on-surface p-1 rounded transition-colors focus:outline-none" onclick="togglePasswordVisibility()" type="button">
+<span class="material-symbols-outlined text-[20px]" id="eyeIcon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Remember Me Checkbox -->
+<div class="flex items-center justify-between pt-space-xs">
+<label class="flex items-center gap-2 cursor-pointer select-none">
+<input class="w-4 h-4 rounded bg-surface-container-lowest text-primary accent-primary focus:ring-0 cursor-pointer" id="rememberMe" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Remember my device</span>
+</label>
+<span class="font-label-sm text-label-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-tertiary">verified_user</span> 256-bit safe
+        </span>
+</div>
+<!-- Login Submit Button -->
+<button class="w-full mt-space-md py-3 px-space-md rounded-lg bg-gradient-to-r from-primary-container via-primary to-secondary-container text-on-primary-fixed font-headline-sm text-headline-sm tracking-wide shadow-lg hover:shadow-primary/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 flex items-center justify-center gap-2" id="submitBtn" type="submit">
+<span>Log In</span>
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+<!-- Feedback message status container -->
+<div class="hidden font-label-md text-label-md p-space-sm rounded-lg text-center transition-all duration-300" id="statusMessage"></div>
+</form>
+<!-- Social Divider -->
+<div class="relative my-space-lg flex items-center justify-center">
+<div class="absolute inset-0 flex items-center">
+<div class="w-full h-px bg-surface-bright"></div>
+</div>
+<span class="relative px-3 bg-surface-container-low font-label-sm text-label-sm text-outline uppercase tracking-wider">
+        Or continue with
+      </span>
+</div>
+<!-- Social Sign In Matrix -->
+<div class="grid grid-cols-2 gap-space-sm">
+<!-- Discord Button -->
+<button class="flex items-center justify-center gap-2 py-2.5 px-space-sm rounded-lg bg-[#5865F2]/15 hover:bg-[#5865F2]/25 text-on-surface hover:text-[#5865F2] font-label-md text-label-md transition-all" onclick="mockSocialLogin('Discord')" type="button">
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"></path>
+</svg>
+<span>Discord</span>
+</button>
+<!-- Google Button -->
+<button class="flex items-center justify-center gap-2 py-2.5 px-space-sm rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface font-label-md text-label-md transition-all" onclick="mockSocialLogin('Google')" type="button">
+<svg class="w-4 h-4" viewbox="0 0 24 24">
+<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"></path>
+<path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"></path>
+</svg>
+<span>Google</span>
+</button>
+</div>
+<!-- Registration Callout Footer -->
+<div class="mt-space-lg pt-space-md bg-surface-container/60 -mx-space-xl -mb-space-xl px-space-xl pb-space-lg flex flex-col items-center text-center">
+<div class="flex items-center gap-1.5 text-on-surface-variant font-body-sm text-body-sm">
+<span>Don't have an Aura account?</span>
+<a class="text-secondary hover:text-secondary-fixed font-label-md text-label-md inline-flex items-center gap-0.5" href="#">
+          Sign Up
+          <span class="material-symbols-outlined text-[14px]">arrow_outward</span>
+</a>
+</div>
+<div class="mt-2 inline-flex items-center gap-1.5 bg-secondary-container/20 px-3 py-1 rounded-full text-secondary">
+<span class="material-symbols-outlined text-[14px]">stars</span>
+<span class="font-label-sm text-label-sm">+100 Starter Aura on registration</span>
+</div>
+</div>
+</div>
+<!-- Micro Footer Information -->
+<div class="mt-space-lg flex items-center gap-4 text-outline font-label-sm text-label-sm">
+<a class="hover:text-on-surface transition-colors" href="#">Rules of Aura</a>
+<span>•</span>
+<a class="hover:text-on-surface transition-colors" href="#">Privacy</a>
+<span>•</span>
+<a class="hover:text-on-surface transition-colors" href="#">Meme API</a>
+<span>•</span>
+<span class="text-primary font-code-sm">v2.4-quantum</span>
+</div>
+</div>
+<script>
+  function togglePasswordVisibility() {
+    const pwdInput = document.getElementById('passwordInput');
+    const eyeIcon = document.getElementById('eyeIcon');
+    if (pwdInput.type === 'password') {
+      pwdInput.type = 'text';
+      eyeIcon.textContent = 'visibility_off';
+    } else {
+      pwdInput.type = 'password';
+      eyeIcon.textContent = 'visibility';
+    }
+  }
+
+  function fillDemoCredentials() {
+    const userField = document.getElementById('usernameInput');
+    const passField = document.getElementById('passwordInput');
+    userField.value = 'admin';
+    passField.value = 'aura123';
+    
+    // Visual flash confirmation
+    userField.classList.add('bg-surface-container-high');
+    passField.classList.add('bg-surface-container-high');
+    setTimeout(() => {
+      userField.classList.remove('bg-surface-container-high');
+      passField.classList.remove('bg-surface-container-high');
+    }, 400);
+  }
+
+  function handleLoginSubmit(e) {
+    e.preventDefault();
+    const user = document.getElementById('usernameInput').value.trim();
+    const pass = document.getElementById('passwordInput').value.trim();
+    const status = document.getElementById('statusMessage');
+    const btn = document.getElementById('submitBtn');
+
+    // Simulate authentication check
+    btn.disabled = true;
+    btn.innerHTML = `<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span><span>Authenticating Aura...</span>`;
+
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.innerHTML = `<span>Log In</span><span class="material-symbols-outlined text-[20px]">arrow_forward</span>`;
+      status.classList.remove('hidden');
+
+      if (user === 'admin' && pass === 'aura123') {
+        status.className = 'font-label-md text-label-md p-space-sm rounded-lg text-center bg-emerald-500/15 text-emerald-300 block';
+        status.innerHTML = '✨ Welcome back, Master Memer! Claiming +250 Aura...';
+      } else {
+        status.className = 'font-label-md text-label-md p-space-sm rounded-lg text-center bg-error-container text-error block';
+        status.innerHTML = 'Invalid Aura credentials. Hint: use admin / aura123';
+      }
+    }, 600);
+  }
+
+  function mockSocialLogin(provider) {
+    const status = document.getElementById('statusMessage');
+    status.classList.remove('hidden');
+    status.className = 'font-label-md text-label-md p-space-sm rounded-lg text-center bg-surface-container-high text-secondary block';
+    status.innerHTML = `Connecting securely via ${provider} OAuth...`;
+  }
+</script></main></body></html>
