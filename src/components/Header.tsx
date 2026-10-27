@@ -14,12 +14,13 @@ export const Header: React.FC = () => {
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const navItems: { label: string; page: 'home' | 'explore' | 'about-us' | 'team' | 'contact' }[] = [
+  const navItems: { label: string; page: string }[] = [
     { label: 'Home', page: 'home' },
     { label: 'Explore', page: 'explore' },
     { label: 'About Us', page: 'about-us' },
     { label: 'Team', page: 'team' },
     { label: 'Contact', page: 'contact' },
+    { label: 'API Practice', page: 'api-practice' },
   ];
 
   return (
@@ -69,7 +70,7 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Center: Search Bar with Ctrl + K */}
-        <div className="flex-1 max-w-md hidden md:block">
+        <div className="flex-1 max-w-md hidden md:block xl:hidden 2xl:block">
           <div
             onClick={() => setSearchOpen(true)}
             className="relative flex items-center cursor-pointer group"

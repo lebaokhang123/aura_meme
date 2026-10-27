@@ -11,6 +11,7 @@ import { ContactPage } from './pages/ContactPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignUpPage } from './pages/SignUpPage';
 import { ExplorePage } from './pages/ExplorePage';
+import { ApiPracticePage } from './pages/ApiPracticePage';
 
 function AppContent() {
   const { toastMessage } = useUI();
@@ -29,6 +30,7 @@ function AppContent() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<SignUpPage />} />
           <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/api-practice" element={<ApiPracticePage />} />
           <Route path="/signup" element={<Navigate to="/register" replace />} />
           <Route path="*" element={<div className="p-12 text-center"><h1>Page not found</h1><Link to="/">Back to Home</Link></div>} />
         </Routes>
