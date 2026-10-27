@@ -1,0 +1,37 @@
+@baseUrl = http://localhost:5080
+@postId = 0
+
+### GET all
+GET {{baseUrl}}/api/posts
+
+### GET by id - replace postId with the id returned by POST
+GET {{baseUrl}}/api/posts/{{postId}}
+
+### POST - copy returned id into postId above
+POST {{baseUrl}}/api/posts
+Content-Type: application/json
+
+{
+  "title": "My lab post",
+  "content": "React -> Axios -> ASP.NET Core -> EF Core -> SQLite",
+  "author": "Student"
+}
+
+### PUT
+PUT {{baseUrl}}/api/posts/{{postId}}
+Content-Type: application/json
+
+{
+  "title": "Updated lab post",
+  "content": "Updated using PUT",
+  "author": "Student"
+}
+
+### DELETE - deletes only the chosen record
+DELETE {{baseUrl}}/api/posts/{{postId}}
+
+### Validation - expected 400
+POST {{baseUrl}}/api/posts
+Content-Type: application/json
+
+{ "title": "", "content": "", "author": "Student" }
