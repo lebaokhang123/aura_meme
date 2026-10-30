@@ -29,6 +29,29 @@
 
 ## Trạng thái dự án
 
-Các tài liệu phân tích và thiết kế đã được xây dựng trên nhánh [`dev`](https://github.com/lebaokhang123/aura_meme/tree/dev). Ứng dụng mới đang ở giai đoạn chuẩn bị triển khai; **backend, database, CI/CD và hạ tầng AWS chưa được công bố là đã vận hành**. Hướng dẫn khởi chạy và bằng chứng kiểm thử sẽ được bổ sung khi có mã nguồn tương ứng.
+Frontend nền tảng nằm trong [`frontend/`](frontend/), tái sử dụng giao diện prototype. Có Home, Explore, About/Team, Contact, Login và Register. **Đây là bản preview:** bài viết và số liệu là dữ liệu mẫu; đăng nhập, đăng ký, gửi liên hệ, tạo bài và phần thưởng chưa kết nối backend. Các form preview không gửi hoặc lưu dữ liệu.
+
+**Backend, database, CI/CD và hạ tầng AWS chưa triển khai.** Tài liệu thiết kế trên nhánh [`dev`](https://github.com/lebaokhang123/aura_meme/tree/dev) là cơ sở cho các mốc tiếp theo.
+
+## Chạy frontend local
+
+Yêu cầu Node.js **22.12 trở lên** và npm. Từ thư mục repository:
+
+```powershell
+cd frontend
+npm ci
+npm run dev
+```
+
+Mở URL Vite in ra trong terminal (mặc định `http://localhost:5173`). Không cần backend hoặc PostgreSQL cho bản preview này.
+
+```powershell
+npm run lint     # TypeScript typecheck, chưa phải ESLint
+npm run build    # Typecheck và production bundle trong dist/
+npm run preview  # Xem production bundle sau build
+npm test         # Smoke test Playwright, cần Google Chrome đã cài
+```
+
+Smoke test tự chạy Vite trên `127.0.0.1:4173`, kiểm routing, refresh, alias/404, màn hình 375/768/1440px, bàn phím và giảm chuyển động. Font/icon được self-host cùng giấy phép; ảnh chưa xác minh được thay bằng SVG placeholder tự tạo. Xem [`frontend/ASSET_SOURCES.md`](frontend/ASSET_SOURCES.md).
 
 > Nhánh `main` lưu bản prototype/bài thực hành trước đây; nhánh `dev` dùng cho sản phẩm đang phát triển và có lịch sử Git độc lập.
