@@ -1,0 +1,763 @@
+// AuraMeme - M0.3 Database Design (DBML)
+// Canonical specification: docs/design/03-database-design.md
+// One PostgreSQL database, 7 logical groups. TableGroup DOES NOT create SQL schemas.
+// P0: university blog | P1: Aura & Vault | P2: extensions.
+// This is a DESIGN, not evidence of executed migrations.
+
+Project AuraMeme {
+  database_type: 'PostgreSQL'
+  Note: 'M0.3 | 35 tables / 66 foreign keys. Core business rules and transaction invariants are specified in 03-database-design.md.'
+}
+
+// ======================================================================
+// account_auth: Tài khoản, phân quyền, phiên đăng nhập
+// ======================================================================
+
+Table users {
+  id uuid [not null, pk]
+  username text [not null, unique, note: 'Trim + ASCII lowercase, 3–32 ký tự [a-z0-9_]; UQ']
+  email text [not null, unique, note: 'Trim + lowercase theo chính sách email đề xuất; UQ']
+  password_hash text [not null, note: 'Argon2id; không lưu mật khẩu plaintext']
+  status text [not null, note: 'active / locked / deleted']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [note: 'NULL khi chưa soft delete']
+
+  Note: 'P0 | Tài khoản, phân quyền, phiên đăng nhập'
+}
+
+Table roles {
+  id uuid [not null, pk]
+  code text [not null, unique, note: 'USER / ADMIN']
+  description text [not null]
+
+  Note: 'P0 | Tài khoản, phân quyền, phiên đăng nhập'
+}
+
+Table user_roles {
+  user_id uuid [not null]
+  role_id uuid [not null]
+  granted_at timestamptz [not null]
+
+  indexes {
+    (user_id, role_id) [pk]
+  }
+
+  Note: 'P0 | Tài khoản, phân quyền, phiên đăng nhập'
+}
+
+Table profiles {
+  user_id uuid [not null, pk]
+  display_name text [not null]
+  birth_year smallint [note: 'Chưa cung cấp; dùng năm sinh đúng đề bài, không buộc thu ngày sinh']
+  address text [note: 'Chưa cung cấp; thông tin riêng tư']
+  phone text [note: 'Chưa cung cấp; giữ dạng chuỗi']
+  bio text [note: 'Chưa có giới thiệu']
+  avatar_media_id uuid [note: 'FK; Chưa chọn ảnh upload']
+  cover_media_id uuid [note: 'FK; Chưa chọn ảnh bìa']
+  show_streak boolean [not null, note: 'P1, mặc định false']
+  updated_at timestamptz [not null]
+
+  Note: 'P0 | Tài khoản, phân quyền, phiên đăng nhập'
+}
+
+Table auth_sessions {
+  id uuid [not null, pk]
+  user_id uuid [not null]
+  token_hash text [not null, unique, note: 'Chỉ digest token ngẫu nhiên entropy cao']
+  created_at timestamptz [not null]
+  expires_at timestamptz [not null]
+  revoked_at timestamptz [note: 'NULL khi chưa revoke']
+
+  Note: 'P0 | Tài khoản, phân quyền, phiên đăng nhập'
+}
+
+// ======================================================================
+// blog_media: Bài viết, danh mục, bình luận, media, liên hệ
+// ======================================================================
+
+Table categories {
+  id uuid [not null, pk]
+  slug text [not null, unique, note: 'UQ; lowercase']
+  name text [not null]
+  status text [not null, note: 'active / hidden']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'P0 | Bài viết, danh mục, bình luận, media, liên hệ'
+}
+
+Table media_uploads {
+  id uuid [not null, pk]
+  owner_id uuid [not null]
+  object_key text [not null, unique, note: 'UQ; khóa object storage, không phải client path']
+  mime text [not null, note: 'image/jpeg, image/png, image/webp, image/gif']
+  size_bytes bigint [not null, note: 'Dung lượng > 0']
+  status text [not null, note: 'pending / ready / rejected / deleted']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (owner_id, id) [unique]
+  }
+
+  Note: 'P0 | Bài viết, danh mục, bình luận, media, liên hệ'
+}
+
+Table posts {
+  id uuid [not null, pk]
+  author_id uuid [not null]
+  category_id uuid [not null]
+  media_id uuid [note: 'FK; Bài chỉ có chữ; một cột => tối đa 01 ảnh']
+  title text [not null]
+  content text [not null, note: 'Có thể rỗng nếu có ảnh; không lưu HTML chưa sanitize']
+  status text [not null, note: 'draft / published / hidden / deleted']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [note: 'Chưa soft delete']
+
+  Note: 'P0 | Bài viết, danh mục, bình luận, media, liên hệ'
+}
+
+Table comments {
+  id uuid [not null, pk]
+  post_id uuid [not null]
+  author_id uuid [not null]
+  body text [not null]
+  status text [not null, note: 'visible / hidden / deleted']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [note: 'Chưa soft delete']
+
+  Note: 'P0 | Bài viết, danh mục, bình luận, media, liên hệ'
+}
+
+Table post_reactions {
+  post_id uuid [not null]
+  user_id uuid [not null]
+  reaction_type text [not null, note: 'like / laugh / fire']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (post_id, user_id) [pk]
+  }
+
+  Note: 'P1 | Bài viết, danh mục, bình luận, media, liên hệ'
+}
+
+Table post_bookmarks {
+  post_id uuid [not null]
+  user_id uuid [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (post_id, user_id) [pk]
+  }
+
+  Note: 'P1 | Bài viết, danh mục, bình luận, media, liên hệ'
+}
+
+Table contact_messages {
+  id uuid [not null, pk]
+  user_id uuid [note: 'FK; Guest được liên hệ, không bắt buộc tài khoản']
+  name text [not null]
+  email text [not null]
+  subject text [not null]
+  body text [not null]
+  status text [not null, note: 'new / in_review / resolved']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'P0 | Bài viết, danh mục, bình luận, media, liên hệ'
+}
+
+// ======================================================================
+// aura_streak_wallet: Điểm Aura, streak, Khí Vận và sổ giao dịch
+// ======================================================================
+
+Table reward_policy_versions {
+  id uuid [not null, pk]
+  version integer [not null, unique, note: 'UQ; > 0']
+  config_json jsonb [not null, note: 'XP/caps, level/rank, weekly icon, generator/offline cap khi P2']
+  status text [not null, note: 'draft / published / retired']
+  effective_at timestamptz [not null]
+  created_by uuid [not null]
+  created_at timestamptz [not null]
+
+  Note: 'P1 | Điểm Aura, streak, Khí Vận và sổ giao dịch'
+}
+
+Table user_progress {
+  user_id uuid [not null, pk]
+  aura_xp_earned bigint [not null, note: 'Cache SUM(base_xp), dùng rank và odds']
+  aura_xp_bonus bigint [not null, note: 'Cache SUM(bonus_xp), chỉ level/khung']
+  aura_xp_total bigint [not null, note: 'GENERATED ALWAYS AS earned + bonus STORED']
+  level_cached integer [not null, note: '>= 1, tính từ tổng']
+  fair_level_cached integer [not null, note: '>= 1, tính từ gốc']
+  streak_days integer [not null, note: '>= 0']
+  last_checkin_day date [note: 'Chưa điểm danh']
+  updated_at timestamptz [not null]
+
+  Note: 'P1 | Điểm Aura, streak, Khí Vận và sổ giao dịch'
+}
+
+Table aura_ledger {
+  id uuid [not null, pk]
+  user_id uuid [not null]
+  event_key text [not null, note: 'UQ(user_id,event_key); namespace server']
+  event_type text [not null, note: 'post / reaction / comment / checkin / adjustment / reversal']
+  source_actor_id uuid [note: 'FK; System reward không có actor người dùng']
+  source_post_id uuid [note: 'FK; Check-in/manual không có post']
+  source_comment_id uuid [note: 'FK; Không phải comment event']
+  policy_id uuid [not null]
+  base_xp bigint [not null, note: 'Signed delta; reward dương, reversal âm']
+  bonus_xp bigint [not null, note: 'Signed delta, không nhân lại']
+  tier_at_event text [not null, note: 'FREE / PLUS / PRIME']
+  multiplier_at_event smallint [not null, note: '1 / 2 / 3 snapshot']
+  reverses_id uuid [unique, note: 'FK; NULL cho event gốc; reversal trỏ event cùng user']
+  occurred_at timestamptz [not null, note: 'Thời điểm server, UTC']
+
+  indexes {
+    (user_id, event_key) [unique]
+    (user_id, id) [unique]
+  }
+
+  Note: 'P1 | Điểm Aura, streak, Khí Vận và sổ giao dịch'
+}
+
+Table daily_checkins {
+  user_id uuid [not null]
+  effective_day date [not null, note: 'PK; Ngày server theo mốc 07:00 VN']
+  aura_ledger_id uuid [not null, unique, note: 'FK; Một reward event']
+  wallet_transaction_id uuid [not null, unique, note: 'FK; Một credit Khí Vận']
+  claimed_at timestamptz [not null, note: 'UTC']
+
+  indexes {
+    (user_id, effective_day) [pk]
+  }
+
+  Note: 'P1 | Điểm Aura, streak, Khí Vận và sổ giao dịch'
+}
+
+Table wallets {
+  user_id uuid [not null, pk]
+  khi_van_balance bigint [not null, note: '>= 0']
+  updated_at timestamptz [not null]
+
+  Note: 'P1 | Điểm Aura, streak, Khí Vận và sổ giao dịch'
+}
+
+Table wallet_transactions {
+  id uuid [not null, pk]
+  user_id uuid [not null]
+  event_key text [not null, note: 'UQ(user_id,event_key); checkin:/case:/generator:/reversal:']
+  delta_khi_van bigint [not null, note: 'Signed; credit >0, debit <0']
+  reason text [not null, note: 'checkin / case_open / generator / adjustment / reversal']
+  policy_id uuid [not null]
+  reverses_id uuid [unique, note: 'FK; Chỉ reversal; giữ lịch sử']
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id, event_key) [unique]
+    (user_id, id) [unique]
+  }
+
+  Note: 'P1 | Điểm Aura, streak, Khí Vận và sổ giao dịch'
+}
+
+// ======================================================================
+// vault_inventory: Kho vật phẩm, xác suất, rương, trang bị
+// ======================================================================
+
+Table asset_items {
+  id uuid [not null, pk]
+  slug text [not null, unique, note: 'UQ; import một catalog JSON chuẩn']
+  kind text [not null, note: 'avatar / frame / icon / effect / generator']
+  collection text [not null]
+  rarity text [not null, note: 'D / C / B / A / S']
+  media_key text [not null, note: 'Asset do catalog quản lý, không phải upload user']
+  source_rights jsonb [not null, note: 'source/author/license/attribution/review_status']
+  active boolean [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (id, kind) [unique]
+    (id, rarity) [unique]
+  }
+
+  Note: 'P1 | Kho vật phẩm, xác suất, rương, trang bị'
+}
+
+Table case_definitions {
+  id uuid [not null, pk]
+  slug text [not null, unique, note: 'UQ; common / d / c / b / a / s']
+  label text [not null]
+  cost_khi_van bigint [not null, note: '>= 0, giá hiện hành đề xuất']
+  status text [not null, note: 'draft / active / retired']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'P1 | Kho vật phẩm, xác suất, rương, trang bị'
+}
+
+Table case_loot_tables {
+  id uuid [not null, pk, note: 'PK; Một pool cụ thể cho một case/version/band']
+  case_id uuid [not null]
+  odds_version integer [not null]
+  band_no smallint [not null]
+  min_earned_xp bigint [not null, note: 'Cận dưới bao gồm, chỉ Aura gốc']
+  max_earned_xp bigint [note: 'NULL cho band cuối; cận trên loại trừ']
+  policy_id uuid [not null, note: 'FK; Policy mức công bằng tại thời điểm publish']
+  status text [not null, note: 'draft / published / retired']
+  active_from timestamptz [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (case_id, odds_version, band_no) [unique]
+    (case_id, id) [unique]
+  }
+
+  Note: 'P1 | Kho vật phẩm, xác suất, rương, trang bị'
+}
+
+Table case_loot_rarities {
+  loot_table_id uuid [not null]
+  rarity text [not null, note: 'PK; D / C / B / A / S']
+  weight_bps integer [not null, note: '0..10000; 10000 = 100%']
+
+  indexes {
+    (loot_table_id, rarity) [pk]
+  }
+
+  Note: 'P1 | Kho vật phẩm, xác suất, rương, trang bị'
+}
+
+Table case_pool_items {
+  loot_table_id uuid [not null]
+  asset_id uuid [not null]
+  rarity text [not null, note: 'FK; FK phải đồng nhất rarity của asset và bucket']
+  item_weight integer [not null, note: '> 0 trong bucket']
+
+  indexes {
+    (loot_table_id, asset_id) [pk]
+  }
+
+  Note: 'P1 | Kho vật phẩm, xác suất, rương, trang bị'
+}
+
+Table case_opens {
+  id uuid [not null, pk]
+  user_id uuid [not null]
+  request_key text [not null, note: 'UQ(user_id,request_key); retry giữ nguyên payload']
+  case_id uuid [not null]
+  loot_table_id uuid [not null, note: 'FK; FK ràng buộc case và phiên bản cụ thể']
+  reward_asset_id uuid [not null, note: 'FK; Phải có trong đúng pool']
+  earned_xp_at_open bigint [not null, note: 'Snapshot gốc, không cộng VIP']
+  cost_khi_van bigint [not null, note: 'Chi phí đã trừ, snapshot']
+  wallet_transaction_id uuid [unique, note: 'FK; NULL chỉ khi cost=0']
+  is_daily_free boolean [not null, note: 'Thiết kế rương chung 1 lượt/ngày']
+  effective_day date [not null, note: 'Ngày 07:00 VN']
+  decision_trace jsonb [not null, note: 'Bucket/draw audit; không log secret/RNG seed runtime']
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id, request_key) [unique]
+    (user_id, id) [unique]
+  }
+
+  Note: 'P1 | Kho vật phẩm, xác suất, rương, trang bị'
+}
+
+Table user_inventory {
+  user_id uuid [not null]
+  asset_id uuid [not null]
+  quantity integer [not null, note: '>= 0; số bản sở hữu, chưa chốt xử lý duplicate']
+  acquired_at timestamptz [not null, note: 'Lần đầu có item']
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, asset_id) [pk]
+  }
+
+  Note: 'P1 | Kho vật phẩm, xác suất, rương, trang bị'
+}
+
+Table inventory_grants {
+  id uuid [not null, pk]
+  user_id uuid [not null]
+  asset_id uuid [not null]
+  event_key text [not null, note: 'UQ(user_id,event_key); case:/weekly:/level:/admin:']
+  quantity integer [not null, note: '> 0']
+  source_type text [not null, note: 'case_open / weekly_streak / level / admin']
+  case_open_id uuid [unique, note: 'FK; Chỉ có cho nguồn case_open']
+  policy_id uuid [not null]
+  granted_at timestamptz [not null]
+
+  indexes {
+    (user_id, event_key) [unique]
+  }
+
+  Note: 'P1 | Kho vật phẩm, xác suất, rương, trang bị'
+}
+
+Table user_equipment {
+  user_id uuid [not null]
+  slot_kind text [not null, note: 'PK; FK; avatar / frame / icon / effect']
+  asset_id uuid [not null]
+  equipped_at timestamptz [not null]
+
+  indexes {
+    (user_id, slot_kind) [pk]
+  }
+
+  Note: 'P1 | Kho vật phẩm, xác suất, rương, trang bị'
+}
+
+// ======================================================================
+// generator: Ba ô sinh Khí Vận - P2
+// ======================================================================
+
+Table asset_generator_stats {
+  asset_id uuid [not null, pk]
+  kind text [not null, note: 'FK; Luôn generator']
+  rate_khi_van_per_hour integer [not null, note: '>= 0; không float']
+  created_at timestamptz [not null]
+
+  Note: 'P2 | Ba ô sinh Khí Vận - P2'
+}
+
+Table generator_slots {
+  user_id uuid [not null]
+  slot_no smallint [not null, note: 'PK; 1..3']
+  asset_id uuid [note: 'FK; Slot trống']
+  equipped_at timestamptz [note: 'NULL khi trống']
+  accrual_cursor_at timestamptz [not null, note: 'Mốc server đã settle, kể cả slot trống']
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, slot_no) [pk]
+  }
+
+  Note: 'P2 | Ba ô sinh Khí Vận - P2'
+}
+
+Table generator_claims {
+  id uuid [not null, pk]
+  user_id uuid [not null]
+  slot_no smallint [not null]
+  asset_id uuid [not null, note: 'FK; Snapshot item sinh khoản claim này']
+  event_key text [not null, note: 'UQ(user_id,event_key); gồm request + slot']
+  accrual_from timestamptz [not null]
+  accrual_to timestamptz [not null]
+  rate_at_claim integer [not null, note: 'Snapshot integer/giờ']
+  delta_khi_van bigint [not null, note: '> 0']
+  policy_id uuid [not null]
+  wallet_transaction_id uuid [not null, unique]
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id, event_key) [unique]
+    (user_id, slot_no, accrual_from) [unique]
+  }
+
+  Note: 'P2 | Ba ô sinh Khí Vận - P2'
+}
+
+// ======================================================================
+// membership_payment: Aura Plus, Aura Prime và thanh toán - P2
+// ======================================================================
+
+Table membership_plans {
+  code text [not null, pk, note: 'PK; FREE / PLUS / PRIME']
+  name text [not null]
+  multiplier smallint [not null, note: '1 / 2 / 3']
+  period text [not null, note: 'none / month / year']
+  price_amount numeric(12,2) [not null, note: '0.00 / 10.00 / 100.00']
+  currency char(3) [not null, note: 'USD cho bảng giá đã chốt']
+  active boolean [not null]
+
+  Note: 'P2 | Aura Plus, Aura Prime và thanh toán - P2'
+}
+
+Table subscription_entitlements {
+  id uuid [not null, pk]
+  user_id uuid [not null]
+  plan_code text [not null, note: 'FK; PLUS / PRIME']
+  starts_at timestamptz [not null]
+  ends_at timestamptz [not null]
+  status text [not null, note: 'active / canceled / expired / revoked']
+  source text [not null, note: 'demo / provider_verified']
+  environment text [not null, note: 'FK; demo / sandbox / live; không trộn entitlement test với live']
+  verified_payment_event_id uuid [unique, note: 'FK; NULL chỉ cho demo']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'P2 | Aura Plus, Aura Prime và thanh toán - P2'
+}
+
+Table payment_events {
+  id uuid [not null, pk]
+  user_id uuid [not null, note: 'FK; Đã map từ order/customer phía server']
+  provider text [not null, note: 'Namespace provider']
+  environment text [not null, note: 'demo / sandbox / live']
+  provider_event_id text [not null, note: 'UQ(provider,environment,provider_event_id)']
+  plan_code text [not null]
+  amount numeric(12,2) [not null, note: 'Không float']
+  currency char(3) [not null]
+  status text [not null, note: 'received / verified / applied / failed / refunded']
+  verified_at timestamptz [note: 'Chưa xác minh hoặc demo']
+  payload_digest text [not null, note: 'Digest đối chiếu retry, không lưu số thẻ/secret']
+  created_at timestamptz [not null]
+
+  indexes {
+    (provider, environment, provider_event_id) [unique]
+    (user_id, id, environment) [unique]
+  }
+
+  Note: 'P2 | Aura Plus, Aura Prime và thanh toán - P2'
+}
+
+// ======================================================================
+// admin_audit: Báo cáo vi phạm và nhật ký quản trị
+// ======================================================================
+
+Table user_reports {
+  id uuid [not null, pk]
+  reporter_id uuid [not null]
+  post_id uuid [not null]
+  reason text [not null]
+  status text [not null, note: 'new / in_review / resolved / dismissed']
+  resolved_by uuid [note: 'FK; Chưa xử lý']
+  resolved_at timestamptz [note: 'Chưa xử lý']
+  created_at timestamptz [not null]
+
+  Note: 'P1 | Báo cáo vi phạm và nhật ký quản trị'
+}
+
+Table admin_audit_logs {
+  id uuid [not null, pk]
+  actor_id uuid [not null]
+  action text [not null]
+  target_type text [not null, note: 'Tên resource từ allowlist server']
+  target_id text [not null, note: 'UUID/composite/business key biểu diễn; không FK đa hình']
+  before_json jsonb [note: 'Không có trạng thái trước khi tạo']
+  after_json jsonb [note: 'Không có trạng thái sau khi xóa/thu hồi']
+  created_at timestamptz [not null]
+
+  Note: 'P0 | Báo cáo vi phạm và nhật ký quản trị'
+}
+
+// LOGICAL GROUPS - one PostgreSQL database, not independent databases
+
+TableGroup account_auth [note: 'Tài khoản, phân quyền, phiên đăng nhập'] {
+  users
+  roles
+  user_roles
+  profiles
+  auth_sessions
+}
+
+TableGroup blog_media [note: 'Bài viết, danh mục, bình luận, media, liên hệ'] {
+  categories
+  media_uploads
+  posts
+  comments
+  post_reactions
+  post_bookmarks
+  contact_messages
+}
+
+TableGroup aura_streak_wallet [note: 'Điểm Aura, streak, Khí Vận và sổ giao dịch'] {
+  reward_policy_versions
+  user_progress
+  aura_ledger
+  daily_checkins
+  wallets
+  wallet_transactions
+}
+
+TableGroup vault_inventory [note: 'Kho vật phẩm, xác suất, rương, trang bị'] {
+  asset_items
+  case_definitions
+  case_loot_tables
+  case_loot_rarities
+  case_pool_items
+  case_opens
+  user_inventory
+  inventory_grants
+  user_equipment
+}
+
+TableGroup generator [note: 'Ba ô sinh Khí Vận - P2'] {
+  asset_generator_stats
+  generator_slots
+  generator_claims
+}
+
+TableGroup membership_payment [note: 'Aura Plus, Aura Prime và thanh toán - P2'] {
+  membership_plans
+  subscription_entitlements
+  payment_events
+}
+
+TableGroup admin_audit [note: 'Báo cáo vi phạm và nhật ký quản trị'] {
+  user_reports
+  admin_audit_logs
+}
+
+// FOREIGN KEYS (from 03-database-design.md; full composite FK fidelity)
+
+// account_auth
+Ref: user_roles.user_id > users.id [delete: restrict]
+Ref: user_roles.role_id > roles.id [delete: restrict]
+Ref: profiles.user_id > users.id [delete: restrict]
+Ref: profiles.(user_id, avatar_media_id) > media_uploads.(owner_id, id) [delete: restrict]
+Ref: profiles.(user_id, cover_media_id) > media_uploads.(owner_id, id) [delete: restrict]
+Ref: auth_sessions.user_id > users.id [delete: restrict]
+
+// blog_media
+Ref: media_uploads.owner_id > users.id [delete: restrict]
+Ref: posts.author_id > users.id [delete: restrict]
+Ref: posts.category_id > categories.id [delete: restrict]
+Ref: posts.(author_id, media_id) > media_uploads.(owner_id, id) [delete: restrict]
+Ref: comments.author_id > users.id [delete: restrict]
+Ref: comments.post_id > posts.id [delete: restrict]
+Ref: post_reactions.user_id > users.id [delete: restrict]
+Ref: post_reactions.post_id > posts.id [delete: restrict]
+Ref: post_bookmarks.user_id > users.id [delete: restrict]
+Ref: post_bookmarks.post_id > posts.id [delete: restrict]
+Ref: contact_messages.user_id > users.id [delete: restrict]
+
+// aura_streak_wallet
+Ref: reward_policy_versions.created_by > users.id [delete: restrict]
+Ref: user_progress.user_id > users.id [delete: restrict]
+Ref: aura_ledger.user_id > users.id [delete: restrict]
+Ref: aura_ledger.source_actor_id > users.id [delete: restrict]
+Ref: aura_ledger.source_post_id > posts.id [delete: restrict]
+Ref: aura_ledger.source_comment_id > comments.id [delete: restrict]
+Ref: aura_ledger.policy_id > reward_policy_versions.id [delete: restrict]
+Ref: aura_ledger.(user_id, reverses_id) > aura_ledger.(user_id, id) [delete: restrict]
+Ref: daily_checkins.user_id > users.id [delete: restrict]
+Ref: daily_checkins.(user_id, aura_ledger_id) > aura_ledger.(user_id, id) [delete: restrict]
+Ref: daily_checkins.(user_id, wallet_transaction_id) > wallet_transactions.(user_id, id) [delete: restrict]
+Ref: wallets.user_id > users.id [delete: restrict]
+Ref: wallet_transactions.user_id > wallets.user_id [delete: restrict]
+Ref: wallet_transactions.policy_id > reward_policy_versions.id [delete: restrict]
+Ref: wallet_transactions.(user_id, reverses_id) > wallet_transactions.(user_id, id) [delete: restrict]
+
+// vault_inventory
+Ref: case_loot_tables.case_id > case_definitions.id [delete: restrict]
+Ref: case_loot_tables.policy_id > reward_policy_versions.id [delete: restrict]
+Ref: case_loot_rarities.loot_table_id > case_loot_tables.id [delete: restrict]
+Ref: case_pool_items.(loot_table_id, rarity) > case_loot_rarities.(loot_table_id, rarity) [delete: restrict]
+Ref: case_pool_items.(asset_id, rarity) > asset_items.(id, rarity) [delete: restrict]
+Ref: case_opens.user_id > users.id [delete: restrict]
+Ref: case_opens.(case_id, loot_table_id) > case_loot_tables.(case_id, id) [delete: restrict]
+Ref: case_opens.(loot_table_id, reward_asset_id) > case_pool_items.(loot_table_id, asset_id) [delete: restrict]
+Ref: case_opens.(user_id, wallet_transaction_id) > wallet_transactions.(user_id, id) [delete: restrict]
+Ref: user_inventory.user_id > users.id [delete: restrict]
+Ref: user_inventory.asset_id > asset_items.id [delete: restrict]
+Ref: inventory_grants.(user_id, asset_id) > user_inventory.(user_id, asset_id) [delete: restrict]
+Ref: inventory_grants.(user_id, case_open_id) > case_opens.(user_id, id) [delete: restrict]
+Ref: inventory_grants.policy_id > reward_policy_versions.id [delete: restrict]
+Ref: user_equipment.user_id > users.id [delete: restrict]
+Ref: user_equipment.(user_id, asset_id) > user_inventory.(user_id, asset_id) [delete: restrict]
+Ref: user_equipment.(asset_id, slot_kind) > asset_items.(id, kind) [delete: restrict]
+
+// generator
+Ref: asset_generator_stats.(asset_id, kind) > asset_items.(id, kind) [delete: restrict]
+Ref: generator_slots.user_id > users.id [delete: restrict]
+Ref: generator_slots.(user_id, asset_id) > user_inventory.(user_id, asset_id) [delete: restrict]
+Ref: generator_slots.asset_id > asset_generator_stats.asset_id [delete: restrict]
+Ref: generator_claims.(user_id, slot_no) > generator_slots.(user_id, slot_no) [delete: restrict]
+Ref: generator_claims.asset_id > asset_generator_stats.asset_id [delete: restrict]
+Ref: generator_claims.policy_id > reward_policy_versions.id [delete: restrict]
+Ref: generator_claims.(user_id, wallet_transaction_id) > wallet_transactions.(user_id, id) [delete: restrict]
+
+// membership_payment
+Ref: subscription_entitlements.user_id > users.id [delete: restrict]
+Ref: subscription_entitlements.plan_code > membership_plans.code [delete: restrict]
+Ref: subscription_entitlements.(user_id, verified_payment_event_id, environment) > payment_events.(user_id, id, environment) [delete: restrict]
+Ref: payment_events.user_id > users.id [delete: restrict]
+Ref: payment_events.plan_code > membership_plans.code [delete: restrict]
+
+// admin_audit
+Ref: user_reports.reporter_id > users.id [delete: restrict]
+Ref: user_reports.resolved_by > users.id [delete: restrict]
+Ref: user_reports.post_id > posts.id [delete: restrict]
+Ref: admin_audit_logs.actor_id > users.id [delete: restrict]
+
+// FOCUSED VIEWS - choose a view inside dbdiagram to examine one module
+// A view only affects presentation; it does not change tables or foreign keys.
+
+DiagramView view_account_auth {
+  Tables {
+    users
+    roles
+    user_roles
+    profiles
+    auth_sessions
+  }
+}
+
+DiagramView view_blog_media {
+  Tables {
+    categories
+    media_uploads
+    posts
+    comments
+    post_reactions
+    post_bookmarks
+    contact_messages
+  }
+}
+
+DiagramView view_aura_streak_wallet {
+  Tables {
+    reward_policy_versions
+    user_progress
+    aura_ledger
+    daily_checkins
+    wallets
+    wallet_transactions
+  }
+}
+
+DiagramView view_vault_inventory {
+  Tables {
+    asset_items
+    case_definitions
+    case_loot_tables
+    case_loot_rarities
+    case_pool_items
+    case_opens
+    user_inventory
+    inventory_grants
+    user_equipment
+  }
+}
+
+DiagramView view_generator {
+  Tables {
+    asset_generator_stats
+    generator_slots
+    generator_claims
+  }
+}
+
+DiagramView view_membership_payment {
+  Tables {
+    membership_plans
+    subscription_entitlements
+    payment_events
+  }
+}
+
+DiagramView view_admin_audit {
+  Tables {
+    user_reports
+    admin_audit_logs
+  }
+}
