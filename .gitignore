@@ -1,4 +1,5 @@
 node_modules/
+/docs/internal/
 dist/
 .env
 .env.*
