@@ -1,0 +1,2670 @@
+openapi: 3.0.3
+info:
+  title: AuraMeme API — Design Contract
+  version: 0.5.0-design
+  description: Thiết kế M0.5 cho một FastAPI modular monolith / PostgreSQL. P0 là blog học phần, P1 là AuraMeme;
+    P2 payment/generator chưa cấp hợp đồng vì nghiệp vụ chưa khóa. Chưa phải API đã triển khai. Mỗi operation
+    có x-phase.
+servers:
+- url: /
+  description: Same-origin Nginx + /api/v1 (production); local Vite proxy cho /api/v1
+tags:
+- name: Health
+  description: Readiness
+- name: Auth
+  description: Đăng ký, phiên và CSRF
+- name: Account
+  description: Hồ sơ cá nhân
+- name: Blog
+  description: Bài viết, bình luận, danh mục
+- name: Media
+  description: Ảnh upload
+- name: Contact
+  description: Liên hệ
+- name: Admin
+  description: Phân quyền và quản trị
+- name: Aura
+  description: XP, check-in, leaderboard, tương tác
+- name: Vault
+  description: Rương, inventory, trang bị
+paths:
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health check (process readiness)
+      operationId: health
+      security: []
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - ok
+                required:
+                - status
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/auth/csrf:
+    get:
+      tags:
+      - Auth
+      summary: Lấy CSRF token cho form / AJAX
+      operationId: getCsrf
+      description: Token sinh và xác thực phía server (được ràng buộc với phiên hoặc phiên tiền đăng nhập);
+        không đưa vào URL/log.
+      security: []
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  csrf_token:
+                    type: string
+                required:
+                - csrf_token
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/auth/register:
+    post:
+      tags:
+      - Auth
+      summary: Đăng ký tài khoản
+      operationId: register
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        '201':
+          description: Tài khoản đã tạo; chưa tự đăng nhập
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPrivate'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/auth/login:
+    post:
+      tags:
+      - Auth
+      summary: Đăng nhập bằng email/mật khẩu
+      operationId: login
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200':
+          description: 'Xác thực thành công; Set-Cookie: am_session'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPrivate'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/auth/logout:
+    post:
+      tags:
+      - Auth
+      summary: Đăng xuất, thu hồi session
+      operationId: logout
+      security: &id001
+      - sessionCookie: []
+      parameters:
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Đã thu hồi session và xoá cookie
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/users/me:
+    get:
+      tags:
+      - Account
+      summary: Xem thông tin riêng tư của chính mình
+      operationId: getMe
+      security: *id001
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPrivate'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+    patch:
+      tags:
+      - Account
+      summary: Cập nhật hồ sơ
+      operationId: updateMe
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfilePatch'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPrivate'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/users/me/password:
+    put:
+      tags:
+      - Account
+      summary: Đổi mật khẩu; thu hồi các phiên khác
+      operationId: changePassword
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChange'
+      responses:
+        '204':
+          description: Đã đổi mật khẩu và thu hồi các phiên theo chính sách
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/users/{username}:
+    get:
+      tags:
+      - Account
+      summary: Xem hồ sơ công khai (không trả PII)
+      operationId: getPublicUser
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Username'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPublic'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/categories:
+    get:
+      tags:
+      - Blog
+      summary: Liệt kê danh mục hiển thị
+      operationId: listCategories
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/posts:
+    get:
+      tags:
+      - Blog
+      summary: 'Danh sách bài viết công khai: tìm/lọc/sắp xếp/phân trang'
+      operationId: listPosts
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - $ref: '#/components/parameters/PostSearch'
+      - $ref: '#/components/parameters/PostCategory'
+      - $ref: '#/components/parameters/PostSort'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+    post:
+      tags:
+      - Blog
+      summary: Tạo bài viết thuộc chính user
+      operationId: createPost
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostInput'
+      responses:
+        '201':
+          description: Đã tạo bài viết
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/posts/{post_id}:
+    get:
+      tags:
+      - Blog
+      summary: Chi tiết bài viết công khai
+      operationId: getPost
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+    patch:
+      tags:
+      - Blog
+      summary: Sửa bài của chính mình
+      operationId: updatePost
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostPatch'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+    delete:
+      tags:
+      - Blog
+      summary: Xoá logic bài của chính mình
+      operationId: deletePost
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Đã đánh dấu xoá bài
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/posts/{post_id}/comments:
+    get:
+      tags:
+      - Blog
+      summary: Bình luận của bài viết
+      operationId: listComments
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+    post:
+      tags:
+      - Blog
+      summary: Viết bình luận cho bài công khai
+      operationId: addComment
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentInput'
+      responses:
+        '201':
+          description: Đã đăng bình luận
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/comments/{comment_id}:
+    delete:
+      tags:
+      - Blog
+      summary: Xóa logic bình luận của chính mình
+      operationId: deleteComment
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Đã đánh dấu xoá bình luận
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/media:
+    post:
+      tags:
+      - Media
+      summary: Tải một ảnh lên và nhận media ID
+      operationId: uploadMedia
+      description: Chỉ JPG/PNG/WebP/GIF; backend kiểm signature, MIME, size và quyền sở hữu. Tối đa một ảnh/post
+        P0.
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        '201':
+          description: Đã tạo metadata ảnh
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Media'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/contact:
+    post:
+      tags:
+      - Contact
+      summary: Gửi liên hệ từ Guest hoặc User
+      operationId: sendContact
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactInput'
+      responses:
+        '201':
+          description: Đã lưu liên hệ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum:
+                    - new
+                required:
+                - id
+                - status
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/admin/users:
+    post:
+      tags:
+      - Admin
+      summary: Admin tạo tài khoản người dùng
+      operationId: adminCreateUser
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateUser'
+      responses:
+        '201':
+          description: Tạo người dùng mới
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPrivate'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+    get:
+      tags:
+      - Admin
+      summary: Quản lý danh sách người dùng
+      operationId: adminListUsers
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - $ref: '#/components/parameters/PostSearch'
+      - $ref: '#/components/parameters/AdminStatus'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserPrivate'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+  /api/v1/admin/users/{user_id}:
+    patch:
+      tags:
+      - Admin
+      summary: Khóa / kích hoạt người dùng
+      operationId: adminSetUserStatus
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserPatch'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPrivate'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+    delete:
+      tags:
+      - Admin
+      summary: Xóa logic tài khoản, thu hồi session
+      operationId: adminDeleteUser
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Tài khoản chuyển deleted
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+  /api/v1/admin/users/{user_id}/roles:
+    put:
+      tags:
+      - Admin
+      summary: Cập nhật role (không được bỏ admin cuối cùng)
+      operationId: adminSetUserRoles
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRolePatch'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPrivate'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+  /api/v1/admin/posts:
+    get:
+      tags:
+      - Admin
+      summary: Danh sách bài viết để kiểm duyệt
+      operationId: adminListPosts
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - $ref: '#/components/parameters/PostSearch'
+      - $ref: '#/components/parameters/AdminStatus'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+  /api/v1/admin/posts/{post_id}:
+    delete:
+      tags:
+      - Admin
+      summary: Xóa logic bất kỳ bài viết
+      operationId: adminDeletePost
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Đã xóa logic bài viết
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+    patch:
+      tags:
+      - Admin
+      summary: Quản trị sửa nội dung / ẩn / hiện bài viết
+      operationId: adminModeratePost
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminPostPatch'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+  /api/v1/admin/categories:
+    get:
+      tags:
+      - Admin
+      summary: Danh sách danh mục kể cả ẩn
+      operationId: adminListCategories
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - $ref: '#/components/parameters/PostSearch'
+      - $ref: '#/components/parameters/AdminStatus'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+    post:
+      tags:
+      - Admin
+      summary: Tạo danh mục
+      operationId: adminCreateCategory
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryInput'
+      responses:
+        '201':
+          description: Đã tạo danh mục
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+  /api/v1/admin/categories/{category_id}:
+    patch:
+      tags:
+      - Admin
+      summary: Sửa / ẩn danh mục
+      operationId: adminUpdateCategory
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/CategoryId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryPatch'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+    delete:
+      tags:
+      - Admin
+      summary: Ẩn / ngưng dùng danh mục; không làm gãy FK post
+      operationId: adminDeleteCategory
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/CategoryId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Đã ngưng dùng danh mục
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+  /api/v1/admin/contacts:
+    get:
+      tags:
+      - Admin
+      summary: Danh sách liên hệ cần xử lý
+      operationId: adminListContacts
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - $ref: '#/components/parameters/AdminStatus'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ContactMessage'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+  /api/v1/admin/contacts/{contact_id}:
+    patch:
+      tags:
+      - Admin
+      summary: Đánh dấu trạng thái xử lý liên hệ
+      operationId: adminSetContactStatus
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/ContactId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminContactPatch'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactMessage'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+  /api/v1/admin/audit-logs:
+    get:
+      tags:
+      - Admin
+      summary: Tra cứu thao tác quản trị (chỉ admin)
+      operationId: adminListAudit
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminAuditEvent'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+      description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+  /api/v1/posts/{post_id}/reactions:
+    put:
+      tags:
+      - Aura
+      summary: Đặt hoặc thay reaction hiện hành
+      operationId: setReaction
+      description: Một reaction hiện hành/user/post theo phương án ERD; mọi Aura được backend đánh giá, không
+        cộng theo số request lặp.
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReactionInput'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReactionResult'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+    delete:
+      tags:
+      - Aura
+      summary: Gỡ reaction hiện hành
+      operationId: removeReaction
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Đã bỏ reaction
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+  /api/v1/posts/{post_id}/bookmark:
+    put:
+      tags:
+      - Aura
+      summary: Lưu bài viết
+      operationId: savePost
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Đã lưu bài
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+    delete:
+      tags:
+      - Aura
+      summary: Bỏ lưu bài
+      operationId: unsavePost
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Đã bỏ lưu
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+  /api/v1/aura/progress:
+    get:
+      tags:
+      - Aura
+      summary: Tiến trình của tôi
+      operationId: getAuraProgress
+      security: *id001
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuraProgress'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+  /api/v1/aura/check-in:
+    post:
+      tags:
+      - Aura
+      summary: Điểm danh ngày (07:00 Asia/Ho_Chi_Minh)
+      operationId: dailyCheckin
+      description: UNIQUE(user_id,effective_day), transaction cho XP + Khí Vận. Gửi lặp cùng ngày trả kết
+        quả đã có; không cộng lần hai.
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckInResult'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+  /api/v1/leaderboard:
+    get:
+      tags:
+      - Aura
+      summary: Bảng xếp hạng Aura gốc
+      operationId: getLeaderboard
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - $ref: '#/components/parameters/LeaderboardPeriod'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LeaderboardEntry'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+  /api/v1/vault/cases:
+    get:
+      tags:
+      - Vault
+      summary: Danh sách rương đang mở
+      operationId: listCases
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CaseDefinition'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+  /api/v1/vault/cases/{case_id}:
+    get:
+      tags:
+      - Vault
+      summary: Chi tiết rương, giá và xác suất đã công bố
+      operationId: getCase
+      description: Xác suất riêng theo ngưỡng earned_xp; không nhận client-provided rarity/odds. Bảng tỷ lệ
+        chính thức vẫn cần duyệt trước P1.
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/CaseId'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseDetail'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+  /api/v1/vault/cases/{case_id}/open:
+    post:
+      tags:
+      - Vault
+      summary: 'Mở hòm: trừ Khí Vận và cấp vật phẩm nguyên tử'
+      operationId: openCase
+      description: Backend xác định published loot pool theo earned_xp, CSPRNG, transaction debit+case_open+inventory_grant.
+        Retry cùng key trả đúng phần thưởng cũ, không quay lại.
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/CaseId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseOpenResult'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+  /api/v1/inventory/me:
+    get:
+      tags:
+      - Vault
+      summary: Bộ sưu tập của tôi
+      operationId: getInventory
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InventoryItem'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+  /api/v1/inventory/equipment/{slot_kind}:
+    put:
+      tags:
+      - Vault
+      summary: Trang bị hoặc tháo vật phẩm
+      operationId: equipItem
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/SlotKind'
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        description: Dữ liệu yêu cầu
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EquipmentInput'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EquipmentResult'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Dữ liệu không hợp lệ
+            request_id:
+              type: string
+              example: req_abc123
+            details:
+              type: object
+              additionalProperties: true
+              nullable: true
+          required:
+          - code
+          - message
+          - request_id
+      required:
+      - error
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        total_pages:
+          type: integer
+          minimum: 0
+      required:
+      - page
+      - page_size
+      - total
+      - total_pages
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - active
+          - hidden
+      required:
+      - id
+      - slug
+      - name
+      - status
+    UserPublic:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - username
+      - display_name
+      - created_at
+    UserPrivate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        display_name:
+          type: string
+        birth_year:
+          type: integer
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        avatar_media_id:
+          type: string
+          format: uuid
+          nullable: true
+        cover_media_id:
+          type: string
+          format: uuid
+          nullable: true
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+            - USER
+            - ADMIN
+        status:
+          type: string
+          enum:
+          - active
+          - locked
+          - deleted
+      required:
+      - id
+      - username
+      - email
+      - display_name
+      - roles
+      - status
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        author:
+          $ref: '#/components/schemas/UserPublic'
+        category:
+          $ref: '#/components/schemas/Category'
+        title:
+          type: string
+        content:
+          type: string
+        media_url:
+          type: string
+          format: uri
+          nullable: true
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+          - hidden
+          - deleted
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        comments_count:
+          type: integer
+          minimum: 0
+      required:
+      - id
+      - author
+      - category
+      - title
+      - content
+      - status
+      - created_at
+      - updated_at
+    PostInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        content:
+          type: string
+          maxLength: 20000
+        category_id:
+          type: string
+          format: uuid
+        media_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+      required:
+      - title
+      - content
+      - category_id
+    PostPatch:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        content:
+          type: string
+          maxLength: 20000
+        category_id:
+          type: string
+          format: uuid
+        media_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+      minProperties: 1
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        post_id:
+          type: string
+          format: uuid
+        author:
+          $ref: '#/components/schemas/UserPublic'
+        body:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - post_id
+      - author
+      - body
+      - created_at
+    CommentInput:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 4000
+      required:
+      - body
+    Media:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        mime:
+          type: string
+          enum:
+          - image/jpeg
+          - image/png
+          - image/webp
+          - image/gif
+        size_bytes:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum:
+          - pending
+          - ready
+          - rejected
+          - deleted
+        url:
+          type: string
+          format: uri
+          nullable: true
+      required:
+      - id
+      - mime
+      - size_bytes
+      - status
+    ContactInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 160
+        body:
+          type: string
+          minLength: 1
+          maxLength: 4000
+      required:
+      - name
+      - email
+      - subject
+      - body
+    ContactMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+        status:
+          type: string
+          enum:
+          - new
+          - in_review
+          - resolved
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - name
+      - email
+      - subject
+      - body
+      - status
+      - created_at
+    RegisterInput:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+          pattern: ^[a-z0-9_]+$
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+      required:
+      - username
+      - email
+      - password
+      - display_name
+    LoginInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+      - email
+      - password
+    ProfilePatch:
+      type: object
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        bio:
+          type: string
+          maxLength: 1000
+          nullable: true
+        birth_year:
+          type: integer
+          minimum: 1900
+          nullable: true
+        address:
+          type: string
+          maxLength: 255
+          nullable: true
+        phone:
+          type: string
+          maxLength: 30
+          nullable: true
+        avatar_media_id:
+          type: string
+          format: uuid
+          nullable: true
+        cover_media_id:
+          type: string
+          format: uuid
+          nullable: true
+      minProperties: 1
+    PasswordChange:
+      type: object
+      properties:
+        current_password:
+          type: string
+        new_password:
+          type: string
+          minLength: 12
+          maxLength: 128
+      required:
+      - current_password
+      - new_password
+    AdminUserPatch:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - active
+          - locked
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        email:
+          type: string
+          format: email
+      minProperties: 1
+    AdminCreateUser:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+          pattern: ^[a-z0-9_]+$
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+            - USER
+            - ADMIN
+      required:
+      - username
+      - email
+      - password
+      - display_name
+      - roles
+    AdminRolePatch:
+      type: object
+      properties:
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+            - USER
+            - ADMIN
+      required:
+      - roles
+    AdminPostPatch:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        content:
+          type: string
+          maxLength: 20000
+        category_id:
+          type: string
+          format: uuid
+        media_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+          - hidden
+      minProperties: 1
+    CategoryInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 80
+          pattern: ^[a-z0-9-]+$
+      required:
+      - name
+      - slug
+    CategoryPatch:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        status:
+          type: string
+          enum:
+          - active
+          - hidden
+      minProperties: 1
+    AdminContactPatch:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - new
+          - in_review
+          - resolved
+      required:
+      - status
+    AdminAuditEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        target_type:
+          type: string
+        target_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - actor_id
+      - action
+      - target_type
+      - target_id
+      - created_at
+    AuraProgress:
+      type: object
+      properties:
+        earned_xp:
+          type: integer
+          minimum: 0
+          description: Aura gốc cho Rank và odds
+        bonus_xp:
+          type: integer
+          minimum: 0
+          description: Aura thưởng VIP
+        total_xp:
+          type: integer
+          minimum: 0
+        level:
+          type: integer
+          minimum: 1
+        fair_level:
+          type: integer
+          minimum: 1
+        streak_days:
+          type: integer
+          minimum: 0
+        khi_van_balance:
+          type: integer
+          minimum: 0
+      required:
+      - earned_xp
+      - bonus_xp
+      - total_xp
+      - level
+      - fair_level
+      - streak_days
+      - khi_van_balance
+    CheckInResult:
+      type: object
+      properties:
+        effective_day:
+          type: string
+          format: date
+        already_checked_in:
+          type: boolean
+        earned_xp_delta:
+          type: integer
+          minimum: 0
+        bonus_xp_delta:
+          type: integer
+          minimum: 0
+        khi_van_delta:
+          type: integer
+          minimum: 0
+        streak_days:
+          type: integer
+          minimum: 0
+      required:
+      - effective_day
+      - already_checked_in
+      - earned_xp_delta
+      - bonus_xp_delta
+      - khi_van_delta
+      - streak_days
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+        user:
+          $ref: '#/components/schemas/UserPublic'
+        earned_xp:
+          type: integer
+          minimum: 0
+      required:
+      - rank
+      - user
+      - earned_xp
+    ReactionInput:
+      type: object
+      properties:
+        reaction_type:
+          type: string
+          enum:
+          - like
+          - laugh
+          - fire
+      required:
+      - reaction_type
+    ReactionResult:
+      type: object
+      properties:
+        reaction_type:
+          type: string
+          enum:
+          - like
+          - laugh
+          - fire
+        post_id:
+          type: string
+          format: uuid
+      required:
+      - reaction_type
+      - post_id
+    CaseDefinition:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        label:
+          type: string
+        cost_khi_van:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum:
+          - active
+          - retired
+      required:
+      - id
+      - slug
+      - label
+      - cost_khi_van
+      - status
+    CaseBand:
+      type: object
+      properties:
+        min_earned_xp:
+          type: integer
+          minimum: 0
+        max_earned_xp:
+          type: integer
+          minimum: 0
+          nullable: true
+        odds_version:
+          type: integer
+          minimum: 1
+        weights_bps:
+          type: object
+          properties:
+            D:
+              type: integer
+              minimum: 0
+              maximum: 10000
+            C:
+              type: integer
+              minimum: 0
+              maximum: 10000
+            B:
+              type: integer
+              minimum: 0
+              maximum: 10000
+            A:
+              type: integer
+              minimum: 0
+              maximum: 10000
+            S:
+              type: integer
+              minimum: 0
+              maximum: 10000
+          required:
+          - D
+          - C
+          - B
+          - A
+          - S
+      required:
+      - min_earned_xp
+      - odds_version
+      - weights_bps
+    CaseDetail:
+      type: object
+      properties:
+        case:
+          $ref: '#/components/schemas/CaseDefinition'
+        bands:
+          type: array
+          items:
+            $ref: '#/components/schemas/CaseBand'
+      required:
+      - case
+      - bands
+    Asset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        kind:
+          type: string
+          enum:
+          - avatar
+          - frame
+          - icon
+          - effect
+          - generator
+        rarity:
+          type: string
+          enum:
+          - D
+          - C
+          - B
+          - A
+          - S
+        media_url:
+          type: string
+          format: uri
+      required:
+      - id
+      - slug
+      - kind
+      - rarity
+      - media_url
+    CaseOpenResult:
+      type: object
+      properties:
+        open_id:
+          type: string
+          format: uuid
+        case_id:
+          type: string
+          format: uuid
+        reward:
+          $ref: '#/components/schemas/Asset'
+        cost_khi_van:
+          type: integer
+          minimum: 0
+        khi_van_balance:
+          type: integer
+          minimum: 0
+        already_processed:
+          type: boolean
+      required:
+      - open_id
+      - case_id
+      - reward
+      - cost_khi_van
+      - khi_van_balance
+      - already_processed
+    InventoryItem:
+      type: object
+      properties:
+        asset:
+          $ref: '#/components/schemas/Asset'
+        quantity:
+          type: integer
+          minimum: 0
+        equipped:
+          type: boolean
+      required:
+      - asset
+      - quantity
+      - equipped
+    EquipmentInput:
+      type: object
+      properties:
+        asset_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - asset_id
+    EquipmentResult:
+      type: object
+      properties:
+        slot_kind:
+          type: string
+          enum:
+          - avatar
+          - frame
+          - icon
+          - effect
+        asset_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - slot_kind
+      - asset_id
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Trang, bắt đầu từ 1
+    PageSize:
+      in: query
+      name: page_size
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    PostId:
+      in: path
+      name: post_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CommentId:
+      in: path
+      name: comment_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      in: path
+      name: user_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CategoryId:
+      in: path
+      name: category_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ContactId:
+      in: path
+      name: contact_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Username:
+      in: path
+      name: username
+      required: true
+      schema:
+        type: string
+    CaseId:
+      in: path
+      name: case_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SlotKind:
+      in: path
+      name: slot_kind
+      required: true
+      schema:
+        type: string
+        enum:
+        - avatar
+        - frame
+        - icon
+        - effect
+    CsrfHeader:
+      in: header
+      name: X-CSRF-Token
+      required: true
+      schema:
+        type: string
+        minLength: 16
+      description: CSRF token được cấp bởi GET /api/v1/auth/csrf; bắt buộc trên mọi request thay đổi trạng
+        thái (kể cả guest).
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema:
+        type: string
+        minLength: 12
+        maxLength: 128
+      description: Khóa retry của cùng một lần mở hòm. Cùng khóa và payload trả đúng kết quả cũ; khóa đã dùng
+        với payload khác trả 409.
+    PostSearch:
+      in: query
+      name: search
+      schema:
+        type: string
+        maxLength: 100
+    PostCategory:
+      in: query
+      name: category
+      schema:
+        type: string
+      description: Slug danh mục
+    PostSort:
+      in: query
+      name: sort
+      schema:
+        type: string
+        enum:
+        - created_desc
+        - created_asc
+        - title_asc
+    AdminStatus:
+      in: query
+      name: status
+      schema:
+        type: string
+    LeaderboardPeriod:
+      in: query
+      name: period
+      schema:
+        type: string
+        enum:
+        - week
+        - all
+      description: Tuần tính từ thứ Hai 07:00 giờ Việt Nam; chỉ Aura gốc.
+  responses:
+    BadRequest:
+      description: Yêu cầu không hợp lệ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Chưa đăng nhập / phiên hết hạn
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Không đủ quyền
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Không tìm thấy
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Xung đột / trùng nghiệp vụ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Dữ liệu không hợp lệ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: Quá giới hạn yêu cầu
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalError:
+      description: Lỗi máy chủ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: am_session
+      description: Opaque session cookie, HttpOnly, Secure trên HTTPS, SameSite=Lax. Backend tra session trong
+        PostgreSQL; không truyền JWT trong response.
