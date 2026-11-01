@@ -31,7 +31,7 @@
 
 Frontend nền tảng nằm trong [`frontend/`](frontend/), tái sử dụng giao diện prototype. Có Home, Explore, About/Team, Contact, Login và Register. **Đây là bản preview:** bài viết và số liệu là dữ liệu mẫu; đăng nhập, đăng ký, gửi liên hệ, tạo bài và phần thưởng chưa kết nối backend. Các form preview không gửi hoặc lưu dữ liệu.
 
-**Backend, database, CI/CD và hạ tầng AWS chưa triển khai.** Tài liệu thiết kế trên nhánh [`dev`](https://github.com/lebaokhang123/aura_meme/tree/dev) là cơ sở cho các mốc tiếp theo.
+Backend nền tảng có `GET /health`, cấu hình môi trường và lệnh kiểm tra PostgreSQL. Chưa tạo bảng/migration hoặc API nghiệp vụ; frontend vẫn là preview độc lập. CI/CD và hạ tầng AWS chưa triển khai. Tài liệu thiết kế trên nhánh [`dev`](https://github.com/lebaokhang123/aura_meme/tree/dev) là cơ sở cho các mốc tiếp theo.
 
 ## Chạy frontend local
 
@@ -53,5 +53,35 @@ npm test         # Smoke test Playwright, cần Google Chrome đã cài
 ```
 
 Smoke test tự chạy Vite trên `127.0.0.1:4173`, kiểm routing, refresh, alias/404, màn hình 375/768/1440px, bàn phím và giảm chuyển động. Font/icon được self-host cùng giấy phép; ảnh chưa xác minh được thay bằng SVG placeholder tự tạo. Xem [`frontend/ASSET_SOURCES.md`](frontend/ASSET_SOURCES.md).
+
+## Chạy backend local (Windows)
+
+Yêu cầu Python **3.12 trở lên**. Từ thư mục repository, dùng PowerShell:
+
+```powershell
+cd backend
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --only-binary=:all: -e ".[test]"
+Copy-Item .env.example .env
+# Sửa DATABASE_URL trong .env theo PostgreSQL của bạn trước khi chạy.
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Các lệnh gọi Python trực tiếp trong venv nên không cần đổi ExecutionPolicy hoặc activate. Environment ghi đè `backend/.env`. `DATABASE_URL` bắt buộc có dạng `postgresql+psycopg://user:password@host:5432/database`; percent-encode ký tự đặc biệt trong user/password. `.env.example` chỉ có placeholder, không phải credential hoạt động. `DB_CONNECT_TIMEOUT` là số giây từ 1 đến 30, mặc định 5. Không đưa `.env` hoặc URL chứa mật khẩu vào Git/log.
+
+- `http://127.0.0.1:8000/health` → HTTP 200, `{"status":"ok"}`: kiểm tra tiến trình API; không xác nhận DB đã sẵn sàng.
+- `http://127.0.0.1:8000/openapi.json` và `/docs`: hợp đồng runtime chỉ cho endpoint đã triển khai. Đặc tả toàn dự án nằm tại `docs/api/05-openapi.yaml`.
+- Thiếu/sai cấu hình làm startup thất bại với lỗi đã ẩn giá trị nhạy cảm. DB chưa sẵn sàng vẫn có thể chạy health; dùng probe riêng bên dưới.
+
+Mở terminal khác tại `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m app.db  # SELECT 1: exit 0 nếu OK, exit 1 nếu cấu hình/DB lỗi
+```
+
+Probe dùng connection context manager của SQLAlchemy, trả connection về pool và dispose khi kết thúc; không tạo/sửa bảng. Engine API dùng `pool_pre_ping`, được dispose khi shutdown. Không bật SQL echo hoặc in connection string khi probe lỗi.
+
+Integration test chỉ kết nối khi bạn đặt **environment** `TEST_DATABASE_URL` trỏ tới PostgreSQL test có quyền kết nối; không tự đọc biến này từ `.env`, không tạo database. Nếu thiếu biến, pytest ghi rõ SKIPPED thay vì nhận PASS cho DB thật. Dùng trình soạn thảo/secret manager để đặt giá trị riêng; không dán credential vào lịch sử terminal. Bộ test chỉ thực hiện `SELECT 1`, không migration/seed.
 
 > Nhánh `main` lưu bản prototype/bài thực hành trước đây; nhánh `dev` dùng cho sản phẩm đang phát triển và có lịch sử Git độc lập.
