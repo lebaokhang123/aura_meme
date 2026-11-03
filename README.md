@@ -31,7 +31,7 @@
 
 Frontend nền tảng nằm trong [`frontend/`](frontend/), tái sử dụng giao diện prototype. Có Home, Explore, About/Team, Contact, Login và Register. **Đây là bản preview:** bài viết và số liệu là dữ liệu mẫu; đăng nhập, đăng ký, gửi liên hệ, tạo bài và phần thưởng chưa kết nối backend. Các form preview không gửi hoặc lưu dữ liệu.
 
-Backend nền tảng có `GET /health`, cấu hình môi trường và lệnh kiểm tra PostgreSQL. Chưa tạo bảng/migration hoặc API nghiệp vụ; frontend vẫn là preview độc lập. CI/CD và hạ tầng AWS chưa triển khai. Tài liệu thiết kế trên nhánh [`dev`](https://github.com/lebaokhang123/aura_meme/tree/dev) là cơ sở cho các mốc tiếp theo.
+Backend nền tảng có `GET /health`, cấu hình môi trường, lệnh kiểm tra PostgreSQL và migration schema 11 bảng P0. M1.4 chỉ thử migration trên DB test riêng, chưa áp dụng vào development hoặc triển khai API nghiệp vụ; frontend vẫn là preview độc lập. CI/CD và hạ tầng AWS chưa triển khai. Tài liệu thiết kế trên nhánh [`dev`](https://github.com/lebaokhang123/aura_meme/tree/dev) là cơ sở cho các mốc tiếp theo.
 
 ## Chạy frontend local
 
@@ -82,6 +82,25 @@ Mở terminal khác tại `backend/`:
 
 Probe dùng connection context manager của SQLAlchemy, trả connection về pool và dispose khi kết thúc; không tạo/sửa bảng. Engine API dùng `pool_pre_ping`, được dispose khi shutdown. Không bật SQL echo hoặc in connection string khi probe lỗi.
 
-Integration test chỉ kết nối khi bạn đặt **environment** `TEST_DATABASE_URL` trỏ tới PostgreSQL test có quyền kết nối; không tự đọc biến này từ `.env`, không tạo database. Nếu thiếu biến, pytest ghi rõ SKIPPED thay vì nhận PASS cho DB thật. Dùng trình soạn thảo/secret manager để đặt giá trị riêng; không dán credential vào lịch sử terminal. Bộ test chỉ thực hiện `SELECT 1`, không migration/seed.
+Integration test chỉ kết nối khi bạn đặt **environment** `TEST_DATABASE_URL`; không tự đọc biến này từ `.env`, không tạo database. Nếu thiếu biến, test cần DB ghi rõ SKIPPED thay vì nhận PASS cho DB thật. Dùng trình soạn thảo/secret manager để đặt giá trị riêng; không dán credential vào lịch sử terminal.
+
+### Migration P0 (M1.4)
+
+Alembic hiện chỉ cho phép database **`aurameme_test`**, tách khỏi `DATABASE_URL` development. Không có DSN trong `alembic.ini`, không tự migrate khi FastAPI startup. Offline SQL và migration development được chặn trong milestone này.
+
+Lưu test URL riêng vào `backend/.env` dưới tên `TEST_DATABASE_URL` rồi chạy từ `backend/` bằng PowerShell; đoạn sau chỉ truyền giá trị vào process con, không in credential:
+
+```powershell
+@'
+import os, subprocess, sys
+from dotenv import dotenv_values
+env = os.environ.copy()
+env["TEST_DATABASE_URL"] = dotenv_values(".env")["TEST_DATABASE_URL"]
+subprocess.run([sys.executable, "-m", "alembic", "current"], env=env, check=True)
+raise SystemExit(subprocess.call([sys.executable, "-m", "pytest", "-q"], env=env))
+'@ | & .\.venv\Scripts\python.exe -
+```
+
+Test migration thực hiện upgrade → upgrade lại → downgrade base → upgrade, so DBML/metadata và thử constraint trong transaction rollback. **Downgrade xóa các bảng của migration**: chỉ dùng DB test chuyên dụng. Bộ test từ chối schema lạ hoặc bảng ứng dụng có dữ liệu; bản thân downgrade cũng khóa các bảng P0 và từ chối nếu còn hàng, không tự xóa dữ liệu để chạy tiếp. Không reset database/volume. Kết thúc để DB test ở `0001_p0` (head), không có dữ liệu nghiệp vụ mẫu. Không áp dụng schema/rollback vào development ở M1.4.
 
 > Nhánh `main` lưu bản prototype/bài thực hành trước đây; nhánh `dev` dùng cho sản phẩm đang phát triển và có lịch sử Git độc lập.
