@@ -32,6 +32,8 @@ Một API backend phục vụ tất cả module; **không tạo microservices**.
 
 **CSRF:** OpenAPI mô tả header và cookie, còn implementation phải chọn pattern token an toàn được ràng buộc phiên (hoặc pre-session cho form đăng nhập), tránh token trong URL/log. Kiểm tra Origin/SameSite và CORS chính xác. Chính sách này sẽ được xác nhận khi triển khai Auth, không đồng nghĩa đã có code chạy.
 
+**M2.1 · Owner duyệt 2026-11-04:** email trim + lowercase toàn chuỗi theo schema M1.4. Bổ sung 401 cho login thất bại, 403 cho CSRF register/login; giữ schema nghiệp vụ/error format. GET csrf vẫn public: pre-session hết hạn được cấp mới, không mặc định 401. Implementation dùng pre-session ngẫu nhiên có hạn trong store bounded một process và HMAC-SHA256 gắn pre-session/session; login tiêu thụ pre-session và cấp session riêng. Cookie HttpOnly/host-only/Path=/SameSite=Lax, Secure trên production HTTPS; idle 30 phút, absolute 12 giờ, row lock khi trượt hạn/revoke. Không bật CORS; chỉ nhận Origin hoặc Referer thuộc allowlist chính xác. Limiter/pre-session RAM chưa đáp ứng multi-worker; nghiệm thu PostgreSQL M2.1 còn BLOCKED, xem bàn giao nội bộ. Reset password/email verification/OAuth không thuộc M2.1.
+
 ## 3. API P0 — Blog phục vụ môn học
 
 ### Public và tài khoản

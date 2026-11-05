@@ -1,7 +1,10 @@
 from pathlib import Path
+from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 
@@ -11,6 +14,33 @@ ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 class ConfigurationError(RuntimeError):
     """Invalid backend configuration, safe to display without its values."""
+
+
+class AuthSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
+    auth_signing_key: SecretStr
+    auth_environment: Literal["development", "production"] = "production"
+    auth_allowed_origins: list[str] = ["https://localhost:8000"]
+
+    @model_validator(mode="after")
+    def check_auth_security(self):
+        key = self.auth_signing_key.get_secret_value()
+        if len(key.encode()) < 32 or key.startswith("CHANGE_ME"):
+            raise ValueError("AUTH_SIGNING_KEY must contain at least 32 random bytes.")
+        if not self.auth_allowed_origins:
+            raise ValueError("AUTH_ALLOWED_ORIGINS must not be empty.")
+        for origin in self.auth_allowed_origins:
+            parsed = urlsplit(origin)
+            _ = parsed.port  # Validate the optional port as well as the hostname.
+            if (parsed.scheme not in {"http", "https"} or not parsed.hostname
+                    or parsed.username or parsed.password or parsed.path or parsed.query or parsed.fragment
+                    or "*" in origin):
+                raise ValueError("AUTH_ALLOWED_ORIGINS must contain exact HTTP(S) origins.")
+            if self.auth_environment == "production" and parsed.scheme != "https":
+                raise ValueError("Production authentication requires HTTPS origins.")
+            if self.auth_environment == "development" and parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
+                raise ValueError("Development HTTP mode is restricted to loopback origins.")
+        return self
 
 
 class Settings(BaseSettings):

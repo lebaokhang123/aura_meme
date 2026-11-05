@@ -62,12 +62,16 @@ Yêu cầu Python **3.12 trở lên**. Từ thư mục repository, dùng PowerSh
 cd backend
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --only-binary=:all: -e ".[test]"
-Copy-Item .env.example .env
-# Sửa DATABASE_URL trong .env theo PostgreSQL của bạn trước khi chạy.
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+# Sửa DATABASE_URL, AUTH_ENVIRONMENT và AUTH_ALLOWED_ORIGINS trong .env.
+# Chỉ tạo signing key lần đầu, không ghi đè key đang dùng:
+.\.venv\Scripts\python.exe -c "import secrets; from dotenv import dotenv_values, set_key; v=dotenv_values('.env').get('AUTH_SIGNING_KEY'); set_key('.env','AUTH_SIGNING_KEY',secrets.token_urlsafe(48)) if not v or v.startswith('CHANGE_ME') else None"
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 Các lệnh gọi Python trực tiếp trong venv nên không cần đổi ExecutionPolicy hoặc activate. Environment ghi đè `backend/.env`. `DATABASE_URL` bắt buộc có dạng `postgresql+psycopg://user:password@host:5432/database`; percent-encode ký tự đặc biệt trong user/password. `.env.example` chỉ có placeholder, không phải credential hoạt động. `DB_CONNECT_TIMEOUT` là số giây từ 1 đến 30, mặc định 5. Không đưa `.env` hoặc URL chứa mật khẩu vào Git/log.
+
+`AUTH_SIGNING_KEY` bắt buộc, ít nhất 32 byte ngẫu nhiên; placeholder bị từ chối. `AUTH_ENVIRONMENT=production` mặc định yêu cầu HTTPS và cookie Secure. Chỉ dùng `development` với origin loopback cụ thể cho HTTP local; `AUTH_ALLOWED_ORIGINS` là JSON array origin chính xác, không wildcard. Không bật CORS; frontend dùng same-origin/proxy theo thiết kế. Chưa migrate `aurameme_dev`: Auth sẽ chưa chạy nghiệp vụ trên development cho tới khi được Owner phê duyệt riêng.
 
 - `http://127.0.0.1:8000/health` → HTTP 200, `{"status":"ok"}`: kiểm tra tiến trình API; không xác nhận DB đã sẵn sàng.
 - `http://127.0.0.1:8000/openapi.json` và `/docs`: hợp đồng runtime chỉ cho endpoint đã triển khai. Đặc tả toàn dự án nằm tại `docs/api/05-openapi.yaml`.
@@ -102,5 +106,15 @@ raise SystemExit(subprocess.call([sys.executable, "-m", "pytest", "-q"], env=env
 ```
 
 Test migration thực hiện upgrade → upgrade lại → downgrade base → upgrade, so DBML/metadata và thử constraint trong transaction rollback. **Downgrade xóa các bảng của migration**: chỉ dùng DB test chuyên dụng. Bộ test từ chối schema lạ hoặc bảng ứng dụng có dữ liệu; bản thân downgrade cũng khóa các bảng P0 và từ chối nếu còn hàng, không tự xóa dữ liệu để chạy tiếp. Không reset database/volume. Kết thúc để DB test ở `0001_p0` (head), không có dữ liệu nghiệp vụ mẫu. Không áp dụng schema/rollback vào development ở M1.4.
+
+### Authentication (M2.1)
+
+`GET /api/v1/auth/csrf` cấp token JSON gắn với pre-session có hạn 10 phút hoặc session đang đăng nhập. Gửi token qua `X-CSRF-Token` và Origin/Referer hợp lệ cho register/login/logout. Sau login, gọi lại GET csrf để lấy token gắn với session mới; token pre-auth bị tiêu thụ. GET vẫn public và cấp pre-session mới nếu cookie cũ hết hạn. Không đưa token vào URL/log/localStorage.
+
+Register tạo user/profile/USER role trong một transaction, không tự login; email được trim + lowercase toàn chuỗi. Password 12–128 ký tự, Argon2id 19 MiB/2 iterations/parallelism 1, không truncate. Login cấp session token ngẫu nhiên mới, DB chỉ giữ SHA-256 digest. Cookie `am_session` HttpOnly, host-only, Path=/, SameSite=Lax, Secure ở production. Idle timeout 30 phút trượt, absolute 12 giờ tại server; logout chỉ revoke session hiện tại. Các tab cùng profile chia sẻ cookie, các thiết bị có phiên độc lập.
+
+Chạy nhóm không cần PostgreSQL: `.\.venv\Scripts\python.exe -m pytest -q -m "not integration"`. Full suite dùng đoạn truyền TEST_DATABASE_URL ở trên: có test Auth với savepoint/rollback và test concurrency trên các UUID test riêng, cleanup đúng dữ liệu tạo ra. Chỉ dùng `aurameme_test` chuyên dụng, không chạy song song với thao tác SQL của Owner; không dùng database có dữ liệu cần giữ. Đừng coi nhóm không cần DB là nghiệm thu integration.
+
+Giới hạn hiện tại: limiter và pre-session store bounded trong RAM, chỉ hỗ trợ **một process**; restart hủy pre-session, chưa có shared limiter cho multi-worker/production. Rate limit theo IP thật (không tin X-Forwarded-For) và email đăng nhập; cấu hình proxy/retention session cần review ở milestone vận hành. Không có OAuth/JWT/reset password/đổi mật khẩu hoặc kết nối frontend trong M2.1.
 
 > Nhánh `main` lưu bản prototype/bài thực hành trước đây; nhánh `dev` dùng cho sản phẩm đang phát triển và có lịch sử Git độc lập.
