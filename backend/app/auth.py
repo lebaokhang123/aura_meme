@@ -57,14 +57,17 @@ def guest_guard(request: Request):
 def current_session(db, runtime, raw):
     if not raw or not TOKEN.fullmatch(raw):
         raise AuthError(401, "UNAUTHORIZED", "Invalid or expired session.")
+    user_id = db.scalar(select(AuthSession.user_id).where(AuthSession.token_hash == digest(raw)))
+    # Login/password changes lock user first; use that order everywhere to avoid lock inversion.
+    user = db.scalar(select(User).where(User.id == user_id).with_for_update()
+                     .execution_options(populate_existing=True)) if user_id else None
+    if user is None or user.status != "active":
+        raise AuthError(401, "UNAUTHORIZED", "Invalid or expired session.")
     record = db.scalars(select(AuthSession).where(AuthSession.token_hash == digest(raw))
-                        .with_for_update()).one_or_none()
+                        .with_for_update().execution_options(populate_existing=True)).one_or_none()
     now = runtime.now()
     if (record is None or record.revoked_at is not None or record.expires_at <= now
             or record.created_at > now or record.created_at + timedelta(seconds=ABSOLUTE_SECONDS) <= now):
-        raise AuthError(401, "UNAUTHORIZED", "Invalid or expired session.")
-    user = db.get(User, record.user_id)
-    if user is None or user.status != "active":
         raise AuthError(401, "UNAUTHORIZED", "Invalid or expired session.")
     # Row lock serializes sliding expiry and revocation; expiry never moves backwards.
     record.expires_at = min(max(record.expires_at, now + timedelta(seconds=IDLE_SECONDS)),

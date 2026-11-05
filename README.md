@@ -31,7 +31,7 @@
 
 Frontend nền tảng nằm trong [`frontend/`](frontend/), tái sử dụng giao diện prototype. Có Home, Explore, About/Team, Contact, Login và Register. **Đây là bản preview:** bài viết và số liệu là dữ liệu mẫu; đăng nhập, đăng ký, gửi liên hệ, tạo bài và phần thưởng chưa kết nối backend. Các form preview không gửi hoặc lưu dữ liệu.
 
-Backend nền tảng có `GET /health`, cấu hình môi trường, lệnh kiểm tra PostgreSQL và migration schema 11 bảng P0. M1.4 chỉ thử migration trên DB test riêng, chưa áp dụng vào development hoặc triển khai API nghiệp vụ; frontend vẫn là preview độc lập. CI/CD và hạ tầng AWS chưa triển khai. Tài liệu thiết kế trên nhánh [`dev`](https://github.com/lebaokhang123/aura_meme/tree/dev) là cơ sở cho các mốc tiếp theo.
+Backend có health/probe PostgreSQL, migration 11 bảng P0, Auth session/CSRF và API Account (hồ sơ riêng/công khai, đổi mật khẩu, dependency USER/ADMIN). Migration mới chỉ được thử trên DB test riêng, chưa áp dụng vào development; frontend vẫn là preview độc lập. CI/CD và hạ tầng AWS chưa triển khai. Tài liệu thiết kế trên nhánh [`dev`](https://github.com/lebaokhang123/aura_meme/tree/dev) là cơ sở cho các mốc tiếp theo.
 
 ## Chạy frontend local
 
@@ -118,3 +118,9 @@ Chạy nhóm không cần PostgreSQL: `.\.venv\Scripts\python.exe -m pytest -q -
 Giới hạn hiện tại: limiter và pre-session store bounded trong RAM, chỉ hỗ trợ **một process**; restart hủy pre-session, chưa có shared limiter cho multi-worker/production. Rate limit theo IP thật (không tin X-Forwarded-For) và email đăng nhập; cấu hình proxy/retention session cần review ở milestone vận hành. Không có OAuth/JWT/reset password/đổi mật khẩu hoặc kết nối frontend trong M2.1.
 
 > Nhánh `main` lưu bản prototype/bài thực hành trước đây; nhánh `dev` dùng cho sản phẩm đang phát triển và có lịch sử Git độc lập.
+
+### Account & Authorization (M2.2)
+
+`GET/PATCH /api/v1/users/me`, `PUT /api/v1/users/me/password` cần session (mutation cần CSRF/Origin); profile PATCH từ chối field ngoài allowlist. `GET /api/v1/users/{username}` chỉ trả hồ sơ active với whitelist công khai, chưa có avatar URL provider nên avatar_url là null. Đổi mật khẩu giữ phiên hiện tại, revoke các phiên khác trong cùng transaction; helper require_role đọc role từ DB, chưa có Admin CRUD. Response Auth M2.1 giữ nguyên.
+
+Test riêng: `python -m pytest tests/test_account.py tests/test_account_concurrency.py -q` với TEST_DATABASE_URL explicit theo hướng dẫn trên; PostgreSQL test phải có schema P0, không dữ liệu/đối tượng lạ. Các test concurrency dùng connection riêng và cleanup đúng identity UUID tạo ra; snapshot development và postflight phải đạt. Không chạy song song với Owner trên DB test. Chưa migrate development để demo Account.

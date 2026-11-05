@@ -19,7 +19,8 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         assert schema.status_code == 200
         contract = schema.json()
         assert set(contract["paths"]) == {"/health", "/api/v1/auth/csrf", "/api/v1/auth/register",
-                                          "/api/v1/auth/login", "/api/v1/auth/logout"}
+                                          "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/users/me",
+                                          "/api/v1/users/me/password", "/api/v1/users/{username}"}
         assert contract["paths"]["/health"]["get"]["operationId"] == "health"
         model = contract["components"]["schemas"]["HealthResponse"]
         assert model["required"] == ["status"]
@@ -34,7 +35,13 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         assert "401" not in contract["paths"]["/api/v1/auth/csrf"]["get"]["responses"]
         password = contract["components"]["schemas"]["RegisterInput"]["properties"]["password"]
         assert password["minLength"] == 12 and password["maxLength"] == 128
-        assert client.post("/api/v1/users/me").status_code == 404
+        patch = contract["components"]["schemas"]["ProfilePatch"]
+        assert patch["additionalProperties"] is False and patch["minProperties"] == 1
+        assert patch["properties"]["display_name"]["type"] == "string"
+        public = contract["components"]["schemas"]["UserPublic"]
+        assert set(public["properties"]) == {"id", "username", "display_name", "created_at", "bio", "avatar_url"}
+        assert any(item.get("format") == "uri" for item in public["properties"]["avatar_url"]["anyOf"])
+        assert client.get("/api/v1/admin/users").status_code == 404
 
 
 def test_startup_rejects_invalid_configuration_without_secret(monkeypatch, caplog):
