@@ -16,6 +16,22 @@ class ConfigurationError(RuntimeError):
     """Invalid backend configuration, safe to display without its values."""
 
 
+class MediaSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
+    media_storage_root: Path = ENV_FILE.parent / ".local" / "media"
+
+    @field_validator("media_storage_root")
+    @classmethod
+    def private_absolute_root(cls, value):
+        project = ENV_FILE.parent.parent
+        if (not value.is_absolute() or ".." in value.parts or value == Path(value.anchor)
+                or any(part.lower() in {"public", "static", "wwwroot"} for part in value.parts)
+                or value == project or value in project.parents
+                or value == ENV_FILE.parent or value.is_relative_to(project / "frontend")):
+            raise ValueError("MEDIA_STORAGE_ROOT must be an absolute, dedicated private directory.")
+        return value
+
+
 class AuthSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
     auth_signing_key: SecretStr

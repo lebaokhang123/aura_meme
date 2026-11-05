@@ -40,6 +40,8 @@ Một API backend phục vụ tất cả module; **không tạo microservices**.
 
 ## 3. API P0 — Blog phục vụ môn học
 
+**M3.2 · chính sách Owner chốt 2026-11-05:** POST media nhận một multipart file; session/CSRF/Origin trước parse, MIME/signature/decode nhất quán. 5 MiB/file, 12.000.000 pixels/frame; GIF tối đa60 frames/40.000.000 pixels cộng dồn (cùng ngân sách áp dụng ảnh động PNG/WebP). Private local bytes ngoài webroot, PostgreSQL chỉ metadata; UUID key, exclusive write/fsync, COMMIT trước201/ready. URL null, không GET/DELETE/delivery. Giữ original bytes, chưa sanitize. Cleanup khi DB từ chối, safe reconciliation event khi cleanup thất bại hoặc COMMIT không xác định; filesystem không nằm trong DB transaction. Không đổi Posts DTO/endpoint.
+
 ### Public và tài khoản
 
 | HTTP | Endpoint | Quyền | Công dụng |

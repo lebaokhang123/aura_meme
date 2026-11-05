@@ -22,7 +22,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
                                           "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/users/me",
                                           "/api/v1/users/me/password", "/api/v1/users/{username}", "/api/v1/categories",
                                           "/api/v1/admin/categories", "/api/v1/admin/categories/{category_id}",
-                                          "/api/v1/posts", "/api/v1/posts/{post_id}"}
+                                          "/api/v1/posts", "/api/v1/posts/{post_id}", "/api/v1/media"}
         assert contract["paths"]["/health"]["get"]["operationId"] == "health"
         model = contract["components"]["schemas"]["HealthResponse"]
         assert model["required"] == ["status"]
