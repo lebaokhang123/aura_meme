@@ -2128,6 +2128,7 @@ components:
       - roles
     AdminPostPatch:
       type: object
+      additionalProperties: false
       properties:
         title:
           type: string

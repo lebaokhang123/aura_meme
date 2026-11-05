@@ -133,8 +133,8 @@ def post_dto(post, user, profile, category):
         content=post.content, status=post.status, created_at=post.created_at, updated_at=post.updated_at, media_url=None)
 
 
-def validate_post(db, user_id, category_id, media_id, content):
-    category = locked_category(db, category_id, active=True)
+def validate_post(db, user_id, category_id, media_id, content, *, allow_hidden_category=False):
+    category = locked_category(db, category_id, active=not allow_hidden_category)
     if media_id is not None:
         media = db.scalar(select(MediaUpload).where(MediaUpload.id == media_id, MediaUpload.owner_id == user_id).with_for_update())
         if media is None or media.status != "ready":
