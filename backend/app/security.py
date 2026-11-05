@@ -122,7 +122,7 @@ class AuthBoundaryMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or not scope["path"].startswith(("/api/v1/auth/", "/api/v1/users/", "/api/v1/posts", "/api/v1/categories", "/api/v1/admin/categories", "/api/v1/media", "/api/v1/comments/")):
+        if scope["type"] != "http" or not scope["path"].startswith(("/api/v1/auth/", "/api/v1/users/", "/api/v1/posts", "/api/v1/categories", "/api/v1/admin/categories", "/api/v1/admin/users", "/api/v1/media", "/api/v1/comments/")):
             return await self.app(scope, receive, send)
         runtime = scope["app"].state.auth
         try:
