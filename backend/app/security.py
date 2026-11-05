@@ -122,7 +122,7 @@ class AuthBoundaryMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or not scope["path"].startswith(("/api/v1/auth/", "/api/v1/users/")):
+        if scope["type"] != "http" or not scope["path"].startswith(("/api/v1/auth/", "/api/v1/users/", "/api/v1/posts", "/api/v1/categories", "/api/v1/admin/categories")):
             return await self.app(scope, receive, send)
         runtime = scope["app"].state.auth
         try:
@@ -133,6 +133,7 @@ class AuthBoundaryMiddleware:
             limit = {"register": 5, "login": 10}.get(scope["path"].rsplit("/", 1)[-1], 60)
             runtime.limiter.check(scope["path"] + ":" + peer, limit, 60)
             if scope["method"] in {"POST", "PATCH", "PUT"}:
+                body_limit = 262144 if scope["path"].startswith("/api/v1/posts") else 16384
                 chunks, size = [], 0
                 while True:
                     event = await receive()
@@ -140,7 +141,7 @@ class AuthBoundaryMiddleware:
                         return
                     body = event.get("body", b"")
                     size += len(body)
-                    if size > 16384:
+                    if size > body_limit:
                         raise AuthError(422, "VALIDATION_ERROR", "Request body too large.")
                     chunks.append(body)
                     if not event.get("more_body", False):

@@ -31,7 +31,7 @@
 
 Frontend nền tảng nằm trong [`frontend/`](frontend/), tái sử dụng giao diện prototype. Có Home, Explore, About/Team, Contact, Login và Register. **Đây là bản preview:** bài viết và số liệu là dữ liệu mẫu; đăng nhập, đăng ký, gửi liên hệ, tạo bài và phần thưởng chưa kết nối backend. Các form preview không gửi hoặc lưu dữ liệu.
 
-Backend có health/probe PostgreSQL, migration 11 bảng P0, Auth session/CSRF và API Account (hồ sơ riêng/công khai, đổi mật khẩu, dependency USER/ADMIN). Migration mới chỉ được thử trên DB test riêng, chưa áp dụng vào development; frontend vẫn là preview độc lập. CI/CD và hạ tầng AWS chưa triển khai. Tài liệu thiết kế trên nhánh [`dev`](https://github.com/lebaokhang123/aura_meme/tree/dev) là cơ sở cho các mốc tiếp theo.
+Backend có health/probe PostgreSQL, migration 11 bảng P0, Auth session/CSRF và API Account (hồ sơ riêng/công khai, đổi mật khẩu, dependency USER/ADMIN), Categories và Posts P0. Migration mới chỉ được thử trên DB test riêng, chưa áp dụng vào development; frontend vẫn là preview độc lập. CI/CD và hạ tầng AWS chưa triển khai. Tài liệu thiết kế trên nhánh [`dev`](https://github.com/lebaokhang123/aura_meme/tree/dev) là cơ sở cho các mốc tiếp theo.
 
 ## Chạy frontend local
 
@@ -124,3 +124,9 @@ Giới hạn hiện tại: limiter và pre-session store bounded trong RAM, ch�
 `GET/PATCH /api/v1/users/me`, `PUT /api/v1/users/me/password` cần session (mutation cần CSRF/Origin); profile PATCH từ chối field ngoài allowlist. `GET /api/v1/users/{username}` chỉ trả hồ sơ active với whitelist công khai, chưa có avatar URL provider nên avatar_url là null. Đổi mật khẩu giữ phiên hiện tại, revoke các phiên khác trong cùng transaction; helper require_role đọc role từ DB, chưa có Admin CRUD. Response Auth M2.1 giữ nguyên.
 
 Test riêng: `python -m pytest tests/test_account.py tests/test_account_concurrency.py -q` với TEST_DATABASE_URL explicit theo hướng dẫn trên; PostgreSQL test phải có schema P0, không dữ liệu/đối tượng lạ. Các test concurrency dùng connection riêng và cleanup đúng identity UUID tạo ra; snapshot development và postflight phải đạt. Không chạy song song với Owner trên DB test. Chưa migrate development để demo Account.
+
+### Categories & Posts (M3.1)
+
+Public GET `/api/v1/categories`, `/api/v1/posts`, `/api/v1/posts/{id}`; Admin category GET/POST/PATCH/DELETE dưới `/api/v1/admin/categories`; post POST/PATCH/DELETE chỉ cho author. Mutation cần session/CSRF/Origin, Admin cần role DB. Category mới active, post mặc định draft; PATCH không gửi status giữ nguyên. Category DELETE chỉ hide với audit atomic; post DELETE là soft delete giữ FK. Public không hiện bài/category/author bị ẩn/xóa/khóa hoặc media không hợp lệ.
+
+Search literal, sort allowlist/tie-break UUID, pagination page>=1/page_size<=100. Chưa URL provider nên media/avatar URL null; comments_count optional omit. Content là text JSON, chưa có renderer/upload/comment API. Test: `python -m pytest tests/test_blog.py tests/test_blog_concurrency.py -q` với TEST_DATABASE_URL như trên, chỉ test DB riêng preflight sạch và postflight/cleanup, không migrate development.

@@ -1814,6 +1814,7 @@ components:
       - updated_at
     PostInput:
       type: object
+      additionalProperties: false
       properties:
         title:
           type: string
@@ -1840,6 +1841,7 @@ components:
       - category_id
     PostPatch:
       type: object
+      additionalProperties: false
       properties:
         title:
           type: string
@@ -2144,6 +2146,7 @@ components:
       minProperties: 1
     CategoryInput:
       type: object
+      additionalProperties: false
       properties:
         name:
           type: string
@@ -2159,6 +2162,7 @@ components:
       - slug
     CategoryPatch:
       type: object
+      additionalProperties: false
       properties:
         name:
           type: string
