@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
@@ -45,6 +45,10 @@ class AdminUserPatch(NonemptyPatch):
 class AdminUserPage(BaseModel):
     items: list[UserPrivate]
     pagination: Pagination
+
+
+class AdminRolePatch(StrictInput):
+    roles: list[Literal["USER", "ADMIN"]]
 
 
 def require_admin_mutation(request: Request, response: Response, raw=Depends(session_cookie)):
@@ -183,3 +187,30 @@ def delete_user(user_id: UUID, request: Request, response: Response,
     revoke_sessions(account.db, user.id, now)
     audit_user(account, user, "user.delete", before, now)
     if user.id == account.user.id: delete_cookie(response, request.app.state.auth, "am_session")
+
+
+@router.put("/{user_id}/roles", response_model=UserPrivate, operation_id="adminSetUserRoles",
+            responses=ERRORS | NOT_FOUND, openapi_extra=CSRF_HEADER)
+def set_user_roles(user_id: UUID, payload: AdminRolePatch, request: Request, response: Response,
+                   account=Depends(require_admin_mutation, scope="function")):
+    user = target_user(account, user_id)
+    before = user_state(account.db, user)
+    requested, current = set(payload.roles), set(before["roles"])
+    if "ADMIN" not in requested:
+        protect_last_admin(account.db, user, before)
+    now = request.app.state.auth.now()
+    if requested != current:
+        removed = select(Role.id).where(Role.code.in_(current - requested))
+        account.db.execute(delete(UserRole).where(UserRole.user_id == user.id, UserRole.role_id.in_(removed)))
+        for code in sorted(requested - current):
+            account.db.execute(insert(Role).values(id=uuid4(), code=code, description=code + " role")
+                               .on_conflict_do_nothing(index_elements=[Role.code]))
+            role_id = account.db.scalar(select(Role.id).where(Role.code == code))
+            account.db.add(UserRole(user_id=user.id, role_id=role_id, granted_at=now))
+        user.updated_at = now
+        account.db.flush()
+        revoke_sessions(account.db, user.id, now)
+        if user.id == account.user.id:
+            delete_cookie(response, request.app.state.auth, "am_session")
+    audit_user(account, user, "user.roles", before, now, roles_changed=requested != current)
+    return user_private(account.db, user)

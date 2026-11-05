@@ -24,7 +24,8 @@ def test_health_and_openapi_without_a_database(monkeypatch):
                                           "/api/v1/admin/categories", "/api/v1/admin/categories/{category_id}",
                                           "/api/v1/posts", "/api/v1/posts/{post_id}", "/api/v1/media",
                                           "/api/v1/posts/{post_id}/comments", "/api/v1/comments/{comment_id}",
-                                          "/api/v1/admin/users", "/api/v1/admin/users/{user_id}"}
+                                          "/api/v1/admin/users", "/api/v1/admin/users/{user_id}",
+                                          "/api/v1/admin/users/{user_id}/roles"}
         assert contract["paths"]["/health"]["get"]["operationId"] == "health"
         model = contract["components"]["schemas"]["HealthResponse"]
         assert model["required"] == ["status"]
@@ -47,7 +48,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         assert any(item.get("format") == "uri" for item in public["properties"]["avatar_url"]["anyOf"])
         for name in ["CategoryInput", "CategoryPatch", "PostInput", "PostPatch"]:
             assert contract["components"]["schemas"][name]["additionalProperties"] is False
-        assert client.get("/api/v1/admin/users/{user_id}/roles").status_code == 404
+        assert client.get("/api/v1/admin/users/{user_id}/roles").status_code == 405
 
 
 def test_startup_rejects_invalid_configuration_without_secret(monkeypatch, caplog):

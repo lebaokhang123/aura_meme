@@ -2115,6 +2115,7 @@ components:
       - roles
     AdminRolePatch:
       type: object
+      additionalProperties: false
       properties:
         roles:
           type: array
