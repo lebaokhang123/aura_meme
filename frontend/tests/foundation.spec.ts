@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { mockPublicBlog } from './blog-fixtures';
 
 const routes = ['/', '/explore', '/about', '/contact', '/login', '/register'];
 test.beforeEach(async ({ page }) => {
+  await mockPublicBlog(page);
   await page.route('**/api/v1/users/me', route => route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED' } } }));
 });
 
@@ -21,7 +23,8 @@ for (const width of [375, 768, 1440]) {
       page.on('pageerror', (error) => errors.push(error.message));
       await page.goto(route);
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
-      await expect(page.getByRole('note')).toContainText('Frontend preview');
+      await expect(page.getByRole('note')).toContainText('Community preview');
+      if (route === '/' || route === '/explore') await expect(page.getByRole('link', { name: 'Synthetic API post', exact: true })).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
       expect(await page.evaluate(() => document.documentElement.scrollWidth), route).toBeLessThanOrEqual(
         width,
@@ -68,16 +71,16 @@ test('mobile search and menu work with keyboard and return focus', async ({ page
   await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.locator('#main-content')).toBeFocused();
-  const search = page.getByRole('button', { name: 'Search demo posts' });
+  const search = page.getByRole('button', { name: 'Search posts' });
   await search.focus();
   await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog', { name: 'Search demo posts' });
+  const dialog = page.getByRole('dialog', { name: 'Search posts' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('searchbox')).toBeFocused();
-  await dialog.getByRole('searchbox').fill('centering');
-  await expect(dialog.getByText('CSS in real life:', { exact: false })).toBeVisible();
+  await dialog.getByRole('searchbox').fill('Synthetic API');
+  await expect(dialog.getByText('Synthetic API post', { exact: true })).toBeVisible();
   await dialog.getByRole('searchbox').fill('no-such-demo-post');
-  await expect(dialog.getByText('No sample posts found')).toBeVisible();
+  await expect(dialog.getByText('No posts found.', { exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
   await expect(search).toBeFocused();
@@ -121,8 +124,9 @@ test('unconnected actions and mismatched registration do not invent success', as
   await page.getByRole('button', { name: 'Preview message' }).click();
   await expect(page.getByRole('status')).toContainText('not sent or saved');
   await page.goto('/');
-  await page.getByRole('button', { name: 'Create post preview' }).click();
-  await expect(page.getByRole('status')).toContainText('No post was created');
+  await page.getByRole('link', { name: 'Create post', exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('heading', { name: /Welcome Back/ })).toBeVisible();
   expect(writes).toEqual([]);
 });
 

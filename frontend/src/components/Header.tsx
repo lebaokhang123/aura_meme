@@ -16,6 +16,7 @@ export function Header() {
   const { user, pending, error, logout, refresh } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const accountLinks = user ? <>
+    <Link to="/my-posts" onClick={() => setMenuOpen(false)} className="min-h-11 px-3 py-3 rounded-lg bg-surface-container text-xs">My posts</Link>
     <Link to="/settings" onClick={() => setMenuOpen(false)} className="min-h-11 px-3 py-3 rounded-lg bg-surface-container text-xs">Settings</Link>
     <button disabled={signingOut} className="min-h-11 px-3 py-3 rounded-lg bg-primary text-on-primary text-xs" onClick={async () => {
       if (signingOut) return;
@@ -83,7 +84,7 @@ export function Header() {
         </div>
         <button
           type="button"
-          aria-label="Search demo posts"
+          aria-label="Search posts"
           onClick={() => {
             setMenuOpen(false);
             setSearchOpen(true);
@@ -93,13 +94,13 @@ export function Header() {
           <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
             search
           </span>
-          <span className="flex-1 text-left">Search demo memes...</span>
+          <span className="flex-1 text-left">Search posts...</span>
           <kbd className="font-mono text-[10px] px-1.5 py-1 rounded bg-surface-container-high">Ctrl K</kbd>
         </button>
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
-            aria-label="Search demo posts"
+            aria-label="Search posts"
             onClick={() => {
               setMenuOpen(false);
               setSearchOpen(true);
@@ -110,17 +111,17 @@ export function Header() {
               search
             </span>
           </button>
-          <button
-            type="button"
-            aria-label="Create post preview"
-            onClick={() => showToast('Post creation is not connected yet. No post was created.')}
+          <Link
+            to="/posts/new"
+            aria-label="Create post"
+            onClick={() => setMenuOpen(false)}
             className="h-11 min-w-11 px-2 sm:px-3.5 rounded-lg bg-gradient-to-r from-primary-container to-primary text-on-primary-fixed font-semibold text-xs shadow-[0_0_12px_rgba(160,120,255,0.35)] inline-flex items-center justify-center gap-1.5 transition-shadow hover:shadow-[0_0_20px_rgba(160,120,255,0.5)]"
           >
             <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
               add
             </span>
             <span className="hidden sm:inline">Create Post</span>
-          </button>
+          </Link>
           <div className="hidden xl:flex items-center gap-2">{sessionControls}</div>
           <button
             ref={menuButton}

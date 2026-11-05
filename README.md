@@ -29,7 +29,7 @@
 
 ## Trạng thái dự án
 
-Frontend trong [`frontend/`](frontend/) giữ giao diện prototype. Đăng ký, đăng nhập, đăng xuất, profile và settings dùng API thật; bài viết/số liệu vẫn là demo, Contact và phần thưởng chưa kết nối.
+Frontend trong [`frontend/`](frontend/) giữ giao diện prototype. Tài khoản/profile, feed/tìm kiếm, bài viết/draft riêng, bình luận và upload dùng API thật. Ảnh lưu riêng tư, preview file chỉ cục bộ; server media display, Contact và phần thưởng chưa kết nối.
 
 Backend P0 có session/CSRF, account, blog, media riêng tư, quản trị và Contact. Database development chưa được migrate; dùng môi trường kiểm thử cô lập, không tự migrate/seed development. CI/CD và AWS chưa triển khai.
 

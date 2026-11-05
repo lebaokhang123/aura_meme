@@ -327,6 +327,75 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
       x-phase: P0
+  /api/v1/users/me/posts:
+    get:
+      tags: [Blog]
+      summary: Danh sách bài của chính user, không gồm deleted
+      operationId: listOwnPosts
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [draft, published, hidden]
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OwnPost'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required: [items, pagination]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/users/me/posts/{post_id}:
+    get:
+      tags: [Blog]
+      summary: Đọc bài của chính user, kể cả draft; không gồm deleted
+      operationId: getOwnPost
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnPost'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
   /api/v1/posts:
     get:
       tags:
@@ -1816,6 +1885,15 @@ components:
       - status
       - created_at
       - updated_at
+    OwnPost:
+      allOf:
+      - $ref: '#/components/schemas/Post'
+      - type: object
+        properties:
+          media_id:
+            type: [string, 'null']
+            format: uuid
+        required: [media_id]
     PostInput:
       type: object
       additionalProperties: false
