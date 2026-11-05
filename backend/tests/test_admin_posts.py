@@ -133,3 +133,25 @@ def test_admin_post_audit_failure_rolls_back(admin,method):
     assert mutation(client,method,'/admin/posts/'+str(ident),{"status":"hidden"}).status_code==500
     assert dict(connection.execute(select(Post.__table__).where(Post.id==ident)).mappings().one())==before
     assert client.get('/api/v1/posts/'+str(ident)).status_code==200
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("path", ["/api/v1/admin/posts","/api/v1/admin/audit-logs"])
+def test_admin_boundary_requires_https(admin,path):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    insecure=TestClient(app,base_url="http://testserver")
+    try:assert insecure.get(path).status_code==403
+    finally:insecure.close()
+
+
+@pytest.mark.integration
+def test_admin_post_body_boundary_preserves_legitimate_maximum(admin):
+    import json
+    client,*_=admin
+    ident=create_post(admin).json()['id']
+    headers={'Origin':'https://testserver','X-CSRF-Token':csrf(client),'Content-Type':'application/json'}
+    path='/api/v1/admin/posts/'+ident
+    assert client.patch(path,content=json.dumps({'content':'🐱'*20000}),headers=headers).status_code==200
+    response=client.patch(path,content=b'x'*262145,headers=headers)
+    assert response.status_code==422 and response.json()['error']['message']=='Request body too large.'

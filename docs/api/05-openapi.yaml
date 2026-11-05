@@ -675,6 +675,8 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '429':
           $ref: '#/components/responses/RateLimited'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
         '500':
@@ -1931,6 +1933,7 @@ components:
       - status
     ContactInput:
       type: object
+      additionalProperties: false
       properties:
         name:
           type: string
@@ -2183,6 +2186,7 @@ components:
       minProperties: 1
     AdminContactPatch:
       type: object
+      additionalProperties: false
       properties:
         status:
           type: string

@@ -117,12 +117,12 @@ class AuthRuntime:
 
 
 class AuthBoundaryMiddleware:
-    """Cap auth bodies before parsing and rate-limit before expensive password work."""
+    """Bound API bodies and rate-limit before parsing or expensive password work."""
     def __init__(self, app):
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or not scope["path"].startswith(("/api/v1/auth/", "/api/v1/users/", "/api/v1/posts", "/api/v1/categories", "/api/v1/admin/categories", "/api/v1/admin/users", "/api/v1/media", "/api/v1/comments/")):
+        if scope["type"] != "http" or not scope["path"].startswith(("/api/v1/auth/", "/api/v1/users/", "/api/v1/posts", "/api/v1/categories", "/api/v1/admin/", "/api/v1/contact", "/api/v1/media", "/api/v1/comments/")):
             return await self.app(scope, receive, send)
         runtime = scope["app"].state.auth
         try:
@@ -130,7 +130,7 @@ class AuthBoundaryMiddleware:
                 raise AuthError(403, "FORBIDDEN", "Authentication requires HTTPS.")
             peer = scope.get("client", ("unknown",))[0]
             runtime.limiter.check("ip:" + peer, 120, 60)
-            limit = {"register": 5, "login": 10}.get(scope["path"].rsplit("/", 1)[-1], 60)
+            limit = {"register": 5, "login": 10, "contact": 5}.get(scope["path"].rsplit("/", 1)[-1], 60)
             runtime.limiter.check(scope["path"] + ":" + peer, limit, 60)
             if scope["path"] == "/api/v1/media" and scope["method"] == "POST":
                 from app.media import MAX_REQUEST_BYTES
@@ -158,7 +158,7 @@ class AuthBoundaryMiddleware:
                 # No body is read until the endpoint's authenticated, CSRF-checked dependency yields.
                 return await self.app(scope, bounded_receive, send)
             if scope["method"] in {"POST", "PATCH", "PUT"}:
-                body_limit = 262144 if scope["path"].startswith("/api/v1/posts") else 16384
+                body_limit = 262144 if scope["path"].startswith(("/api/v1/posts", "/api/v1/admin/posts")) else 65536 if scope["path"] == "/api/v1/contact" else 16384
                 chunks, size = [], 0
                 while True:
                     event = await receive()
