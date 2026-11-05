@@ -17,13 +17,17 @@ class AuthenticatedAccount:
     session: AuthSession
 
 
-def require_authenticated_user(request: Request, response: Response, raw=Depends(session_cookie)):
+def authenticated_account(request, response, raw, db):
     runtime = request.app.state.auth
+    record = current_session(db, runtime, raw)
+    lifetime = max(1, int((record.expires_at - runtime.now()).total_seconds()))
+    set_cookie(response, runtime, "am_session", raw, lifetime)
+    return AuthenticatedAccount(db=db, user=db.get(User, record.user_id), session=record)
+
+
+def require_authenticated_user(request: Request, response: Response, raw=Depends(session_cookie)):
     with request.app.state.auth_session_factory() as db, db.begin():
-        record = current_session(db, runtime, raw)
-        lifetime = max(1, int((record.expires_at - runtime.now()).total_seconds()))
-        set_cookie(response, runtime, "am_session", raw, lifetime)
-        yield AuthenticatedAccount(db=db, user=db.get(User, record.user_id), session=record)
+        yield authenticated_account(request, response, raw, db)
     # Callers use scope=function so commit errors cannot follow a successful response.
 
 
