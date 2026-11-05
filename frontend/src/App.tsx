@@ -10,6 +10,10 @@ import { AboutPage } from './pages/AboutPage';
 import { ContactPage } from './pages/ContactPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignUpPage } from './pages/SignUpPage';
+import { AuthProvider } from './context/AuthContext';
+import { AccountBoundary } from './components/AccountBoundary';
+import { SettingsPage } from './pages/SettingsPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 function AppContent() {
   const { toastMessage } = useUI();
@@ -23,8 +27,9 @@ function AppContent() {
       '/contact': 'Contact',
       '/login': 'Login',
       '/register': 'Register',
+      '/settings': 'Settings',
     };
-    document.title = `${titles[pathname] ?? 'Page not found'} — AuraMeme`;
+    document.title = `${titles[pathname] ?? (pathname.startsWith('/profile/') ? 'Profile' : 'Page not found')} — AuraMeme`;
     if (hash === '#team') {
       const team = document.getElementById('team');
       team?.scrollIntoView();
@@ -48,8 +53,8 @@ function AppContent() {
           role="note"
           className="preview-note px-4 py-2.5 text-center text-xs border-b border-primary/15 bg-primary/5 text-on-surface-variant"
         >
-          <strong className="text-primary">Frontend preview</strong> · Demo posts and sample counts. Accounts,
-          messages and rewards are not connected.
+          <strong className="text-primary">Frontend preview</strong> · Demo posts and sample counts. Messages
+          and rewards are not connected. Account forms now use the API.
         </div>
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -58,6 +63,8 @@ function AppContent() {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<SignUpPage />} />
+          <Route path="/settings" element={<AccountBoundary><SettingsPage /></AccountBoundary>} />
+          <Route path="/profile/:username" element={<ProfilePage />} />
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/about-us" element={<Navigate to="/about" replace />} />
           <Route path="/team" element={<Navigate to="/about#team" replace />} />
@@ -94,7 +101,7 @@ function AppContent() {
 export default function App() {
   return (
     <UIProvider>
-      <AppContent />
+      <AuthProvider><AppContent /></AuthProvider>
     </UIProvider>
   );
 }

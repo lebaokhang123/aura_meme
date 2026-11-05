@@ -37,14 +37,14 @@ export function Footer() {
               <a href="https://github.com/lebaokhang123/aura_meme" target="_blank" rel="noreferrer">
                 GitHub repository <span className="sr-only">(opens in a new tab)</span>
               </a>
-              <Link to="/login">Login preview</Link>
-              <Link to="/register">Registration preview</Link>
+              <Link to="/login">Login</Link>
+              <Link to="/register">Registration</Link>
             </nav>
           </div>
         </div>
         <div className="border-t border-surface-container-highest/40 pt-6 flex flex-col sm:flex-row justify-between gap-3 text-xs text-outline">
           <span>AuraMeme · Khang & Kiên</span>
-          <span>No live accounts, rewards or payments in this preview.</span>
+          <span>Accounts use the API. Rewards and payments are not available.</span>
         </div>
       </div>
     </footer>

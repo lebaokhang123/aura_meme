@@ -1,4 +1,7 @@
 import { expect, test } from '@playwright/test';
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/users/me', route => route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED' } } }));
+});
 
 for (const width of [320, 1024]) {
   for (const route of ['/', '/explore', '/about']) {

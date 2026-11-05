@@ -1,9 +1,15 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { api, errorMessage } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const { refresh, user } = useAuth();
+  const navigate = useNavigate();
+  if (user) return <Navigate to="/settings" replace />;
   return (
     <div className="auth-page w-full min-h-[calc(100dvh-12rem)] relative isolate flex flex-col items-center justify-center px-4 py-10 sm:py-14">
       <div aria-hidden="true" className="auth-glows absolute inset-0 pointer-events-none overflow-clip -z-10">
@@ -22,7 +28,7 @@ export function LoginPage() {
             </span>
             Welcome back
           </span>
-          <span className="text-xs text-outline">Form preview</span>
+          <span className="text-xs text-outline">Your account</span>
         </div>
         <div className="text-center mb-7">
           <div className="relative w-20 h-20 mx-auto mb-4">
@@ -37,28 +43,35 @@ export function LoginPage() {
             Welcome Back to <span className="text-primary">AuraMeme</span>
           </h1>
           <p id="login-preview" className="text-xs text-on-surface-variant leading-relaxed mt-3">
-            Explore the sign-in form. Authentication is not connected yet, and this preview does not send or
-            save your details.
+            Sign in with your email. Your session is managed by the server.
           </p>
         </div>
         <form
           aria-describedby="login-preview"
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault();
-            setMessage('Sign-in is not connected yet. No request was sent and no session was created.');
+            if (busy) return;
+            const data = new FormData(event.currentTarget);
+            setBusy(true); setMessage('');
+            try {
+              await api('/auth/login', { method: 'POST', body: { email: data.get('email'), password: data.get('password') } });
+              await refresh(); navigate('/settings');
+            } catch (error) { setMessage(errorMessage(error)); }
+            finally { setBusy(false); }
           }}
           className="flex flex-col gap-5"
         >
           <div>
             <label htmlFor="login-username" className="block text-xs font-semibold mb-2">
-              Email or username
+              Email
             </label>
             <input
               id="login-username"
-              name="username"
+              name="email"
+              type="email"
               autoComplete="username"
               required
-              placeholder="Your email or username"
+              placeholder="Your email"
               className="w-full min-w-0 rounded-lg bg-surface-container-lowest border border-surface-container-highest/50 px-4 py-3 text-sm placeholder:text-outline"
             />
           </div>
@@ -91,9 +104,10 @@ export function LoginPage() {
           </div>
           <button
             type="submit"
+            disabled={busy}
             className="w-full min-h-12 rounded-lg bg-gradient-to-r from-primary-container via-primary-fixed-dim to-secondary text-on-primary-fixed font-['Plus_Jakarta_Sans'] font-bold text-sm shadow-lg hover:shadow-primary/20 transition-shadow flex items-center justify-center gap-2"
           >
-            Preview sign-in
+            {busy ? 'Signing in…' : 'Sign in'}
             <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
               arrow_forward
             </span>
@@ -101,7 +115,7 @@ export function LoginPage() {
         </form>
         {message && (
           <p
-            role="status"
+            role="alert"
             className="mt-4 rounded-lg bg-secondary/10 border border-secondary/20 p-3 text-xs text-secondary leading-relaxed"
           >
             {message}

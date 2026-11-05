@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 const routes = ['/', '/explore', '/about', '/contact', '/login', '/register'];
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/users/me', route => route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED' } } }));
+});
 
 test('About presents confirmed members and the current integration boundary', async ({ page }) => {
   await page.goto('/about');
@@ -97,26 +100,19 @@ test('team section receives focus after keyboard navigation', async ({ page }) =
   await expect(page.locator('#team')).toBeFocused();
 });
 
-test('forms and post actions do not send requests or invent success', async ({ page }) => {
+test('unconnected actions and mismatched registration do not invent success', async ({ page }) => {
   const writes: string[] = [];
   page.on('request', (request) => {
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method())) writes.push(request.url());
   });
-  await page.goto('/login');
-  await page.getByLabel('Email or username').fill('preview-user');
-  await page.getByLabel('Password', { exact: true }).fill('not-a-real-password');
-  await page.getByRole('button', { name: 'Preview sign-in' }).click();
-  await expect(page.getByRole('status')).toContainText('No request was sent');
   await page.goto('/register');
-  await page.getByLabel('Username', { exact: true }).fill('preview-user');
+  await page.getByLabel('Username', { exact: true }).fill('preview_user');
+  await page.getByLabel('Display name', { exact: true }).fill('Synthetic preview');
   await page.getByLabel('Email', { exact: true }).fill('preview@example.com');
   await page.getByLabel('Password', { exact: true }).fill('not-a-real-password');
   await page.getByLabel('Confirm password').fill('different-password');
-  await page.getByRole('button', { name: 'Preview registration' }).click();
-  await expect(page.getByRole('status')).toContainText('Passwords do not match');
-  await page.getByLabel('Confirm password').fill('not-a-real-password');
-  await page.getByRole('button', { name: 'Preview registration' }).click();
-  await expect(page.getByRole('status')).toContainText('No account was created');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('alert')).toContainText('Passwords do not match');
   await page.goto('/contact');
   await page.getByLabel('Your name').fill('Preview visitor');
   await page.getByLabel('Email address').fill('preview@example.com');

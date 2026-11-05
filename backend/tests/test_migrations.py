@@ -265,6 +265,37 @@ def test_cli_requires_explicit_test_url(monkeypatch):
         command.upgrade(config(), "head")
 
 
+@pytest.mark.parametrize("value", [None, "postgresql+psycopg://test:secret-marker@127.0.0.1/aurameme_dev",
+    "postgresql+psycopg://test:secret-marker@127.0.0.1/aurameme_test"])
+def test_e2e_migrations_require_explicit_separate_database(monkeypatch,value):
+    from types import SimpleNamespace
+    monkeypatch.delenv('E2E_DATABASE_URL',raising=False)
+    if value:monkeypatch.setenv('E2E_DATABASE_URL',value)
+    cfg=config();cfg.cmd_opts=SimpleNamespace(x=['target=e2e'])
+    with pytest.raises(RuntimeError,match='E2E_DATABASE_URL') as error:
+        command.upgrade(cfg,'head')
+    assert 'secret-marker' not in str(error.value)
+
+
+def test_unknown_migration_target_is_refused():
+    from types import SimpleNamespace
+    cfg=config();cfg.cmd_opts=SimpleNamespace(x=['target=development'])
+    with pytest.raises(RuntimeError,match='development is forbidden'):
+        command.upgrade(cfg,'head')
+
+
+@pytest.mark.integration
+def test_e2e_migrations_refuse_development_connection(migrated):
+    from types import SimpleNamespace
+    engine=create_db_engine(load_settings())
+    try:
+        with engine.begin() as connection:
+            cfg=config();cfg.cmd_opts=SimpleNamespace(x=['target=e2e']);cfg.attributes['connection']=connection
+            with pytest.raises(RuntimeError,match='only on aurameme_e2e'):
+                command.upgrade(cfg,'head')
+    finally:engine.dispose()
+
+
 @pytest.mark.parametrize("url,expected", [
     ("sqlite:///secret-marker", "Invalid TEST_DATABASE_URL"),
     ("postgresql+psycopg://test:secret-marker@127.0.0.1/aurameme_dev", "aurameme_test"),
