@@ -1889,6 +1889,7 @@ components:
       - created_at
     CommentInput:
       type: object
+      additionalProperties: false
       properties:
         body:
           type: string
