@@ -20,7 +20,9 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         contract = schema.json()
         assert set(contract["paths"]) == {"/health", "/api/v1/auth/csrf", "/api/v1/auth/register",
                                           "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/users/me",
-                                          "/api/v1/users/me/password", "/api/v1/users/{username}"}
+                                          "/api/v1/users/me/password", "/api/v1/users/{username}", "/api/v1/categories",
+                                          "/api/v1/admin/categories", "/api/v1/admin/categories/{category_id}",
+                                          "/api/v1/posts", "/api/v1/posts/{post_id}"}
         assert contract["paths"]["/health"]["get"]["operationId"] == "health"
         model = contract["components"]["schemas"]["HealthResponse"]
         assert model["required"] == ["status"]
@@ -41,6 +43,8 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         public = contract["components"]["schemas"]["UserPublic"]
         assert set(public["properties"]) == {"id", "username", "display_name", "created_at", "bio", "avatar_url"}
         assert any(item.get("format") == "uri" for item in public["properties"]["avatar_url"]["anyOf"])
+        for name in ["CategoryInput", "CategoryPatch", "PostInput", "PostPatch"]:
+            assert contract["components"]["schemas"][name]["additionalProperties"] is False
         assert client.get("/api/v1/admin/users").status_code == 404
 
 

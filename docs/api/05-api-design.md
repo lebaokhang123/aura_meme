@@ -36,6 +36,8 @@ Một API backend phục vụ tất cả module; **không tạo microservices**.
 
 **M2.2 · Owner duyệt 2026-11-05:** riêng ProfilePatch bổ sung `additionalProperties: false`; giữ field/endpoint và hợp đồng Auth M2.1. PATCH phân biệt omission/null, media phải owned+ready; public profile chỉ active và whitelist PII-safe, avatar_url null khi chưa có provider. Đổi mật khẩu và revoke phiên khác trong một transaction, khóa user → session thống nhất với login/logout; dependency commit trước gửi response. Chưa triển khai Admin CRUD hoặc media URL service.
 
+**M3.1 · Owner duyệt 2026-11-05:** additionalProperties:false cho CategoryInput/CategoryPatch/PostInput/PostPatch; category mới active, post mặc định draft, PATCH không gửi status giữ nguyên. Category hidden/author không active/media không ready làm post không public. Post owner mutation lọc ID+author tại DB; hidden/deleted không được sửa, foreign/missing/repeated post DELETE trả404. Category DELETE idempotent hide và ghi audit; post DELETE giữ hàng/FK. URLs null tới khi có provider; comments_count optional omit, không dùng count giả. Content chỉ text JSON, chưa renderer. Không thay các field/endpoint hợp đồng khác.
+
 ## 3. API P0 — Blog phục vụ môn học
 
 ### Public và tài khoản
