@@ -17,6 +17,7 @@ from app.blog import router as blog_router
 from app.media import router as media_router
 from app.comments import router as comments_router
 from app.admin_users import router as admin_users_router
+from app.admin_posts import router as admin_posts_router
 from app.security import AuthBoundaryMiddleware, AuthError, AuthRuntime
 
 
@@ -42,6 +43,7 @@ app.include_router(blog_router)
 app.include_router(media_router)
 app.include_router(comments_router)
 app.include_router(admin_users_router)
+app.include_router(admin_posts_router)
 app.add_middleware(AuthBoundaryMiddleware)
 
 
