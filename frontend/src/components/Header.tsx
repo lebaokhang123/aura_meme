@@ -1,6 +1,8 @@
 import { Link, NavLink } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { useUI } from '../context/UIContext';
+import { useAuth } from '../context/AuthContext';
+import { ApiError, errorMessage } from '../api';
 
 const navigation = [
   { label: 'Home', to: '/' },
@@ -11,6 +13,26 @@ const navigation = [
 
 export function Header() {
   const { setSearchOpen, showToast } = useUI();
+  const { user, pending, error, logout, refresh } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+  const accountLinks = user ? <>
+    <Link to="/settings" onClick={() => setMenuOpen(false)} className="min-h-11 px-3 py-3 rounded-lg bg-surface-container text-xs">Settings</Link>
+    <button disabled={signingOut} className="min-h-11 px-3 py-3 rounded-lg bg-primary text-on-primary text-xs" onClick={async () => {
+      if (signingOut) return;
+      setSigningOut(true);
+      try { await logout(); setMenuOpen(false); showToast('Signed out.'); }
+      catch (fault) {
+        showToast(errorMessage(fault));
+        if (fault instanceof ApiError && fault.status === 401) await refresh();
+      }
+      finally { setSigningOut(false); }
+    }}>{signingOut ? 'Signing out…' : 'Sign out'}</button>
+  </> : <>
+    <Link to="/login" onClick={() => setMenuOpen(false)} className="min-h-11 px-3 py-3 rounded-lg bg-surface-container text-xs">Login</Link>
+    <Link to="/register" onClick={() => setMenuOpen(false)} className="min-h-11 px-3 py-3 rounded-lg bg-primary text-on-primary text-xs">Sign Up</Link>
+  </>;
+  const sessionControls = pending ? <span className="text-xs">Checking session…</span> : error
+    ? <Link to="/settings" className="text-xs underline">Connection issue</Link> : accountLinks;
   const [isMenuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -99,18 +121,7 @@ export function Header() {
             </span>
             <span className="hidden sm:inline">Create Post</span>
           </button>
-          <Link
-            to="/login"
-            className="hidden lg:inline-flex items-center min-h-11 px-3 rounded-lg bg-surface-container text-xs"
-          >
-            Login
-          </Link>
-          <Link
-            to="/register"
-            className="hidden lg:inline-flex items-center min-h-11 px-3 rounded-lg bg-primary text-on-primary text-xs font-semibold"
-          >
-            Sign Up
-          </Link>
+          <div className="hidden xl:flex items-center gap-2">{sessionControls}</div>
           <button
             ref={menuButton}
             type="button"
@@ -145,22 +156,7 @@ export function Header() {
               {item.label}
             </NavLink>
           ))}
-          <div className="flex gap-2 border-t border-surface-container-highest pt-3 mt-2">
-            <Link
-              to="/login"
-              onClick={() => setMenuOpen(false)}
-              className="flex-1 text-center p-3 rounded-lg bg-surface-container"
-            >
-              Login
-            </Link>
-            <Link
-              to="/register"
-              onClick={() => setMenuOpen(false)}
-              className="flex-1 text-center p-3 rounded-lg bg-primary text-on-primary"
-            >
-              Sign Up
-            </Link>
-          </div>
+          <div className="flex gap-2 border-t border-surface-container-highest pt-3 mt-2">{sessionControls}</div>
         </nav>
       )}
     </header>

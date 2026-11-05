@@ -29,9 +29,9 @@
 
 ## Trạng thái dự án
 
-Frontend nền tảng nằm trong [`frontend/`](frontend/), tái sử dụng giao diện prototype. Có Home, Explore, About/Team, Contact, Login và Register. **Đây là bản preview:** bài viết và số liệu là dữ liệu mẫu; đăng nhập, đăng ký, gửi liên hệ, tạo bài và phần thưởng chưa kết nối backend. Các form preview không gửi hoặc lưu dữ liệu.
+Frontend trong [`frontend/`](frontend/) giữ giao diện prototype. Đăng ký, đăng nhập, đăng xuất, profile và settings dùng API thật; bài viết/số liệu vẫn là demo, Contact và phần thưởng chưa kết nối.
 
-Backend có health/probe PostgreSQL, migration 11 bảng P0, Auth session/CSRF và API Account (hồ sơ riêng/công khai, đổi mật khẩu, dependency USER/ADMIN), Categories và Posts P0. Migration mới chỉ được thử trên DB test riêng, chưa áp dụng vào development; frontend vẫn là preview độc lập. CI/CD và hạ tầng AWS chưa triển khai. Tài liệu thiết kế trên nhánh [`dev`](https://github.com/lebaokhang123/aura_meme/tree/dev) là cơ sở cho các mốc tiếp theo.
+Backend P0 có session/CSRF, account, blog, media riêng tư, quản trị và Contact. Database development chưa được migrate; dùng môi trường kiểm thử cô lập, không tự migrate/seed development. CI/CD và AWS chưa triển khai.
 
 ## Chạy frontend local
 
@@ -43,7 +43,7 @@ npm ci
 npm run dev
 ```
 
-Mở URL Vite in ra trong terminal (mặc định `http://localhost:5173`). Không cần backend hoặc PostgreSQL cho bản preview này.
+Mở URL Vite in ra (mặc định `http://localhost:5173`). Vite proxy `/api/v1` tới backend cổng8000; Auth cần backend/DB đã chuẩn bị, `AUTH_ENVIRONMENT=development` và `AUTH_ALLOWED_ORIGINS` đúng origin loopback đang mở. Cookie và CSRF do server cấp, không lưu token vào browser storage.
 
 ```powershell
 npm run lint     # TypeScript typecheck, chưa phải ESLint
@@ -53,6 +53,8 @@ npm test         # Smoke test Playwright, cần Google Chrome đã cài
 ```
 
 Smoke test tự chạy Vite trên `127.0.0.1:4173`, kiểm routing, refresh, alias/404, màn hình 375/768/1440px, bàn phím và giảm chuyển động. Font/icon được self-host cùng giấy phép; ảnh chưa xác minh được thay bằng SVG placeholder tự tạo. Xem [`frontend/ASSET_SOURCES.md`](frontend/ASSET_SOURCES.md).
+
+E2E thật: `backend\.venv\Scripts\python.exe backend/tests/run_browser.py` từ repository. Cần DB riêng `aurameme_e2e/public` rỗng, revision hiện hành và `backend/e2e.local/.env` (ignored) chứa cấu hình DB/Auth riêng, origin `http://127.0.0.1:4173`; migration chỉ bằng `E2E_DATABASE_URL` tường minh và `alembic -x target=e2e upgrade head`. Runner dùng API8001/Vite4173, từ chối dữ liệu lạ và chỉ cleanup fixtures của lần chạy; không reset/drop database.
 
 ## Chạy backend local (Windows)
 

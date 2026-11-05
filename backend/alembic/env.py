@@ -1,4 +1,4 @@
-"""M1.4 is deliberately restricted to the dedicated PostgreSQL test database."""
+"""Migrations require an explicit isolated test/E2E database; never development."""
 import os
 
 from alembic import context
@@ -11,16 +11,22 @@ from app.config import Settings, load_settings
 from app.db import create_db_engine
 from app.models import Base
 
+target = context.get_x_argument(as_dictionary=True).get("target", "test")
+if target not in {"test", "e2e"}:
+    raise RuntimeError("Migration target must be test or e2e; development is forbidden.")
+database = "aurameme_" + target
+variable = "E2E_DATABASE_URL" if target == "e2e" else "TEST_DATABASE_URL"
+
 
 def run_with_connection(connection):
-    if make_url(load_settings().database_url.get_secret_value()).database == "aurameme_test":
-        raise RuntimeError("Development DATABASE_URL must remain separate from aurameme_test.")
+    if make_url(load_settings().database_url.get_secret_value()).database == database:
+        raise RuntimeError(f"Development DATABASE_URL must remain separate from {database}.")
     if connection.dialect.name != "postgresql":
-        raise RuntimeError("M1.4 requires PostgreSQL aurameme_test.")
-    if connection.execute(text("SELECT current_database()")).scalar_one() != "aurameme_test":
-        raise RuntimeError("M1.4 migrations are allowed only on aurameme_test.")
+        raise RuntimeError(f"Migrations require PostgreSQL {database}.")
+    if connection.execute(text("SELECT current_database()")).scalar_one() != database:
+        raise RuntimeError(f"Migrations are allowed only on {database} for this target.")
     if connection.execute(text("SELECT current_schema()")).scalar_one() != "public":
-        raise RuntimeError("M1.4 requires the public schema of aurameme_test.")
+        raise RuntimeError(f"Migrations require the public schema of {database}.")
     context.configure(connection=connection, target_metadata=Base.metadata,
                       compare_type=True, compare_server_default=True)
     with context.begin_transaction():
@@ -32,15 +38,15 @@ def run_online():
     if connection is not None:
         run_with_connection(connection)
         return
-    value = os.environ.get("TEST_DATABASE_URL")
+    value = os.environ.get(variable)
     if not value:
-        raise RuntimeError("Set TEST_DATABASE_URL explicitly; M1.4 never defaults to development.")
+        raise RuntimeError(f"Set {variable} explicitly; migrations never default to development.")
     try:
         settings = Settings(_env_file=None, database_url=value)
     except ValidationError:
-        raise RuntimeError("Invalid TEST_DATABASE_URL; use a PostgreSQL psycopg URL.") from None
-    if make_url(settings.database_url.get_secret_value()).database != "aurameme_test":
-        raise RuntimeError("TEST_DATABASE_URL must target aurameme_test.")
+        raise RuntimeError(f"Invalid {variable}; use a PostgreSQL psycopg URL.") from None
+    if make_url(settings.database_url.get_secret_value()).database != database:
+        raise RuntimeError(f"{variable} must target {database}.")
     engine = create_db_engine(settings)
     try:
         with engine.begin() as connection:
