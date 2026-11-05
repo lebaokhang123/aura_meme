@@ -122,7 +122,7 @@ class AuthBoundaryMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or not scope["path"].startswith(("/api/v1/auth/", "/api/v1/users/", "/api/v1/posts", "/api/v1/categories", "/api/v1/admin/categories")):
+        if scope["type"] != "http" or not scope["path"].startswith(("/api/v1/auth/", "/api/v1/users/", "/api/v1/posts", "/api/v1/categories", "/api/v1/admin/categories", "/api/v1/media")):
             return await self.app(scope, receive, send)
         runtime = scope["app"].state.auth
         try:
@@ -132,6 +132,31 @@ class AuthBoundaryMiddleware:
             runtime.limiter.check("ip:" + peer, 120, 60)
             limit = {"register": 5, "login": 10}.get(scope["path"].rsplit("/", 1)[-1], 60)
             runtime.limiter.check(scope["path"] + ":" + peer, limit, 60)
+            if scope["path"] == "/api/v1/media" and scope["method"] == "POST":
+                from app.media import MAX_REQUEST_BYTES
+                size = 0
+                lengths = [value for name, value in scope["headers"] if name == b"content-length"]
+                declared = None
+
+                async def bounded_receive():
+                    nonlocal size, declared
+                    if size == 0 and lengths:
+                        if len(lengths) != 1 or not lengths[0].isdigit() or len(lengths[0]) > 10:
+                            raise AuthError(422, "VALIDATION_ERROR", "Invalid Content-Length.")
+                        declared = int(lengths[0])
+                        if declared > MAX_REQUEST_BYTES:
+                            raise AuthError(422, "VALIDATION_ERROR", "Request body too large.")
+                    event = await receive()
+                    if event["type"] == "http.request":
+                        size += len(event.get("body", b""))
+                        if size > MAX_REQUEST_BYTES or (declared is not None and size > declared):
+                            raise AuthError(422, "VALIDATION_ERROR", "Request body too large.")
+                        if not event.get("more_body", False) and declared is not None and size != declared:
+                            raise AuthError(422, "VALIDATION_ERROR", "Incomplete request body.")
+                    return event
+
+                # No body is read until the endpoint's authenticated, CSRF-checked dependency yields.
+                return await self.app(scope, bounded_receive, send)
             if scope["method"] in {"POST", "PATCH", "PUT"}:
                 body_limit = 262144 if scope["path"].startswith("/api/v1/posts") else 16384
                 chunks, size = [], 0

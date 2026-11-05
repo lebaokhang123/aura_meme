@@ -598,8 +598,10 @@ paths:
       - Media
       summary: Tải một ảnh lên và nhận media ID
       operationId: uploadMedia
-      description: Chỉ JPG/PNG/WebP/GIF; backend kiểm signature, MIME, size và quyền sở hữu. Tối đa một ảnh/post
-        P0.
+      description: Một file JPEG/PNG/WebP/GIF, tối đa 5 MiB và 12.000.000 pixels/frame.
+        Ảnh động tối đa 60 frames và 40.000.000 pixels cộng dồn (bao gồm GIF).
+        Backend kiểm MIME, signature và decode thật; xác thực session/CSRF/Origin trước parse.
+        M3.2 lưu bytes private local, metadata PostgreSQL; status ready chỉ trả sau COMMIT, url null.
       security: *id001
       parameters:
       - $ref: '#/components/parameters/CsrfHeader'

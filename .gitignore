@@ -6,6 +6,7 @@ dist/
 .env.*
 !backend/.env.example
 .venv/
+/backend/.local/
 __pycache__/
 *.py[cod]
 .pytest_cache/
