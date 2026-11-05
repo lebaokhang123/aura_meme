@@ -2015,6 +2015,7 @@ components:
       - password
     ProfilePatch:
       type: object
+      additionalProperties: false
       properties:
         display_name:
           type: string

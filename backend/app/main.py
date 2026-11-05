@@ -12,6 +12,7 @@ from pydantic import BaseModel, ValidationError
 from app.config import AuthSettings, ConfigurationError, load_settings
 from app.db import create_db_engine
 from app.auth import router
+from app.account import router as account_router
 from app.security import AuthBoundaryMiddleware, AuthError, AuthRuntime
 
 
@@ -32,6 +33,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AuraMeme API", version="0.1.0", lifespan=lifespan)
 app.include_router(router)
+app.include_router(account_router)
 app.add_middleware(AuthBoundaryMiddleware)
 
 

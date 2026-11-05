@@ -122,7 +122,7 @@ class AuthBoundaryMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or not scope["path"].startswith("/api/v1/auth/"):
+        if scope["type"] != "http" or not scope["path"].startswith(("/api/v1/auth/", "/api/v1/users/")):
             return await self.app(scope, receive, send)
         runtime = scope["app"].state.auth
         try:
@@ -132,7 +132,7 @@ class AuthBoundaryMiddleware:
             runtime.limiter.check("ip:" + peer, 120, 60)
             limit = {"register": 5, "login": 10}.get(scope["path"].rsplit("/", 1)[-1], 60)
             runtime.limiter.check(scope["path"] + ":" + peer, limit, 60)
-            if scope["method"] == "POST":
+            if scope["method"] in {"POST", "PATCH", "PUT"}:
                 chunks, size = [], 0
                 while True:
                     event = await receive()
