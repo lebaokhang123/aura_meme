@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { mockPublicBlog } from './blog-fixtures';
 test.beforeEach(async ({ page }) => {
+  await mockPublicBlog(page);
   await page.route('**/api/v1/users/me', route => route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED' } } }));
 });
 

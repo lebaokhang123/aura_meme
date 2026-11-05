@@ -4,7 +4,7 @@ import base from './playwright.config';
 export default defineConfig({
   ...base,
   testIgnore: [],
-  testMatch: '**/auth-real.spec.ts',
+  testMatch: ['**/auth-real.spec.ts', '**/blog-real.spec.ts'],
   fullyParallel: false,
   workers: 1,
   webServer: {

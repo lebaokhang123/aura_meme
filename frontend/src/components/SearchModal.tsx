@@ -1,11 +1,18 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import type { Page, Post } from '../blog';
+import { useResource } from '../hooks/useResource';
 import { useState, useEffect, useRef } from 'react';
 import { useUI } from '../context/UIContext';
 
 export function SearchModal() {
-  const { isSearchOpen, setSearchOpen, posts, setSelectedCategory } = useUI();
+  const { isSearchOpen, setSearchOpen } = useUI();
+  const navigate = useNavigate();
   const dialog = useRef<HTMLDialogElement>(null);
   const [query, setQuery] = useState('');
+  const [debounced, setDebounced] = useState('');
+  useEffect(() => { const timer = window.setTimeout(() => setDebounced(query.trim()), 250); return () => window.clearTimeout(timer); }, [query]);
+  const results = useResource<Page<Post>>(isSearchOpen ? '/posts?search=' + encodeURIComponent(debounced) + '&page_size=5' : null);
+  const openResults = () => { setSearchOpen(false); navigate('/explore?search=' + encodeURIComponent(query.trim())); };
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -24,11 +31,6 @@ export function SearchModal() {
     if (isSearchOpen) dialog.current?.showModal();
     else dialog.current?.close();
   }, [isSearchOpen]);
-  const matches = posts.filter((post) =>
-    [post.title, post.author.username, post.category].some((value) =>
-      value.toLowerCase().includes(query.trim().toLowerCase()),
-    ),
-  );
   return (
     <dialog
       ref={dialog}
@@ -41,10 +43,10 @@ export function SearchModal() {
     >
       <div className="p-4 border-b border-surface-container-highest">
         <h2 id="search-title" className="font-bold text-sm">
-          Search demo posts
+          Search posts
         </h2>
         <p className="text-xs text-outline mt-1">
-          Search the sample collection. Results filter the feed; post details are not connected.
+          Search published titles and post text. Open a discussion or view all results.
         </p>
       </div>
       <div className="flex gap-3 items-center p-4">
@@ -54,10 +56,11 @@ export function SearchModal() {
         <input
           autoFocus
           type="search"
-          aria-label="Search sample collection"
-          placeholder="Memes, categories, creators..."
+          aria-label="Search posts"
+          placeholder="Titles and post text..."
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); openResults(); } }}
           className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-outline py-2"
         />
         <button
@@ -70,27 +73,14 @@ export function SearchModal() {
         </button>
       </div>
       <div className="max-h-[55dvh] overflow-y-auto px-4 pb-4 flex flex-col gap-2">
-        {matches.length === 0 ? (
-          <p className="text-center py-8 text-sm text-on-surface-variant">No sample posts found</p>
-        ) : (
-          matches.map((post) => (
-            <Link
-              to="/"
-              key={post.id}
-              onClick={() => {
-                setSelectedCategory(post.category);
-                setSearchOpen(false);
-              }}
-              className="p-3 rounded-xl bg-surface-container hover:bg-surface-container-high transition-colors flex gap-3 items-center"
-            >
-              <img src={post.imageUrl} alt="" className="h-12 w-12 object-cover rounded-lg shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs font-semibold line-clamp-2">{post.title}</p>
-                <p className="text-[11px] text-secondary mt-1">#{post.category} · Demo feed</p>
-              </div>
-            </Link>
-          ))
-        )}
+        {results.pending ? <p role="status">Searching…</p> : results.error ? <p role="alert">{results.error}</p> : results.data?.items.length ? results.data.items.map(post => (
+          <Link to={'/posts/' + post.id} key={post.id} onClick={() => setSearchOpen(false)} className="min-h-11 p-3 rounded-xl bg-surface-container hover:bg-surface-container-high">
+            <p className="text-sm font-semibold break-words">{post.title}</p><p className="mt-1 text-xs text-secondary">#{post.category.name}</p>
+          </Link>
+        )) : <p className="text-center py-8 text-sm text-on-surface-variant">No posts found.</p>}
+        <form onSubmit={event => { event.preventDefault(); openResults(); }}>
+          <button className="min-h-11 text-secondary underline">View all results</button>
+        </form>
       </div>
     </dialog>
   );

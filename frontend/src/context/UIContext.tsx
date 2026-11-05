@@ -1,26 +1,18 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { demoPosts } from '../data/demoData';
 
 function useUIState() {
   const [isSearchOpen, setSearchOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [feedTab, setFeedTab] = useState<'hot' | 'new' | 'top'>('hot');
   useEffect(() => {
     if (!toastMessage) return;
     const timer = window.setTimeout(() => setToastMessage(null), 5000);
     return () => window.clearTimeout(timer);
   }, [toastMessage]);
   return {
-    posts: demoPosts,
     isSearchOpen,
     setSearchOpen,
     toastMessage,
     showToast: setToastMessage,
-    selectedCategory,
-    setSelectedCategory,
-    feedTab,
-    setFeedTab,
   };
 }
 

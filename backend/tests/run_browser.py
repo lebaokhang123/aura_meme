@@ -1,12 +1,16 @@
-"""Run real browser Auth against an empty, explicitly provisioned local E2E database."""
+"""Run real Auth/Blog browsers with exact synthetic fixtures on isolated PostgreSQL."""
 from pathlib import Path
 import os
+import json
+import re
 import secrets
 import socket
 import subprocess
 import sys
 import time
 import urllib.request
+from datetime import datetime,timedelta,timezone
+from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -17,7 +21,9 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from app.config import Settings
 from app.db import create_db_engine
-from app.models import Base, User, Role
+from app.models import Base,User,Role,Profile,UserRole,Category,Post,Comment,MediaUpload
+from argon2 import PasswordHasher
+from PIL import Image
 from test_migrations import TABLES, REVISION
 
 
@@ -49,10 +55,32 @@ def main():
         with socket.socket() as probe:
             probe.bind(('127.0.0.1', port))  # Never reuse an unknown API/frontend process.
     prefix = 'e2e_' + secrets.token_hex(6)
-    environment = os.environ | values | {'AURA_E2E_PREFIX': prefix}
+    media_root=ROOT/'e2e.local/media'
+    assert not media_root.is_symlink() and not media_root.is_junction()
+    assert not media_root.exists() or not list(media_root.iterdir()), 'Existing E2E files; refusing cleanup'
+    fixture=ROOT/'e2e.local/fixture.png'
+    assert not fixture.exists(), 'Existing fixture file; refusing overwrite'
+    category_id=uuid4();role_id=uuid4();now=datetime.now(timezone.utc)
+    usernames={prefix,prefix+'_blog',prefix+'_reader'}
+    environment = os.environ | values | {'AURA_E2E_PREFIX': prefix,'AURA_E2E_IMAGE':str(fixture),'MEDIA_STORAGE_ROOT':str(media_root)}
     api = None
     result = 1
+    fixture_created=False
     try:
+        with fixture.open('xb') as output:
+            fixture_created=True
+            Image.new('RGB',(24,24),(120,80,220)).save(output,format='PNG')
+        with engine.begin() as connection:
+            connection.execute(Category.__table__.insert().values(id=category_id,name='Synthetic E2E channel',slug=prefix.replace('_','-'),status='active',created_at=now,updated_at=now))
+            connection.execute(Role.__table__.insert().values(id=role_id,code='USER',description='Synthetic E2E role'))
+            encoded=PasswordHasher().hash('Synthetic blog password!')
+            for suffix in ('_blog','_reader'):
+                ident=uuid4();name=prefix+suffix
+                connection.execute(User.__table__.insert().values(id=ident,username=name,email=name+'@example.com',password_hash=encoded,status='active',created_at=now,updated_at=now))
+                connection.execute(Profile.__table__.insert().values(user_id=ident,display_name='Synthetic Writer' if suffix=='_blog' else 'Synthetic Reader',updated_at=now))
+                connection.execute(UserRole.__table__.insert().values(user_id=ident,role_id=role_id,granted_at=now))
+                if suffix=='_blog':
+                    connection.execute(Post.__table__.insert(),[dict(id=uuid4(),author_id=ident,category_id=category_id,title=f'Synthetic E2E paging {index:02}',content='Synthetic E2E fixture text',status='published',created_at=now-timedelta(seconds=index+1),updated_at=now) for index in range(21)])
         with (ROOT / 'e2e.local/api.log').open('w', encoding='utf-8') as log:
             api = subprocess.Popen([sys.executable, '-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8001'], cwd=ROOT, env=environment, stdout=log, stderr=log)
             for _ in range(100):
@@ -73,19 +101,41 @@ def main():
             api.wait(timeout=10)
         with engine.begin() as connection:
             counts = inventory(connection)
-            allowed = {'users', 'profiles', 'auth_sessions', 'user_roles', 'roles'}
+            allowed = {'users','profiles','auth_sessions','user_roles','roles','categories','posts','comments','media_uploads'}
             assert all(not count for name, count in counts.items() if name not in allowed), 'Unknown E2E business data; refusing cleanup'
             users = connection.execute(select(User.id, User.username, User.email)).all()
-            assert all(row.username == prefix and row.email == prefix + '@example.com' for row in users), 'Unknown E2E identity; refusing cleanup'
+            assert all(row.username in usernames and row.email == row.username + '@example.com' for row in users), 'Unknown E2E identity; refusing cleanup'
             assert set(connection.scalars(select(Role.code))) <= {'USER'}, 'Unknown E2E role; refusing cleanup'
             ids = [row.id for row in users]
+            channels=connection.execute(select(Category.id,Category.slug)).all()
+            assert all(row.id==category_id and row.slug==prefix.replace('_','-') for row in channels), 'Unknown E2E channel'
+            posts=connection.execute(select(Post.id,Post.author_id,Post.category_id,Post.title)).all()
+            assert all(row.author_id in ids and row.category_id==category_id and row.title.startswith('Synthetic E2E') for row in posts), 'Unknown E2E post'
+            post_ids=[row.id for row in posts]
+            comments=connection.execute(select(Comment.author_id,Comment.post_id,Comment.body)).all()
+            assert all(row.author_id in ids and row.post_id in post_ids and row.body.startswith('Synthetic E2E') for row in comments), 'Unknown E2E comment'
+            media=connection.execute(select(MediaUpload.owner_id,MediaUpload.object_key)).all()
+            assert all(row.owner_id in ids and re.fullmatch(r'[0-9a-f]{32}\.(?:png|jpg|webp|gif)',row.object_key) for row in media), 'Unknown E2E media'
+            keys={row.object_key for row in media}
+            files=list(media_root.iterdir()) if media_root.exists() else []
+            assert {file.name for file in files}==keys and all(file.is_file() and not file.is_symlink() and not file.is_junction() for file in files), 'Unknown E2E bytes; refusing cleanup'
+            manifest=ROOT/('e2e.local/'+prefix+'-cleanup.json')
+            with manifest.open('x',encoding='utf-8') as output:json.dump({'users':[str(ident) for ident in ids],'media_keys':sorted(keys)},output)
+            connection.execute(Comment.__table__.delete().where(Comment.post_id.in_(post_ids)))
+            connection.execute(Post.__table__.delete().where(Post.id.in_(post_ids)))
             for name in ('auth_sessions', 'user_roles', 'profiles'):
                 table = Base.metadata.tables[name]
                 connection.execute(table.delete().where(table.c.user_id.in_(ids)))
+            connection.execute(MediaUpload.__table__.delete().where(MediaUpload.owner_id.in_(ids)))
             connection.execute(User.__table__.delete().where(User.id.in_(ids)))
             connection.execute(Role.__table__.delete().where(Role.code == 'USER'))
+            connection.execute(Category.__table__.delete().where(Category.id==category_id))
             assert not any(inventory(connection).values()), 'E2E cleanup incomplete'
             assert connection.execute(text("SELECT c.oid,c.relname,c.relfilenode FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' ORDER BY c.relname")).all() == objects, 'E2E schema objects changed'
+        for file in files:file.unlink()
+        if fixture_created:fixture.unlink()
+        manifest.unlink()
+        assert not media_root.exists() or not list(media_root.iterdir()), 'E2E file cleanup incomplete'
         engine.dispose()
         print('E2E fixture cleanup PASS: original schema/revision preserved, zero rows; no DROP/reset.')
     return result

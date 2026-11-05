@@ -17,11 +17,12 @@ export async function api<T>(path: string, options: { method?: string; body?: un
     const { csrf_token } = await api<{ csrf_token: string }>('/auth/csrf');
     headers['X-CSRF-Token'] = csrf_token;
   }
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  const multipart = options.body instanceof FormData;
+  if (options.body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   let response: Response;
   try {
     response = await fetch('/api/v1' + path, { method, headers, credentials: 'include', cache: 'no-store',
-      signal: options.signal, body: options.body === undefined ? undefined : JSON.stringify(options.body) });
+      signal: options.signal, body: options.body === undefined ? undefined : multipart ? options.body as FormData : JSON.stringify(options.body) });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
     throw new ApiError(0, 'NETWORK_ERROR');
