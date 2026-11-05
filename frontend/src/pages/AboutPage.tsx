@@ -51,7 +51,7 @@ export function AboutPage() {
                 {
                   icon: 'code',
                   title: 'Build it step by step',
-                  text: 'This frontend is a local preview. Accounts and community services are still to come.',
+                  text: 'Core APIs are implemented. This preview is being connected to live community services.',
                 },
               ].map((item) => (
                 <div
