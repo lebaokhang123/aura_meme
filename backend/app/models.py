@@ -75,6 +75,14 @@ class UserProgress(Base):
     )
 
 
+class Wallet(Base):
+    __tablename__ = "wallets"
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
+    khi_van_balance: Mapped[int] = mapped_column(BigInteger)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (CheckConstraint("khi_van_balance >= 0", name="balance_nonnegative"),)
+
+
 class AuraLedger(Base):
     __tablename__ = "aura_ledger"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)

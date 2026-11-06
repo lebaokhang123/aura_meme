@@ -20,12 +20,12 @@ from schema_guard import assert_auxiliary_objects
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TABLES = {
+P0_TABLES = {
     "users", "roles", "user_roles", "profiles", "auth_sessions", "categories",
     "media_uploads", "posts", "comments", "contact_messages", "admin_audit_logs",
-    "post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger",
 }
-REVISION = "0003_aura_draft"
+TABLES = P0_TABLES | {"post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger", "wallets"}
+REVISION = "0004_wallet_read"
 
 
 def config():
@@ -56,7 +56,7 @@ def development_inventory(engine):
 
 @pytest.mark.integration
 def test_interactions_revision_preserves_p0_objects(migrated):
-    p0 = TABLES - {"post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger"}
+    p0 = P0_TABLES
     def inventory():
         with migrated.connect() as connection:
             assert all(connection.scalar(text(f'SELECT count(*) FROM "{name}"')) == 0 for name in TABLES)
@@ -73,7 +73,7 @@ def test_interactions_revision_preserves_p0_objects(migrated):
 
 @pytest.mark.integration
 def test_draft_revision_preserves_existing_tables_and_guards(migrated):
-    old = TABLES - {"reward_policy_versions", "user_progress", "aura_ledger"}
+    old = P0_TABLES | {"post_reactions", "post_bookmarks"}
     def inventory():
         with migrated.connect() as connection:
             return connection.execute(text("SELECT c.oid,c.relname,c.relfilenode FROM pg_class c LEFT JOIN pg_index i ON i.indexrelid=c.oid WHERE c.relnamespace='public'::regnamespace AND (c.relname=ANY(:names) OR i.indrelid IN (SELECT oid FROM pg_class WHERE relnamespace='public'::regnamespace AND relname=ANY(:names))) ORDER BY c.relname"), {"names": sorted(old)}).all()
@@ -89,6 +89,24 @@ def test_draft_revision_preserves_existing_tables_and_guards(migrated):
     assert inventory() == before
     with migrated.connect() as connection:
         assert_auxiliary_objects(connection)
+
+
+@pytest.mark.integration
+def test_wallet_revision_roundtrip_preserves_existing_schema(migrated):
+    old = TABLES - {"wallets"}
+    def inventory():
+        with migrated.connect() as connection:
+            return connection.execute(text("SELECT oid,relname,relfilenode FROM pg_class WHERE relnamespace='public'::regnamespace AND relname=ANY(:names) ORDER BY relname"), {"names":sorted(old)}).all()
+    with migrated.connect() as connection:
+        assert all(connection.scalar(text(f'SELECT count(*) FROM "{name}"')) == 0 for name in TABLES)
+    before=inventory()
+    migrate(migrated, "downgrade", "0003_aura_draft")
+    with migrated.connect() as connection:
+        assert set(inspect(connection).get_table_names()) == old | {"alembic_version"}
+        assert_auxiliary_objects(connection)
+    migrate(migrated,"upgrade","head")
+    migrate(migrated,"upgrade","head")
+    assert inventory()==before
 
 
 @pytest.fixture(scope="module")
