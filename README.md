@@ -107,7 +107,7 @@ raise SystemExit(subprocess.call([sys.executable, "-m", "pytest", "-q"], env=env
 '@ | & .\.venv\Scripts\python.exe -
 ```
 
-Test migration thực hiện upgrade → upgrade lại → downgrade base → upgrade, so DBML/metadata và thử constraint trong transaction rollback. **Downgrade xóa các bảng của migration**: chỉ dùng DB test chuyên dụng. Bộ test từ chối schema lạ hoặc bảng ứng dụng có dữ liệu; bản thân downgrade cũng khóa các bảng P0 và từ chối nếu còn hàng, không tự xóa dữ liệu để chạy tiếp. Không reset database/volume. Kết thúc để DB test ở `0007_inventory` (head; 22 bảng, gồm Aura và check-in/wallet ledger), không có dữ liệu nghiệp vụ mẫu. Không áp dụng schema/rollback vào development ở M1.4.
+Test migration thực hiện upgrade → upgrade lại → downgrade base → upgrade, so DBML/metadata và thử constraint trong transaction rollback. **Downgrade xóa các bảng của migration**: chỉ dùng DB test chuyên dụng. Bộ test từ chối schema lạ hoặc bảng ứng dụng có dữ liệu; bản thân downgrade cũng khóa các bảng P0 và từ chối nếu còn hàng, không tự xóa dữ liệu để chạy tiếp. Không reset database/volume. Kết thúc để DB test ở `0008_vault_odds` (head; 26 bảng, gồm Aura và check-in/wallet ledger), không có dữ liệu nghiệp vụ mẫu. Không áp dụng schema/rollback vào development ở M1.4.
 
 ### Authentication (M2.1)
 
@@ -150,3 +150,5 @@ Test riêng: `python -m pytest tests/test_media.py tests/test_media_transactions
 Catalog draft: từ `backend`, dùng `python -m app.catalog <catalog.json>` để kiểm manifest version1 và ảnh local (SHA256/MIME/provenance). Lệnh chỉ validate, không nhập DB, không publish bytes hoặc duyệt quyền. Importer test-only giữ asset inactive; chưa có catalog phát hành.
 
 `CATALOG_STORAGE_ROOT` mặc định `backend/.local/catalog`, tách khỏi media upload. GET `/api/v1/catalog/assets/{id}` chỉ trả PNG chuẩn hóa khi item active/rights approved và file hash-addressed đã kiểm; chưa có catalog release. Inventory/equipment dùng session/CSRF, không mint vật phẩm.
+
+GET `/api/v1/vault/cases` chỉ liệt kê common case active có odds/policy published hợp lệ; chưa có dữ liệu phát hành nên danh sách rỗng. Odds engine hai tầng dùng `secrets.randbelow`; fixtures/Monte Carlo không phải xác suất được duyệt.

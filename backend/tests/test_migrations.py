@@ -25,8 +25,8 @@ P0_TABLES = {
     "media_uploads", "posts", "comments", "contact_messages", "admin_audit_logs",
 }
 AURA_TABLES = P0_TABLES | {"post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger"}
-TABLES = AURA_TABLES | {"wallets", "wallet_transactions", "daily_checkins", "asset_items", "user_inventory", "user_equipment"}
-REVISION = "0007_inventory"
+TABLES = AURA_TABLES | {"wallets", "wallet_transactions", "daily_checkins", "asset_items", "user_inventory", "user_equipment", "case_definitions", "case_loot_tables", "case_loot_rarities", "case_pool_items"}
+REVISION = "0008_vault_odds"
 
 
 def config():

@@ -83,6 +83,68 @@ class Wallet(Base):
     __table_args__ = (CheckConstraint("khi_van_balance >= 0", name="balance_nonnegative"),)
 
 
+class CaseDefinition(Base):
+    __tablename__ = "case_definitions"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    slug: Mapped[str] = mapped_column(Text, unique=True)
+    label: Mapped[str] = mapped_column(Text)
+    cost_khi_van: Mapped[int] = mapped_column(BigInteger)
+    status: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint("cost_khi_van >= 0", name="cost_nonnegative"),
+        CheckConstraint("status IN ('draft','active','retired')", name="status"),
+        CheckConstraint("btrim(slug) <> '' AND btrim(label) <> ''", name="nonempty"),
+    )
+
+
+class CaseLootTable(Base):
+    __tablename__ = "case_loot_tables"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("case_definitions.id", ondelete="RESTRICT"))
+    odds_version: Mapped[int] = mapped_column(Integer)
+    band_no: Mapped[int] = mapped_column(SmallInteger)
+    min_earned_xp: Mapped[int] = mapped_column(BigInteger)
+    max_earned_xp: Mapped[int | None] = mapped_column(BigInteger)
+    policy_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("reward_policy_versions.id", ondelete="RESTRICT"))
+    status: Mapped[str] = mapped_column(Text)
+    active_from: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint("case_id", "odds_version", "band_no", name="uq_case_loot_tables_case_version_band"),
+        UniqueConstraint("case_id", "id", name="uq_case_loot_tables_case_id_id"),
+        CheckConstraint("odds_version > 0 AND band_no > 0 AND min_earned_xp >= 0", name="positive_version_band"),
+        CheckConstraint("max_earned_xp IS NULL OR max_earned_xp > min_earned_xp", name="range"),
+        CheckConstraint("status IN ('draft','published','retired')", name="status"),
+        Index("ix_case_loot_tables_case_status_from", "case_id", "status", "active_from"),
+    )
+
+
+class CaseLootRarity(Base):
+    __tablename__ = "case_loot_rarities"
+    loot_table_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("case_loot_tables.id", ondelete="RESTRICT"), primary_key=True)
+    rarity: Mapped[str] = mapped_column(Text, primary_key=True)
+    weight_bps: Mapped[int] = mapped_column(Integer)
+    __table_args__ = (
+        CheckConstraint("rarity IN ('D','C','B','A','S')", name="rarity"),
+        CheckConstraint("weight_bps BETWEEN 0 AND 10000", name="weight_bps"),
+    )
+
+
+class CasePoolItem(Base):
+    __tablename__ = "case_pool_items"
+    loot_table_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    asset_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    rarity: Mapped[str] = mapped_column(Text)
+    item_weight: Mapped[int] = mapped_column(Integer)
+    __table_args__ = (
+        ForeignKeyConstraint(["loot_table_id", "rarity"], ["case_loot_rarities.loot_table_id", "case_loot_rarities.rarity"], ondelete="RESTRICT", name="fk_case_pool_items_bucket"),
+        ForeignKeyConstraint(["asset_id", "rarity"], ["asset_items.id", "asset_items.rarity"], ondelete="RESTRICT", name="fk_case_pool_items_asset_rarity"),
+        CheckConstraint("item_weight > 0", name="item_weight"),
+    )
+
+
 class UserInventory(Base):
     __tablename__ = "user_inventory"
     user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)

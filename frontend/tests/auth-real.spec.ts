@@ -44,6 +44,10 @@ test('real register/login/profile/password/logout and revoked second session', a
   expect(unequip.status()).toBe(200);
   expect((await unequip.json()).asset_id).toBeNull();
   expect((await page.request.get('/api/v1/catalog/assets/00000000-0000-0000-0000-000000000000')).status()).toBe(404);
+  const cases = await page.request.get('/api/v1/vault/cases');
+  expect(cases.status()).toBe(200);
+  expect((await cases.json()).items).toEqual([]);
+  expect((await page.request.get('/api/v1/vault/cases/00000000-0000-0000-0000-000000000000')).status()).toBe(404);
   const second = await browser.newContext();
   const other = await second.newPage();
   try {
