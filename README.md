@@ -107,7 +107,7 @@ raise SystemExit(subprocess.call([sys.executable, "-m", "pytest", "-q"], env=env
 '@ | & .\.venv\Scripts\python.exe -
 ```
 
-Test migration thực hiện upgrade → upgrade lại → downgrade base → upgrade, so DBML/metadata và thử constraint trong transaction rollback. **Downgrade xóa các bảng của migration**: chỉ dùng DB test chuyên dụng. Bộ test từ chối schema lạ hoặc bảng ứng dụng có dữ liệu; bản thân downgrade cũng khóa các bảng P0 và từ chối nếu còn hàng, không tự xóa dữ liệu để chạy tiếp. Không reset database/volume. Kết thúc để DB test ở `0008_vault_odds` (head; 26 bảng, gồm Aura và check-in/wallet ledger), không có dữ liệu nghiệp vụ mẫu. Không áp dụng schema/rollback vào development ở M1.4.
+Test migration thực hiện upgrade → upgrade lại → downgrade base → upgrade, so DBML/metadata và thử constraint trong transaction rollback. **Downgrade xóa các bảng của migration**: chỉ dùng DB test chuyên dụng. Bộ test từ chối schema lạ hoặc bảng ứng dụng có dữ liệu; bản thân downgrade cũng khóa các bảng P0 và từ chối nếu còn hàng, không tự xóa dữ liệu để chạy tiếp. Không reset database/volume. Kết thúc để DB test ở `0009_vault_open` (head; 28 bảng, gồm Aura và check-in/wallet ledger), không có dữ liệu nghiệp vụ mẫu. Không áp dụng schema/rollback vào development ở M1.4.
 
 ### Authentication (M2.1)
 
@@ -131,7 +131,7 @@ Test riêng: `python -m pytest tests/test_account.py tests/test_account_concurre
 
 Public GET `/api/v1/categories`, `/api/v1/posts`, `/api/v1/posts/{id}`; Admin category GET/POST/PATCH/DELETE dưới `/api/v1/admin/categories`; post POST/PATCH/DELETE chỉ cho author. Mutation cần session/CSRF/Origin, Admin cần role DB. Category mới active, post mặc định draft; PATCH không gửi status giữ nguyên. Category DELETE chỉ hide với audit atomic; post DELETE là soft delete giữ FK. Public không hiện bài/category/author bị ẩn/xóa/khóa hoặc media không hợp lệ.
 
-PUT/DELETE `/api/v1/posts/{id}/reactions` và `/bookmark` cần session/CSRF; mỗi user/post có một reaction và một bookmark, retry không tạo hàng trùng. Chưa phát XP/Khí Vận hoặc bật nút reaction/bookmark trên UI. Aura hiện chỉ có simulation policy draft trên `aurameme_test`, không có reward hook; GET `/api/v1/aura/progress` và `/api/v1/leaderboard` trả503/NOT_READY khi thiếu policy published hợp lệ hoặc account state cần thiết; các số XP/caps/level trong test không phải chính sách sản phẩm. POST `/api/v1/aura/check-in` kiểm session/CSRF/Origin rồi trả503/NOT_READY; chỉ có core simulation test-only, chưa phát thưởng hoặc cấp weekly icon.
+PUT/DELETE `/api/v1/posts/{id}/reactions` và `/bookmark` cần session/CSRF; mỗi user/post có một reaction và một bookmark, retry không tạo hàng trùng. Chưa phát XP/Khí Vận hoặc bật nút reaction/bookmark trên UI. Aura hiện chỉ có simulation policy draft trên `aurameme_test`, không có reward hook; GET `/api/v1/aura/progress` và `/api/v1/leaderboard` trả503/NOT_READY khi thiếu policy published hợp lệ hoặc account state cần thiết; các số XP/caps/level trong test không phải chính sách sản phẩm. POST `/api/v1/aura/check-in` kiểm session/CSRF/Origin rồi trả503/NOT_READY; chỉ có core simulation test-only, chưa phát thưởng hoặc cấp weekly icon ở runtime.
 
 Search literal, sort allowlist/tie-break UUID, pagination page>=1/page_size<=100. Chưa URL provider nên media/avatar URL null; comments_count optional omit. Content là text JSON, chưa có renderer/upload/comment API. Test: `python -m pytest tests/test_blog.py tests/test_blog_concurrency.py -q` với TEST_DATABASE_URL như trên, chỉ test DB riêng preflight sạch và postflight/cleanup, không migrate development.
 
@@ -152,3 +152,5 @@ Catalog draft: từ `backend`, dùng `python -m app.catalog <catalog.json>` đ�
 `CATALOG_STORAGE_ROOT` mặc định `backend/.local/catalog`, tách khỏi media upload. GET `/api/v1/catalog/assets/{id}` chỉ trả PNG chuẩn hóa khi item active/rights approved và file hash-addressed đã kiểm; chưa có catalog release. Inventory/equipment dùng session/CSRF, không mint vật phẩm.
 
 GET `/api/v1/vault/cases` chỉ liệt kê common case active có odds/policy published hợp lệ; chưa có dữ liệu phát hành nên danh sách rỗng. Odds engine hai tầng dùng `secrets.randbelow`; fixtures/Monte Carlo không phải xác suất được duyệt.
+
+UI `/vault` đọc case/inventory và equip từ API; mở case hiện trả503/NOT_READY sau session/CSRF/Origin, không grant/debit/quota. Retry key được giữ theo user/case trong sessionStorage, không lưu credentials hoặc tự chọn reward. Atomicopen/weeklygrants chỉ có trong draft simulations trên DB test.

@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 test('About presents confirmed members and the current integration boundary', async ({ page }) => {
   await page.goto('/about');
   await expect(page.locator('#team article h3')).toHaveText(['Lê Bảo Khang', 'Phan Trung Kiên']);
-  await expect(page.getByText('Core community APIs are connected. Media display, Aura and Vault remain unavailable.')).toBeVisible();
+  await expect(page.getByText('Core community APIs are connected. Post media display and rewards remain unavailable. Vault preview uses published data.')).toBeVisible();
   await expect(page.locator('#team img')).toHaveCount(0);
   await expect(page.locator('#team').getByRole('link', { name: 'Contact', exact: true })).toHaveAttribute('href', '/contact');
 });
@@ -57,7 +57,7 @@ for (const [alias, target] of [
     await expect(page).toHaveURL(`http://127.0.0.1:4173${target}`);
   });
 }
-for (const route of ['/rank', '/vault', '/api-practice', '/something-missing']) {
+for (const route of ['/rank', '/api-practice', '/something-missing']) {
   test(`${route} is not a pretend feature route`, async ({ page }) => {
     await page.goto(route);
     await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();

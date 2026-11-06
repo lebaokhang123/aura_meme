@@ -7,6 +7,7 @@ import { ApiError, errorMessage } from '../api';
 const navigation = [
   { label: 'Home', to: '/' },
   { label: 'Explore', to: '/explore' },
+  { label: 'Vault', to: '/vault' },
   { label: 'About', to: '/about' },
   { label: 'Contact', to: '/contact' },
 ];

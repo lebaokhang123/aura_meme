@@ -10,6 +10,7 @@ from app.aura import lock_users, policy_config, simulation_only, update_progress
 from app.aura_clock import effective_day
 from app.auth import CSRF_HEADER, ERRORS
 from app.auth_schemas import ErrorResponse
+from app.inventory_grants import weekly_grant
 from app.models import AuraLedger, DailyCheckin, UserProgress, Wallet, WalletTransaction
 from app.permissions import require_account_csrf
 from app.security import AuthError
@@ -114,4 +115,6 @@ def _checkin(db, policy_id, owner, now):
     receipt = DailyCheckin(user_id=owner, effective_day=day, aura_ledger_id=entry.id, wallet_transaction_id=credit.id, claimed_at=now)
     db.add(receipt)
     db.flush()
+    if config.checkin.weekly_asset_id is not None:
+        weekly_grant(db, owner, config.checkin.weekly_asset_id, policy_id, day, now)
     return receipt_result(db, receipt, streak, False)

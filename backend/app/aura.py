@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 from sqlalchemy import func, select, text
 
 from app.comments import lock_public_post
@@ -17,6 +17,14 @@ class CheckinSchedule(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     xp_by_weekday: list[Positive] = Field(min_length=7, max_length=7)
     khi_by_weekday: list[Positive] = Field(min_length=7, max_length=7)
+    weekly_asset_id: Annotated[UUID, Field(strict=False)] | None = None
+
+
+class VaultSchedule(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    daily_free: StrictBool
+    max_daily_opens: Positive
+    duplicate_mode: Literal["quantity"]
 
 
 class DraftPolicy(BaseModel):
@@ -25,6 +33,7 @@ class DraftPolicy(BaseModel):
     daily_cap: Positive
     levels: list[Annotated[int, Field(strict=True, ge=0, le=2**63 - 1)]] = Field(min_length=1, max_length=1000)
     checkin: CheckinSchedule | None = None
+    vault: VaultSchedule | None = None
 
     @field_validator("levels")
     @classmethod
