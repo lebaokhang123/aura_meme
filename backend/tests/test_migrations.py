@@ -22,8 +22,9 @@ ROOT = Path(__file__).resolve().parents[1]
 TABLES = {
     "users", "roles", "user_roles", "profiles", "auth_sessions", "categories",
     "media_uploads", "posts", "comments", "contact_messages", "admin_audit_logs",
+    "post_reactions", "post_bookmarks",
 }
-REVISION = "0001_p0"
+REVISION = "0002_interactions"
 
 
 def config():
@@ -50,6 +51,23 @@ def development_inventory(engine):
             quoted = connection.dialect.identifier_preparer.quote(table)
             counts[table] = connection.execute(text(f'SELECT count(*) FROM {quoted}')).scalar_one()
         return objects, counts
+
+
+@pytest.mark.integration
+def test_interactions_revision_preserves_p0_objects(migrated):
+    p0 = TABLES - {"post_reactions", "post_bookmarks"}
+    def inventory():
+        with migrated.connect() as connection:
+            assert all(connection.scalar(text(f'SELECT count(*) FROM "{name}"')) == 0 for name in TABLES)
+            return connection.execute(text("SELECT oid,relname,relfilenode FROM pg_class WHERE relnamespace='public'::regnamespace AND relname=ANY(:names) ORDER BY relname"), {"names": sorted(p0)}).all()
+    before = inventory()
+    migrate(migrated, "downgrade", "0001_p0")
+    with migrated.connect() as connection:
+        assert set(inspect(connection).get_table_names()) == p0 | {"alembic_version"}
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0001_p0"
+    migrate(migrated, "upgrade", "head")
+    migrate(migrated, "upgrade", "head")
+    assert inventory() == before
 
 
 @pytest.fixture(scope="module")

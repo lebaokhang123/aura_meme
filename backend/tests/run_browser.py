@@ -128,6 +128,9 @@ def main():
             contact_ids=[row.id for row in contacts]
             targets={'user':ids,'post':post_ids,'category':category_ids,'contact':contact_ids}
             assert all(row.actor_id in ids and row.target_type in targets and row.target_id in {str(ident) for ident in targets[row.target_type]} for row in connection.execute(select(AdminAuditLog.actor_id,AdminAuditLog.target_type,AdminAuditLog.target_id))), 'Unknown E2E audit'
+            for name in ('post_reactions', 'post_bookmarks'):
+                table = Base.metadata.tables[name]
+                assert all(row.user_id in ids and row.post_id in post_ids for row in connection.execute(select(table.c.user_id, table.c.post_id))), 'Unknown E2E interaction'
             media=connection.execute(select(MediaUpload.owner_id,MediaUpload.object_key)).all()
             assert all(row.owner_id in ids and re.fullmatch(r'[0-9a-f]{32}\.(?:png|jpg|webp|gif)',row.object_key) for row in media), 'Unknown E2E media'
             keys={row.object_key for row in media}
@@ -138,6 +141,9 @@ def main():
             connection.execute(AdminAuditLog.__table__.delete().where(AdminAuditLog.actor_id.in_(ids)))
             connection.execute(ContactMessage.__table__.delete().where(ContactMessage.id.in_(contact_ids)))
             connection.execute(Comment.__table__.delete().where(Comment.post_id.in_(post_ids)))
+            for name in ('post_reactions', 'post_bookmarks'):
+                table = Base.metadata.tables[name]
+                connection.execute(table.delete().where(table.c.user_id.in_(ids), table.c.post_id.in_(post_ids)))
             connection.execute(Post.__table__.delete().where(Post.id.in_(post_ids)))
             for name in ('auth_sessions', 'user_roles', 'profiles'):
                 table = Base.metadata.tables[name]

@@ -55,6 +55,16 @@ test('real draft refresh, upload, publish, pagination, comments and owner deleti
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   await page.screenshot({ path: test.info().outputPath('home-375.png'), fullPage: true });
   await page.getByRole('link', { name: 'Synthetic E2E published', exact: true }).click();
+  const token = (await (await page.request.get('/api/v1/auth/csrf')).json()).csrf_token;
+  const headers = { Origin: 'http://127.0.0.1:4173', 'X-CSRF-Token': token };
+  for (const reaction_type of ['like', 'like', 'fire']) {
+    const response = await page.request.put('/api/v1/posts/' + id + '/reactions', { headers, data: { reaction_type } });
+    expect(response.status()).toBe(200);
+    expect(await response.json()).toEqual({ post_id: id, reaction_type });
+  }
+  for (let repeat = 0; repeat < 2; repeat++) expect((await page.request.put('/api/v1/posts/' + id + '/bookmark', { headers })).status()).toBe(204);
+  expect((await page.request.delete('/api/v1/posts/' + id + '/reactions', { headers })).status()).toBe(204);
+  expect((await page.request.delete('/api/v1/posts/' + id + '/bookmark', { headers })).status()).toBe(204);
   await page.getByLabel('Write a comment').fill('Synthetic E2E author comment');
   await page.getByRole('button', { name: 'Post comment', exact: true }).click();
   await expect(page.getByText('Synthetic E2E author comment', { exact: true })).toBeVisible();
