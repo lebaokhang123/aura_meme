@@ -12,7 +12,7 @@ test('About presents confirmed members and the current integration boundary', as
   await expect(page.locator('#team article h3')).toHaveText(['Lê Bảo Khang', 'Phan Trung Kiên']);
   await expect(page.getByText('Core APIs are implemented. This preview is being connected to live community services.')).toBeVisible();
   await expect(page.locator('#team img')).toHaveCount(0);
-  await expect(page.locator('#team').getByRole('link', { name: 'Contact preview', exact: true })).toHaveAttribute('href', '/contact');
+  await expect(page.locator('#team').getByRole('link', { name: 'Contact', exact: true })).toHaveAttribute('href', '/contact');
 });
 
 for (const width of [375, 768, 1440]) {
@@ -57,7 +57,7 @@ for (const [alias, target] of [
     await expect(page).toHaveURL(`http://127.0.0.1:4173${target}`);
   });
 }
-for (const route of ['/rank', '/vault', '/admin', '/api-practice', '/something-missing']) {
+for (const route of ['/rank', '/vault', '/api-practice', '/something-missing']) {
   test(`${route} is not a pretend feature route`, async ({ page }) => {
     await page.goto(route);
     await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
@@ -103,7 +103,7 @@ test('team section receives focus after keyboard navigation', async ({ page }) =
   await expect(page.locator('#team')).toBeFocused();
 });
 
-test('unconnected actions and mismatched registration do not invent success', async ({ page }) => {
+test('mismatched registration and Guest post guard do not send writes', async ({ page }) => {
   const writes: string[] = [];
   page.on('request', (request) => {
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method())) writes.push(request.url());
@@ -116,13 +116,6 @@ test('unconnected actions and mismatched registration do not invent success', as
   await page.getByLabel('Confirm password').fill('different-password');
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('alert')).toContainText('Passwords do not match');
-  await page.goto('/contact');
-  await page.getByLabel('Your name').fill('Preview visitor');
-  await page.getByLabel('Email address').fill('preview@example.com');
-  await page.getByLabel('Subject').selectOption('feedback');
-  await page.getByLabel('Message', { exact: true }).fill('A local preview message.');
-  await page.getByRole('button', { name: 'Preview message' }).click();
-  await expect(page.getByRole('status')).toContainText('not sent or saved');
   await page.goto('/');
   await page.getByRole('link', { name: 'Create post', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);

@@ -17,6 +17,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { MyPostsPage } from './pages/MyPostsPage';
 import { PostEditorPage } from './pages/PostEditorPage';
 import { PostDetailPage } from './pages/PostDetailPage';
+import { AdminPage } from './pages/AdminPage';
 
 function AppContent() {
   const { toastMessage } = useUI();
@@ -33,6 +34,7 @@ function AppContent() {
       '/settings': 'Settings',
       '/my-posts': 'My posts',
       '/posts/new': 'Create post',
+      '/admin': 'Admin',
     };
     document.title = `${titles[pathname] ?? (pathname.startsWith('/profile/') ? 'Profile' : pathname.startsWith('/my-posts/') ? 'Edit post' : pathname.startsWith('/posts/') ? 'Post' : 'Page not found')} — AuraMeme`;
     if (hash === '#team') {
@@ -59,7 +61,7 @@ function AppContent() {
           className="preview-note px-4 py-2.5 text-center text-xs border-b border-primary/15 bg-primary/5 text-on-surface-variant"
         >
           <strong className="text-primary">Community preview</strong> · Accounts and blog use the API.
-          Media display, messages and rewards are not connected.
+          Contact uses the Admin inbox. Media display and rewards are not available.
         </div>
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -74,6 +76,7 @@ function AppContent() {
           <Route path="/my-posts/:postId" element={<AccountBoundary><PostEditorPage /></AccountBoundary>} />
           <Route path="/posts/new" element={<AccountBoundary><PostEditorPage /></AccountBoundary>} />
           <Route path="/posts/:postId" element={<PostDetailPage />} />
+          <Route path="/admin" element={<AccountBoundary><AdminPage /></AccountBoundary>} />
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/about-us" element={<Navigate to="/about" replace />} />
           <Route path="/team" element={<Navigate to="/about#team" replace />} />

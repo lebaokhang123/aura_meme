@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { api, errorMessage } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 const faqs = [
   {
     question: 'Can I send a message from this form?',
-    answer: 'Not yet. This local preview lets you explore the form without sending or saving your message.',
+    answer: 'Yes. Messages are stored in the project Admin inbox. Sending does not send an email automatically.',
   },
   {
     question: 'Where can I follow the project?',
@@ -20,6 +22,9 @@ const faqs = [
 export function ContactPage() {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const { refresh } = useAuth();
   return (
     <div className="relative w-full isolate">
       <div aria-hidden="true" className="absolute inset-0 overflow-clip pointer-events-none -z-10">
@@ -42,8 +47,7 @@ export function ContactPage() {
               </span>
             </h1>
             <p className="text-sm text-on-surface-variant leading-relaxed mt-4">
-              Feedback, a new category, or a meme worth talking about? This is a preview of how you will reach
-              the team.
+              Feedback, a new category, or a meme worth talking about? Leave a message for the team.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-7">
               <a
@@ -105,20 +109,31 @@ export function ContactPage() {
           </section>
           <section className="lg:col-span-6 min-w-0 bg-surface-container-low/95 rounded-xl p-6 sm:p-8 border border-surface-container-highest/30 shadow-2xl">
             <span className="text-[10px] uppercase tracking-widest text-primary font-semibold">
-              Contact form preview
+              Contact the team
             </span>
             <h2 className="font-['Plus_Jakarta_Sans'] font-bold text-2xl mt-2">Send us a Message</h2>
             <p id="contact-preview" className="text-xs text-on-surface-variant leading-relaxed mt-3 mb-6">
-              Messages are not connected yet. Please use sample details here; nothing is sent or saved.
+              Your message goes to the Admin inbox. No email or reward is sent automatically.
             </p>
             <form
               aria-describedby="contact-preview"
               className="flex flex-col gap-5"
-              onSubmit={(event) => {
+              onSubmit={async (event) => {
                 event.preventDefault();
-                setMessage('Contact is not connected yet. Your message was not sent or saved.');
+                if (busy) return;
+                const form = event.currentTarget, data = new FormData(form);
+                setBusy(true); setSuccess(false); setMessage('');
+                try {
+                  const receipt = await api<{ id: string; status: 'new' }>('/contact', { method: 'POST', body: {
+                    name: data.get('name'), email: data.get('email'), subject: data.get('subject'), body: data.get('message'),
+                  } });
+                  setSuccess(true); setMessage('Message received. Reference: ' + receipt.id); form.reset();
+                  void refresh();
+                } catch (error) { setMessage(errorMessage(error)); }
+                finally { setBusy(false); }
               }}
             >
+              <fieldset disabled={busy} className="contents">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="contact-name" className="text-xs font-semibold block mb-2">
@@ -127,6 +142,7 @@ export function ContactPage() {
                   <input
                     id="contact-name"
                     name="name"
+                    maxLength={100}
                     autoComplete="name"
                     required
                     placeholder="Your name"
@@ -174,6 +190,7 @@ export function ContactPage() {
                 <textarea
                   id="contact-message"
                   name="message"
+                  maxLength={4000}
                   rows={6}
                   required
                   placeholder="What's on your mind?"
@@ -182,18 +199,20 @@ export function ContactPage() {
               </div>
               <button
                 type="submit"
+                disabled={busy}
                 className="min-h-12 rounded-xl bg-gradient-to-r from-primary-container via-primary-fixed-dim to-secondary text-on-primary-fixed font-['Plus_Jakarta_Sans'] font-bold text-sm shadow-lg transition-shadow hover:shadow-primary/25 inline-flex items-center justify-center gap-2"
               >
-                Preview message
+                {busy ? 'Sending…' : 'Send message'}
                 <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
                   send
                 </span>
               </button>
+              </fieldset>
             </form>
             {message && (
               <p
-                role="status"
-                className="mt-4 bg-secondary/10 border border-secondary/20 rounded-lg p-3 text-xs text-secondary leading-relaxed"
+                role={success ? 'status' : 'alert'}
+                className="mt-4 bg-secondary/10 border border-secondary/20 rounded-lg p-3 text-xs text-secondary leading-relaxed break-words"
               >
                 {message}
               </p>

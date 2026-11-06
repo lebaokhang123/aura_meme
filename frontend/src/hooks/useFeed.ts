@@ -3,10 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import type { Category, Page, Post } from '../blog';
 import { useResource } from './useResource';
 
-export function useCategories() {
+export function useCategories(endpoint: string | null = '/categories') {
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<Category[]>([]);
-  const resource = useResource<Page<Category>>('/categories?page=' + page + '&page_size=100');
+  const resource = useResource<Page<Category>>(endpoint ? endpoint + '?page=' + page + '&page_size=100' : null);
   useEffect(() => {
     if (resource.data) setItems(previous => [...new Map([...previous, ...resource.data!.items].map(item => [item.id, item])).values()]);
   }, [resource.data]);
