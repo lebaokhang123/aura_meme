@@ -32,6 +32,16 @@ class MediaSettings(BaseSettings):
         return value
 
 
+class CatalogSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
+    catalog_storage_root: Path = ENV_FILE.parent / ".local" / "catalog"
+
+    @field_validator("catalog_storage_root")
+    @classmethod
+    def dedicated_absolute_root(cls, value):
+        return MediaSettings.private_absolute_root(value)
+
+
 class AuthSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
     auth_signing_key: SecretStr

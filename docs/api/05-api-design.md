@@ -153,3 +153,5 @@ Các màn hình Home giới thiệu/About/Team có thể là **React static cont
 Owner duyệt M6.1c: riêng GET `/api/v1/aura/progress` và GET `/api/v1/leaderboard` bổ sung503/`NOT_READY`, dùng error schema hiện có; không đổi response fields/endpoint. Progress vẫn cần session, leaderboard public. Missing/draft/invalid policy hoặc trạng thái P1 thiếu trả NOT_READY, không tự publish policy hoặc bật runtime rewards.
 
 Owner duyệt M6.2: POST `/api/v1/aura/check-in` bổ sung503/NOT_READY, error schema hiện có; session/CSRF/Origin trước readiness. Chưa mở runtime phát thưởng, không thay endpoint/response fields và không coi fixture schedule là chính sách được duyệt.
+
+M7.1b Owner duyệt GET `/api/v1/catalog/assets/{asset_id}` public chỉ cho catalog active/rights approved. Đọc bounded từ CATALOG_STORAGE_ROOT riêng, kiểm SHA256/MIME, decode và xuất PNG bỏ metadata, no-store/nosniff; missing/inactive/rights/hash/file không hợp lệ trả404. Không phục vụ media_uploads, không mount thư mục hoặc tự duyệt catalog. Inventory/equipment luôn kiểm owner từ session, quantity>0/active/slot, DB guard bảo vệ khi thay quantity/active.
