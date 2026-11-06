@@ -92,7 +92,7 @@ Integration test chỉ kết nối khi bạn đặt **environment** `TEST_DATABA
 
 ### Migration P0 (M1.4)
 
-Alembic hiện chỉ cho phép database **`aurameme_test`**, tách khỏi `DATABASE_URL` development. Không có DSN trong `alembic.ini`, không tự migrate khi FastAPI startup. Offline SQL và migration development được chặn trong milestone này.
+Alembic mặc định chỉ cho phép database **`aurameme_test`**, tách khỏi `DATABASE_URL` development. Không có DSN trong `alembic.ini`, không tự migrate khi FastAPI startup. Offline SQL và migration development được chặn trong milestone này.
 
 Lưu test URL riêng vào `backend/.env` dưới tên `TEST_DATABASE_URL` rồi chạy từ `backend/` bằng PowerShell; đoạn sau chỉ truyền giá trị vào process con, không in credential:
 
@@ -107,7 +107,7 @@ raise SystemExit(subprocess.call([sys.executable, "-m", "pytest", "-q"], env=env
 '@ | & .\.venv\Scripts\python.exe -
 ```
 
-Test migration thực hiện upgrade → upgrade lại → downgrade base → upgrade, so DBML/metadata và thử constraint trong transaction rollback. **Downgrade xóa các bảng của migration**: chỉ dùng DB test chuyên dụng. Bộ test từ chối schema lạ hoặc bảng ứng dụng có dữ liệu; bản thân downgrade cũng khóa các bảng P0 và từ chối nếu còn hàng, không tự xóa dữ liệu để chạy tiếp. Không reset database/volume. Kết thúc để DB test ở `0001_p0` (head), không có dữ liệu nghiệp vụ mẫu. Không áp dụng schema/rollback vào development ở M1.4.
+Test migration thực hiện upgrade → upgrade lại → downgrade base → upgrade, so DBML/metadata và thử constraint trong transaction rollback. **Downgrade xóa các bảng của migration**: chỉ dùng DB test chuyên dụng. Bộ test từ chối schema lạ hoặc bảng ứng dụng có dữ liệu; bản thân downgrade cũng khóa các bảng P0 và từ chối nếu còn hàng, không tự xóa dữ liệu để chạy tiếp. Không reset database/volume. Kết thúc để DB test ở `0002_interactions` (head; 11 bảng P0 và 2 bảng interaction P1), không có dữ liệu nghiệp vụ mẫu. Không áp dụng schema/rollback vào development ở M1.4.
 
 ### Authentication (M2.1)
 
@@ -131,6 +131,8 @@ Test riêng: `python -m pytest tests/test_account.py tests/test_account_concurre
 
 Public GET `/api/v1/categories`, `/api/v1/posts`, `/api/v1/posts/{id}`; Admin category GET/POST/PATCH/DELETE dưới `/api/v1/admin/categories`; post POST/PATCH/DELETE chỉ cho author. Mutation cần session/CSRF/Origin, Admin cần role DB. Category mới active, post mặc định draft; PATCH không gửi status giữ nguyên. Category DELETE chỉ hide với audit atomic; post DELETE là soft delete giữ FK. Public không hiện bài/category/author bị ẩn/xóa/khóa hoặc media không hợp lệ.
 
+PUT/DELETE `/api/v1/posts/{id}/reactions` và `/bookmark` cần session/CSRF; mỗi user/post có một reaction và một bookmark, retry không tạo hàng trùng. Chưa phát XP/Khí Vận hoặc bật nút reaction/bookmark trên UI.
+
 Search literal, sort allowlist/tie-break UUID, pagination page>=1/page_size<=100. Chưa URL provider nên media/avatar URL null; comments_count optional omit. Content là text JSON, chưa có renderer/upload/comment API. Test: `python -m pytest tests/test_blog.py tests/test_blog_concurrency.py -q` với TEST_DATABASE_URL như trên, chỉ test DB riêng preflight sạch và postflight/cleanup, không migrate development.
 
 ### Private media upload (M3.2)
@@ -143,4 +145,4 @@ Server tạo UUID key, ghi exclusive + fsync, INSERT metadata rồi COMMIT; ch�
 
 PostgreSQL không bao trùm filesystem: crash sau ghi file có thể để orphan. Khi process đã dừng nhận upload, Owner đối chiếu keys trong root private với `media_uploads.object_key` bằng DB query read-only, kiểm tra trạng thái transaction trước khi quyết định xử lý từng key. Không tự xóa toàn root hoặc thêm worker. Chưa có delivery/retention/quota/production malware scanning.
 
-Test riêng: `python -m pytest tests/test_media.py tests/test_media_transactions.py -q` với TEST_DATABASE_URL explicit như trên. Chỉ DB test/public/11P0/head0001_p0/rỗng, không chạy đồng thời với Owner; test dùng temp storage và rollback/cleanup identities riêng. Bao gồm lỗi COMMIT deferred thật, concurrency, fsync/cleanup fault injection và subprocess crash. Full suite có roundtrip migration M1.4 chỉ trên DB test rỗng đã được duyệt; tuyệt đối không migrate development để demo.
+Test riêng: `python -m pytest tests/test_media.py tests/test_media_transactions.py -q` với TEST_DATABASE_URL explicit như trên. Chỉ DB test/public/schema hiện hành/rỗng, không chạy đồng thời với Owner; test dùng temp storage và rollback/cleanup identities riêng. Bao gồm lỗi COMMIT deferred thật, concurrency, fsync/cleanup fault injection và subprocess crash. Full suite có roundtrip migration M1.4 chỉ trên DB test rỗng đã được duyệt; tuyệt đối không migrate development để demo.

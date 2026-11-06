@@ -60,6 +60,17 @@ def require_public_post(db, post_id):
         raise AuthError(404, "NOT_FOUND", "Post not found.")
 
 
+def lock_public_post(db, post_id):
+    # Same post -> category -> media order as post PATCH; SHARE blocks visibility mutations until commit.
+    post = db.scalar(select(Post).where(Post.id == post_id).with_for_update(read=True))
+    if post is None:
+        raise AuthError(404, "NOT_FOUND", "Post not found.")
+    db.scalar(select(Category.id).where(Category.id == post.category_id).with_for_update(read=True))
+    if post.media_id is not None:
+        db.scalar(select(MediaUpload.id).where(MediaUpload.id == post.media_id).with_for_update(read=True))
+    require_public_post(db, post_id)
+
+
 @router.get("/posts/{post_id}/comments", response_model=CommentPage, operation_id="listComments",
             responses={status: {"model": ErrorResponse} for status in (404, 422, 429, 500)})
 def list_comments(post_id: UUID, request: Request, page: int = Query(1, ge=1),
@@ -77,14 +88,7 @@ def list_comments(post_id: UUID, request: Request, page: int = Query(1, ge=1),
 @router.post("/posts/{post_id}/comments", status_code=201, response_model=CommentResponse,
              operation_id="addComment", responses=ERRORS | NOT_FOUND, openapi_extra=CSRF_HEADER)
 def add_comment(post_id: UUID, payload: CommentInput, request: Request, account=Depends(require_account_csrf)):
-    # Same post -> category -> media order as post PATCH; SHARE blocks visibility mutations until commit.
-    post = account.db.scalar(select(Post).where(Post.id == post_id).with_for_update(read=True))
-    if post is None:
-        raise AuthError(404, "NOT_FOUND", "Post not found.")
-    account.db.scalar(select(Category.id).where(Category.id == post.category_id).with_for_update(read=True))
-    if post.media_id is not None:
-        account.db.scalar(select(MediaUpload.id).where(MediaUpload.id == post.media_id).with_for_update(read=True))
-    require_public_post(account.db, post_id)
+    lock_public_post(account.db, post_id)
     now = request.app.state.auth.now()
     comment = Comment(id=uuid4(), post_id=post_id, author_id=account.user.id, body=payload.body,
                       status="visible", created_at=now, updated_at=now, deleted_at=None)

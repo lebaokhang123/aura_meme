@@ -1,4 +1,4 @@
-"""P0 schema only; business services and ORM relationships belong to later tasks."""
+"""Implemented schema; business services live in their feature modules."""
 from datetime import datetime
 from uuid import UUID
 
@@ -18,6 +18,27 @@ class Base(DeclarativeBase):
         "ck": "ck_%(table_name)s_%(constraint_name)s",
         "ix": "ix_%(table_name)s_%(column_0_name)s",
     })
+
+
+class PostReaction(Base):
+    __tablename__ = "post_reactions"
+    post_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("posts.id", ondelete="RESTRICT"), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
+    reaction_type: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint("reaction_type IN ('like','laugh','fire')", name="reaction_type"),
+        Index("ix_post_reactions_user_created_post", "user_id", "created_at", "post_id"),
+    )
+
+
+class PostBookmark(Base):
+    __tablename__ = "post_bookmarks"
+    post_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("posts.id", ondelete="RESTRICT"), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (Index("ix_post_bookmarks_user_created_post", "user_id", created_at.desc(), "post_id"),)
 
 
 class User(Base):
