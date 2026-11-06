@@ -1637,6 +1637,38 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
       x-phase: P1
+  /api/v1/catalog/assets/{asset_id}:
+    get:
+      tags:
+      - Vault
+      summary: Ảnh catalog đã duyệt, chuẩn hóa PNG; không phục vụ user upload
+      operationId: catalogAsset
+      parameters:
+      - in: path
+        name: asset_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: PNG không metadata, Cache-Control no-store và nosniff
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
   /api/v1/inventory/me:
     get:
       tags:

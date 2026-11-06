@@ -37,6 +37,13 @@ test('real register/login/profile/password/logout and revoked second session', a
   const checkin = await page.request.post('/api/v1/aura/check-in', { headers: { Origin: 'http://127.0.0.1:4173', 'X-CSRF-Token': csrf } });
   expect(checkin.status()).toBe(503);
   expect((await checkin.json()).error.code).toBe('NOT_READY');
+  const inventory = await page.request.get('/api/v1/inventory/me');
+  expect(inventory.status()).toBe(200);
+  expect((await inventory.json()).items).toEqual([]);
+  const unequip = await page.request.put('/api/v1/inventory/equipment/icon', { data: { asset_id: null }, headers: { Origin: 'http://127.0.0.1:4173', 'X-CSRF-Token': csrf } });
+  expect(unequip.status()).toBe(200);
+  expect((await unequip.json()).asset_id).toBeNull();
+  expect((await page.request.get('/api/v1/catalog/assets/00000000-0000-0000-0000-000000000000')).status()).toBe(404);
   const second = await browser.newContext();
   const other = await second.newPage();
   try {

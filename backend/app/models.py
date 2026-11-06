@@ -83,6 +83,29 @@ class Wallet(Base):
     __table_args__ = (CheckConstraint("khi_van_balance >= 0", name="balance_nonnegative"),)
 
 
+class UserInventory(Base):
+    __tablename__ = "user_inventory"
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
+    asset_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("asset_items.id", ondelete="RESTRICT"), primary_key=True)
+    quantity: Mapped[int] = mapped_column(Integer)
+    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (CheckConstraint("quantity >= 0", name="quantity_nonnegative"),)
+
+
+class UserEquipment(Base):
+    __tablename__ = "user_equipment"
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
+    slot_kind: Mapped[str] = mapped_column(Text, primary_key=True)
+    asset_id: Mapped[UUID] = mapped_column(Uuid)
+    equipped_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        ForeignKeyConstraint(["user_id", "asset_id"], ["user_inventory.user_id", "user_inventory.asset_id"], ondelete="RESTRICT", name="fk_user_equipment_owner_asset"),
+        ForeignKeyConstraint(["asset_id", "slot_kind"], ["asset_items.id", "asset_items.kind"], ondelete="RESTRICT", name="fk_user_equipment_asset_kind"),
+        CheckConstraint("slot_kind IN ('avatar','frame','icon','effect')", name="slot_kind"),
+    )
+
+
 class AssetItem(Base):
     __tablename__ = "asset_items"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
