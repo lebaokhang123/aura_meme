@@ -21,6 +21,7 @@ from app.admin_posts import router as admin_posts_router
 from app.contact import router as contact_router
 from app.own_posts import router as own_posts_router
 from app.interactions import router as interactions_router
+from app.aura_reads import router as aura_reads_router
 from app.security import AuthBoundaryMiddleware, AuthError, AuthRuntime
 
 
@@ -50,6 +51,7 @@ app.include_router(admin_posts_router)
 app.include_router(contact_router)
 app.include_router(own_posts_router)
 app.include_router(interactions_router)
+app.include_router(aura_reads_router)
 app.add_middleware(AuthBoundaryMiddleware)
 
 

@@ -1456,6 +1456,12 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalError'
+        '503':
+          description: NOT_READY — policy hoặc trạng thái P1 chưa sẵn sàng; không trả số giả.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
       x-phase: P1
   /api/v1/aura/check-in:
     post:
@@ -1522,6 +1528,12 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
+        '503':
+          description: NOT_READY — policy hoặc trạng thái P1 chưa sẵn sàng; không trả số giả.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
       x-phase: P1
   /api/v1/vault/cases:
     get:

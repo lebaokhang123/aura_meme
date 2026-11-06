@@ -28,6 +28,11 @@ test('real register/login/profile/password/logout and revoked second session', a
     await expect(tab.getByRole('heading', { name: 'Account settings' })).toBeVisible();
   };
   await signIn(page, password);
+  for (const path of ['/api/v1/aura/progress', '/api/v1/leaderboard']) {
+    const response = await page.request.get(path);
+    expect(response.status()).toBe(503);
+    expect((await response.json()).error.code).toBe('NOT_READY');
+  }
   const second = await browser.newContext();
   const other = await second.newPage();
   try {

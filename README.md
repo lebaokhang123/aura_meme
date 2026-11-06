@@ -107,7 +107,7 @@ raise SystemExit(subprocess.call([sys.executable, "-m", "pytest", "-q"], env=env
 '@ | & .\.venv\Scripts\python.exe -
 ```
 
-Test migration thực hiện upgrade → upgrade lại → downgrade base → upgrade, so DBML/metadata và thử constraint trong transaction rollback. **Downgrade xóa các bảng của migration**: chỉ dùng DB test chuyên dụng. Bộ test từ chối schema lạ hoặc bảng ứng dụng có dữ liệu; bản thân downgrade cũng khóa các bảng P0 và từ chối nếu còn hàng, không tự xóa dữ liệu để chạy tiếp. Không reset database/volume. Kết thúc để DB test ở `0003_aura_draft` (head; 16 bảng, gồm nền tảng Aura draft), không có dữ liệu nghiệp vụ mẫu. Không áp dụng schema/rollback vào development ở M1.4.
+Test migration thực hiện upgrade → upgrade lại → downgrade base → upgrade, so DBML/metadata và thử constraint trong transaction rollback. **Downgrade xóa các bảng của migration**: chỉ dùng DB test chuyên dụng. Bộ test từ chối schema lạ hoặc bảng ứng dụng có dữ liệu; bản thân downgrade cũng khóa các bảng P0 và từ chối nếu còn hàng, không tự xóa dữ liệu để chạy tiếp. Không reset database/volume. Kết thúc để DB test ở `0004_wallet_read` (head; 17 bảng, gồm Aura draft và wallet read model), không có dữ liệu nghiệp vụ mẫu. Không áp dụng schema/rollback vào development ở M1.4.
 
 ### Authentication (M2.1)
 
@@ -131,7 +131,7 @@ Test riêng: `python -m pytest tests/test_account.py tests/test_account_concurre
 
 Public GET `/api/v1/categories`, `/api/v1/posts`, `/api/v1/posts/{id}`; Admin category GET/POST/PATCH/DELETE dưới `/api/v1/admin/categories`; post POST/PATCH/DELETE chỉ cho author. Mutation cần session/CSRF/Origin, Admin cần role DB. Category mới active, post mặc định draft; PATCH không gửi status giữ nguyên. Category DELETE chỉ hide với audit atomic; post DELETE là soft delete giữ FK. Public không hiện bài/category/author bị ẩn/xóa/khóa hoặc media không hợp lệ.
 
-PUT/DELETE `/api/v1/posts/{id}/reactions` và `/bookmark` cần session/CSRF; mỗi user/post có một reaction và một bookmark, retry không tạo hàng trùng. Chưa phát XP/Khí Vận hoặc bật nút reaction/bookmark trên UI. Aura hiện chỉ có simulation policy draft trên `aurameme_test`, không có reward hook hoặc API progress/leaderboard; các số XP/caps/level trong test không phải chính sách sản phẩm.
+PUT/DELETE `/api/v1/posts/{id}/reactions` và `/bookmark` cần session/CSRF; mỗi user/post có một reaction và một bookmark, retry không tạo hàng trùng. Chưa phát XP/Khí Vận hoặc bật nút reaction/bookmark trên UI. Aura hiện chỉ có simulation policy draft trên `aurameme_test`, không có reward hook; GET `/api/v1/aura/progress` và `/api/v1/leaderboard` trả503/NOT_READY khi thiếu policy published hợp lệ hoặc account state cần thiết; các số XP/caps/level trong test không phải chính sách sản phẩm.
 
 Search literal, sort allowlist/tie-break UUID, pagination page>=1/page_size<=100. Chưa URL provider nên media/avatar URL null; comments_count optional omit. Content là text JSON, chưa có renderer/upload/comment API. Test: `python -m pytest tests/test_blog.py tests/test_blog_concurrency.py -q` với TEST_DATABASE_URL như trên, chỉ test DB riêng preflight sạch và postflight/cleanup, không migrate development.
 
