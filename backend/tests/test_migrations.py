@@ -25,8 +25,8 @@ P0_TABLES = {
     "media_uploads", "posts", "comments", "contact_messages", "admin_audit_logs",
 }
 AURA_TABLES = P0_TABLES | {"post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger"}
-TABLES = AURA_TABLES | {"wallets", "wallet_transactions", "daily_checkins"}
-REVISION = "0005_checkin"
+TABLES = AURA_TABLES | {"wallets", "wallet_transactions", "daily_checkins", "asset_items"}
+REVISION = "0006_catalog"
 
 
 def config():

@@ -83,6 +83,29 @@ class Wallet(Base):
     __table_args__ = (CheckConstraint("khi_van_balance >= 0", name="balance_nonnegative"),)
 
 
+class AssetItem(Base):
+    __tablename__ = "asset_items"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    slug: Mapped[str] = mapped_column(Text, unique=True)
+    kind: Mapped[str] = mapped_column(Text)
+    collection: Mapped[str] = mapped_column(Text)
+    rarity: Mapped[str] = mapped_column(Text)
+    media_key: Mapped[str] = mapped_column(Text)
+    source_rights: Mapped[dict] = mapped_column(JSONB)
+    active: Mapped[bool] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint("id", "kind", name="uq_asset_items_id_kind"),
+        UniqueConstraint("id", "rarity", name="uq_asset_items_id_rarity"),
+        CheckConstraint("kind IN ('avatar','frame','icon','effect','generator')", name="kind"),
+        CheckConstraint("rarity IN ('D','C','B','A','S')", name="rarity"),
+        CheckConstraint("btrim(slug) <> '' AND btrim(media_key) <> '' AND btrim(collection) <> ''", name="nonempty"),
+        CheckConstraint("jsonb_typeof(source_rights) = 'object'", name="rights_object"),
+        CheckConstraint("NOT active OR coalesce(source_rights->>'review_status' = 'approved', false)", name="active_rights"),
+    )
+
+
 class WalletTransaction(Base):
     __tablename__ = "wallet_transactions"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
