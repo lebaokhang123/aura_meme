@@ -51,7 +51,7 @@ export function AboutPage() {
                 {
                   icon: 'code',
                   title: 'Build it step by step',
-                  text: 'Core community APIs are connected. Media display, Aura and Vault remain unavailable.',
+                  text: 'Core community APIs are connected. Post media display and rewards remain unavailable. Vault preview uses published data.',
                 },
               ].map((item) => (
                 <div

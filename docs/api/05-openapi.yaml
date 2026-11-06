@@ -1636,6 +1636,12 @@ paths:
           $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalError'
+        '503':
+          description: NOT_READY — chưa mở giao dịch; không cấp item, trừ Khí Vận hoặc dùng quota.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
       x-phase: P1
   /api/v1/catalog/assets/{asset_id}:
     get:

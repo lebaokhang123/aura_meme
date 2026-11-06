@@ -48,6 +48,20 @@ test('real register/login/profile/password/logout and revoked second session', a
   expect(cases.status()).toBe(200);
   expect((await cases.json()).items).toEqual([]);
   expect((await page.request.get('/api/v1/vault/cases/00000000-0000-0000-0000-000000000000')).status()).toBe(404);
+  const opening = await page.request.post('/api/v1/vault/cases/00000000-0000-0000-0000-000000000000/open', { headers: { Origin: 'http://127.0.0.1:4173', 'X-CSRF-Token': csrf, 'Idempotency-Key': 'synthetic-real-open-001' } });
+  expect(opening.status()).toBe(503);
+  expect((await opening.json()).error.code).toBe('NOT_READY');
+  await page.goto('/vault');
+  await expect(page.getByRole('heading', { name: 'Vault', exact: true })).toBeVisible();
+  await expect(page.getByText('No cases have been published.')).toBeVisible();
+  await expect(page.getByText('You have no owned items.')).toBeVisible();
+  for (const width of [375, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: test.info().outputPath(`vault-real-${width}.png`), fullPage: true });
+  }
+  await page.goto('/settings');
   const second = await browser.newContext();
   const other = await second.newPage();
   try {

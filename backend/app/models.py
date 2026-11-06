@@ -4,7 +4,7 @@ from uuid import UUID
 
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Computed, Date, DateTime, ForeignKey, ForeignKeyConstraint,
-    Index, Integer, MetaData, SmallInteger, Text, UniqueConstraint, Uuid, false,
+    Index, Integer, MetaData, SmallInteger, Text, UniqueConstraint, Uuid, false, text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -81,6 +81,58 @@ class Wallet(Base):
     khi_van_balance: Mapped[int] = mapped_column(BigInteger)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (CheckConstraint("khi_van_balance >= 0", name="balance_nonnegative"),)
+
+
+class CaseOpen(Base):
+    __tablename__ = "case_opens"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"))
+    request_key: Mapped[str] = mapped_column(Text)
+    case_id: Mapped[UUID] = mapped_column(Uuid)
+    loot_table_id: Mapped[UUID] = mapped_column(Uuid)
+    reward_asset_id: Mapped[UUID] = mapped_column(Uuid)
+    earned_xp_at_open: Mapped[int] = mapped_column(BigInteger)
+    cost_khi_van: Mapped[int] = mapped_column(BigInteger)
+    wallet_transaction_id: Mapped[UUID | None] = mapped_column(Uuid, unique=True)
+    is_daily_free: Mapped[bool] = mapped_column(Boolean)
+    effective_day: Mapped[date] = mapped_column(Date)
+    decision_trace: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint("user_id", "request_key", name="uq_case_opens_user_request"),
+        UniqueConstraint("user_id", "id", name="uq_case_opens_user_id_id"),
+        ForeignKeyConstraint(["case_id", "loot_table_id"], ["case_loot_tables.case_id", "case_loot_tables.id"], ondelete="RESTRICT", name="fk_case_opens_case_pool"),
+        ForeignKeyConstraint(["loot_table_id", "reward_asset_id"], ["case_pool_items.loot_table_id", "case_pool_items.asset_id"], ondelete="RESTRICT", name="fk_case_opens_pool_reward"),
+        ForeignKeyConstraint(["user_id", "wallet_transaction_id"], ["wallet_transactions.user_id", "wallet_transactions.id"], ondelete="RESTRICT", name="fk_case_opens_owner_debit"),
+        CheckConstraint("earned_xp_at_open >= 0 AND cost_khi_van >= 0", name="nonnegative"),
+        CheckConstraint("(cost_khi_van=0 AND wallet_transaction_id IS NULL) OR (cost_khi_van>0 AND wallet_transaction_id IS NOT NULL)", name="debit_required"),
+        CheckConstraint("NOT is_daily_free OR cost_khi_van=0", name="free_cost"),
+        CheckConstraint("effective_day = ((created_at AT TIME ZONE 'Asia/Ho_Chi_Minh') - interval '7 hours')::date", name="effective_day"),
+        CheckConstraint("jsonb_typeof(decision_trace)='object'", name="trace_object"),
+        Index("uq_case_opens_daily_free", "user_id", "case_id", "effective_day", unique=True, postgresql_where=text("is_daily_free")),
+        Index("ix_case_opens_user_created_id", "user_id", "created_at", "id"),
+    )
+
+
+class InventoryGrant(Base):
+    __tablename__ = "inventory_grants"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(Uuid)
+    asset_id: Mapped[UUID] = mapped_column(Uuid)
+    event_key: Mapped[str] = mapped_column(Text)
+    quantity: Mapped[int] = mapped_column(Integer)
+    source_type: Mapped[str] = mapped_column(Text)
+    case_open_id: Mapped[UUID | None] = mapped_column(Uuid, unique=True)
+    policy_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("reward_policy_versions.id", ondelete="RESTRICT"))
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint("user_id", "event_key", name="uq_inventory_grants_user_event"),
+        ForeignKeyConstraint(["user_id", "asset_id"], ["user_inventory.user_id", "user_inventory.asset_id"], ondelete="RESTRICT", name="fk_inventory_grants_owner_inventory"),
+        ForeignKeyConstraint(["user_id", "case_open_id"], ["case_opens.user_id", "case_opens.id"], ondelete="RESTRICT", name="fk_inventory_grants_owner_open"),
+        CheckConstraint("quantity > 0", name="quantity_positive"),
+        CheckConstraint("source_type IN ('case_open','weekly_streak','level','admin')", name="source_type"),
+        CheckConstraint("(source_type='case_open')=(case_open_id IS NOT NULL)", name="case_reference"),
+    )
 
 
 class CaseDefinition(Base):

@@ -6,17 +6,19 @@ export class ApiError extends Error {
       : status === 409 ? 'The request conflicts with existing data. Check your values.'
       : status === 422 ? 'Check the entered fields and try again.'
       : status === 429 ? 'Too many requests. Please wait before trying again.'
+      : status === 503 && code === 'NOT_READY' ? 'This feature is not ready. Rewards and spending are not enabled.'
       : 'Unable to complete the request. Check your connection and try again.');
   }
 }
 
-export async function api<T>(path: string, options: { method?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
+export async function api<T>(path: string, options: { method?: string; body?: unknown; signal?: AbortSignal; idempotencyKey?: string } = {}): Promise<T> {
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = {};
   if (method !== 'GET') {
-    const { csrf_token } = await api<{ csrf_token: string }>('/auth/csrf');
+    const { csrf_token } = await api<{ csrf_token: string }>('/auth/csrf', { signal: options.signal });
     headers['X-CSRF-Token'] = csrf_token;
   }
+  if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
   const multipart = options.body instanceof FormData;
   if (options.body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   let response: Response;

@@ -380,3 +380,7 @@ body,
     scroll-behavior: auto !important;
   }
 }
+
+@keyframes vault-reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.vault-reveal { animation: vault-reveal 700ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .vault-reveal { animation: none; } }
