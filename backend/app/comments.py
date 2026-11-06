@@ -62,7 +62,7 @@ def require_public_post(db, post_id):
 
 def lock_public_post(db, post_id):
     # Same post -> category -> media order as post PATCH; SHARE blocks visibility mutations until commit.
-    post = db.scalar(select(Post).where(Post.id == post_id).with_for_update(read=True))
+    post = db.scalar(select(Post).where(Post.id == post_id).with_for_update(read=True).execution_options(populate_existing=True))
     if post is None:
         raise AuthError(404, "NOT_FOUND", "Post not found.")
     db.scalar(select(Category.id).where(Category.id == post.category_id).with_for_update(read=True))

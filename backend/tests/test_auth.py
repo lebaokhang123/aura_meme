@@ -13,6 +13,7 @@ from app.db import create_db_engine
 from app.main import app
 from app.models import AuthSession, Profile, Role, User, UserRole
 from test_migrations import TABLES, REVISION, development_inventory
+from schema_guard import assert_auxiliary_objects
 
 
 ORIGIN = "https://testserver"
@@ -36,11 +37,7 @@ def migrated():
             from sqlalchemy import inspect
             assert set(inspect(connection).get_table_names()) == TABLES | {"alembic_version"}
             assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == REVISION
-            assert connection.execute(text(
-                "SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid "
-                "JOIN pg_namespace n ON n.oid=c.relnamespace "
-                "WHERE n.nspname='public' AND NOT t.tgisinternal"
-            )).scalar_one() == 0, "Unknown triggers; refusing Auth tests"
+            assert_auxiliary_objects(connection)
             assert connection.execute(text("SELECT count(*) FROM pg_policies WHERE schemaname='public'")).scalar_one() == 0
             for table in TABLES:
                 assert connection.execute(text('SELECT count(*) FROM "' + table + '"')).scalar_one() == 0, "Existing data; refusing Auth tests"
