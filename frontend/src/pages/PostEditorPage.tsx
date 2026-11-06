@@ -72,19 +72,19 @@ function PostForm({ post, reload }: { post?: OwnPost; reload: () => void }) {
       {categories.items.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}
     </select></label>
     {categories.error && <p role="alert">{categories.error} <button type="button" className="underline min-h-11" onClick={categories.reload}>Retry channels</button></p>}
-    {categories.more && <button type="button" disabled={categories.pending} onClick={categories.loadMore} className="text-secondary min-h-11">More channels</button>}
+    {categories.hasPages && <button type="button" aria-disabled={categories.pending || !categories.more} aria-live="polite" onClick={categories.loadMore} className="text-secondary min-h-11">{categories.more || categories.pending ? "More channels" : "All channels loaded"}</button>}
     <label>Post status<select className={input} name="status" defaultValue={post?.status ?? 'draft'}><option value="draft">Draft</option><option value="published">Published</option></select></label>
     <label>Attach image (optional)<input className={input} type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={busy} onChange={event => {
       const value = event.target.files?.[0] ?? null;
       if (value && (value.size > 5 * 1024 * 1024 || !['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(value.type))) { setFile(null); setUploaded(null); setError('Choose a JPEG, PNG, WebP or GIF up to 5 MiB.'); event.target.value = ''; return; }
       setFile(value); setUploaded(null); setRemove(false); setError('');
     }} /></label>
-    {preview && <figure><img src={preview} alt="Local preview of the selected attachment" className="max-h-80 max-w-full rounded-lg object-contain" /><figcaption className="mt-2 text-xs text-secondary">Local preview only. Server media display is not available.</figcaption></figure>}
+    {preview && <figure><img src={preview} alt="Local preview of the selected attachment" className="motion-reduce:hidden max-h-80 max-w-full rounded-lg object-contain" /><figcaption className="mt-2 text-xs text-secondary"><span className="hidden motion-reduce:inline">Preview hidden for reduced motion. Your attachment remains selected.</span> Local preview only. Server media display is not available.</figcaption></figure>}
     {post?.media_id && <label className="text-sm"><input type="checkbox" checked={remove} disabled={!!file || busy} onChange={event => setRemove(event.target.checked)} /> Remove existing private attachment</label>}
     <p className="text-xs text-on-surface-variant">Images are stored privately. An uploaded image remains saved if you leave before attaching it; keep this page open to retry a failed post save.</p>
     <div className="flex flex-wrap gap-4"><button disabled={busy} className="min-h-11 px-5 py-3 rounded-lg bg-primary text-on-primary disabled:opacity-50">{busy ? 'Saving…' : 'Save post'}</button>
       {post && <button type="button" disabled={busy} onClick={() => void erase()} className="min-h-11 underline text-primary">Delete post</button>}
-      {post?.status === 'published' && <Link className="min-h-11 py-3 text-secondary" to={'/posts/' + post.id}>View discussion</Link>}
+      {post?.status === 'published' && !busy && <Link className="min-h-11 py-3 text-secondary" to={'/posts/' + post.id}>View discussion</Link>}
     </div>
     </fieldset>
   </form>;

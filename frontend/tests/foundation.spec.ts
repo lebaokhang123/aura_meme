@@ -10,12 +10,12 @@ test.beforeEach(async ({ page }) => {
 test('About presents confirmed members and the current integration boundary', async ({ page }) => {
   await page.goto('/about');
   await expect(page.locator('#team article h3')).toHaveText(['Lê Bảo Khang', 'Phan Trung Kiên']);
-  await expect(page.getByText('Core APIs are implemented. This preview is being connected to live community services.')).toBeVisible();
+  await expect(page.getByText('Core community APIs are connected. Media display, Aura and Vault remain unavailable.')).toBeVisible();
   await expect(page.locator('#team img')).toHaveCount(0);
   await expect(page.locator('#team').getByRole('link', { name: 'Contact', exact: true })).toHaveAttribute('href', '/contact');
 });
 
-for (const width of [375, 768, 1440]) {
+for (const width of [375, 768, 1024, 1440]) {
   for (const route of routes) {
     test(`${route} refreshes without overflow at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });

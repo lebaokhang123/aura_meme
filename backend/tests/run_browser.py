@@ -99,7 +99,7 @@ def main():
                         time.sleep(.1)
                 else:
                     raise RuntimeError('E2E API health timeout')
-                result = subprocess.run(['npm.cmd', 'test', '--', '--config=playwright.e2e.config.ts','tests/'+flow+'.spec.ts'], cwd=ROOT.parent / 'frontend', env=environment).returncode
+                result = subprocess.run(['npm.cmd', 'test', '--', '--config=playwright.e2e.config.ts','--output=test-results/'+flow,'tests/'+flow+'.spec.ts'], cwd=ROOT.parent / 'frontend', env=environment).returncode
                 api.terminate();api.wait(timeout=10);api=None
                 if result:break
     finally:

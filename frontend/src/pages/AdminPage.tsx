@@ -47,11 +47,12 @@ function Workspace({ tab }: { tab: AdminTab }) {
       </fieldset>
     </form>}
     {resource.pending ? <p role="status">Loading Admin records…</p> : resource.error ? <div><p role="alert">{resource.error}</p><button className="min-h-11 underline" onClick={resource.reload}>Retry Admin records</button></div> : resource.data && <>
-      <div role="region" aria-label="Admin results" tabIndex={0} className="overflow-x-auto rounded-xl border border-surface-container-highest bg-surface-container-low">
+      <p id="admin-scroll-hint" className="text-xs text-on-surface-variant mb-2">Wide table: scroll horizontally to view all columns. Keyboard: focus the table region and use arrow keys.</p>
+      <div role="region" aria-describedby="admin-scroll-hint" aria-label="Admin results" tabIndex={0} className="overflow-x-auto rounded-xl border border-surface-container-highest bg-surface-container-low">
         <table className="w-full min-w-[600px] text-left text-sm"><caption className="sr-only">{tab} page {resource.data.pagination.page}</caption>
           <thead><tr>{columns[tab].map(key => <th key={key} className="p-4 font-bold capitalize">{key.replaceAll('_', ' ')}</th>)}{tab !== 'audit-logs' && <th className="p-4">Actions</th>}</tr></thead>
           <tbody>{resource.data.items.map(record => <tr key={record.id} className="border-t border-surface-container-highest">
-            {columns[tab].map(key => <td key={key} className="p-4 max-w-xs break-words">{key === 'author' ? record.author?.username : key === 'category' ? record.category?.name : key === 'roles' ? record.roles?.join(', ') : String(record[key] ?? '')}</td>)}
+            {columns[tab].map(key => <td key={key} className="p-4 max-w-xs break-words [overflow-wrap:anywhere]">{key === 'author' ? record.author?.username : key === 'category' ? record.category?.name : key === 'roles' ? record.roles?.join(', ') : String(record[key] ?? '')}</td>)}
             {tab !== 'audit-logs' && <td className="p-4">{record.status !== 'deleted' && <button disabled={busy} className="min-h-11 text-secondary underline" onClick={event => { trigger.current = event.currentTarget; setCreating(false); setRow(record); }}>{tab === 'contacts' ? 'Review contact ' + record.subject : 'Edit ' + (tab === 'users' ? 'user ' + record.username : tab === 'posts' ? 'post ' + record.title : 'category ' + record.name)}</button>}</td>}
           </tr>)}</tbody>
         </table>

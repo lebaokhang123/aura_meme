@@ -67,7 +67,7 @@ export function AdminEditor({ tab, row, busy, setBusy, onSaved, onClose }: { tab
             {categories.items.map(item => <option value={item.id} key={item.id}>{item.name} ({item.status})</option>)}
           </select></label>
           {categories.error && <p role="alert">{categories.error} <button type="button" className="min-h-11 underline" onClick={categories.reload}>Retry channels</button></p>}
-          {categories.more && <button type="button" className="min-h-11 underline" disabled={categories.pending} onClick={categories.loadMore}>More channels</button>}
+          {categories.hasPages && <button type="button" className="min-h-11 underline" aria-disabled={categories.pending || !categories.more} aria-live="polite" onClick={categories.loadMore}>{categories.more || categories.pending ? "More channels" : "All channels loaded"}</button>}
         </>}
         {tab === 'categories' && <>
           <label>Category name<input className={input} name="name" required maxLength={80} defaultValue={row?.name ?? ''} /></label>

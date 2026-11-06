@@ -51,7 +51,7 @@ export function AboutPage() {
                 {
                   icon: 'code',
                   title: 'Build it step by step',
-                  text: 'Core APIs are implemented. This preview is being connected to live community services.',
+                  text: 'Core community APIs are connected. Media display, Aura and Vault remain unavailable.',
                 },
               ].map((item) => (
                 <div
