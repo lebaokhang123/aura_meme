@@ -33,6 +33,10 @@ test('real register/login/profile/password/logout and revoked second session', a
     expect(response.status()).toBe(503);
     expect((await response.json()).error.code).toBe('NOT_READY');
   }
+  const csrf = (await (await page.request.get('/api/v1/auth/csrf')).json()).csrf_token;
+  const checkin = await page.request.post('/api/v1/aura/check-in', { headers: { Origin: 'http://127.0.0.1:4173', 'X-CSRF-Token': csrf } });
+  expect(checkin.status()).toBe(503);
+  expect((await checkin.json()).error.code).toBe('NOT_READY');
   const second = await browser.newContext();
   const other = await second.newPage();
   try {

@@ -13,11 +13,18 @@ from app.models import AuraLedger, Comment, Post, PostReaction, RewardPolicyVers
 Positive = Annotated[int, Field(strict=True, gt=0, le=2**31 - 1)]
 
 
+class CheckinSchedule(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    xp_by_weekday: list[Positive] = Field(min_length=7, max_length=7)
+    khi_by_weekday: list[Positive] = Field(min_length=7, max_length=7)
+
+
 class DraftPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     xp: dict[Literal["post", "reaction", "comment"], Positive]
     daily_cap: Positive
     levels: list[Annotated[int, Field(strict=True, ge=0, le=2**63 - 1)]] = Field(min_length=1, max_length=1000)
+    checkin: CheckinSchedule | None = None
 
     @field_validator("levels")
     @classmethod

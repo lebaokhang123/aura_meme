@@ -83,6 +83,42 @@ class Wallet(Base):
     __table_args__ = (CheckConstraint("khi_van_balance >= 0", name="balance_nonnegative"),)
 
 
+class WalletTransaction(Base):
+    __tablename__ = "wallet_transactions"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("wallets.user_id", ondelete="RESTRICT"))
+    event_key: Mapped[str] = mapped_column(Text)
+    delta_khi_van: Mapped[int] = mapped_column(BigInteger)
+    reason: Mapped[str] = mapped_column(Text)
+    policy_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("reward_policy_versions.id", ondelete="RESTRICT"))
+    reverses_id: Mapped[UUID | None] = mapped_column(Uuid, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint("user_id", "event_key", name="uq_wallet_transactions_user_event"),
+        UniqueConstraint("user_id", "id", name="uq_wallet_transactions_user_id_id"),
+        ForeignKeyConstraint(["user_id", "reverses_id"], ["wallet_transactions.user_id", "wallet_transactions.id"], ondelete="RESTRICT", name="fk_wallet_transactions_owner_reversal"),
+        CheckConstraint("delta_khi_van <> 0", name="nonzero"),
+        CheckConstraint("reason IN ('checkin','case_open','generator','adjustment','reversal')", name="reason"),
+        CheckConstraint("(reason = 'reversal') = (reverses_id IS NOT NULL) AND (reverses_id IS NULL OR reverses_id <> id)", name="reversal_reference"),
+        CheckConstraint("(reason NOT IN ('checkin','generator') OR delta_khi_van > 0) AND (reason <> 'case_open' OR delta_khi_van < 0)", name="sign"),
+        Index("ix_wallet_transactions_user_created_id", "user_id", "created_at", "id"),
+    )
+
+
+class DailyCheckin(Base):
+    __tablename__ = "daily_checkins"
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
+    effective_day: Mapped[date] = mapped_column(Date, primary_key=True)
+    aura_ledger_id: Mapped[UUID] = mapped_column(Uuid, unique=True)
+    wallet_transaction_id: Mapped[UUID] = mapped_column(Uuid, unique=True)
+    claimed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        ForeignKeyConstraint(["user_id", "aura_ledger_id"], ["aura_ledger.user_id", "aura_ledger.id"], ondelete="RESTRICT", name="fk_daily_checkins_owner_aura"),
+        ForeignKeyConstraint(["user_id", "wallet_transaction_id"], ["wallet_transactions.user_id", "wallet_transactions.id"], ondelete="RESTRICT", name="fk_daily_checkins_owner_wallet"),
+        CheckConstraint("effective_day = ((claimed_at AT TIME ZONE 'Asia/Ho_Chi_Minh') - interval '7 hours')::date", name="effective_day"),
+    )
+
+
 class AuraLedger(Base):
     __tablename__ = "aura_ledger"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)

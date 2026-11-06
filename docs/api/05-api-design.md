@@ -151,3 +151,5 @@ Các màn hình Home giới thiệu/About/Team có thể là **React static cont
 **M5.2 · Owner duyệt 2026-11-06:** thêm GET `/api/v1/users/me/posts` (page/page_size/status draft/published/hidden) và GET `/api/v1/users/me/posts/{post_id}`. Cần session active, lọc author_id từ session và loại deleted; foreign/missing/deleted detail trả404. `OwnPost` kế thừa Post, thêm `media_id` UUID nullable cho editor private; không object_key/file path/PII mới. GET public và media_url=null giữ nguyên, không mở media delivery.
 
 Owner duyệt M6.1c: riêng GET `/api/v1/aura/progress` và GET `/api/v1/leaderboard` bổ sung503/`NOT_READY`, dùng error schema hiện có; không đổi response fields/endpoint. Progress vẫn cần session, leaderboard public. Missing/draft/invalid policy hoặc trạng thái P1 thiếu trả NOT_READY, không tự publish policy hoặc bật runtime rewards.
+
+Owner duyệt M6.2: POST `/api/v1/aura/check-in` bổ sung503/NOT_READY, error schema hiện có; session/CSRF/Origin trước readiness. Chưa mở runtime phát thưởng, không thay endpoint/response fields và không coi fixture schedule là chính sách được duyệt.
