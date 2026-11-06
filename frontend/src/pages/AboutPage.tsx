@@ -116,7 +116,7 @@ export function AboutPage() {
             Project repository<span className="sr-only">(opens in a new tab)</span>
           </a>
           <Link to="/contact" className="inline-flex items-center gap-2 px-4 py-3 text-sm text-secondary">
-            Contact preview
+            Contact
             <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
               arrow_forward
             </span>

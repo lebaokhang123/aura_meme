@@ -18,6 +18,7 @@ export function Header() {
   const accountLinks = user ? <>
     <Link to="/my-posts" onClick={() => setMenuOpen(false)} className="min-h-11 px-3 py-3 rounded-lg bg-surface-container text-xs">My posts</Link>
     <Link to="/settings" onClick={() => setMenuOpen(false)} className="min-h-11 px-3 py-3 rounded-lg bg-surface-container text-xs">Settings</Link>
+    {user.roles.includes('ADMIN') && <Link to="/admin" onClick={() => setMenuOpen(false)} className="min-h-11 px-3 py-3 rounded-lg bg-surface-container text-xs">Admin</Link>}
     <button disabled={signingOut} className="min-h-11 px-3 py-3 rounded-lg bg-primary text-on-primary text-xs" onClick={async () => {
       if (signingOut) return;
       setSigningOut(true);
@@ -157,7 +158,7 @@ export function Header() {
               {item.label}
             </NavLink>
           ))}
-          <div className="flex gap-2 border-t border-surface-container-highest pt-3 mt-2">{sessionControls}</div>
+          <div className="flex flex-wrap gap-2 border-t border-surface-container-highest pt-3 mt-2">{sessionControls}</div>
         </nav>
       )}
     </header>

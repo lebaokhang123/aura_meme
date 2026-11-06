@@ -33,7 +33,7 @@ export function Footer() {
           <div>
             <h2 className="text-xs uppercase font-semibold tracking-wider mb-3">Connect</h2>
             <nav aria-label="Community links" className="flex flex-col gap-3 text-xs text-on-surface-variant">
-              <Link to="/contact">Contact preview</Link>
+              <Link to="/contact">Contact</Link>
               <a href="https://github.com/lebaokhang123/aura_meme" target="_blank" rel="noreferrer">
                 GitHub repository <span className="sr-only">(opens in a new tab)</span>
               </a>
