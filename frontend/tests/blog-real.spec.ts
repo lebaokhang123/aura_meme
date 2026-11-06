@@ -26,6 +26,12 @@ test('real draft refresh, upload, publish, pagination, comments and owner deleti
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Synthetic E2E draft');
   await expect(page.getByRole('combobox', { name: 'Post status', exact: true })).toHaveValue('draft');
   await expect(page.getByLabel('Remove existing private attachment')).not.toBeChecked();
+  for (const width of [375, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: test.info().outputPath('editor-polish-' + width + '.png'), fullPage: true });
+  }
   expect((await page.request.get('/api/v1/posts/' + id)).status()).toBe(404);
   await page.getByLabel('Title', { exact: true }).fill('Synthetic E2E published');
   await page.getByRole('combobox', { name: 'Post status', exact: true }).selectOption('published');

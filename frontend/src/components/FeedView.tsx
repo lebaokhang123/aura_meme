@@ -23,7 +23,7 @@ export function FeedView({ feed, grid = false }: { feed: ReturnType<typeof useFe
       <label className="text-xs">Sort posts<select className={input + ' block mt-1'} value={params.get('sort') ?? 'created_desc'} onChange={event => update({ sort: event.target.value, page: '1' })}>
         <option value="created_desc">Newest</option><option value="created_asc">Oldest</option><option value="title_asc">Title A–Z</option>
       </select></label>
-      {categories.more && <button type="button" disabled={categories.pending} className="text-secondary min-h-11" onClick={categories.loadMore}>More channels</button>}
+      {categories.hasPages && <button type="button" aria-disabled={categories.pending || !categories.more} aria-live="polite" className="text-secondary min-h-11" onClick={categories.loadMore}>{categories.more || categories.pending ? "More channels" : "All channels loaded"}</button>}
     </form>
     {categories.error && <p role="alert">{categories.error} <button onClick={categories.reload} className="underline min-h-11">Retry channels</button></p>}
     {pending ? <p role="status" className="p-6">Loading posts…</p> : error ? <div className="surface-panel p-6 rounded-xl bg-surface-container-low"><p role="alert">{error}</p><button onClick={reload} className="text-secondary underline min-h-11">Retry feed</button></div> : data && <>

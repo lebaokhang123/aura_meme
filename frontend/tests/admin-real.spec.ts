@@ -111,5 +111,17 @@ test('real Guest/User Contact and Admin CRUD, roles, moderation, audit and last 
     await page.setViewportSize({ width: 375, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
     await page.screenshot({ path: test.info().outputPath('admin-375.png'), fullPage: true });
+    for (const width of [375, 768, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      const region = page.getByRole('region', { name: 'Admin results' });
+      await region.focus();
+      await expect(region).toBeFocused();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      expect(await page.evaluate(() => document.getAnimations().filter(animation => animation.playState === 'running').length)).toBe(0);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: test.info().outputPath('admin-polish-' + width + '.png'), fullPage: true });
+    }
+
   } finally { await readerContext.close(); }
 });

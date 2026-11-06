@@ -43,6 +43,13 @@ test('real register/login/profile/password/logout and revoked second session', a
     await page.setViewportSize({ width: 375, height: 900 });
     await page.screenshot({ path: test.info().outputPath('settings-375.png'), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+    for (const width of [375, 768, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      await page.screenshot({ path: test.info().outputPath('settings-polish-' + width + '.png'), fullPage: true });
+    }
+    await page.setViewportSize({ width: 375, height: 900 });
     await page.getByLabel('Current password', { exact: true }).fill(password);
     await page.getByLabel('New password', { exact: true }).fill('Synthetic changed password!');
     await page.getByLabel('Confirm new password', { exact: true }).fill('Synthetic changed password!');

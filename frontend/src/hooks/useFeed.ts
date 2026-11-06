@@ -6,12 +6,16 @@ import { useResource } from './useResource';
 export function useCategories(endpoint: string | null = '/categories') {
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<Category[]>([]);
+  const [totalPages, setTotalPages] = useState(0);
   const resource = useResource<Page<Category>>(endpoint ? endpoint + '?page=' + page + '&page_size=100' : null);
   useEffect(() => {
-    if (resource.data) setItems(previous => [...new Map([...previous, ...resource.data!.items].map(item => [item.id, item])).values()]);
+    if (resource.data) {
+      setItems(previous => [...new Map([...previous, ...resource.data!.items].map(item => [item.id, item])).values()]);
+      setTotalPages(resource.data.pagination.total_pages);
+    }
   }, [resource.data]);
-  return { ...resource, items, more: !!resource.data && page < resource.data.pagination.total_pages,
-    loadMore: () => setPage(value => value + 1) };
+  return { ...resource, items, hasPages: totalPages > 1, more: page < totalPages,
+    loadMore: () => { if (!resource.pending && page < totalPages) setPage(value => value + 1); } };
 }
 
 export function useFeed() {
