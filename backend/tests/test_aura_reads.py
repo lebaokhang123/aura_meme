@@ -27,7 +27,7 @@ def ready(draft):
     db.execute(text('UPDATE users SET created_at=:time'), {'time': now - timedelta(days=60)})
     db.execute(text('UPDATE reward_policy_versions SET effective_at=:time,created_at=:time'), {'time': now - timedelta(days=30)})
     simulate_reward(db, policy, 'post', post, owner, now)
-    db.execute(text('INSERT INTO wallets VALUES (:owner,17,:now)'), {'owner': owner, 'now': now})
+    db.execute(text('INSERT INTO wallets VALUES (:owner,0,:now)'), {'owner': owner, 'now': now})
     db.execute(text("UPDATE reward_policy_versions SET status='published'"))
     return client, db, owner, policy, now
 
@@ -53,7 +53,12 @@ def member(db, policy, now, ident, score=7, status='active'):
 
 @pytest.mark.integration
 def test_progress_uses_actual_private_state_and_total_vs_earned_levels(ready):
+    from app.models import WalletTransaction
     client, db, owner, policy, now = ready
+    ident=uuid4()
+    db.execute(WalletTransaction.__table__.insert().values(id=ident,user_id=owner,event_key='fixture:'+str(ident),
+        delta_khi_van=17,reason='adjustment',policy_id=policy,reverses_id=None,created_at=now))
+    db.execute(text('UPDATE wallets SET khi_van_balance=17'))
     entry(db, owner, policy, now, 2, bonus=4)
     db.execute(text('UPDATE user_progress SET aura_xp_earned=9,aura_xp_bonus=4'))
     response = client.get('/api/v1/aura/progress?user_id='+str(uuid4()))
@@ -65,12 +70,14 @@ def test_progress_uses_actual_private_state_and_total_vs_earned_levels(ready):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize('missing', ['wallet','progress','cache'])
+@pytest.mark.parametrize('missing', ['wallet','progress','cache','money','streak'])
 def test_missing_or_inconsistent_account_state_is_not_fabricated(ready, missing):
     client, db, *_ = ready
     if missing == 'wallet': db.execute(text('DELETE FROM wallets'))
     elif missing == 'progress': db.execute(text('DELETE FROM user_progress'))
-    else: db.execute(text('UPDATE user_progress SET aura_xp_earned=8'))
+    elif missing == 'cache': db.execute(text('UPDATE user_progress SET aura_xp_earned=8'))
+    elif missing == 'money': db.execute(text('UPDATE wallets SET khi_van_balance=1'))
+    else: db.execute(text('UPDATE user_progress SET streak_days=2'))
     response = client.get('/api/v1/aura/progress')
     assert response.status_code == 503 and response.json()['error']['code'] == 'NOT_READY'
     assert 'earned_xp' not in response.json()

@@ -12,9 +12,16 @@ def assert_auxiliary_objects(connection):
         assert name in FUNCTION_HASHES and not security_definer and arguments == 0 and result == 'trigger' and language == 'plpgsql'
         assert hashlib.sha256(' '.join(body.split()).encode()).hexdigest() == FUNCTION_HASHES[name], "Changed immutable function body"
     triggers = connection.execute(text("SELECT t.tgname,c.relname,p.proname,t.tgtype,t.tgenabled,t.tgqual IS NULL,t.tgnargs,t.tgconstraint FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid WHERE n.nspname='public' AND NOT t.tgisinternal")).all()
-    assert set(triggers) == {
+    expected = {
         ('aura_ledger_no_truncate','aura_ledger','aurameme_immutable_ledger',34,'O',True,0,0),
         ('reward_policy_no_truncate','reward_policy_versions','aurameme_immutable_ledger',34,'O',True,0,0),
         ('aura_ledger_immutable','aura_ledger','aurameme_immutable_ledger',27,'O',True,0,0),
         ('reward_policy_immutable','reward_policy_versions','aurameme_immutable_policy',27,'O',True,0,0),
-    }, "Unknown, changed or disabled triggers"
+    }
+    revision = connection.scalar(text('SELECT version_num FROM alembic_version'))
+    assert revision in {'0003_aura_draft','0004_wallet_read','0005_checkin'}, "Unknown schema revision"
+    if revision == '0005_checkin':
+        for table in ['wallet_transactions','daily_checkins']:
+            expected.add((table+'_immutable',table,'aurameme_immutable_ledger',27,'O',True,0,0))
+            expected.add((table+'_no_truncate',table,'aurameme_immutable_ledger',34,'O',True,0,0))
+    assert set(triggers) == expected, "Unknown, changed or disabled triggers"

@@ -68,7 +68,7 @@ def test_ledger_truncate_is_rejected_before_data_loss(draft):
     client, db, owner, post, policy = draft
     simulate_reward(db, policy, "post", post, owner, client.app.state.auth.now())
     with pytest.raises(IntegrityError), db.begin_nested():
-        db.execute(text("TRUNCATE aura_ledger"))
+        db.execute(text("TRUNCATE aura_ledger CASCADE"))
     assert db.scalar(text("SELECT count(*) FROM aura_ledger")) == 1
 
 

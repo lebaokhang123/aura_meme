@@ -24,8 +24,9 @@ P0_TABLES = {
     "users", "roles", "user_roles", "profiles", "auth_sessions", "categories",
     "media_uploads", "posts", "comments", "contact_messages", "admin_audit_logs",
 }
-TABLES = P0_TABLES | {"post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger", "wallets"}
-REVISION = "0004_wallet_read"
+AURA_TABLES = P0_TABLES | {"post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger"}
+TABLES = AURA_TABLES | {"wallets", "wallet_transactions", "daily_checkins"}
+REVISION = "0005_checkin"
 
 
 def config():
@@ -93,7 +94,7 @@ def test_draft_revision_preserves_existing_tables_and_guards(migrated):
 
 @pytest.mark.integration
 def test_wallet_revision_roundtrip_preserves_existing_schema(migrated):
-    old = TABLES - {"wallets"}
+    old = AURA_TABLES
     def inventory():
         with migrated.connect() as connection:
             return connection.execute(text("SELECT oid,relname,relfilenode FROM pg_class WHERE relnamespace='public'::regnamespace AND relname=ANY(:names) ORDER BY relname"), {"names":sorted(old)}).all()
