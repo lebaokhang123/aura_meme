@@ -1,10 +1,10 @@
 """Implemented schema; business services live in their feature modules."""
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from sqlalchemy import (
-    BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint,
-    Index, MetaData, SmallInteger, Text, UniqueConstraint, Uuid, false,
+    BigInteger, Boolean, CheckConstraint, Computed, Date, DateTime, ForeignKey, ForeignKeyConstraint,
+    Index, Integer, MetaData, SmallInteger, Text, UniqueConstraint, Uuid, false,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -39,6 +39,70 @@ class PostBookmark(Base):
     user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (Index("ix_post_bookmarks_user_created_post", "user_id", created_at.desc(), "post_id"),)
+
+
+class RewardPolicyVersion(Base):
+    __tablename__ = "reward_policy_versions"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, unique=True)
+    config_json: Mapped[dict] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(Text)
+    effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint("version > 0", name="version"),
+        CheckConstraint("jsonb_typeof(config_json) = 'object'", name="config_object"),
+        CheckConstraint("status IN ('draft','published','retired')", name="status"),
+    )
+
+
+class UserProgress(Base):
+    __tablename__ = "user_progress"
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
+    aura_xp_earned: Mapped[int] = mapped_column(BigInteger)
+    aura_xp_bonus: Mapped[int] = mapped_column(BigInteger)
+    aura_xp_total: Mapped[int] = mapped_column(BigInteger, Computed("aura_xp_earned + aura_xp_bonus", persisted=True))
+    level_cached: Mapped[int] = mapped_column(Integer)
+    fair_level_cached: Mapped[int] = mapped_column(Integer)
+    streak_days: Mapped[int] = mapped_column(Integer)
+    last_checkin_day: Mapped[date | None] = mapped_column(Date)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint("aura_xp_earned >= 0 AND aura_xp_bonus >= 0", name="xp_nonnegative"),
+        CheckConstraint("level_cached >= 1 AND fair_level_cached >= 1 AND streak_days >= 0", name="progress_bounds"),
+        Index("ix_user_progress_earned_user", aura_xp_earned.desc(), "user_id"),
+    )
+
+
+class AuraLedger(Base):
+    __tablename__ = "aura_ledger"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"))
+    event_key: Mapped[str] = mapped_column(Text)
+    event_type: Mapped[str] = mapped_column(Text)
+    source_actor_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"))
+    source_post_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("posts.id", ondelete="RESTRICT"))
+    source_comment_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("comments.id", ondelete="RESTRICT"))
+    policy_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("reward_policy_versions.id", ondelete="RESTRICT"))
+    base_xp: Mapped[int] = mapped_column(BigInteger)
+    bonus_xp: Mapped[int] = mapped_column(BigInteger)
+    tier_at_event: Mapped[str] = mapped_column(Text)
+    multiplier_at_event: Mapped[int] = mapped_column(SmallInteger)
+    reverses_id: Mapped[UUID | None] = mapped_column(Uuid, unique=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint("user_id", "event_key", name="uq_aura_ledger_user_event"),
+        UniqueConstraint("user_id", "id", name="uq_aura_ledger_user_id_id"),
+        ForeignKeyConstraint(["user_id", "reverses_id"], ["aura_ledger.user_id", "aura_ledger.id"], ondelete="RESTRICT", name="fk_aura_ledger_owner_reversal"),
+        CheckConstraint("event_type IN ('post','reaction','comment','checkin','adjustment','reversal')", name="event_type"),
+        CheckConstraint("tier_at_event IN ('FREE','PLUS','PRIME') AND multiplier_at_event IN (1,2,3)", name="tier"),
+        CheckConstraint("(event_type = 'reversal') = (reverses_id IS NOT NULL) AND (reverses_id IS NULL OR reverses_id <> id)", name="reversal_reference"),
+        CheckConstraint("base_xp <> 0 OR bonus_xp <> 0", name="nonzero"),
+        CheckConstraint("(event_type IN ('post','reaction','comment','checkin') AND base_xp >= 0 AND bonus_xp = base_xp * (multiplier_at_event - 1) AND ((tier_at_event='FREE' AND multiplier_at_event=1) OR (tier_at_event='PLUS' AND multiplier_at_event=2) OR (tier_at_event='PRIME' AND multiplier_at_event=3))) OR (event_type='adjustment' AND base_xp >= 0 AND bonus_xp=0 AND multiplier_at_event=1) OR (event_type='reversal' AND base_xp <= 0 AND bonus_xp <= 0)", name="deltas"),
+        Index("ix_aura_ledger_user_occurred_id", "user_id", "occurred_at", "id"),
+        Index("ix_aura_ledger_occurred_user", "occurred_at", "user_id", postgresql_include=["base_xp"]),
+    )
 
 
 class User(Base):

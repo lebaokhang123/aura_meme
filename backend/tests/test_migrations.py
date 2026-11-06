@@ -16,15 +16,16 @@ from sqlalchemy.exc import IntegrityError
 from app.config import Settings, load_settings
 from app.db import create_db_engine
 from app.models import Base
+from schema_guard import assert_auxiliary_objects
 
 
 ROOT = Path(__file__).resolve().parents[1]
 TABLES = {
     "users", "roles", "user_roles", "profiles", "auth_sessions", "categories",
     "media_uploads", "posts", "comments", "contact_messages", "admin_audit_logs",
-    "post_reactions", "post_bookmarks",
+    "post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger",
 }
-REVISION = "0002_interactions"
+REVISION = "0003_aura_draft"
 
 
 def config():
@@ -55,7 +56,7 @@ def development_inventory(engine):
 
 @pytest.mark.integration
 def test_interactions_revision_preserves_p0_objects(migrated):
-    p0 = TABLES - {"post_reactions", "post_bookmarks"}
+    p0 = TABLES - {"post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger"}
     def inventory():
         with migrated.connect() as connection:
             assert all(connection.scalar(text(f'SELECT count(*) FROM "{name}"')) == 0 for name in TABLES)
@@ -68,6 +69,26 @@ def test_interactions_revision_preserves_p0_objects(migrated):
     migrate(migrated, "upgrade", "head")
     migrate(migrated, "upgrade", "head")
     assert inventory() == before
+
+
+@pytest.mark.integration
+def test_draft_revision_preserves_existing_tables_and_guards(migrated):
+    old = TABLES - {"reward_policy_versions", "user_progress", "aura_ledger"}
+    def inventory():
+        with migrated.connect() as connection:
+            return connection.execute(text("SELECT c.oid,c.relname,c.relfilenode FROM pg_class c LEFT JOIN pg_index i ON i.indexrelid=c.oid WHERE c.relnamespace='public'::regnamespace AND (c.relname=ANY(:names) OR i.indrelid IN (SELECT oid FROM pg_class WHERE relnamespace='public'::regnamespace AND relname=ANY(:names))) ORDER BY c.relname"), {"names": sorted(old)}).all()
+    with migrated.connect() as connection:
+        assert all(connection.scalar(text(f'SELECT count(*) FROM "{name}"')) == 0 for name in TABLES)
+    before = inventory()
+    migrate(migrated, "downgrade", "0002_interactions")
+    with migrated.connect() as connection:
+        assert set(inspect(connection).get_table_names()) == old | {"alembic_version"}
+        assert connection.scalar(text("SELECT count(*) FROM pg_proc WHERE pronamespace='public'::regnamespace")) == 0
+    migrate(migrated, "upgrade", "head")
+    migrate(migrated, "upgrade", "head")
+    assert inventory() == before
+    with migrated.connect() as connection:
+        assert_auxiliary_objects(connection)
 
 
 @pytest.fixture(scope="module")
@@ -87,11 +108,11 @@ def migrated():
             assert not inspect(connection).get_view_names(), "Unknown views; refusing migration test"
             assert not inspect(connection).get_materialized_view_names(), "Unknown materialized views"
             assert not inspect(connection).get_sequence_names(), "Unknown sequences"
-            assert connection.execute(text(
-                "SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid "
-                "JOIN pg_namespace n ON n.oid=c.relnamespace "
-                "WHERE n.nspname='public' AND NOT t.tgisinternal"
-            )).scalar_one() == 0, "Unknown user triggers; refusing destructive test"
+            if tables == TABLES | {"alembic_version"}:
+                assert_auxiliary_objects(connection)
+            else:
+                assert connection.scalar(text("SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal")) == 0
+                assert connection.scalar(text("SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public'")) == 0
             assert connection.execute(text(
                 "SELECT count(*) FROM pg_policies WHERE schemaname='public'"
             )).scalar_one() == 0, "Unknown row policies"
@@ -126,7 +147,7 @@ def test_schema_matches_dbml_and_metadata(migrated):
     dbml = (ROOT.parent / "docs/design/03-database.dbml").read_text(encoding="utf-8")
     blocks = dict(re.findall(r"^Table (\w+) \{(.*?)^\}", dbml, re.M | re.S))
     types = {"uuid": "UUID", "text": "TEXT", "timestamptz": "TIMESTAMP WITH TIME ZONE",
-             "smallint": "SMALLINT", "boolean": "BOOLEAN", "bigint": "BIGINT", "jsonb": "JSONB"}
+             "integer": "INTEGER", "date": "DATE", "smallint": "SMALLINT", "boolean": "BOOLEAN", "bigint": "BIGINT", "jsonb": "JSONB"}
     with migrated.connect() as connection:
         inspector = inspect(connection)
         assert set(Base.metadata.tables) == TABLES

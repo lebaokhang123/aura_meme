@@ -25,6 +25,7 @@ from app.models import Base,User,Role,Profile,UserRole,Category,Post,Comment,Med
 from argon2 import PasswordHasher
 from PIL import Image
 from test_migrations import TABLES, REVISION
+from schema_guard import assert_auxiliary_objects
 
 
 def inventory(connection):
@@ -36,8 +37,8 @@ def inventory(connection):
     assert not compare_metadata(MigrationContext.configure(connection, opts={'compare_server_default': True}), Base.metadata), 'E2E schema drift'
     assert not inspector.get_view_names() and not inspector.get_materialized_view_names() and not inspector.get_sequence_names()
     assert not connection.scalar(text("SELECT count(*) FROM pg_namespace WHERE nspname NOT IN ('public','information_schema') AND nspname NOT LIKE 'pg_%'"))
-    assert not connection.scalar(text("SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public'"))
-    assert not connection.scalar(text("SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal"))
+    assert_auxiliary_objects(connection)
+
     assert not connection.scalar(text("SELECT count(*) FROM pg_policies WHERE schemaname='public'"))
     return {name: connection.scalar(select(text('count(*)')).select_from(Base.metadata.tables[name])) for name in TABLES}
 

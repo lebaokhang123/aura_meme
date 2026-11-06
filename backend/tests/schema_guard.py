@@ -1,0 +1,20 @@
+"""Allow only reviewed immutable-ledger/policy triggers; never ignore unknown SQL."""
+import hashlib
+from sqlalchemy import text
+
+FUNCTION_HASHES = {'aurameme_immutable_ledger': '16133b0d1c38d3a566921db341effef89e3f9692e716bd5038350dd91cd66c8a', 'aurameme_immutable_policy': 'b067b4a3b866faefeff3d6218e0be4fb250ba22b65916858ee6a548f869e56d5'}
+
+
+def assert_auxiliary_objects(connection):
+    functions = connection.execute(text("SELECT p.proname,p.prosrc,p.prosecdef,p.pronargs,p.prorettype::regtype::text,l.lanname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_language l ON l.oid=p.prolang WHERE n.nspname='public'")).all()
+    assert len(functions) == len(FUNCTION_HASHES), "Unknown or missing public functions"
+    for name, body, security_definer, arguments, result, language in functions:
+        assert name in FUNCTION_HASHES and not security_definer and arguments == 0 and result == 'trigger' and language == 'plpgsql'
+        assert hashlib.sha256(' '.join(body.split()).encode()).hexdigest() == FUNCTION_HASHES[name], "Changed immutable function body"
+    triggers = connection.execute(text("SELECT t.tgname,c.relname,p.proname,t.tgtype,t.tgenabled,t.tgqual IS NULL,t.tgnargs,t.tgconstraint FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid WHERE n.nspname='public' AND NOT t.tgisinternal")).all()
+    assert set(triggers) == {
+        ('aura_ledger_no_truncate','aura_ledger','aurameme_immutable_ledger',34,'O',True,0,0),
+        ('reward_policy_no_truncate','reward_policy_versions','aurameme_immutable_ledger',34,'O',True,0,0),
+        ('aura_ledger_immutable','aura_ledger','aurameme_immutable_ledger',27,'O',True,0,0),
+        ('reward_policy_immutable','reward_policy_versions','aurameme_immutable_policy',27,'O',True,0,0),
+    }, "Unknown, changed or disabled triggers"
