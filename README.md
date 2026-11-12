@@ -1,41 +1,19 @@
 # AuraMeme
 
-**AuraMeme** là dự án ứng dụng web cộng đồng chia sẻ meme, kết hợp tính năng blog, tương tác bài viết và cơ chế tích lũy điểm Aura. Dự án hướng tới việc xây dựng một sản phẩm có thể vận hành, đồng thời thực hành thiết kế hệ thống, lập trình web và quy trình triển khai DevOps.
+AuraMeme là đồ án web cộng đồng chia sẻ meme. Frontend chính hiện là bản Stitch React đã được Owner duyệt; backend FastAPI/PostgreSQL được giữ riêng để phát triển tiếp.
 
-## Phạm vi sản phẩm
+## Frontend hiện tại
 
-- **Blog cộng đồng (P0):** tài khoản, hồ sơ cá nhân, phân loại bài viết, đăng bài, bình luận, tìm kiếm, trang liên hệ và chức năng quản trị.
-- **Tương tác và Aura (P1):** biểu cảm, lưu bài, bảng xếp hạng, điểm danh hằng ngày, ví Khí Vận, Bảo Khố và vật phẩm trang trí.
-- **Mở rộng (P2):** ô tạo Khí Vận, gói thành viên và mô phỏng thanh toán; chỉ triển khai sau các chức năng cốt lõi.
+- React 19, JavaScript/JSX, Vite 7; 14 màn Guest/User/Auth trên 8 route.
+- Responsive, dark/light, VI/EN; header/footer dùng chung.
+- Home/Explore: category, search, New/Hot; số danh mục đếm theo bài hiện có.
+- Demo tạo bài text/PNG/JPEG/GIF, reaction, bình luận, chèn emoji, xóa có xác nhận và chia sẻ đúng bài.
+- Dữ liệu tương tác và file lưu trong IndexedDB theo browser/origin. Frontend chưa kết nối API; đăng nhập mẫu không phải xác thực thật.
+- Rank/Vault/Contact và các chức năng tương lai có trạng thái demo/bảo trì, không phát thưởng hoặc thanh toán thật.
 
-## Công nghệ dự kiến
+## Chạy demo
 
-| Thành phần | Công nghệ |
-|---|---|
-| Frontend | React, TypeScript, Vite |
-| Backend | Python, FastAPI (modular monolith) |
-| Database | PostgreSQL, Alembic |
-| Đóng gói và triển khai | Docker Compose, Nginx, AWS |
-| Tích hợp và vận hành | GitHub Actions, giám sát, sao lưu và Infrastructure as Code theo từng giai đoạn |
-
-## Tài liệu kỹ thuật
-
-| Nội dung | Tài liệu |
-|---|---|
-| Sitemap, Use Case | [`docs/design/`](docs/design/) |
-| Mô hình dữ liệu và đặc tả PostgreSQL | [`03-database.dbml`](docs/design/03-database.dbml) · [`03-database-design.md`](docs/design/03-database-design.md) |
-| Kiến trúc hệ thống | [`04-system-architecture.drawio`](docs/architecture/04-system-architecture.drawio) · [`04-architecture-decisions.md`](docs/architecture/04-architecture-decisions.md) |
-| Hợp đồng API và luồng dữ liệu | [`05-openapi.yaml`](docs/api/05-openapi.yaml) · [`05-api-design.md`](docs/api/05-api-design.md) · [`05-data-flows.drawio`](docs/api/05-data-flows.drawio) |
-
-## Trạng thái dự án
-
-Frontend trong [`frontend/`](frontend/) giữ giao diện prototype. Tài khoản/profile, blog, bình luận, upload, Contact và quản trị dùng API thật. Ảnh lưu riêng tư, preview file chỉ cục bộ; server media display và phần thưởng chưa kết nối.
-
-Backend P0 có session/CSRF, account, blog, media riêng tư, quản trị và Contact. Database development chưa được migrate; dùng môi trường kiểm thử cô lập, không tự migrate/seed development. CI/CD và AWS chưa triển khai.
-
-## Chạy frontend local
-
-Yêu cầu Node.js **22.12 trở lên** và npm. Từ thư mục repository:
+Cần Node.js >=22.12.0 và npm. Không cần khởi động backend hoặc database để xem frontend.
 
 ```powershell
 cd frontend
@@ -43,114 +21,34 @@ npm ci
 npm run dev
 ```
 
-Mở URL Vite in ra (mặc định `http://localhost:5173`). Vite proxy `/api/v1` tới backend cổng8000; Auth cần backend/DB đã chuẩn bị, `AUTH_ENVIRONMENT=development` và `AUTH_ALLOWED_ORIGINS` đúng origin loopback đang mở. Cookie và CSRF do server cấp, không lưu token vào browser storage.
+Mở http://127.0.0.1:5173. Đăng nhập bằng Khang_dev@example.com, Kien_dev@example.com hoặc Gigachad@example.com với mật khẩu demo bất kỳ; ứng dụng không lưu mật khẩu.
 
 ```powershell
-npm run lint     # TypeScript typecheck, chưa phải ESLint
-npm run build    # Typecheck và production bundle trong dist/
-npm run preview  # Xem production bundle sau build
-npm test         # Smoke test Playwright, cần Google Chrome đã cài
+npm run build
+node --test tests/*test.mjs
+npm test
 ```
 
-Smoke test tự chạy Vite trên `127.0.0.1:4173`, kiểm routing, refresh, alias/404, màn hình 375/768/1440px, bàn phím và giảm chuyển động. Font/icon được self-host cùng giấy phép; ảnh chưa xác minh được thay bằng SVG placeholder tự tạo. Xem [`frontend/ASSET_SOURCES.md`](frontend/ASSET_SOURCES.md).
+Browser tests dùng Chrome qua Playwright. Tailwind Play CDN, Google Fonts và một số ảnh từ xa cần Internet. Xóa storage/đổi origin sẽ không thấy dữ liệu demo đã tạo. Xem [hướng dẫn frontend](frontend/SETUP.txt) và [nguồn asset](frontend/ASSET_SOURCES.md).
 
-E2E thật: `backend\.venv\Scripts\python.exe backend/tests/run_browser.py` từ repository. Cần DB riêng `aurameme_e2e/public` rỗng, revision hiện hành và `backend/e2e.local/.env` (ignored) chứa cấu hình DB/Auth riêng, origin `http://127.0.0.1:4173`; migration chỉ bằng `E2E_DATABASE_URL` tường minh và `alembic -x target=e2e upgrade head`. Runner dùng API8001/Vite4173, từ chối dữ liệu lạ và chỉ cleanup fixtures của lần chạy; không reset/drop database.
+## Cấu trúc
 
-## Chạy backend local (Windows)
+| Thư mục | Vai trò |
+|---|---|
+| [frontend/](frontend/) | Frontend Stitch demo hiện hành, source/reference/assets/tests |
+| [backend/](backend/) | FastAPI modular monolith, Alembic, PostgreSQL; chưa tích hợp vào frontend demo |
+| [docs/design/](docs/design/) | Sitemap, use case và thiết kế dữ liệu |
+| [docs/architecture/](docs/architecture/) | Kiến trúc và các quyết định thiết kế |
+| [docs/api/](docs/api/) | Hợp đồng API và data flow; một phần phản ánh runtime legacy |
 
-Yêu cầu Python **3.12 trở lên**. Từ thư mục repository, dùng PowerShell:
+Các thay đổi backend local chưa thuộc checkpoint frontend này. Không tự migrate/seed database development. Code frontend cũ có thể phục hồi qua Git history; backup/evidence nội bộ không được đưa lên GitHub.
 
-```powershell
-cd backend
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --only-binary=:all: -e ".[test]"
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-# Sửa DATABASE_URL, AUTH_ENVIRONMENT và AUTH_ALLOWED_ORIGINS trong .env.
-# Chỉ tạo signing key lần đầu, không ghi đè key đang dùng:
-.\.venv\Scripts\python.exe -c "import secrets; from dotenv import dotenv_values, set_key; v=dotenv_values('.env').get('AUTH_SIGNING_KEY'); set_key('.env','AUTH_SIGNING_KEY',secrets.token_urlsafe(48)) if not v or v.startswith('CHANGE_ME') else None"
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
+## Game Mechanics V1 — đặc tả, chưa bật runtime
 
-Các lệnh gọi Python trực tiếp trong venv nên không cần đổi ExecutionPolicy hoặc activate. Environment ghi đè `backend/.env`. `DATABASE_URL` bắt buộc có dạng `postgresql+psycopg://user:password@host:5432/database`; percent-encode ký tự đặc biệt trong user/password. `.env.example` chỉ có placeholder, không phải credential hoạt động. `DB_CONNECT_TIMEOUT` là số giây từ 1 đến 30, mặc định 5. Không đưa `.env` hoặc URL chứa mật khẩu vào Git/log.
+Owner đã chốt 10 cảnh giới ×10 Level; XP lên cấp ` 10 + Level ` từ Lv.1–100, điểm danh +15 Aura gốc/ngày tại07:00 Việt Nam và earned XP cap135/ngày. Rank tính Aura gốc. Hai rương Meme/Ảnh Bìa quay miễn phí, có cooldown, nhận trùng; odds D68,9/C20/B10/A1/S0,1 và không cộng XP khi mở hòm. Plus30 ngày XP×2, Prime365 ngày XP×3; VNPAY Sandbox, chưa bán tiền thật. Ví Khí Vận/generator legacy đang hoãn. Cần task API/schema/test tương ứng trước khi tích hợp.
 
-`AUTH_SIGNING_KEY` bắt buộc, ít nhất 32 byte ngẫu nhiên; placeholder bị từ chối. `AUTH_ENVIRONMENT=production` mặc định yêu cầu HTTPS và cookie Secure. Chỉ dùng `development` với origin loopback cụ thể cho HTTP local; `AUTH_ALLOWED_ORIGINS` là JSON array origin chính xác, không wildcard. Không bật CORS; frontend dùng same-origin/proxy theo thiết kế. Chưa migrate `aurameme_dev`: Auth sẽ chưa chạy nghiệp vụ trên development cho tới khi được Owner phê duyệt riêng.
+## Phạm vi kiểm chứng
 
-- `http://127.0.0.1:8000/health` → HTTP 200, `{"status":"ok"}`: kiểm tra tiến trình API; không xác nhận DB đã sẵn sàng.
-- `http://127.0.0.1:8000/openapi.json` và `/docs`: hợp đồng runtime chỉ cho endpoint đã triển khai. Đặc tả toàn dự án nằm tại `docs/api/05-openapi.yaml`.
-- Thiếu/sai cấu hình làm startup thất bại với lỗi đã ẩn giá trị nhạy cảm. DB chưa sẵn sàng vẫn có thể chạy health; dùng probe riêng bên dưới.
+Frontend có unit tests và browser regression cho14màn, Guest/3user demo,375/768/1440px, theme/language, filter/history và lưu trữ lỗi/reload. Đây là demo frontend để review UI/logic; chưa chứng minh triển khai production hoặc vận hành backend/DevOps.
 
-Mở terminal khác tại `backend/`:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe -m app.db  # SELECT 1: exit 0 nếu OK, exit 1 nếu cấu hình/DB lỗi
-```
-
-Probe dùng connection context manager của SQLAlchemy, trả connection về pool và dispose khi kết thúc; không tạo/sửa bảng. Engine API dùng `pool_pre_ping`, được dispose khi shutdown. Không bật SQL echo hoặc in connection string khi probe lỗi.
-
-Integration test chỉ kết nối khi bạn đặt **environment** `TEST_DATABASE_URL`; không tự đọc biến này từ `.env`, không tạo database. Nếu thiếu biến, test cần DB ghi rõ SKIPPED thay vì nhận PASS cho DB thật. Dùng trình soạn thảo/secret manager để đặt giá trị riêng; không dán credential vào lịch sử terminal.
-
-### Migration P0 (M1.4)
-
-Alembic mặc định chỉ cho phép database **`aurameme_test`**, tách khỏi `DATABASE_URL` development. Không có DSN trong `alembic.ini`, không tự migrate khi FastAPI startup. Offline SQL và migration development được chặn trong milestone này.
-
-Lưu test URL riêng vào `backend/.env` dưới tên `TEST_DATABASE_URL` rồi chạy từ `backend/` bằng PowerShell; đoạn sau chỉ truyền giá trị vào process con, không in credential:
-
-```powershell
-@'
-import os, subprocess, sys
-from dotenv import dotenv_values
-env = os.environ.copy()
-env["TEST_DATABASE_URL"] = dotenv_values(".env")["TEST_DATABASE_URL"]
-subprocess.run([sys.executable, "-m", "alembic", "current"], env=env, check=True)
-raise SystemExit(subprocess.call([sys.executable, "-m", "pytest", "-q"], env=env))
-'@ | & .\.venv\Scripts\python.exe -
-```
-
-Test migration thực hiện upgrade → upgrade lại → downgrade base → upgrade, so DBML/metadata và thử constraint trong transaction rollback. **Downgrade xóa các bảng của migration**: chỉ dùng DB test chuyên dụng. Bộ test từ chối schema lạ hoặc bảng ứng dụng có dữ liệu; bản thân downgrade cũng khóa các bảng P0 và từ chối nếu còn hàng, không tự xóa dữ liệu để chạy tiếp. Không reset database/volume. Kết thúc để DB test ở `0009_vault_open` (head; 28 bảng, gồm Aura và check-in/wallet ledger), không có dữ liệu nghiệp vụ mẫu. Không áp dụng schema/rollback vào development ở M1.4.
-
-### Authentication (M2.1)
-
-`GET /api/v1/auth/csrf` cấp token JSON gắn với pre-session có hạn 10 phút hoặc session đang đăng nhập. Gửi token qua `X-CSRF-Token` và Origin/Referer hợp lệ cho register/login/logout. Sau login, gọi lại GET csrf để lấy token gắn với session mới; token pre-auth bị tiêu thụ. GET vẫn public và cấp pre-session mới nếu cookie cũ hết hạn. Không đưa token vào URL/log/localStorage.
-
-Register tạo user/profile/USER role trong một transaction, không tự login; email được trim + lowercase toàn chuỗi. Password 12–128 ký tự, Argon2id 19 MiB/2 iterations/parallelism 1, không truncate. Login cấp session token ngẫu nhiên mới, DB chỉ giữ SHA-256 digest. Cookie `am_session` HttpOnly, host-only, Path=/, SameSite=Lax, Secure ở production. Idle timeout 30 phút trượt, absolute 12 giờ tại server; logout chỉ revoke session hiện tại. Các tab cùng profile chia sẻ cookie, các thiết bị có phiên độc lập.
-
-Chạy nhóm không cần PostgreSQL: `.\.venv\Scripts\python.exe -m pytest -q -m "not integration"`. Full suite dùng đoạn truyền TEST_DATABASE_URL ở trên: có test Auth với savepoint/rollback và test concurrency trên các UUID test riêng, cleanup đúng dữ liệu tạo ra. Chỉ dùng `aurameme_test` chuyên dụng, không chạy song song với thao tác SQL của Owner; không dùng database có dữ liệu cần giữ. Đừng coi nhóm không cần DB là nghiệm thu integration.
-
-Giới hạn hiện tại: limiter và pre-session store bounded trong RAM, chỉ hỗ trợ **một process**; restart hủy pre-session, chưa có shared limiter cho multi-worker/production. Rate limit theo IP thật (không tin X-Forwarded-For) và email đăng nhập; cấu hình proxy/retention session cần review ở milestone vận hành. Không có OAuth/JWT/reset password/đổi mật khẩu hoặc kết nối frontend trong M2.1.
-
-> Nhánh `main` lưu bản prototype/bài thực hành trước đây; nhánh `dev` dùng cho sản phẩm đang phát triển và có lịch sử Git độc lập.
-
-### Account & Authorization (M2.2)
-
-`GET/PATCH /api/v1/users/me`, `PUT /api/v1/users/me/password` cần session (mutation cần CSRF/Origin); profile PATCH từ chối field ngoài allowlist. `GET /api/v1/users/{username}` chỉ trả hồ sơ active với whitelist công khai, chưa có avatar URL provider nên avatar_url là null. Đổi mật khẩu giữ phiên hiện tại, revoke các phiên khác trong cùng transaction; helper require_role đọc role từ DB, chưa có Admin CRUD. Response Auth M2.1 giữ nguyên.
-
-Test riêng: `python -m pytest tests/test_account.py tests/test_account_concurrency.py -q` với TEST_DATABASE_URL explicit theo hướng dẫn trên; PostgreSQL test phải có schema P0, không dữ liệu/đối tượng lạ. Các test concurrency dùng connection riêng và cleanup đúng identity UUID tạo ra; snapshot development và postflight phải đạt. Không chạy song song với Owner trên DB test. Chưa migrate development để demo Account.
-
-### Categories & Posts (M3.1)
-
-Public GET `/api/v1/categories`, `/api/v1/posts`, `/api/v1/posts/{id}`; Admin category GET/POST/PATCH/DELETE dưới `/api/v1/admin/categories`; post POST/PATCH/DELETE chỉ cho author. Mutation cần session/CSRF/Origin, Admin cần role DB. Category mới active, post mặc định draft; PATCH không gửi status giữ nguyên. Category DELETE chỉ hide với audit atomic; post DELETE là soft delete giữ FK. Public không hiện bài/category/author bị ẩn/xóa/khóa hoặc media không hợp lệ.
-
-PUT/DELETE `/api/v1/posts/{id}/reactions` và `/bookmark` cần session/CSRF; mỗi user/post có một reaction và một bookmark, retry không tạo hàng trùng. Chưa phát XP/Khí Vận hoặc bật nút reaction/bookmark trên UI. Aura hiện chỉ có simulation policy draft trên `aurameme_test`, không có reward hook; GET `/api/v1/aura/progress` và `/api/v1/leaderboard` trả503/NOT_READY khi thiếu policy published hợp lệ hoặc account state cần thiết; các số XP/caps/level trong test không phải chính sách sản phẩm. POST `/api/v1/aura/check-in` kiểm session/CSRF/Origin rồi trả503/NOT_READY; chỉ có core simulation test-only, chưa phát thưởng hoặc cấp weekly icon ở runtime.
-
-Search literal, sort allowlist/tie-break UUID, pagination page>=1/page_size<=100. Chưa URL provider nên media/avatar URL null; comments_count optional omit. Content là text JSON, chưa có renderer/upload/comment API. Test: `python -m pytest tests/test_blog.py tests/test_blog_concurrency.py -q` với TEST_DATABASE_URL như trên, chỉ test DB riêng preflight sạch và postflight/cleanup, không migrate development.
-
-### Private media upload (M3.2)
-
-`POST /api/v1/media` nhận đúng một multipart field `file`, cần session cookie, `X-CSRF-Token` và Origin hợp lệ trước đọc body. JPEG/PNG/WebP/GIF: tối đa **5 MiB**, **12.000.000 pixels/frame**, ảnh động tối đa **60 frames/40.000.000 pixels cộng dồn**. MIME khai báo, signature và decode Pillow phải khớp; filename bị bỏ qua, extension lấy từ định dạng xác minh. Request tối đa 5 MiB + 64 KiB; overhead ≤64 KiB, part headers ≤8 KiB, không field phụ. Vượt giới hạn trả422 theo hợp đồng.
-
-Bytes lưu riêng tư tại `backend/.local/media/` (ignored), có thể override bằng `MEDIA_STORAGE_ROOT` **absolute, dedicated, ngoài webroot** trong `.env`. Không tạo thư mục khi startup/test; chỉ tạo khi upload thật. Thư mục mới dùng0700 (Python3.12.4+ hỗ trợ ACL Windows); root/ancestors có sẵn phải được Owner giữ quyền ghi cho tài khoản chạy backend/admin. Không dùng junction/symlink, public/static hoặc frontend làm root. Windows pin handles chống rename và cleanup đúng handle; POSIX dùng directory fd/O_NOFOLLOW. Chưa kiểm chứng runtime POSIX.
-
-Server tạo UUID key, ghi exclusive + fsync, INSERT metadata rồi COMMIT; chỉ sau đó trả201/ready với `url=null`. Không có GET/DELETE/static mount. Không lưu binary vào DB; không sửa Posts API/DTO. **Original bytes được giữ, chưa sanitize/public-serving**; EXIF/metadata vẫn có thể tồn tại. DB INSERT/COMMIT bị từ chối chắc chắn thì cleanup file mới; lỗi cleanup ghi safe event + object_key. Nếu mất xác nhận COMMIT, giữ file để tránh xóa bytes của row có thể đã commit, trả500 và ghi `media_commit_uncertain`.
-
-PostgreSQL không bao trùm filesystem: crash sau ghi file có thể để orphan. Khi process đã dừng nhận upload, Owner đối chiếu keys trong root private với `media_uploads.object_key` bằng DB query read-only, kiểm tra trạng thái transaction trước khi quyết định xử lý từng key. Không tự xóa toàn root hoặc thêm worker. Chưa có delivery/retention/quota/production malware scanning.
-
-Test riêng: `python -m pytest tests/test_media.py tests/test_media_transactions.py -q` với TEST_DATABASE_URL explicit như trên. Chỉ DB test/public/schema hiện hành/rỗng, không chạy đồng thời với Owner; test dùng temp storage và rollback/cleanup identities riêng. Bao gồm lỗi COMMIT deferred thật, concurrency, fsync/cleanup fault injection và subprocess crash. Full suite có roundtrip migration M1.4 chỉ trên DB test rỗng đã được duyệt; tuyệt đối không migrate development để demo.
-
-Catalog draft: từ `backend`, dùng `python -m app.catalog <catalog.json>` để kiểm manifest version1 và ảnh local (SHA256/MIME/provenance). Lệnh chỉ validate, không nhập DB, không publish bytes hoặc duyệt quyền. Importer test-only giữ asset inactive; chưa có catalog phát hành.
-
-`CATALOG_STORAGE_ROOT` mặc định `backend/.local/catalog`, tách khỏi media upload. GET `/api/v1/catalog/assets/{id}` chỉ trả PNG chuẩn hóa khi item active/rights approved và file hash-addressed đã kiểm; chưa có catalog release. Inventory/equipment dùng session/CSRF, không mint vật phẩm.
-
-GET `/api/v1/vault/cases` chỉ liệt kê common case active có odds/policy published hợp lệ; chưa có dữ liệu phát hành nên danh sách rỗng. Odds engine hai tầng dùng `secrets.randbelow`; fixtures/Monte Carlo không phải xác suất được duyệt.
-
-UI `/vault` đọc case/inventory và equip từ API; mở case hiện trả503/NOT_READY sau session/CSRF/Origin, không grant/debit/quota. Retry key được giữ theo user/case trong sessionStorage, không lưu credentials hoặc tự chọn reward. Atomicopen/weeklygrants chỉ có trong draft simulations trên DB test.
+Nguồn/license và xác nhận của Owner đối với asset được ghi riêng trong [asset ledger](frontend/ASSET_SOURCES.md); license mã nguồn không tự áp dụng cho mọi ảnh bên thứ ba.

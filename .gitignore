@@ -12,6 +12,7 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+/Apply_AuraMeme_V1_NoZip.ps1
 *.egg-info/
 backend/build/
 *.local
