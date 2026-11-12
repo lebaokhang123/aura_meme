@@ -1,5 +1,6 @@
 """Flat P0 comments, public visibility and owner-only soft deletion."""
 from datetime import datetime
+from typing import Literal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -14,6 +15,7 @@ from app.blog_schemas import Pagination, StrictInput
 from app.models import Category, Comment, MediaUpload, Post, Profile, User
 from app.permissions import require_account_csrf
 from app.security import AuthError
+from app.media import media_url
 
 
 router = APIRouter(prefix="/api/v1", tags=["Blog"])
@@ -46,7 +48,7 @@ class CommentPage(BaseModel):
 
 def comment_dto(comment, user, profile):
     author = UserPublic(id=user.id, username=user.username, display_name=profile.display_name,
-                        created_at=user.created_at, bio=profile.bio, avatar_url=None)
+                        created_at=user.created_at, bio=profile.bio, avatar_url=media_url(profile.avatar_media_id))
     return CommentResponse(id=comment.id, post_id=comment.post_id, author=author,
                            body=comment.body, created_at=comment.created_at)
 
@@ -74,14 +76,23 @@ def lock_public_post(db, post_id):
 @router.get("/posts/{post_id}/comments", response_model=CommentPage, operation_id="listComments",
             responses={status: {"model": ErrorResponse} for status in (404, 422, 429, 500)})
 def list_comments(post_id: UUID, request: Request, page: int = Query(1, ge=1),
-                  page_size: int = Query(20, ge=1, le=100)):
+                  page_size: int = Query(20, ge=1, le=100), search: str | None = Query(None, max_length=100),
+                  author: str | None = Query(None, max_length=32),
+                  sort: Literal["created_asc", "created_desc"] = "created_asc"):
+    if any(value is not None and "\x00" in value for value in (search, author)):
+        raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
     with request.app.state.auth_session_factory() as db:
         require_public_post(db, post_id)
         statement = select(Comment, User, Profile).join(User, User.id == Comment.author_id).join(
             Profile, Profile.user_id == User.id).where(Comment.post_id == post_id,
                 Comment.status == "visible", Comment.deleted_at.is_(None), User.status == "active",
                 Comment.post_id.in_(public_post_id(post_id)))
-        rows, pagination = page_rows(db, statement.order_by(Comment.created_at, Comment.id), page, page_size)
+        if search is not None:
+            statement = statement.where(Comment.body.icontains(search, autoescape=True))
+        if author is not None:
+            statement = statement.where(User.username == author)
+        ordering = (Comment.created_at, Comment.id) if sort == "created_asc" else (Comment.created_at.desc(), Comment.id.desc())
+        rows, pagination = page_rows(db, statement.order_by(*ordering), page, page_size)
         return CommentPage(items=[comment_dto(*row) for row in rows], pagination=pagination)
 
 

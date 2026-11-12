@@ -22,7 +22,8 @@ def test_health_and_openapi_without_a_database(monkeypatch):
                                           "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/users/me",
                                           "/api/v1/users/me/password", "/api/v1/users/{username}", "/api/v1/categories",
                                           "/api/v1/admin/categories", "/api/v1/admin/categories/{category_id}",
-                                          "/api/v1/posts", "/api/v1/posts/{post_id}", "/api/v1/media",
+                                          "/api/v1/posts", "/api/v1/posts/{post_id}", "/api/v1/media", "/api/v1/media/{media_id}",
+                                          "/api/v1/posts/{post_id}/interactions", "/api/v1/users/me/bookmarks",
                                           "/api/v1/posts/{post_id}/comments", "/api/v1/comments/{comment_id}",
                                           "/api/v1/admin/users", "/api/v1/admin/users/{user_id}",
                                           "/api/v1/admin/users/{user_id}/roles", "/api/v1/admin/posts",
@@ -49,7 +50,14 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         assert patch["properties"]["display_name"]["type"] == "string"
         public = contract["components"]["schemas"]["UserPublic"]
         assert set(public["properties"]) == {"id", "username", "display_name", "created_at", "bio", "avatar_url"}
-        assert any(item.get("format") == "uri" for item in public["properties"]["avatar_url"]["anyOf"])
+        assert public["properties"]["avatar_url"]["format"] == "uri-reference"
+        assert {"type": "string"} in public["properties"]["avatar_url"]["anyOf"]
+        profile = contract["components"]["schemas"]["PublicProfile"]
+        assert set(profile["properties"]) == set(public["properties"]) | {"cover_url"}
+        assert profile["properties"]["cover_url"]["format"] == "uri-reference"
+        assert contract["components"]["schemas"]["PostResponse"]["properties"]["media_url"]["format"] == "uri-reference"
+        upload_schema = contract["paths"]["/api/v1/media"]["post"]["responses"]["201"]["content"]["application/json"]["schema"]["$ref"].rsplit("/", 1)[-1]
+        assert contract["components"]["schemas"][upload_schema]["properties"]["url"]["format"] == "uri-reference"
         for name in ["CategoryInput", "CategoryPatch", "PostInput", "PostPatch"]:
             assert contract["components"]["schemas"][name]["additionalProperties"] is False
         assert client.get("/api/v1/admin/users/{user_id}/roles").status_code == 405

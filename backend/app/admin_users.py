@@ -109,6 +109,8 @@ def revoke_sessions(db, user_id, now):
             responses={status: ERRORS[status] for status in (401, 403, 422, 429, 500)})
 def list_users(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                search: str | None = Query(None, max_length=100), status: str | None = None,
+               role: Literal["USER", "ADMIN"] | None = None,
+               sort: Literal["username_asc", "username_desc", "created_desc", "created_asc"] = "username_asc",
                account=Depends(require_role("ADMIN"))):
     if any(value is not None and "\x00" in value for value in (search, status)):
         raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
@@ -118,7 +120,11 @@ def list_users(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1
     if search is not None:
         statement = statement.where(or_(User.username.icontains(search, autoescape=True),
             User.email.icontains(search, autoescape=True), Profile.display_name.icontains(search, autoescape=True)))
-    rows, pagination = page_rows(account.db, statement.order_by(User.username, User.id), page, page_size)
+    if role is not None:
+        statement = statement.where(User.id.in_(select(UserRole.user_id).join(Role).where(Role.code == role)))
+    ordering = {"username_asc": (User.username, User.id), "username_desc": (User.username.desc(), User.id.desc()),
+                "created_desc": (User.created_at.desc(), User.id.desc()), "created_asc": (User.created_at, User.id)}
+    rows, pagination = page_rows(account.db, statement.order_by(*ordering[sort]), page, page_size)
     roles = {user.id: [] for user, profile in rows}
     if rows:
         for user_id, code in account.db.execute(select(UserRole.user_id, Role.code).join(Role).where(

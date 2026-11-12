@@ -283,7 +283,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserPublic'
+                $ref: '#/components/schemas/PublicProfile'
         '422':
           $ref: '#/components/responses/ValidationError'
         '429':
@@ -303,6 +303,20 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Page'
       - $ref: '#/components/parameters/PageSize'
+      - $ref: '#/components/parameters/PostSearch'
+      - name: slug
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [slug_asc, name_asc, name_desc]
+          default: slug_asc
       responses:
         '200':
           description: Thành công
@@ -342,6 +356,9 @@ paths:
         schema:
           type: string
           enum: [draft, published, hidden]
+      - $ref: '#/components/parameters/PostSearch'
+      - $ref: '#/components/parameters/PostCategory'
+      - $ref: '#/components/parameters/PostSort'
       responses:
         '200':
           description: Thành công
@@ -569,6 +586,20 @@ paths:
       - $ref: '#/components/parameters/PostId'
       - $ref: '#/components/parameters/Page'
       - $ref: '#/components/parameters/PageSize'
+      - $ref: '#/components/parameters/PostSearch'
+      - name: author
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 32
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [created_asc, created_desc]
+          default: created_asc
       responses:
         '200':
           description: Thành công
@@ -670,7 +701,8 @@ paths:
       description: Một file JPEG/PNG/WebP/GIF, tối đa 5 MiB và 12.000.000 pixels/frame.
         Ảnh động tối đa 60 frames và 40.000.000 pixels cộng dồn (bao gồm GIF).
         Backend kiểm MIME, signature và decode thật; xác thực session/CSRF/Origin trước parse.
-        M3.2 lưu bytes private local, metadata PostgreSQL; status ready chỉ trả sau COMMIT, url null.
+        Bytes gốc lưu private local, metadata PostgreSQL; status ready chỉ trả sau COMMIT.
+        url là đường dẫn tương đối cùng origin; GET kiểm lại quyền trước khi xuất ảnh đã bỏ metadata.
       security: *id001
       parameters:
       - $ref: '#/components/parameters/CsrfHeader'
@@ -703,6 +735,53 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/media/{media_id}:
+    get:
+      tags:
+      - Media
+      summary: Hiển thị ảnh upload theo quyền hiện tại
+      operationId: getMedia
+      description: Chỉ media ready của bài public hiện tại hoặc avatar/cover của tài khoản active được public.
+        Chủ media có session active được preview ảnh draft/chưa gắn. Các trường hợp không có quyền,
+        file thiếu/hỏng/link đều trả404, không lộ object key. Không mount storage thành thư mục public.
+        Decode theo ngân sách upload; ảnh tĩnh xuất PNG, ảnh động xuất GIF giữ animation, bỏ metadata.
+        still=true xuất PNG frame đầu cho reduced motion. Cache-Control no-store, nosniff và CSP sandbox.
+      security:
+      - {}
+      - sessionCookie: []
+      parameters:
+      - name: media_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: still
+        in: query
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: Ảnh đã decode và bỏ metadata
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
       x-phase: P0
@@ -799,6 +878,19 @@ paths:
       - $ref: '#/components/parameters/PageSize'
       - $ref: '#/components/parameters/PostSearch'
       - $ref: '#/components/parameters/AdminStatus'
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [USER, ADMIN]
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [username_asc, username_desc, created_desc, created_asc]
+          default: username_asc
       responses:
         '200':
           description: Thành công
@@ -948,6 +1040,8 @@ paths:
       - $ref: '#/components/parameters/PageSize'
       - $ref: '#/components/parameters/PostSearch'
       - $ref: '#/components/parameters/AdminStatus'
+      - $ref: '#/components/parameters/PostCategory'
+      - $ref: '#/components/parameters/PostSort'
       responses:
         '200':
           description: Thành công
@@ -1057,6 +1151,13 @@ paths:
       - $ref: '#/components/parameters/PageSize'
       - $ref: '#/components/parameters/PostSearch'
       - $ref: '#/components/parameters/AdminStatus'
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [slug_asc, name_asc, name_desc]
+          default: slug_asc
       responses:
         '200':
           description: Thành công
@@ -1201,6 +1302,14 @@ paths:
       - $ref: '#/components/parameters/Page'
       - $ref: '#/components/parameters/PageSize'
       - $ref: '#/components/parameters/AdminStatus'
+      - $ref: '#/components/parameters/PostSearch'
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [created_desc, created_asc, subject_asc]
+          default: created_desc
       responses:
         '200':
           description: Thành công
@@ -1280,6 +1389,32 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Page'
       - $ref: '#/components/parameters/PageSize'
+      - $ref: '#/components/parameters/PostSearch'
+      - name: action
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - name: target_type
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - name: actor_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [created_desc, created_asc, action_asc]
+          default: created_desc
       responses:
         '200':
           description: Thành công
@@ -1309,6 +1444,75 @@ paths:
           $ref: '#/components/responses/InternalError'
       x-phase: P0
       description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+  /api/v1/posts/{post_id}/interactions:
+    get:
+      tags: [Aura]
+      summary: Đếm tương tác công khai và đọc trạng thái riêng của phiên hiện tại
+      operationId: getPostInteractions
+      description: Guest nhận counts thật, viewer_reaction null và bookmarked false. Cookie được gửi nhưng không hợp lệ trả 401; không hạ thành Guest. Chỉ bài public; không trả danh sách actor hoặc tổng bookmark. Không phát thưởng.
+      security:
+      - {}
+      - sessionCookie: []
+      parameters:
+      - $ref: '#/components/parameters/PostId'
+      responses:
+        '200':
+          description: Trạng thái tương tác
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostInteractions'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
+  /api/v1/users/me/bookmarks:
+    get:
+      tags: [Aura]
+      summary: Danh sách bài public được chính user lưu
+      operationId: listSavedPosts
+      security: *id001
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - $ref: '#/components/parameters/PostSearch'
+      - $ref: '#/components/parameters/PostCategory'
+      - $ref: '#/components/parameters/PostSort'
+      responses:
+        '200':
+          description: Cùng cấu trúc PostPage với danh sách bài công khai; không gồm bài đã ẩn hoặc bị hạn chế quyền
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required: [items, pagination]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P1
   /api/v1/posts/{post_id}/reactions:
     put:
       tags:
@@ -1832,7 +2036,7 @@ components:
           type: string
         avatar_url:
           type: string
-          format: uri
+          format: uri-reference
           nullable: true
         bio:
           type: string
@@ -1845,6 +2049,15 @@ components:
       - username
       - display_name
       - created_at
+    PublicProfile:
+      allOf:
+      - $ref: '#/components/schemas/UserPublic'
+      - type: object
+        properties:
+          cover_url:
+            type: string
+            format: uri-reference
+            nullable: true
     UserPrivate:
       type: object
       properties:
@@ -1877,6 +2090,14 @@ components:
         cover_media_id:
           type: string
           format: uuid
+          nullable: true
+        avatar_url:
+          type: string
+          format: uri-reference
+          nullable: true
+        cover_url:
+          type: string
+          format: uri-reference
           nullable: true
         roles:
           type: array
@@ -1914,7 +2135,7 @@ components:
           type: string
         media_url:
           type: string
-          format: uri
+          format: uri-reference
           nullable: true
         status:
           type: string
@@ -2058,7 +2279,7 @@ components:
           - deleted
         url:
           type: string
-          format: uri
+          format: uri-reference
           nullable: true
       required:
       - id
@@ -2431,6 +2652,37 @@ components:
       - rank
       - user
       - earned_xp
+    ReactionCounts:
+      type: object
+      properties:
+        like:
+          type: integer
+          minimum: 0
+        laugh:
+          type: integer
+          minimum: 0
+        fire:
+          type: integer
+          minimum: 0
+      required: [like, laugh, fire]
+    PostInteractions:
+      type: object
+      properties:
+        post_id:
+          type: string
+          format: uuid
+        reaction_counts:
+          $ref: '#/components/schemas/ReactionCounts'
+        comments_count:
+          type: integer
+          minimum: 0
+        viewer_reaction:
+          type: string
+          nullable: true
+          enum: [like, laugh, fire, null]
+        bookmarked:
+          type: boolean
+      required: [post_id, reaction_counts, comments_count, viewer_reaction, bookmarked]
     ReactionInput:
       type: object
       properties:

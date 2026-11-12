@@ -5,7 +5,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.admin_users import require_admin_mutation
 from app.auth import CSRF_HEADER, ERRORS, guest_guard
@@ -86,12 +86,15 @@ def send_contact(payload:ContactInput,request:Request,writer=Depends(contact_wri
 @router.get("/admin/contacts",response_model=ContactPage,operation_id="adminListContacts",tags=["Admin"],
     responses={code:ERRORS[code] for code in (401,403,422,429,500)})
 def list_contacts(page:int=Query(1,ge=1),page_size:int=Query(20,ge=1,le=100),status:str|None=None,
+                  search:str|None=Query(None,max_length=100),sort:Literal["created_desc","created_asc","subject_asc"]="created_desc",
                   account=Depends(require_role("ADMIN"))):
-    if status is not None and "\x00" in status:
+    if any(value is not None and "\x00" in value for value in (search,status)):
         raise AuthError(422,"VALIDATION_ERROR","Invalid query text.")
     statement=select(ContactMessage)
     if status is not None:statement=statement.where(ContactMessage.status==status)
-    rows,pagination=page_rows(account.db,statement.order_by(ContactMessage.created_at.desc(),ContactMessage.id.desc()),page,page_size)
+    if search is not None:statement=statement.where(or_(*(column.icontains(search,autoescape=True) for column in (ContactMessage.name,ContactMessage.email,ContactMessage.subject,ContactMessage.body))))
+    ordering={"created_desc":(ContactMessage.created_at.desc(),ContactMessage.id.desc()),"created_asc":(ContactMessage.created_at,ContactMessage.id),"subject_asc":(ContactMessage.subject,ContactMessage.id)}
+    rows,pagination=page_rows(account.db,statement.order_by(*ordering[sort]),page,page_size)
     return ContactPage(items=[ContactResponse.model_validate(row[0],from_attributes=True) for row in rows],pagination=pagination)
 
 

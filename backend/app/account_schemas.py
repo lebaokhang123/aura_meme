@@ -2,7 +2,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import AnyUrl, BaseModel, ConfigDict, Field, SecretStr, StrictInt, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, StrictInt, field_validator, model_validator
 
 from app.auth_schemas import LoginInput, RegisterInput, UserPrivate
 
@@ -14,6 +14,8 @@ class AccountPrivate(UserPrivate):
     bio: str | None = None
     avatar_media_id: UUID | None = None
     cover_media_id: UUID | None = None
+    avatar_url: str | None = Field(default=None, json_schema_extra={"format": "uri-reference"})
+    cover_url: str | None = Field(default=None, json_schema_extra={"format": "uri-reference"})
 
 
 class UserPublic(BaseModel):
@@ -22,7 +24,11 @@ class UserPublic(BaseModel):
     display_name: str
     created_at: datetime
     bio: str | None = None
-    avatar_url: AnyUrl | None = None
+    avatar_url: str | None = Field(default=None, json_schema_extra={"format": "uri-reference"})
+
+
+class PublicProfile(UserPublic):
+    cover_url: str | None = Field(default=None, json_schema_extra={"format": "uri-reference"})
 
 
 class ProfilePatch(BaseModel):

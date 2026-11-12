@@ -40,7 +40,13 @@ Một API backend phục vụ tất cả module; **không tạo microservices**.
 
 ## 3. API P0 — Blog phục vụ môn học
 
-**M3.2 · chính sách Owner chốt 2026-11-05:** POST media nhận một multipart file; session/CSRF/Origin trước parse, MIME/signature/decode nhất quán. 5 MiB/file, 12.000.000 pixels/frame; GIF tối đa60 frames/40.000.000 pixels cộng dồn (cùng ngân sách áp dụng ảnh động PNG/WebP). Private local bytes ngoài webroot, PostgreSQL chỉ metadata; UUID key, exclusive write/fsync, COMMIT trước201/ready. URL null, không GET/DELETE/delivery. Giữ original bytes, chưa sanitize. Cleanup khi DB từ chối, safe reconciliation event khi cleanup thất bại hoặc COMMIT không xác định; filesystem không nằm trong DB transaction. Không đổi Posts DTO/endpoint.
+**M3.2 · chính sách Owner chốt 2026-11-05:** POST media nhận một multipart file; session/CSRF/Origin trước parse, MIME/signature/decode nhất quán. 5 MiB/file, 12.000.000 pixels/frame; GIF tối đa60 frames/40.000.000 pixels cộng dồn (cùng ngân sách áp dụng ảnh động PNG/WebP). Private local bytes ngoài webroot, PostgreSQL chỉ metadata; UUID key, exclusive write/fsync, COMMIT trước201/ready. Giữ original bytes; cleanup khi DB từ chối, safe reconciliation event khi cleanup thất bại hoặc COMMIT không xác định; filesystem không nằm trong DB transaction.
+
+**Media Display · overhaul 2026-11-08:** GET `/api/v1/media/{media_id}` chỉ phục vụ media ready khi đang gắn bài public (published, category/author active, chưa deleted) hoặc avatar/cover của tài khoản active; session owner được preview draft/chưa gắn. Mỗi GET kiểm lại visibility, masked404 cho foreign/private/missing/corrupt/link; không static mount hay object key trong response. Reader pin directory/file, từ chối reparse/symlink/hardlink và đọc tối đa5MiB, so size metadata. Decode theo giới hạn upload, bỏ metadata và EXIF orientation được áp vào pixels; static→PNG, animation→GIF giữ frame/timing/loop trong ngân sách, output tối đa80MiB. `?still=true` dùng cùng quyền và xuất PNG frame đầu cho reduced motion. no-store/nosniff/CSP sandbox. Upload.url, Post.media_url, UserPublic.avatar_url và AccountPrivate.avatar_url/cover_url là đường dẫn tương đối cùng origin để đi qua Vite proxy; private profile vẫn giữ các media ID. Không thêm migration/DELETE/retention hoặc đổi private writer.
+
+Giới hạn delivery: GIF có nhiều frame giống nhau và delay cực dài có thể vượt trường delay16-bit sau khi encoder gộp frame; normal GET masked404 thay vì500, `still=true` vẫn dùng được. Animated PNG/WebP được chuyển sang bảng màu GIF, không bảo đảm giữ toàn bộ màu gốc; bytes upload riêng tư không thay đổi.
+
+GET `/api/v1/users/{username}` trả `PublicProfile` kế thừa `UserPublic`, thêm `cover_url` nullable để hiển thị ảnh bìa đã lưu của tài khoản active. Các author DTO ở post/comment/leaderboard vẫn dùng `UserPublic`, không thêm cover hoặc thông tin riêng tư. Avatar/cover dùng cùng endpoint media kiểm visibility, không lộ storage key.
 
 ### Public và tài khoản
 
@@ -66,6 +72,7 @@ Một API backend phục vụ tất cả module; **không tạo microservices**.
 | GET/POST | `/api/v1/posts/{post_id}/comments` | Public / User | Đọc / thêm bình luận |
 | DELETE | `/api/v1/comments/{comment_id}` | Owner | Xóa logic bình luận |
 | POST | `/api/v1/media` | User | Upload ảnh, nhận `media_id` |
+| GET | `/api/v1/media/{media_id}` | Public/owner | Ảnh đã bỏ metadata theo visibility hiện tại; `still=true` cho frame đầu |
 | POST | `/api/v1/contact` | Guest/User | Gửi liên hệ, lưu database |
 
 **Search:** Query `GET /posts?page=1&page_size=20&search=meme&category=gaming&sort=created_desc`. Search và sort phải tham số hóa/allowlist, không ghép trực tiếp SQL từ dữ liệu người dùng. **P0:** một category/post, không quá một ảnh/post, chỉ JPG/PNG/WebP/GIF.
@@ -159,3 +166,22 @@ M7.1b Owner duyệt GET `/api/v1/catalog/assets/{asset_id}` public chỉ cho cat
 M7.2a: GET common case chỉ công bố version published có policy effective và bands0→∞ không hở/chồng, đủ5rarities/sum10000bps, positive bucket có item active/rightsapproved. Seed/activate/odds economics chưa được duyệt; danh sách rỗng/chi tiết404 khi chưa ready. Draw engine dùng CSPRNG secrets hai tầng; simulation seed chỉ tests, không endpoint chọn reward từ client.
 
 M7.2b Owner duyệt503/NOT_READY riêngPOSTcase-open, session/CSRF/Origin trước readiness; runtime không grant/debit/consumequota. Idempotency-Key12–128 theo contract. Atomicopen/weekly7of7/grants chỉ simulator aurameme_test/public với policy draft; các giá/odds/quota/duplicate-mode fixtures không phải luật sản phẩm. HTTP không nối simulator kể cả có policy fixture.
+
+**Đọc reaction/bookmark:** GET `/api/v1/posts/{post_id}/interactions` trả `post_id`, `reaction_counts` đủ `like/laugh/fire`, `comments_count`, `viewer_reaction` nullable và `bookmarked`. Counts chỉ gồm reaction của user active và comment visible/chưa xóa của author active. Bài không public trả404; counts và visibility được đọc cùng một SQL statement. Guest không có trạng thái cá nhân; cookie đã gửi nhưng sai/hết hạn/khóa trả401, không âm thầm thành Guest. Session hợp lệ dùng cùng cơ chế refresh/revoke hiện hành. Không trả actor IDs, danh sách người lưu hoặc tổng bookmark.
+
+GET `/api/v1/users/me/bookmarks` cần session, lấy owner từ phiên; trả PostPage bằng DTO/public visibility hiện hành với `page`, `page_size`, `search` title/content, `category` slug và `sort=created_desc|created_asc|title_asc`. Bài hidden/draft/deleted, tác giả locked, category hidden hoặc media không ready bị loại. Pagination/sort có UUID tie-break; không cho user chọn owner qua query. PUT/DELETE reaction/bookmark giữ nguyên idempotency và không cộng Aura. Giao diện chi tiết đọc trạng thái một lần, không gọi endpoint này cho từng card của feed.
+
+**Điều khiển danh sách theo đề tài:** mọi route dưới giữ `page/page_size`, quyền hiện hành và UUID tie-break. Search là substring literal (escape `%/_`), tối đa100 ký tự, NUL bị422; sort chỉ nhận allowlist, không ghép SQL từ input.
+
+| GET | Search | Filter | Sort (đầu tiên là mặc định) |
+|---|---|---|---|
+| `/posts/{post_id}/comments` | body | author username exact; public visibility giữ nguyên | created_asc, created_desc |
+| `/users/me/posts` | title/content | status, category slug; owner từ session | created_desc, created_asc, title_asc |
+| `/admin/users` | username/email/display_name | status, role USER/ADMIN | username_asc, username_desc, created_desc, created_asc |
+| `/admin/posts` | title/content | status, category slug | created_desc, created_asc, title_asc |
+| `/admin/categories` | name/slug | status | slug_asc, name_asc, name_desc |
+| `/categories` | name/slug | slug; chỉ active | slug_asc, name_asc, name_desc |
+| `/admin/contacts` | name/email/subject/body, chỉ Admin | status | created_desc, created_asc, subject_asc |
+| `/admin/audit-logs` | action/target_type/target_id/actor_id | action exact, target_type exact, actor_id UUID | created_desc, created_asc, action_asc |
+
+Audit chỉ tìm và trả metadata hiện có, không tìm hoặc trả before/after snapshots. Contact là inbox có quyền Admin, không mở search nội dung cho public. Không thay trạng thái bài, quyền người dùng, schema hoặc cơ chế soft delete.

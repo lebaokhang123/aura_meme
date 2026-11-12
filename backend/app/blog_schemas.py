@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
-from pydantic import AnyUrl, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from app.account_schemas import UserPublic
 
 
@@ -68,7 +68,7 @@ class PostResponse(BaseModel):
     category: CategoryResponse
     title: str
     content: str
-    media_url: AnyUrl | None = None
+    media_url: str | None = Field(default=None, json_schema_extra={"format": "uri-reference"})
     status: Literal["draft", "published", "hidden", "deleted"]
     created_at: datetime
     updated_at: datetime

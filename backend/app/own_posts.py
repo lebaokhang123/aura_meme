@@ -2,7 +2,7 @@
 from typing import Literal
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from app.auth import ERRORS
 from app.auth_schemas import ErrorResponse
 from app.blog import page_rows,post_dto
@@ -34,10 +34,17 @@ def own_dto(post,user,profile,category):
 
 @router.get('',response_model=OwnPostPage,operation_id='listOwnPosts',responses={code:ERRORS[code] for code in (401,403,422,429,500)})
 def list_own_posts(page:int=Query(1,ge=1),page_size:int=Query(20,ge=1,le=100),
-    status:Literal['draft','published','hidden']|None=None,account=Depends(require_authenticated_user,scope='function')):
+    status:Literal['draft','published','hidden']|None=None,search:str|None=Query(None,max_length=100),
+    category:str|None=None,sort:Literal['created_desc','created_asc','title_asc']='created_desc',
+    account=Depends(require_authenticated_user,scope='function')):
+    if any(value is not None and '\x00' in value for value in (search,category)):
+        raise AuthError(422,'VALIDATION_ERROR','Invalid query text.')
     query=own_query(account.user.id)
     if status is not None:query=query.where(Post.status==status)
-    rows,pagination=page_rows(account.db,query.order_by(Post.created_at.desc(),Post.id.desc()),page,page_size)
+    if search is not None:query=query.where(or_(Post.title.icontains(search,autoescape=True),Post.content.icontains(search,autoescape=True)))
+    if category is not None:query=query.where(Category.slug==category)
+    ordering={'created_desc':(Post.created_at.desc(),Post.id.desc()),'created_asc':(Post.created_at,Post.id),'title_asc':(Post.title,Post.id)}
+    rows,pagination=page_rows(account.db,query.order_by(*ordering[sort]),page,page_size)
     return OwnPostPage(items=[own_dto(*row) for row in rows],pagination=pagination)
 
 
