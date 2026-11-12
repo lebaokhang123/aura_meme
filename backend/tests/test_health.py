@@ -10,7 +10,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
     monkeypatch.setenv(
         "DATABASE_URL", "postgresql+psycopg://test:not-a-real-secret@127.0.0.1:1/test"
     )
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         response = client.get("/health")
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
