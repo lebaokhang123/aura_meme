@@ -1,0 +1,10 @@
+@media (max-width: 767px) {
+  #root main { overflow-x: clip; }
+}
+
+@media (max-width: 1023px) {
+  .auth-page #photoTrailStage, .auth-page #trailStage { display: none; }
+  .auth-page .auth-layout { min-height: 0; padding-block: 24px 32px; }
+  .auth-page .auth-card { max-width: 520px; margin-inline: auto; gap: 0; }
+  .auth-card > div:last-child { grid-column: 1 / -1; padding: 24px; }
+}

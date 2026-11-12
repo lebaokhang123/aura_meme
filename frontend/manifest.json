@@ -1,0 +1,156 @@
+{
+  "guest-home": {
+    "source": "stitch_aurameme_guest/trang_ch_kh_ch_done",
+    "original": "/stitch-original/guest-home/code.html",
+    "reference": "/reference/guest-home.png",
+    "html_sha256": "0789f86a60b73affa378410a05174e92d2d8265dadbffe81ba5083e6bd7ff989",
+    "image_remote": 14,
+    "dom_nodes": 796,
+    "inline_handlers": 103,
+    "script_count": 1,
+    "bodyClass": "bg-surface font-body-md text-on-surface antialiased selection:bg-secondary-container selection:text-on-secondary-container"
+  },
+  "guest-explore": {
+    "source": "stitch_aurameme_guest/kh_m_ph_kh_ch_done",
+    "original": "/stitch-original/guest-explore/code.html",
+    "reference": "/reference/guest-explore.png",
+    "html_sha256": "8029ac425b12123214a35e2e4dd28229e0085a770174c659209d84ff0dfbc275",
+    "image_remote": 13,
+    "dom_nodes": 225,
+    "inline_handlers": 0,
+    "script_count": 1,
+    "bodyClass": "bg-background font-body-md text-body-md text-on-surface antialiased"
+  },
+  "guest-about": {
+    "source": "stitch_aurameme_guest/gi_i_thi_u_kh_ch_done",
+    "original": "/stitch-original/guest-about/code.html",
+    "reference": "/reference/guest-about.png",
+    "html_sha256": "ed2e25b84177664c6b6e8dda31aa2d6b86896c3222a8bfe414b3c75e173e82bc",
+    "image_remote": 4,
+    "dom_nodes": 170,
+    "inline_handlers": 0,
+    "script_count": 1,
+    "bodyClass": "bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-secondary-container selection:text-on-secondary-container"
+  },
+  "guest-contact": {
+    "source": "stitch_aurameme_guest/li_n_h_kh_ch_done",
+    "original": "/stitch-original/guest-contact/code.html",
+    "reference": "/reference/guest-contact.png",
+    "html_sha256": "cd72c04a3dab596c5bb91988c616fa911d93cf273c392951ae5370c39b2a9dce",
+    "image_remote": 2,
+    "dom_nodes": 50,
+    "inline_handlers": 0,
+    "script_count": 0,
+    "bodyClass": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"
+  },
+  "guest-rank": {
+    "source": "stitch_aurameme_guest/x_p_h_ng_kh_ch_done",
+    "original": "/stitch-original/guest-rank/code.html",
+    "reference": "/reference/guest-rank.png",
+    "html_sha256": "c5502db9a4b2ec8e474c7315fa9d591375f16ab30fdea164feadcfbf6e74ecd9",
+    "image_remote": 2,
+    "dom_nodes": 50,
+    "inline_handlers": 0,
+    "script_count": 0,
+    "bodyClass": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"
+  },
+  "guest-vault": {
+    "source": "stitch_aurameme_guest/b_o_kh_kh_ch_done",
+    "original": "/stitch-original/guest-vault/code.html",
+    "reference": "/reference/guest-vault.png",
+    "html_sha256": "867e8087566aa634fd6e796b0b7a1c3e366c893657981619d6fb59f07fda34b8",
+    "image_remote": 2,
+    "dom_nodes": 51,
+    "inline_handlers": 0,
+    "script_count": 0,
+    "bodyClass": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"
+  },
+  "user-home": {
+    "source": "stitch_aurameme_user/trang_ch_ng_nh_p_done",
+    "original": "/stitch-original/user-home/code.html",
+    "reference": "/reference/user-home.png",
+    "html_sha256": "405cf3f49e7064b5ff2e35f725c85504a6cd60e846d02193cef05dc6841ce0b1",
+    "image_remote": 14,
+    "dom_nodes": 859,
+    "inline_handlers": 103,
+    "script_count": 1,
+    "bodyClass": "bg-surface font-body-md text-on-surface antialiased selection:bg-secondary-container selection:text-on-secondary-container"
+  },
+  "user-explore": {
+    "source": "stitch_aurameme_user/kh_m_ph_ng_nh_p_done",
+    "original": "/stitch-original/user-explore/code.html",
+    "reference": "/reference/user-explore.png",
+    "html_sha256": "01741b3a2d7288940475500efae89a7b8892c27d2953ac36851973e67e0c73d5",
+    "image_remote": 14,
+    "dom_nodes": 239,
+    "inline_handlers": 0,
+    "script_count": 1,
+    "bodyClass": "bg-background font-body-md text-body-md text-on-surface antialiased"
+  },
+  "user-about": {
+    "source": "stitch_aurameme_user/gi_i_thi_u_ng_nh_p_done",
+    "original": "/stitch-original/user-about/code.html",
+    "reference": "/reference/user-about.png",
+    "html_sha256": "e27ff28545a21ed6a12581da4ae459421baf43b29e7982391d4e9a85bb22fb2a",
+    "image_remote": 5,
+    "dom_nodes": 174,
+    "inline_handlers": 0,
+    "script_count": 1,
+    "bodyClass": "bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-secondary-container selection:text-on-secondary-container"
+  },
+  "user-contact": {
+    "source": "stitch_aurameme_user/li_n_h_ng_nh_p_done",
+    "original": "/stitch-original/user-contact/code.html",
+    "reference": "/reference/user-contact.png",
+    "html_sha256": "58d7c0ae30f9ec344eac42cbb06f0f7a0f0feeb91ed5c4cce6b45cb5568ae27e",
+    "image_remote": 3,
+    "dom_nodes": 55,
+    "inline_handlers": 0,
+    "script_count": 0,
+    "bodyClass": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"
+  },
+  "user-rank": {
+    "source": "stitch_aurameme_user/x_p_h_ng_ng_nh_p_done",
+    "original": "/stitch-original/user-rank/code.html",
+    "reference": "/reference/user-rank.png",
+    "html_sha256": "b37fdb9c92d27d2fd6d0a0254bea4e328e708d53480ad1b1c2077056e09f19ba",
+    "image_remote": 3,
+    "dom_nodes": 53,
+    "inline_handlers": 0,
+    "script_count": 0,
+    "bodyClass": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"
+  },
+  "user-vault": {
+    "source": "stitch_aurameme_user/b_o_kh_ng_nh_p_done",
+    "original": "/stitch-original/user-vault/code.html",
+    "reference": "/reference/user-vault.png",
+    "html_sha256": "985f62a6f40a1dd05c1ae592c915f3c53c9325ff615cda6b08d92b5c523e3353",
+    "image_remote": 3,
+    "dom_nodes": 55,
+    "inline_handlers": 0,
+    "script_count": 0,
+    "bodyClass": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"
+  },
+  "login": {
+    "source": "stitch_aurameme_login_signup/ng_nh_p_done",
+    "original": "/stitch-original/login/code.html",
+    "reference": "/reference/login.png",
+    "html_sha256": "3df443e0dcdb4afffa23c2b7860dc3d12d59437401c1aff746d3c2566d14210c",
+    "image_remote": 2,
+    "dom_nodes": 96,
+    "inline_handlers": 1,
+    "script_count": 1,
+    "bodyClass": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"
+  },
+  "register": {
+    "source": "stitch_aurameme_login_signup/ng_k_aurameme_hi_u_ng_meme_trail_fx_323",
+    "original": "/stitch-original/register/code.html",
+    "reference": "/reference/register.png",
+    "html_sha256": "70cba2d7ea7535415a5d5a42e6dd1a4a7e5dc811897ed1fbbf3a67a141387818",
+    "image_remote": 2,
+    "dom_nodes": 110,
+    "inline_handlers": 2,
+    "script_count": 1,
+    "bodyClass": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"
+  }
+}

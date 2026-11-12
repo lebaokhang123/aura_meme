@@ -1,0 +1,315 @@
+<!DOCTYPE html><html class="dark" lang="vi"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_standard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}
+/* Polaroid drop animation styling */
+.meme-trail-card {
+  position: absolute;
+  pointer-events: none;
+  transform-origin: center center;
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+  z-index: 25;
+}
+@media (prefers-reduced-motion: reduce) {
+  .meme-trail-card {
+    transition: opacity 0.2s ease !important;
+    animation: none !important;
+  }
+}
+</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"tertiary-fixed-dim":"#4cd7f6","outline-variant":"#49454f","on-primary":"#37265e","on-secondary-fixed":"#23005c","primary":"#e9ddff","surface-dim":"#12131b","error":"#ffb4ab","surface-container-highest":"#33343d","on-secondary-fixed-variant":"#5424af","error-container":"#93000a","on-primary-fixed-variant":"#4d3d76","surface-tint":"#d0bcff","on-tertiary-container":"#005b6b","on-tertiary":"#003640","primary-container":"#d0bcff","surface-container-high":"#292932","background":"#12131b","surface":"#12131b","surface-bright":"#383842","tertiary":"#acedff","on-error-container":"#ffdad6","tertiary-fixed":"#acedff","on-primary-fixed":"#210f48","inverse-surface":"#e3e1ed","secondary-fixed":"#e9ddff","on-secondary-container":"#c1a7ff","on-secondary":"#3c0091","secondary-container":"#5424af","surface-container-lowest":"#0d0e15","inverse-on-surface":"#2f3039","surface-container-low":"#1a1b23","primary-fixed":"#e9ddff","on-surface":"#e3e1ed","surface-container":"#1e1f27","on-surface-variant":"#cac4d0","on-tertiary-fixed":"#001f26","secondary-fixed-dim":"#d0bcff","on-primary-container":"#594983","inverse-primary":"#665590","tertiary-container":"#4cd7f6","surface-variant":"#33343d","on-error":"#690005","secondary":"#d0bcff","on-tertiary-fixed-variant":"#004e5c","outline":"#948f9a","primary-fixed-dim":"#d0bcff","on-background":"#e3e1ed"},borderRadius:{DEFAULT:"0.25rem",lg:"0.5rem",xl:"0.75rem",full:"9999px"},spacing:{"space-lg":"1.5rem","space-md":"1rem","gutter-mobile":"0.75rem",margin:"2rem","margin-mobile":"1rem","space-xs":"0.25rem","space-xl":"2rem","space-sm":"0.5rem",gutter:"1.5rem"},fontFamily:{"headline-lg-mobile":["Plus Jakarta Sans"],"label-md":["Plus Jakarta Sans"],"mono-counter":["JetBrains Mono"],"body-lg":["Inter"],"headline-lg":["Plus Jakarta Sans"],"headline-xl":["Plus Jakarta Sans"],"label-lg":["Plus Jakarta Sans"],"headline-md":["Plus Jakarta Sans"],"mono-tag":["JetBrains Mono"],"headline-sm":["Plus Jakarta Sans"],"label-sm":["Plus Jakarta Sans"],"body-sm":["Inter"],"headline-xl-mobile":["Plus Jakarta Sans"],"body-md":["Inter"]},fontSize:{"headline-lg-mobile":["22px",{lineHeight:"28px",letterSpacing:"-0.01em",fontWeight:"700"}],"label-md":["12px",{lineHeight:"16px",letterSpacing:"0.02em",fontWeight:"600"}],"mono-counter":["13px",{lineHeight:"16px",letterSpacing:"-0.01em",fontWeight:"500"}],"body-lg":["16px",{lineHeight:"26px",fontWeight:"400"}],"headline-lg":["28px",{lineHeight:"36px",letterSpacing:"-0.015em",fontWeight:"700"}],"headline-xl":["40px",{lineHeight:"48px",letterSpacing:"-0.02em",fontWeight:"800"}],"label-lg":["14px",{lineHeight:"20px",letterSpacing:"0.01em",fontWeight:"600"}],"headline-md":["20px",{lineHeight:"26px",letterSpacing:"-0.01em",fontWeight:"700"}],"mono-tag":["11px",{lineHeight:"14px",letterSpacing:"0.04em",fontWeight:"400"}],"headline-sm":["16px",{lineHeight:"22px",fontWeight:"600"}],"label-sm":["11px",{lineHeight:"14px",letterSpacing:"0.02em",fontWeight:"500"}],"body-sm":["12px",{lineHeight:"18px",fontWeight:"400"}],"headline-xl-mobile":["30px",{lineHeight:"38px",letterSpacing:"-0.02em",fontWeight:"800"}],"body-md":["14px",{lineHeight:"22px",fontWeight:"400"}]}}}}</script></head><body class="bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col" style="background-color: rgb(18, 19, 27); background-image: radial-gradient(circle at 50% 0%, rgba(208, 188, 255, 0.08) 0%, transparent 60%), radial-gradient(circle at 85% 30%, rgba(76, 215, 246, 0.05) 0%, transparent 50%), linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px); background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px; background-attachment: fixed;"><header class="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.4)]"><div class="h-16 w-full px-gutter flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-md flex-shrink-0"><a class="flex items-center gap-space-xs" data-path="trang-chu" href="#"><img alt="favicon-64.png" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_LdZsuhFtB4-gNcEVaK1KCWq7lywokhHo_PLEeZnGNhHWnGgB57fvLZZfQykRFoeu-yUZjlnNL15Jl-rhFK4d52airkTbxfQISbfDs8qB6uYXyFhhoZJEoR1hBH2MXpLIES_oJDYF9lJboPZv5QZoXwFJi7k-4oj0SPlA5P8ZYTUuY-EPu-NWJs9WS-Pjlcl58STwKfjXTb4Mk0SlEQEAxld1fxri5zPBQj7IjnwZ1DXQ2tuq2WFu"><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight font-bold">AuraMeme</span></a><nav class="hidden lg:flex items-center gap-1"><a class="px-3 py-1.5 font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors rounded-lg" data-path="trang-chu" href="#">Trang chủ</a><a class="px-3 py-1.5 font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors rounded-lg" data-path="kham-pha" href="#">Khám phá</a><a class="px-3 py-1.5 font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors rounded-lg" data-path="xep-hang" href="#">Xếp hạng</a><a class="px-3 py-1.5 font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors rounded-lg" data-path="bao-kho" href="#">Bảo Khố</a><a class="px-3 py-1.5 font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors rounded-lg" data-path="gioi-thieu" href="#">Giới thiệu</a><a class="px-3 py-1.5 font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors rounded-lg" data-path="lien-he" href="#">Liên hệ</a></nav></div><div class="hidden md:flex items-center flex-1 max-w-[380px] h-10 px-space-sm bg-surface-container-low rounded-full shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)] mx-4"><span class="material-symbols-outlined text-outline text-[18px] mr-space-xs">search</span><input class="bg-transparent text-on-surface placeholder:text-outline font-body-sm text-body-sm flex-1 outline-none" placeholder="Tìm kiếm meme, tác giả, thẻ..." type="text"><kbd class="font-mono-tag text-mono-tag text-outline px-1.5 py-0.5 rounded bg-surface-container-highest">Ctrl K</kbd></div><div class="flex items-center gap-space-sm flex-shrink-0"><button aria-label="Chuyển giao diện sáng tối" class="w-8 h-8 rounded-lg flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">dark_mode</span></button><div class="relative">
+<button class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low hover:bg-surface-container text-body-xs font-label text-on-surface-variant hover:text-on-surface transition-colors" title="Chọn ngôn ngữ / Select language" type="button">
+<svg class="w-4 h-4 text-on-surface-variant" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" x2="22" y1="12" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+<span class="font-bold text-on-surface">VI</span>
+<svg class="w-3.5 h-3.5 text-on-surface-variant" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg>
+</button>
+</div><div class="flex items-center gap-space-xs"><a class="px-3 py-1.5 font-label-md text-label-md text-primary bg-secondary-container/30 rounded-lg shadow-[inset_0_0_0_1px_rgba(208,188,255,0.25)] transition-colors" data-path="dang-nhap" href="#">Đăng nhập</a><a class="px-3 py-1.5 font-label-md text-label-md text-on-primary bg-gradient-to-r from-primary to-secondary rounded-lg hover:shadow-[0_0_16px_rgba(160,120,255,0.45)] hover:brightness-105 transition-all font-semibold" data-path="dang-ky" href="#">Đăng ký</a></div></div></div></header><main class="w-full pt-16 flex-1 flex flex-col bg-transparent"><div class="flex flex-col w-full"><div class="fixed inset-0 pointer-events-none -z-10 overflow-hidden"><div class="pointer-events-none absolute -top-10 left-1/4 w-[540px] h-[340px] bg-secondary-container/20 rounded-full blur-[140px] -z-10"></div><div class="pointer-events-none absolute top-40 right-10 w-[420px] h-[300px] bg-tertiary-container/15 rounded-full blur-[120px] -z-10"></div><div class="absolute inset-0 opacity-40 pointer-events-none -z-10" style="background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px); background-size: 40px 40px;"></div></div>
+<div class="relative w-full max-w-[1360px] mx-auto px-gutter py-space-xl flex items-center justify-center min-h-[calc(100vh-64px)]">
+<!-- Ambient Cyber Glows -->
+<div class="absolute -top-16 left-1/4 w-[480px] h-[480px] bg-secondary-container/20 rounded-full blur-[140px] pointer-events-none -z-10"></div>
+<div class="absolute bottom-4 right-1/4 w-[420px] h-[420px] bg-tertiary-container/15 rounded-full blur-[160px] pointer-events-none -z-10"></div>
+<!-- Main Dual-Column Auth Console -->
+<div class="w-full grid grid-cols-1 lg:grid-cols-12 gap-space-lg lg:gap-0 bg-surface-container-low rounded-xl shadow-[0_24px_64px_rgba(0,0,0,0.6)] overflow-hidden border border-outline-variant/30">
+<!-- Left Column: Interactive Lucian UX/UI #323 "Cursor-dropped photo trail" Stage -->
+<div class="lg:col-span-6 relative flex flex-col justify-between p-space-lg sm:p-space-xl overflow-hidden bg-surface-container-lowest select-none cursor-crosshair group min-h-[460px] lg:min-h-[620px]" id="photoTrailStage">
+<!-- Subtle cyber grid background -->
+<div class="absolute inset-0 opacity-25 pointer-events-none" style="background-image: radial-gradient(#d0bcff 0.75px, transparent 0.75px), linear-gradient(to right, rgba(208, 188, 255, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(76, 215, 246, 0.05) 1px, transparent 1px); background-size: 32px 32px, 32px 32px, 32px 32px;"></div>
+<!-- Ambient background glow behind logo -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] bg-secondary-container/25 rounded-full blur-[100px] pointer-events-none"></div>
+<div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[220px] bg-tertiary-container/20 rounded-full blur-[70px] pointer-events-none"></div>
+<!-- Dynamic photo trail container (cards are spawned here) -->
+<div class="absolute inset-0 overflow-hidden pointer-events-none z-20" id="photoTrailContainer"></div>
+<!-- Top stage badge -->
+
+<!-- Center Branding: Glowing Neon Pulse Logo & Tagline -->
+<div class="relative z-10 my-auto py-space-md flex flex-col items-center text-center pointer-events-none">
+<div class="relative w-48 h-48 sm:w-60 sm:h-60 flex items-center justify-center">
+<div class="absolute inset-0 rounded-full bg-gradient-to-tr from-secondary-container via-transparent to-tertiary-container opacity-40 blur-2xl animate-pulse pointer-events-none"></div>
+<div class="relative z-10 w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center"><img alt="AuraMeme Logo" class="w-full h-full object-contain drop-shadow-[0_0_36px_rgba(76,215,246,0.65)]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNRXPjLJgPnohoqAERXpOmRi9Wuakh20uyTUzoJFoN5sEwHYuznOZVKJbkN4ma2BG1ocyIBeXvYG5cxkwbrjLlEBJ9XtuL9Xjuw34vvFgSsA_XsvzOCP3zTW7xHlClN5UhMx6f-NdAb718n1S4eTU7JA6CiGSLuSgz66q-ZkK1q4BMFc2BiQ7IBBUFm1dt5xqTILHfBNvDnkIveiu2C30gb7z1umIyT-HNo7gM-lMoB1LiBXNiL01k"></div>
+</div>
+
+</div>
+<!-- Bottom stage status note -->
+
+</div>
+<!-- Right Column: Focused Cyber-Clean Authentication Form -->
+<div class="lg:col-span-6 bg-surface-container p-space-lg sm:p-space-xl flex flex-col justify-center">
+<div class="max-w-md w-full mx-auto">
+<!-- Header Area -->
+<div class="mb-space-lg"><h1 class="font-headline-lg text-headline-lg text-on-surface font-extrabold tracking-tight text-center">
+              Đăng nhập vào AuraMeme
+            </h1></div>
+<!-- Form Area -->
+<form class="flex flex-col gap-space-md" id="loginForm" onsubmit="event.preventDefault(); handleAuthSubmit();"><div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface" for="identifier">Email</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3.5 text-outline text-[20px] pointer-events-none transition-colors">mail</span>
+<input class="w-full h-12 pl-11 pr-4 bg-surface-container-low rounded-lg text-on-surface placeholder:text-outline font-body-md text-body-md transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)] focus:outline-none focus:bg-surface-container-lowest focus:shadow-[0_0_0_2px_#d0bcff,0_0_14px_rgba(76,215,246,0.25)]" id="identifier" name="identifier" placeholder="name@example.com" required="" type="email">
+</div>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface" for="password">Mật khẩu</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3.5 text-outline text-[20px] pointer-events-none transition-colors">lock</span>
+<input class="w-full h-12 pl-11 pr-11 bg-surface-container-low rounded-lg text-on-surface placeholder:text-outline font-body-md text-body-md transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)] focus:outline-none focus:bg-surface-container-lowest focus:shadow-[0_0_0_2px_#d0bcff,0_0_14px_rgba(76,215,246,0.25)]" id="password" name="password" placeholder="••••••••" required="" type="password">
+<button aria-label="Toggle password visibility" class="absolute right-3 w-8 h-8 flex items-center justify-center rounded-lg text-outline hover:text-on-surface transition-colors focus:outline-none" id="togglePassword" onclick="togglePasswordVisibility()" type="button">
+<span class="material-symbols-outlined text-[20px]" id="eyeIcon">visibility</span>
+</button>
+</div>
+</div>
+<div class="flex justify-end pt-0.5">
+<a class="font-label-sm text-label-sm text-secondary hover:text-tertiary transition-colors underline-offset-4 hover:underline cursor-pointer" href="#">
+    Quên mật khẩu?
+  </a>
+</div>
+<button class="w-full h-12 mt-1 rounded-lg bg-gradient-to-r from-primary-container via-secondary to-tertiary-fixed-dim text-on-secondary-fixed font-label-lg text-label-lg font-bold flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(160,120,255,0.45)] hover:brightness-105 active:scale-[0.99] transition-all duration-200" id="submitBtn" type="submit">
+<span class="material-symbols-outlined text-[20px]">login</span>
+<span>Đăng nhập</span>
+</button>
+<div class="relative flex items-center justify-center my-2">
+<div class="w-full h-[1px] bg-surface-variant"></div>
+<span class="absolute px-3 bg-surface-container font-mono-tag text-mono-tag text-outline uppercase tracking-wider">
+    Hoặc tiếp tục với
+  </span>
+</div>
+<button class="w-full h-12 px-4 rounded-lg bg-surface-container-low hover:bg-surface-container-high border border-outline-variant text-on-surface font-label-md text-label-md flex items-center justify-center gap-2.5 transition-colors shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]" type="button">
+<svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"></path>
+<path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"></path>
+</svg>
+<span>Google</span>
+</button>
+<div class="text-center pt-2">
+<p class="font-body-md text-body-md text-on-surface-variant">
+    Chưa có tài khoản?
+    <a class="font-label-lg text-label-lg text-secondary hover:text-tertiary transition-colors underline underline-offset-4 decoration-secondary/40 hover:decoration-tertiary ml-1" data-path="dang-ky" href="#">
+      Đăng ký ngay
+    </a>
+</p>
+</div></form>
+</div>
+</div>
+</div>
+<!-- Footnote Trust / Status Strip -->
+</div>
+</div>
+<script>
+  function togglePasswordVisibility() {
+    const passwordInput = document.getElementById('password');
+    const eyeIcon = document.getElementById('eyeIcon');
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      eyeIcon.textContent = 'visibility_off';
+    } else {
+      passwordInput.type = 'password';
+      eyeIcon.textContent = 'visibility';
+    }
+  }
+
+  function handleAuthSubmit() {
+    const identifier = document.getElementById('identifier');
+    const password = document.getElementById('password');
+    let hasError = false;
+
+    if (!identifier.value.trim()) {
+      identifier.classList.add('shadow-[0_0_0_2px_#ffb4ab]');
+      hasError = true;
+    } else {
+      identifier.classList.remove('shadow-[0_0_0_2px_#ffb4ab]');
+    }
+
+    if (!password.value.trim()) {
+      password.classList.add('shadow-[0_0_0_2px_#ffb4ab]');
+      hasError = true;
+    } else {
+      password.classList.remove('shadow-[0_0_0_2px_#ffb4ab]');
+    }
+
+    if (!hasError) {
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-70');
+      submitBtn.innerHTML = '<span class="material-symbols-outlined text-[20px] animate-spin">refresh</span><span>Đang đăng nhập...</span>';
+      
+      setTimeout(() => {
+        submitBtn.classList.remove('opacity-70');
+        submitBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">check_circle</span><span>Thành công!</span>';
+      }, 1200);
+    }
+  }
+
+  /* Lucian UX/UI #323: Cursor-dropped meme photo trail */
+  (function initMemePhotoTrail() {
+    const stage = document.getElementById('photoTrailStage');
+    const container = document.getElementById('photoTrailContainer');
+    if (!stage || !container) return;
+
+    // Meme gallery images pool from workspace
+    const memeImages = [
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuDVQTUsaTP6R8GoTNqekRhpUEPhogHQ2hK32f6ZDbOb16YtysIFTVz9AvFAnRm_VA8E19QvICfq-0SuJB13Ve0obd1TqHYfBPVQsN5wIJMLLMwn79oRL-2dag4-ckURd_BmG_f0JV45vftIEkqwOexaxj4rIcWfvF9JyDWZMAutj0QQoA2xvzb0UnTTkvxAphcV2YL_tsC1b7UuVP-yWkFEdDadJoIKWGosxP8l6rKX7vJIL8tzpsNe',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuCT09Uu_yqRLeMkGBwtMVCus2WAfdxeJ1Y396yG_dsQZm1GmXuVHIYTxhz3_2VVfaF00pXJu9YCPU7zCrG_1udwNyva1uSoCczQLAyUwcPz4Fbn9PmptrOg31Cquf1jZGMhNEJddMbo0Ds_3rfyrruH1GO-hKs-j5rxGqagVIrIhQ_9yL-wR7KkMqrNmo8lmXjRdurXQEpmcB4ohY6PeWtDJCwaMZW_l-tTGZW9lXoSRMwgKfSTKFc0',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuDIFHY3fIdCbsOsRmZ-f7On8l7E2r5I8mr0-vpOzJ0cb-Kd2pMfp2mulTwKWyagoX9JuA8L1CXKNMyYqEzsWxDv4JBtAUqS7b3oTqpwzzmxVlcWrQbpOza07Yadx7JF3cvsBewrdl2Q2fVqFZbbsKuzmxc9OveTqXYSJCQVcVkDTafrIZnWnELjy7YasljTFvT242X30t5nN-xMF7Dvz6ylz3ck8sydxL8RX_BwDls6Duqn8UkBZU2g',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuAlagu2TMhgZRjsqOeXJFUz0OVLMCitlG3Sh0EA0Pv_Ht2EuKauJ9LidzSwoWVtxrCNaB2VY6hKA6uTkQVf5kiJ5rKOjDG3owY1DDbgBSkSTtHNRT5e4ev2ykZdu5bedeGzhh8_W-TXFM_VtFpdGkarINRwYjD89aq1ioNLMu0hOOQ-jxyGM2m7Oa56I9I-w7zDi0bc1BYW7H_1gscA7ytlhhK9bxTaR60LSWeRgNDZbVIOAJsNfmUr',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuCPe8x_qUDYlwHEOsQ_nLx5h_8dQYp37RBTIaBh5828b_HIaQuWHZ16AQc2877SUVQLqcuhrTApw1NjD6IhR0_48HkyFAmHllzvMIl8l0IVD7xDb030uxK5ZcYXbVnnegwc3CDvMsoUa-YWzFPXHEkN0pfLS7WNcDF2Fl3Ko49xEnYPDodgvuEc1hSOfhwMe9O2tkTUSIwKz19qvxyo5vSCK-rZ-V5mExilbgKovslHTob1eWEtfAkC',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuDOwu2sp67UTFcYc8iq-j8JZgh12AQlsDvGjJxP3VpoCAGACHIgIb2ku3svkcp_Rf4VCQNh2lw2iIWPTe2v61DaKETiGLVnl6fOZci_xrdnwPkiBnbn5snwh2lw0ED7oYPUH-h2iPq01yBc5BDW4QKmPsDmT1lK6gLaULD06lBp5RaLoUzTsI2Wi12JgK_WM0iAkvo-Ks6OCNA8HpE2H9M2NoaajDnoUoXUa-sZt_F4YfVoULRqbx04',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuBPDBNWdi8ibeXyuSqNCmmISvFiYLyJ1NEADKFrWrw268JoV-go-bqe49YU72-AaY6LIREsiUb_PayEF7DUnGQDaI9_VftF98GmVnA3JBstmTWAUv-zPtoelMesBIx3qZfaJIAf-9iHHEdzs7w_5sN9xSe9-JuwP5jQmCkPVv5eyGiRhZjEMabuRi6r5Yg2rQIkbPeEd1WseFdy_wThGJg0AL3jjDNXzgos0Ap-H012DhN8xzqsSbTc',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuAWxsZjiG3EdOJSn9YjRporWWyq2KFOtHBGiASagaqy_l3TFXyGEIho8VGfYI01T6hDb7ERN15Ui4xA0vJqLwsw7qPn8XSXU52HKYJImU_DWpbRoS6_5xrgZkpA5Qad76f0DoAsYLQO3BeD5j66eMknIoMC99o8qqpW5xJPwJyxYggyvxrtzCHH4Qzd7Piq53D1JnVpJBdJLjBVM0Jylh_DLjn-dBDEQ9kjx-GR_Wx0lvjr4AW59b0o',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuCuul-MBT05nGla_A_4jC16fPx0jPKkECqAQ_h0jQWy0SAditKmleEx6s-B0V-QEe4m4tb2ugKgn-ttTmWjvqXb462a0oYskVXL7d8VhbCY8KJcdW1SsmRrl411FONBuQlEMdSVyp8ECzQb6U_Ym0115ZHpvHFX-iMvvNmPGXjpgt62A1uAVeppaSmOITYRoxExoRsu4Zczxfdmws40jPRvEl_jnzD1yTe_TvdGyceipuDzGy5ecRdn',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuCpd46g7guvO7rRIls5O_6NNiHN1UFgEndmeqSJ1-bOOHCxo4XZArElbnVNJq7YajjOr79SPni6_tfOJkY99YDd7nEWKiqDJTgIqA-fS48bFoz-mS-Y03LPoKEqHL2gAP_MW-kcOnAC4KCFMNOteNChmkoUfq60ioKNn6xxOGMP7NAl_PpnrRUugvLHAz2V9Rkhzf6k1D0U4tqdg3tm5Pk8MOz6GUysET8JX6OcSVp9Eowi_K05lgjl',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuBIV9g5pcaZkjMqLMYc52Y4gSwbPbfDygVMeWfB_FyoFUz1u7adE8NoVNuJzwrH0ZuJER7lXlbBsog2O9m1bqFdpXtQVXlgFvFoQ4zjik87LUcSbm2AjHbvjYOO0g_WfhcAt4kL1WacdUEMMWjlGKjgzJYeF0Jw024YCvurBQitNaOYQX_bNmlwMZVc9f6BLkBE49cSrgej-SJaJzzfOLz6jQv_ezS-qYDt8u16sF4QQRncRcZC4oAF'
+    ];
+
+    let memeIndex = 0;
+    let lastX = 0;
+    let lastY = 0;
+    let lastTime = 0;
+    const distanceThreshold = 48; // minimum distance traveled to drop photo
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function getNextMeme() {
+      const img = memeImages[memeIndex % memeImages.length];
+      memeIndex++;
+      return img;
+    }
+
+    function createPolaroidCard(x, y, vx = 0, vy = 0, customDelay = 0) {
+      const card = document.createElement('div');
+      card.className = 'meme-trail-card p-1 pb-3 rounded-lg bg-white/95 dark:bg-[#1a1b23]/95 backdrop-blur-md border border-[#d0bcff]/40 shadow-[0_12px_28px_rgba(0,0,0,0.65),0_0_12px_rgba(208,188,255,0.25)] flex flex-col items-center';
+      
+      // Random tilt between -18 and 18 deg
+      const rot = (Math.random() * 32 - 16).toFixed(1);
+      const width = Math.floor(Math.random() * 16) + 84; // 84px to 100px width
+      card.style.width = width + 'px';
+      card.style.left = (x - width / 2) + 'px';
+      card.style.top = (y - (width * 0.6)) + 'px';
+
+      // Inner image thumbnail and caption bar like a real polaroid
+      const imgSrc = getNextMeme();
+      card.innerHTML = `
+        <div class="w-full aspect-[4/3] rounded overflow-hidden bg-black/60 relative">
+          <img src="${imgSrc}" class="w-full h-full object-cover select-none pointer-events-none" alt="Meme thumbnail" loading="eager" />
+        </div>
+        <div class="w-full mt-1 px-1 flex items-center justify-between">
+          <span class="w-8 h-1 bg-outline/25 rounded-full"></span>
+          <span class="text-[8px] font-mono-tag text-outline/60 tracking-wider uppercase font-semibold">aura</span>
+        </div>
+      `;
+
+      if (prefersReducedMotion) {
+        card.style.transform = `scale(1) rotate(${rot}deg)`;
+        card.style.opacity = '1';
+        container.appendChild(card);
+        setTimeout(() => {
+          card.style.opacity = '0';
+          setTimeout(() => card.remove(), 250);
+        }, 1200);
+        return;
+      }
+
+      // Initial state: dropping down / popping into position
+      const initialScale = 0.55;
+      card.style.transform = `translate3d(${vx * -8}px, ${vy * -8 - 14}px, 0) scale(${initialScale}) rotate(${-rot * 0.5}deg)`;
+      card.style.opacity = '0';
+
+      container.appendChild(card);
+
+      // Force layout then animate in
+      requestAnimationFrame(() => {
+        card.style.opacity = '1';
+        card.style.transform = `translate3d(${vx * 12}px, ${vy * 12}px, 0) scale(1) rotate(${rot}deg)`;
+      });
+
+      // After lifetime, smoothly shrink and fade away
+      const lifeSpan = 1400 + Math.random() * 400 + customDelay;
+      setTimeout(() => {
+        card.style.opacity = '0';
+        card.style.transform = `translate3d(${vx * 18}px, ${vy * 18 + 18}px, 0) scale(0.65) rotate(${rot * 1.3}deg)`;
+        setTimeout(() => {
+          if (card.parentNode) {
+            card.remove();
+          }
+        }, 460);
+      }, lifeSpan);
+    }
+
+    // Cursor move handler
+    stage.addEventListener('pointermove', (e) => {
+      const rect = stage.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const dist = Math.hypot(x - lastX, y - lastY);
+      const now = Date.now();
+
+      if (dist > distanceThreshold || (dist > 20 && now - lastTime > 180)) {
+        const vx = (x - lastX) / (dist || 1);
+        const vy = (y - lastY) / (dist || 1);
+        createPolaroidCard(x, y, vx * 0.8, vy * 0.8);
+        lastX = x;
+        lastY = y;
+        lastTime = now;
+      }
+    });
+
+    // Stage Click: Fan-out burst of 5 polaroid meme photos
+    stage.addEventListener('pointerdown', (e) => {
+      // Don't trigger if clicked on an actual interactive link inside stage if any
+      if (e.target.closest('a') || e.target.closest('button')) return;
+
+      const rect = stage.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const burstCount = 5;
+      const angleStep = (Math.PI * 2) / burstCount;
+      const baseOffset = Math.random() * Math.PI;
+
+      for (let i = 0; i < burstCount; i++) {
+        const angle = baseOffset + i * angleStep;
+        const radius = 24 + Math.random() * 20;
+        const targetX = x + Math.cos(angle) * radius;
+        const targetY = y + Math.sin(angle) * radius;
+        const vx = Math.cos(angle) * 2;
+        const vy = Math.sin(angle) * 2;
+
+        setTimeout(() => {
+          createPolaroidCard(targetX, targetY, vx, vy, i * 60);
+        }, i * 35);
+      }
+    });
+  })();
+</script></main><footer class="w-full border-t border-[#292932]/40 bg-[#0d0e15]/80 backdrop-blur-md py-6 px-6 sm:px-12 mt-auto">
+<div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#8f8d9f]">
+<div class="flex items-center gap-2"><span>© 2026 AuraMeme. All rights reserved.</span></div>
+<div class="flex items-center gap-6">
+<a class="hover:text-[#d0bcff] transition-colors" href="#">Chính sách bảo mật</a>
+<a class="hover:text-[#d0bcff] transition-colors flex items-center gap-1" href="https://github.com/lebaokhang123/aura_meme" rel="noopener noreferrer" target="_blank">
+        GitHub <span class="text-[10px]">↗</span>
+</a>
+</div>
+</div>
+</footer>
+
+
+
+</body></html>

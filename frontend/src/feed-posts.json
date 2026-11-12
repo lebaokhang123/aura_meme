@@ -1,0 +1,65 @@
+[
+  {
+    "id": "khang",
+    "category": "Gaming",
+    "ageMinutes": 18,
+    "title": "",
+    "content": "Khi bạn vừa tự tin push code sửa được 1 bug production vào lúc 17h30 thứ 6 nhưng hệ thống phát sinh thêm 7 bug chí mạng... 😭💀",
+    "authorName": "Khang Dev",
+    "handle": "@khang_dev",
+    "avatar": "/assets/demo/khang.jpg",
+    "level": "Lvl 79",
+    "nickname": "Bá chủ thiên lôi",
+    "timeLabel": "18 phút trước",
+    "media": "https://lh3.googleusercontent.com/aida-public/AB6AXuCaBOyswOOkj5_h_Sbn7DcAs2F9TIoNDak_8yjpVwVXwrqojPjZ5ZsMMGpBECtasnTGFnwVjAtcPNTb5hZidtNLjbXGH1SWuWHNOb1O103Y7eAV-Q5qbHQJ8qx8itxJ8Tnuy-rjVvtORMl1svfr2-m6Rqw-hSwHcFdMV6sCz-aU2QQGnpGEmS8ihCsHx8M-qUpqMPruvgGbKzuf2jHXWv8ngOKxGIbxCDMTLx1EbZs",
+    "reactions": [
+      369,
+      79,
+      142,
+      88,
+      54
+    ]
+  },
+  {
+    "id": "kien",
+    "category": "CongNghe",
+    "ageMinutes": 120,
+    "title": "Góc Dev Thức Đêm",
+    "content": "“Cuộc đời lập trình viên: 10% viết code, 90% ngồi nhìn chăm chú vào màn hình tự hỏi tại sao nó không chạy... rồi tự nhiên nó chạy mà không hiểu vì sao.”",
+    "authorName": "Kien Dev",
+    "handle": "@Kien_dev",
+    "avatar": "/assets/demo/kien.jpg",
+    "level": "Lvl 36",
+    "nickname": "Trúc cơ kỳ",
+    "timeLabel": "2 giờ trước",
+    "media": null,
+    "reactions": [
+      412,
+      215,
+      96,
+      64,
+      31
+    ]
+  },
+  {
+    "id": "gigachad",
+    "category": "Anime",
+    "ageMinutes": 240,
+    "title": "",
+    "content": "Khi nhân vật chính vừa unlock xong dạng biến hình tối thượng và nhạc OP vang lên: Kẻ phản diện bắt đầu hối hận vì đã làm đổ bát mì của anh ấy 🍜⚔️",
+    "authorName": "Gigachad",
+    "handle": "@Gigachad",
+    "avatar": "/assets/demo/gigachad.jpg",
+    "level": "Lvl 67",
+    "nickname": "Nguyên anh kỳ",
+    "timeLabel": "4 giờ trước",
+    "media": "https://lh3.googleusercontent.com/aida-public/AB6AXuBEUWtgdl7vdfuNaBzHgXQCBCa1lgsJ_c44_thRo9CyGmUD51BMt6gLBwfqFpwy79KgfB_p5tjR1yKqnc6MsdksHi1oLeITG2RDn687AeAKw3LK3qxdtH7KHr7TnXH9ZV5fNb3XBF03Zoo-xQzU7L22vPGOgIPsgBQdi_CcJVZnRBXH9rQx-T_6zAgVyE6kJey0mF0WJq63viHkxD1C0IPiSQKW_3fTKpBy7r72WgY",
+    "reactions": [
+      534,
+      189,
+      120,
+      75,
+      42
+    ]
+  }
+]

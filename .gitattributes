@@ -1,0 +1,2 @@
+# Stitch originals are byte-verified by manifest.json on every platform.
+frontend/public/stitch-original/** -text

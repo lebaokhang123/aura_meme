@@ -1,0 +1,29 @@
+/* Lucian UX/UI Prompt #219 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#219 */
+/* Lucian UX/UI Prompt #267 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#267 */
+.u219 { --ux-page:var(--am-surface); --ux-surface:var(--am-surface-container-low); --ux-surface-2:var(--am-surface-container); --ux-ink:var(--am-on-surface); --ux-ink-2:var(--am-on-surface-variant); --ux-line:var(--am-outline-variant); --ux-accent:var(--am-secondary); --ux-mint:#7ee8c0; --ux-shadow-strong:rgba(0,0,0,.72); }
+.u219[data-theme="light"] { --ux-mint:#119c72; --ux-shadow-strong:rgba(40,30,80,.3); }
+.u219 .u219-control { width:34px; height:34px; display:grid; place-items:center; flex:none; }
+.u219 .u219-tg { width:32px; height:32px; border:0; border-radius:10px; background:var(--ux-surface-2); box-shadow:inset 0 0 0 1px var(--ux-line); color:var(--ux-ink); display:grid; place-items:center; cursor:pointer; }
+.u219 .u219-tg:focus-visible,.u267 .u267-gb:focus-visible,.u267 .u267-op:focus-visible { outline:2px solid var(--ux-accent); outline-offset:2px; }
+.u219 .u219-tg svg { width:16px; height:16px; transition:transform .6s cubic-bezier(.3,1.4,.5,1); }
+.u219 .u219-tg.is-dark svg { transform:rotate(-90deg); }
+.u267 { position:relative; width:68px; flex:none; }
+.u267 .u267-gb { display:inline-flex; align-items:center; justify-content:center; gap:5px; height:30px; width:100%; padding:0 9px; border:0; border-radius:10px; background:var(--ux-surface-2); box-shadow:inset 0 0 0 1px var(--ux-line); color:var(--ux-ink); font:inherit; font-size:11px; font-weight:800; cursor:pointer; }
+.u267 .u267-gb svg { width:14px; height:14px; }
+.u267 .u267-dd { position:absolute; right:0; top:36px; width:150px; padding:5px; border-radius:14px; background:var(--ux-surface); box-shadow:0 0 0 1px var(--ux-line),0 16px 34px -14px var(--ux-shadow-strong); transform-origin:90% 0; transform:scale(.9) translateY(-4px); opacity:0; visibility:hidden; pointer-events:none; transition:transform .25s cubic-bezier(.3,1.5,.5,1),opacity .15s,visibility .15s; }
+.u267.is-open .u267-dd { transform:none; opacity:1; visibility:visible; pointer-events:auto; transition:transform .25s cubic-bezier(.3,1.5,.5,1),opacity .15s; }
+.u267 .u267-op { display:flex; align-items:center; gap:8px; width:100%; height:34px; padding:0 9px; border:0; border-radius:9px; background:none; color:var(--ux-ink); font:inherit; font-size:12px; font-weight:750; cursor:pointer; text-align:left; }
+.u267 .u267-op:hover { background:var(--ux-surface-2); }
+.u267 .u267-op em { font-style:normal; font-size:14px; }
+.u267 .u267-op svg { margin-left:auto; width:13px; height:13px; color:var(--ux-mint); opacity:0; }
+.u267 .u267-op.is-on svg { opacity:1; }
+.u219 .u267-sw { display:inline-block; vertical-align:top; overflow:hidden; max-width:100%; transition:width .35s cubic-bezier(.3,1.3,.5,1); }
+.u219 .u267-sw > span { display:block; }
+.u219 .u267-sw.is-go > span { animation:u267-out .26s ease-in forwards; }
+.u219 .u267-sw.is-in > span { animation:u267-in .38s cubic-bezier(.2,.9,.3,1.2); }
+@keyframes u267-out { to { transform:translateY(-100%); opacity:0; } }
+@keyframes u267-in { from { transform:translateY(100%); opacity:0; } }
+.u219-reveal .site-header { view-transition-name:none; }
+.u219-reveal::view-transition-group(root),.u219-reveal::view-transition-old(root),.u219-reveal::view-transition-new(root) { animation:none; mix-blend-mode:normal; }
+@media(max-width:767px) { .u267 { width:54px; } }
+@media(prefers-reduced-motion:reduce) { .u219 .u219-tg svg,.u267 .u267-dd,.u219 .u267-sw { transition:none; } .u219 .u267-sw>span { animation:none!important; } }
