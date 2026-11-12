@@ -10,6 +10,8 @@ test('old deleted Khang samples are restored once without restoring another auth
  const post=page.locator('#post-kien');await post.getByRole('button',{name:'Bình luận',exact:true}).click();
  const row=post.locator('[data-comment-id="sample-kien-1"]');await expect(row).toBeVisible();
  await row.getByRole('button',{name:'Tùy chọn bình luận'}).click();await row.getByRole('menuitem',{name:'Xóa bình luận'}).click();await row.getByRole('button',{name:'Xác nhận xóa',exact:true}).click();
+ // UI updates only after IndexedDB commits; do not reload while deletion is pending.
+ await expect(row).toHaveCount(0);
  await page.reload();await ready(page);await expect(row).toHaveCount(0);
 });
 test('comment deletion is behind a right-aligned menu and explicit confirmation',async({page})=>{
