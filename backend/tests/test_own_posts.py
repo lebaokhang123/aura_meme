@@ -48,7 +48,7 @@ def test_owner_media_metadata_is_private_and_hidden_category_does_not_publish(bl
     connection.execute(Post.__table__.update().where(Post.id==UUID(ident)).values(category_id=hidden,status='hidden'))
     response=client.get('/api/v1/users/me/posts/'+ident)
     assert response.status_code==200
-    assert response.json()['media_id']==str(media) and response.json()['media_url'] is None
+    assert response.json()['media_id']==str(media) and response.json()['media_url']=='/api/v1/media/'+str(media)
     assert response.json()['category']['status']=='hidden'
     assert 'object_key' not in response.text and 'private-synthetic-key' not in response.text
     assert 'password_hash' not in response.text and 'email' not in response.json()['author']

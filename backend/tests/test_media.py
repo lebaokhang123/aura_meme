@@ -50,11 +50,12 @@ def test_real_upload_private_bytes_and_metadata(media, fmt, mime):
     assert response.status_code == 201, response.text
     dto = response.json()
     assert set(dto) == {"id", "mime", "size_bytes", "status", "url"}
-    assert dto | {"id": None} == dict(id=None, mime=mime, size_bytes=len(payload), status="ready", url=None)
+    assert dto | {"id": None} == dict(id=None, mime=mime, size_bytes=len(payload), status="ready", url='/api/v1/media/' + dto['id'])
     row = connection.execute(select(MediaUpload.__table__)).mappings().one()
     assert row["id"] == UUID(dto["id"])
     assert (root / row["object_key"]).read_bytes() == payload
-    assert client.get("/api/v1/media/" + dto["id"]).status_code == 404
+    delivered = client.get(dto['url'])
+    assert delivered.status_code == 200 and delivered.headers['content-type'] == 'image/png'
 
 
 @pytest.mark.parametrize("payload,mime", [(b"", "image/png"), (b"<script>x</script>", "image/png"),

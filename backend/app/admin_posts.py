@@ -4,7 +4,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
-from sqlalchemy import or_, select
+from sqlalchemy import String, cast, or_, select
 
 from app.admin_users import require_admin_mutation
 from app.auth import CSRF_HEADER, ERRORS
@@ -60,8 +60,10 @@ def locked_post(db, post_id):
             responses={code: ERRORS[code] for code in (401, 403, 422, 429, 500)})
 def list_admin_posts(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                       search: str | None = Query(None, max_length=100), status: str | None = None,
+                      category: str | None = None,
+                      sort: Literal["created_desc", "created_asc", "title_asc"] = "created_desc",
                       account=Depends(require_role("ADMIN"))):
-    if any(value is not None and "\x00" in value for value in (search, status)):
+    if any(value is not None and "\x00" in value for value in (search, status, category)):
         raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
     statement = select(Post, User, Profile, Category).join(User, User.id == Post.author_id).join(
         Profile, Profile.user_id == User.id).join(Category, Category.id == Post.category_id)
@@ -69,7 +71,11 @@ def list_admin_posts(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1
         statement = statement.where(or_(Post.title.icontains(search, autoescape=True), Post.content.icontains(search, autoescape=True)))
     if status is not None:
         statement = statement.where(Post.status == status)
-    rows, pagination = page_rows(account.db, statement.order_by(Post.created_at.desc(), Post.id.desc()), page, page_size)
+    if category is not None:
+        statement = statement.where(Category.slug == category)
+    ordering = {"created_desc": (Post.created_at.desc(), Post.id.desc()),
+                "created_asc": (Post.created_at, Post.id), "title_asc": (Post.title, Post.id)}
+    rows, pagination = page_rows(account.db, statement.order_by(*ordering[sort]), page, page_size)
     return PostPage(items=[post_dto(*row) for row in rows], pagination=pagination)
 
 
@@ -106,6 +112,23 @@ def delete_admin_post(post_id: UUID, request: Request, account=Depends(require_a
 @router.get("/audit-logs", response_model=AuditPage, operation_id="adminListAudit",
             responses={code: ERRORS[code] for code in (401, 403, 422, 429, 500)})
 def list_audit(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+                search: str | None = Query(None, max_length=100), action: str | None = Query(None, max_length=100),
+                target_type: str | None = Query(None, max_length=100), actor_id: UUID | None = None,
+                sort: Literal["created_desc", "created_asc", "action_asc"] = "created_desc",
                 account=Depends(require_role("ADMIN"))):
-    rows, pagination = page_rows(account.db, select(AdminAuditLog).order_by(AdminAuditLog.created_at.desc(), AdminAuditLog.id.desc()), page, page_size)
+    if any(value is not None and "\x00" in value for value in (search, action, target_type)):
+        raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
+    statement = select(AdminAuditLog)
+    if search is not None:
+        statement = statement.where(or_(*(column.icontains(search, autoescape=True) for column in (
+            AdminAuditLog.action, AdminAuditLog.target_type, AdminAuditLog.target_id, cast(AdminAuditLog.actor_id, String)))))
+    if action is not None:
+        statement = statement.where(AdminAuditLog.action == action)
+    if target_type is not None:
+        statement = statement.where(AdminAuditLog.target_type == target_type)
+    if actor_id is not None:
+        statement = statement.where(AdminAuditLog.actor_id == actor_id)
+    ordering = {"created_desc": (AdminAuditLog.created_at.desc(), AdminAuditLog.id.desc()),
+                "created_asc": (AdminAuditLog.created_at, AdminAuditLog.id), "action_asc": (AdminAuditLog.action, AdminAuditLog.id)}
+    rows, pagination = page_rows(account.db, statement.order_by(*ordering[sort]), page, page_size)
     return AuditPage(items=[AdminAuditEvent.model_validate(row[0], from_attributes=True) for row in rows], pagination=pagination)

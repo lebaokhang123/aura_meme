@@ -1,18 +1,21 @@
 """Authentication against real PostgreSQL; each normal case rolls back its writes."""
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+import os
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import Session
 
-from app.config import Settings, load_settings
+from app.config import Settings
 from app.db import create_db_engine
 from app.main import app
 from app.models import AuthSession, Profile, Role, User, UserRole
-from test_migrations import TABLES, REVISION, development_inventory
+from test_migrations import TABLES, REVISION
 from schema_guard import assert_auxiliary_objects
 
 
@@ -21,19 +24,79 @@ PASSWORD = "Correct horse battery staple!"
 ACCOUNT = dict(username="alice_auth", email="alice@example.com", password=PASSWORD, display_name="Alice")
 
 
+def auth_test_settings():
+    url = os.environ.get("TEST_DATABASE_URL")
+    if not url:
+        pytest.fail("TEST_DATABASE_URL is required for PostgreSQL Auth tests", pytrace=False)
+    try:
+        settings = Settings(_env_file=None, database_url=url)
+        target = make_url(settings.database_url.get_secret_value())
+        safe = (target.database == target.username == "aurameme_test"
+                and target.host in {"localhost", "127.0.0.1", "::1"} and not target.query)
+    except (ValueError, ArgumentError):
+        safe = False
+    if not safe:
+        pytest.fail("TEST_DATABASE_URL must use loopback aurameme_test database/role without query overrides",
+                    pytrace=False)
+    return settings
+
+
+@pytest.mark.parametrize("url", [
+    None, "", "secret-marker", "sqlite:///aurameme_test",
+    "postgresql+psycopg://aurameme_dev:secret-marker@127.0.0.1/aurameme_dev",
+    "postgresql+psycopg://aurameme_test:secret-marker@127.0.0.1/aurameme_demo",
+    "postgresql+psycopg://postgres:secret-marker@127.0.0.1/aurameme_test",
+    "postgresql+psycopg://aurameme_test:secret-marker@remote.invalid/aurameme_test",
+    "postgresql+psycopg://aurameme_test:secret-marker@127.0.0.1/aurameme_test?options=-csearch_path%3Dprivate",
+])
+def test_auth_fixture_rejects_unsafe_target_before_engine_creation(monkeypatch, url):
+    from unittest.mock import Mock
+    import sys
+    if url is None:
+        monkeypatch.delenv("TEST_DATABASE_URL", raising=False)
+    else:
+        monkeypatch.setenv("TEST_DATABASE_URL", url)
+    engine_factory = Mock(side_effect=AssertionError("Must refuse before creating an engine"))
+    monkeypatch.setattr(sys.modules[__name__], "create_db_engine", engine_factory)
+    try:
+        with pytest.raises(pytest.fail.Exception, match="TEST_DATABASE_URL") as error:
+            next(migrated.__wrapped__())
+    except pytest.skip.Exception:
+        pytest.fail("Missing TEST_DATABASE_URL must fail, not skip")
+    engine_factory.assert_not_called()
+    assert "secret-marker" not in str(error.value)
+
+
+@pytest.mark.parametrize("identity", [
+    ("aurameme_dev", "aurameme_test", "public"),
+    ("aurameme_test", "postgres", "public"),
+    ("aurameme_test", "aurameme_test", "private"),
+])
+def test_auth_fixture_checks_identity_readonly_before_schema_access(monkeypatch, identity):
+    from unittest.mock import MagicMock
+    import sys
+    monkeypatch.setenv("TEST_DATABASE_URL",
+                       "postgresql+psycopg://aurameme_test:synthetic@127.0.0.1/aurameme_test")
+    engine = MagicMock()
+    connection = engine.connect.return_value.__enter__.return_value
+    connection.execute.return_value.one.return_value = identity
+    monkeypatch.setattr(sys.modules[__name__], "create_db_engine", lambda settings: engine)
+    with pytest.raises(AssertionError, match="identity"):
+        next(migrated.__wrapped__())
+    connection.exec_driver_sql.assert_called_once_with("SET TRANSACTION READ ONLY")
+    assert connection.execute.call_count == 1
+    engine.dispose.assert_called_once()
+
+
 @pytest.fixture(scope="module")
 def migrated():
     """Auth tests require the existing schema; they never upgrade/drop/reset tables."""
-    import os
-    url = os.environ.get("TEST_DATABASE_URL")
-    if not url:
-        pytest.skip("TEST_DATABASE_URL missing; PostgreSQL Auth was NOT TESTED")
-    engine = create_db_engine(Settings(_env_file=None, database_url=url))
-    dev = create_db_engine(load_settings())
+    engine = create_db_engine(auth_test_settings())
     try:
         with engine.connect() as connection:
-            assert connection.execute(text("SELECT current_database()")).scalar_one() == "aurameme_test"
-            assert connection.execute(text("SELECT current_schema()")).scalar_one() == "public"
+            connection.exec_driver_sql("SET TRANSACTION READ ONLY")
+            identity = connection.execute(text("SELECT current_database(), current_user, current_schema()")).one()
+            assert tuple(identity) == ("aurameme_test", "aurameme_test", "public"), "Unsafe test database identity"
             from sqlalchemy import inspect
             assert set(inspect(connection).get_table_names()) == TABLES | {"alembic_version"}
             assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == REVISION
@@ -41,19 +104,18 @@ def migrated():
             assert connection.execute(text("SELECT count(*) FROM pg_policies WHERE schemaname='public'")).scalar_one() == 0
             for table in TABLES:
                 assert connection.execute(text('SELECT count(*) FROM "' + table + '"')).scalar_one() == 0, "Existing data; refusing Auth tests"
-        before = development_inventory(dev)
         yield engine
         with engine.connect() as connection:
+            connection.exec_driver_sql("SET TRANSACTION READ ONLY")
             for table in TABLES:
                 assert connection.execute(text('SELECT count(*) FROM "' + table + '"')).scalar_one() == 0, "Auth test data leaked"
-        assert development_inventory(dev) == before
     finally:
         engine.dispose()
-        dev.dispose()
 
 
 @pytest.fixture
 def auth(migrated, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", auth_test_settings().database_url.get_secret_value())
     monkeypatch.setenv("AUTH_SIGNING_KEY", "test-only-signing-key-with-at-least-32-bytes")
     monkeypatch.setenv("AUTH_ENVIRONMENT", "production")
     monkeypatch.setenv("AUTH_ALLOWED_ORIGINS", '["https://testserver"]')

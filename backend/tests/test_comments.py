@@ -237,7 +237,7 @@ def test_comment_openapi_contract():
     assert delete["delete"]["operationId"] == "deleteComment"
     assert "204" in delete["delete"]["responses"]
     assert nested["get"]["operationId"] == "listComments" and nested["post"]["operationId"] == "addComment"
-    assert {item["name"] for item in nested["get"]["parameters"]} == {"post_id", "page", "page_size"}
+    assert {item["name"] for item in nested["get"]["parameters"]} == {"post_id", "page", "page_size", "search", "sort", "author"}
     for operation in [nested["post"], delete["delete"]]:
         assert {"name": "X-CSRF-Token", "in": "header", "required": True, "schema": {"type": "string"}} in operation["parameters"]
         assert {"401", "403", "404", "422", "429", "500"} <= set(operation["responses"])

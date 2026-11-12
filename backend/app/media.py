@@ -1,5 +1,5 @@
-"""Bounded private image upload, committed metadata and compensating file cleanup."""
-from contextlib import contextmanager
+"""Private image uploads and authorized, bounded, metadata-free display."""
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from io import BytesIO
 import logging
@@ -7,21 +7,23 @@ from typing import Literal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Request, Response
-from pydantic import AnyHttpUrl, BaseModel, Field, ValidationError
-from PIL import Image, UnidentifiedImageError
+from pydantic import BaseModel, Field, ValidationError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from python_multipart import MultipartParser
 from python_multipart.exceptions import MultipartParseError
 from python_multipart.multipart import parse_options_header
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy import or_, select
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
-from app.auth import CSRF_HEADER, ERRORS, session_cookie
+from app.auth import CSRF_HEADER, ERRORS, current_session, session_cookie
+from app.auth_schemas import ErrorResponse
 from app.config import MediaSettings
-from app.models import MediaUpload
+from app.models import AuthSession, MediaUpload, Post, Profile, User
 from app.permissions import AuthenticatedAccount, require_account_csrf, require_authenticated_user
-from app.security import AuthError
-from app.storage import LocalObject
+from app.security import AuthError, TOKEN, digest
+from app.storage import LocalObject, read_private_object
 
 
 MAX_FILE_BYTES = 5 * 1024 * 1024
@@ -30,10 +32,45 @@ MAX_REQUEST_BYTES = MAX_FILE_BYTES + MAX_OVERHEAD
 MAX_PIXELS = 12_000_000
 MAX_FRAMES = 60
 MAX_TOTAL_PIXELS = 40_000_000
+MAX_DELIVERY_BYTES = 80 * 1024 * 1024
 FORMATS = {"JPEG": ("image/jpeg", "jpg"), "PNG": ("image/png", "png"),
            "WEBP": ("image/webp", "webp"), "GIF": ("image/gif", "gif")}
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def media_url(ident):
+    return '/api/v1/media/' + str(ident) if ident is not None else None
+
+
+class ImageOutput(BytesIO):
+    def write(self, data):
+        # The decoded pixel budget bounds normalized output; stop before an oversized allocation.
+        if self.tell() + len(data) > MAX_DELIVERY_BYTES:
+            raise ValueError('Normalized image exceeds delivery budget.')
+        return super().write(data)
+
+
+def normalize_image(payload, mime, *, still=False):
+    validate_image(payload, mime)
+    with Image.open(BytesIO(payload)) as image, ExitStack() as frames_to_close:
+        frames, durations = [], []
+        for index in range(1 if still else getattr(image, 'n_frames', 1)):
+            image.seek(index)
+            with ImageOps.exif_transpose(image).convert('RGBA') as decoded:
+                frame = Image.frombytes('RGBA', decoded.size, decoded.tobytes())
+            frames_to_close.callback(frame.close)
+            frames.append(frame)
+            durations.append(min(655350, max(10, int(image.info.get('duration', 100)))))
+        output = ImageOutput()
+        if len(frames) == 1:
+            frames[0].save(output, format='PNG')
+            return output.getvalue(), 'image/png'
+        # shortcut: GIF quantizes animated PNG/WebP colors; use APNG if full-color animation is required.
+        frames[0].save(output, format='GIF', save_all=True, append_images=frames[1:],
+                       duration=durations, loop=min(65535, max(0, int(image.info.get('loop', 0)))),
+                       disposal=2, optimize=False)
+        return output.getvalue(), 'image/gif'
 
 
 def invalid(message="Invalid image upload."):
@@ -192,7 +229,59 @@ class Media(BaseModel):
     mime: Literal["image/jpeg", "image/png", "image/webp", "image/gif"]
     size_bytes: int = Field(ge=1)
     status: Literal["pending", "ready", "rejected", "deleted"]
-    url: AnyHttpUrl | None = None
+    url: str | None = Field(default=None, json_schema_extra={"format": "uri-reference"})
+
+
+@router.get('/api/v1/media/{media_id}', name='userMedia', operation_id='getMedia', response_class=Response,
+            tags=['Media'], responses={200: {'content': {
+                mime: {'schema': {'type': 'string', 'format': 'binary'}} for mime in ('image/png', 'image/gif')}},
+                **{status: {'model': ErrorResponse} for status in (404, 422, 429, 500)}},
+            openapi_extra={'security': [{}, {'sessionCookie': []}]})
+def get_media(media_id: UUID, request: Request, still: bool = False, raw=Depends(session_cookie)):
+    from app.blog import public_posts
+    from app.comments import lock_public_post
+
+    unavailable = AuthError(404, 'NOT_FOUND', 'Image not available.')
+    with request.app.state.auth_session_factory() as db, db.begin():
+        media = db.get(MediaUpload, media_id)
+        if media is None or media.status != 'ready':
+            raise unavailable
+        owner = False
+        # Only lock this media's owner session; unrelated visitors cannot invert user lock order.
+        if raw and TOKEN.fullmatch(raw) and db.scalar(select(AuthSession.user_id).where(
+                AuthSession.token_hash == digest(raw))) == media.owner_id:
+            try:
+                owner = current_session(db, request.app.state.auth, raw).user_id == media.owner_id
+            except AuthError as error:
+                if error.status != 401:
+                    raise
+        author = db.scalar(select(User).where(User.id == media.owner_id, User.status == 'active')
+                           .with_for_update(read=True))
+        if author is None:
+            raise unavailable
+        if not owner:
+            profile = db.scalar(select(Profile).where(Profile.user_id == media.owner_id,
+                or_(Profile.avatar_media_id == media_id, Profile.cover_media_id == media_id)).with_for_update(read=True))
+            if profile is None:
+                post_id = db.scalar(public_posts().with_only_columns(Post.id).where(Post.media_id == media_id).limit(1))
+                if post_id is None:
+                    raise unavailable
+                lock_public_post(db, post_id)
+                if db.get(Post, post_id).media_id != media_id:
+                    raise unavailable
+        media = db.scalar(select(MediaUpload).where(MediaUpload.id == media_id, MediaUpload.status == 'ready')
+                          .with_for_update(read=True).execution_options(populate_existing=True))
+        if media is None:
+            raise unavailable
+        try:
+            payload = read_private_object(MediaSettings().media_storage_root, media.object_key, MAX_FILE_BYTES)
+            if len(payload) != media.size_bytes:
+                raise ValueError('Private image size changed.')
+            data, mime = normalize_image(payload, media.mime, still=still)
+        # shortcut: GIF delay coalescing can overflow; use still=true until the encoder supports that case.
+        except (OSError, ValueError, OverflowError, ValidationError, AuthError):
+            raise unavailable from None
+        return Response(data, media_type=mime, headers={'Content-Security-Policy': "default-src 'none'; sandbox"})
 
 
 @router.post("/api/v1/media", status_code=201, response_model=Media, operation_id="uploadMedia", tags=["Media"],
@@ -212,4 +301,4 @@ async def upload_media(request: Request, operation=Depends(upload_transaction, s
         mime=mime, size_bytes=len(payload), status="ready", created_at=now, updated_at=now)
     operation.account.db.add(row)
     await run_in_threadpool(operation.account.db.flush)
-    return Media(id=row.id, mime=mime, size_bytes=len(payload), status="ready")
+    return Media(id=row.id, mime=mime, size_bytes=len(payload), status="ready", url=media_url(row.id))

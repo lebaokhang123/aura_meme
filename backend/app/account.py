@@ -2,12 +2,13 @@
 from fastapi import APIRouter, Depends, Path, Request
 from sqlalchemy import select, update
 
-from app.account_schemas import AccountPrivate, PasswordChange, ProfilePatch, UserPublic
+from app.account_schemas import AccountPrivate, PasswordChange, ProfilePatch, PublicProfile
 from app.auth import CSRF_HEADER, ERRORS, user_private
 from app.auth_schemas import ErrorResponse
 from app.models import AuthSession, MediaUpload, Profile, User
 from app.permissions import require_account_csrf, require_authenticated_user
 from app.security import AuthError
+from app.media import media_url
 
 
 router = APIRouter(prefix="/api/v1/users", tags=["Account"])
@@ -17,7 +18,8 @@ PROFILE_FIELDS = ("birth_year", "address", "phone", "bio", "avatar_media_id", "c
 def private_profile(account):
     basic = user_private(account.db, account.user)
     profile = account.db.get(Profile, account.user.id)
-    return AccountPrivate(**basic.model_dump(), **{name: getattr(profile, name) for name in PROFILE_FIELDS})
+    return AccountPrivate(**basic.model_dump(), **{name: getattr(profile, name) for name in PROFILE_FIELDS},
+                          avatar_url=media_url(profile.avatar_media_id), cover_url=media_url(profile.cover_media_id))
 
 
 @router.get("/me", response_model=AccountPrivate, operation_id="getMe",
@@ -62,7 +64,7 @@ def change_password(payload: PasswordChange, request: Request, account=Depends(r
         AuthSession.revoked_at.is_(None)).values(revoked_at=runtime.now()))
 
 
-@router.get("/{username}", response_model=UserPublic, operation_id="getPublicUser",
+@router.get("/{username}", response_model=PublicProfile, operation_id="getPublicUser",
             responses={status: {"model": ErrorResponse} for status in (404, 422, 429, 500)})
 def get_public_user(request: Request, username: str = Path(min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$")):
     with request.app.state.auth_session_factory() as db:
@@ -71,6 +73,6 @@ def get_public_user(request: Request, username: str = Path(min_length=3, max_len
         if row is None:
             raise AuthError(404, "NOT_FOUND", "Profile not found.")
         user, profile = row
-        # No public media URL provider exists yet; never invent an object-storage link.
-        return UserPublic(id=user.id, username=user.username, display_name=profile.display_name,
-                          created_at=user.created_at, bio=profile.bio, avatar_url=None)
+        return PublicProfile(id=user.id, username=user.username, display_name=profile.display_name,
+                          created_at=user.created_at, bio=profile.bio, avatar_url=media_url(profile.avatar_media_id),
+                          cover_url=media_url(profile.cover_media_id))

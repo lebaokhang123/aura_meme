@@ -14,8 +14,8 @@ from test_auth import ACCOUNT, ORIGIN, PASSWORD, auth, csrf, login, migrated, po
 
 
 PRIVATE = {"id", "username", "email", "display_name", "roles", "status", "birth_year", "address",
-           "phone", "bio", "avatar_media_id", "cover_media_id"}
-PUBLIC = {"id", "username", "display_name", "bio", "avatar_url", "created_at"}
+           "phone", "bio", "avatar_media_id", "cover_media_id", "avatar_url", "cover_url"}
+PUBLIC = {"id", "username", "display_name", "bio", "avatar_url", "cover_url", "created_at"}
 NEW_PASSWORD = "Replacement password for test!"
 
 

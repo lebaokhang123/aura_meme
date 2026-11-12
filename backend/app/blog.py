@@ -9,6 +9,7 @@ from app.auth import CSRF_HEADER, ERRORS
 from app.auth_schemas import ErrorResponse
 from app.blog_schemas import CategoryInput, CategoryPage, CategoryPatch, CategoryResponse, Pagination, PostInput, PostPage, PostPatch, PostResponse
 from app.models import AdminAuditLog, Category, MediaUpload, Post, Profile, User
+from app.media import media_url
 from app.permissions import require_account_csrf, require_role
 from app.security import AuthError
 
@@ -27,8 +28,10 @@ def category_dto(category):
     return CategoryResponse.model_validate(category, from_attributes=True)
 
 
-def category_list(db, statement, page, size):
-    rows, pagination = page_rows(db, statement.order_by(Category.slug, Category.id), page, size)
+def category_list(db, statement, page, size, sort="slug_asc"):
+    ordering = {"slug_asc": (Category.slug, Category.id), "name_asc": (Category.name, Category.id),
+                "name_desc": (Category.name.desc(), Category.id.desc())}
+    rows, pagination = page_rows(db, statement.order_by(*ordering[sort]), page, size)
     return CategoryPage(items=[category_dto(row[0]) for row in rows], pagination=pagination)
 
 
@@ -61,22 +64,34 @@ def locked_category(db, category_id, active=False):
 
 @router.get("/categories", response_model=CategoryPage, operation_id="listCategories",
             responses={s: ERRORS[s] for s in (422, 429, 500)})
-def list_categories(request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
+def list_categories(request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+                    search: str | None = Query(None, max_length=100), slug: str | None = None,
+                    sort: Literal["slug_asc", "name_asc", "name_desc"] = "slug_asc"):
+    if any(value is not None and "\x00" in value for value in (search, slug)):
+        raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
+    statement = select(Category).where(Category.status == "active")
+    if search is not None:
+        statement = statement.where(or_(Category.name.icontains(search, autoescape=True), Category.slug.icontains(search, autoescape=True)))
+    if slug is not None:
+        statement = statement.where(Category.slug == slug)
     with request.app.state.auth_session_factory() as db:
-        return category_list(db, select(Category).where(Category.status == "active"), page, page_size)
+        return category_list(db, statement, page, page_size, sort)
 
 
 @router.get("/admin/categories", response_model=CategoryPage, operation_id="adminListCategories", tags=["Admin"],
             responses={s: ERRORS[s] for s in (401, 403, 422, 429, 500)})
 def admin_list_categories(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                           search: str | None = Query(None, max_length=100), status: str | None = None,
+                          sort: Literal["slug_asc", "name_asc", "name_desc"] = "slug_asc",
                           account=Depends(require_role("ADMIN"))):
+    if any(value is not None and "\x00" in value for value in (search, status)):
+        raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
     statement = select(Category)
     if status is not None:
         statement = statement.where(Category.status == status)
     if search is not None:
         statement = statement.where(or_(Category.name.icontains(search, autoescape=True), Category.slug.icontains(search, autoescape=True)))
-    return category_list(account.db, statement, page, page_size)
+    return category_list(account.db, statement, page, page_size, sort)
 
 
 @router.post("/admin/categories", response_model=CategoryResponse, status_code=201,
@@ -127,10 +142,10 @@ def public_posts():
 
 def post_dto(post, user, profile, category):
     author = UserPublic(id=user.id, username=user.username, display_name=profile.display_name,
-        bio=profile.bio, created_at=user.created_at, avatar_url=None)
-    # comments_count is optional and omitted; never invent counts or media URLs.
+        bio=profile.bio, created_at=user.created_at, avatar_url=media_url(profile.avatar_media_id))
+    # comments_count is optional and omitted until a real aggregate is requested.
     return PostResponse(id=post.id, author=author, category=category_dto(category), title=post.title,
-        content=post.content, status=post.status, created_at=post.created_at, updated_at=post.updated_at, media_url=None)
+        content=post.content, status=post.status, created_at=post.created_at, updated_at=post.updated_at, media_url=media_url(post.media_id))
 
 
 def validate_post(db, user_id, category_id, media_id, content, *, allow_hidden_category=False):
@@ -149,6 +164,8 @@ def validate_post(db, user_id, category_id, media_id, content, *, allow_hidden_c
 def list_posts(request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                search: str | None = Query(None, max_length=100), category: str | None = None,
                sort: Literal["created_desc", "created_asc", "title_asc"] = "created_desc"):
+    if any(value is not None and "\x00" in value for value in (search, category)):
+        raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
     statement = public_posts()
     if search is not None:
         statement = statement.where(or_(Post.title.icontains(search, autoescape=True), Post.content.icontains(search, autoescape=True)))
