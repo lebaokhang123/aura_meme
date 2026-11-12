@@ -52,3 +52,13 @@ Owner đã chốt 10 cảnh giới ×10 Level; XP lên cấp ` 10 + Level ` từ
 Frontend có unit tests và browser regression cho14màn, Guest/3user demo,375/768/1440px, theme/language, filter/history và lưu trữ lỗi/reload. Đây là demo frontend để review UI/logic; chưa chứng minh triển khai production hoặc vận hành backend/DevOps.
 
 Nguồn/license và xác nhận của Owner đối với asset được ghi riêng trong [asset ledger](frontend/ASSET_SOURCES.md); license mã nguồn không tự áp dụng cho mọi ảnh bên thứ ba.
+
+## CI trên GitHub Actions
+
+Một workflow `.github/workflows/ci.yml` chạy khi mở/cập nhật PR vào `dev` và khi push `dev`, với quyền `contents: read`, không deploy hoặc dùng secrets. Các action được pin theo commit SHA; Node/Python có phiên bản cụ thể, frontend dùng `npm ci`, backend dùng `backend/requirements-ci.txt` khóa dependency runtime/test (cập nhật cùng `pyproject.toml`).
+
+- **Backend non-DB (Windows):** chạy các test không mang marker integration, gồm filesystem/launcher Windows. Loại module migration và các ca gọi Alembic demo; không có PostgreSQL service hoặc URL DB thật.
+- **Frontend build and unit (Ubuntu):** cài lockfile, build và chạy các test Node hiện có.
+- **Frontend browser regression (Ubuntu):** chạy toàn bộ suite hiện có bằng Chromium đi kèm phiên bản Playwright đã khóa; config riêng trong `.github/` giữ config frontend gốc. Không retry để che lỗi; upload evidence khi fail, giữ 7 ngày. Suite vẫn cần Internet cho Tailwind CDN, Google Fonts và ảnh từ xa.
+
+**NOT COVERED:** PostgreSQL integration/schema guard trên DB thật, migration/downgrade, backend browser E2E và launcher chạy trọn dịch vụ. Job backend xanh chỉ chứng minh nhóm non-DB; không có nghĩa toàn bộ backend hoặc Game Mechanics đã PASS. Không tạo/migrate DB development/demo/production trong workflow này.
