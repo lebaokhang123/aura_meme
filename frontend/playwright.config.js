@@ -13,7 +13,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'npm run preview -- --port 4186 --strictPort',
+    command: 'npm run preview -- --port 4186 --strictPort --host 127.0.0.1',
     url: 'http://127.0.0.1:4186',
     reuseExistingServer: false,
   },

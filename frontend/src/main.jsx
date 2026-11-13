@@ -1,6 +1,10 @@
-import React,{useEffect} from 'react';
+import React,{useEffect,useSyncExternalStore} from 'react';
 import {createRoot} from 'react-dom/client';
-import { resolveScreen, initLegacyEffects, attachNavigation } from './runtime.js';
+import { resolveScreen, initLegacyEffects, attachNavigation, prepareAuthForm, showDemoMessage } from './runtime.js';
+import {AuthBoundary} from './AuthBoundary.jsx';
+import {auth,MOCK_AUTH} from './auth.js';
+import {authMessage} from './auth-client.js';
+import {usePreferences} from './PreferencesContext.jsx';
 import { applyDemoIdentity } from './demo.js';
 import { SiteHeader, SiteFooter, MaintenancePage } from './components/SiteShell.jsx';
 import './mobile.css';
@@ -18,6 +22,8 @@ const effectsFiles=import.meta.glob('./generated/*.effects.json');
 
 function App() {
   const render = useLocalized();
+  const authState=useSyncExternalStore(auth.subscribe,auth.snapshot);
+  const {language}=usePreferences();
   const page = resolveScreen();
   const [screen,setScreen] = React.useState(null);
   const [failed,setFailed] = React.useState(false);
@@ -46,10 +52,13 @@ function App() {
     return()=>{stopped=true;cleanup()};
   },[page.key,screen]);
   useEffect(()=>attachNavigation(),[]);
+  useEffect(()=>{if(!MOCK_AUTH&&screen&&page.path==='/login'&&new URLSearchParams(location.search).has('registered'))showDemoMessage(language==='en'?'Account created. Please sign in.':'Đăng ký thành công. Vui lòng đăng nhập.');},[screen]);
+  useEffect(()=>{if(screen)prepareAuthForm();},[screen,language]);
+  useEffect(()=>{if(!MOCK_AUTH&&authState.error)showDemoMessage(authMessage(authState.error,language));},[authState.error]);
   // Reveal the header and page together after the lazy content and CSS are ready.
   if(!screen&&!failed)return null;
   return render(<><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : <LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}</>);
 }
 
 applyPreferences(readPreferences());
-createRoot(document.getElementById('root')).render(<PreferencesProvider><SocialProvider><FeedProvider><App /></FeedProvider></SocialProvider></PreferencesProvider>);
+createRoot(document.getElementById('root')).render(<PreferencesProvider><AuthBoundary><SocialProvider><FeedProvider><App /></FeedProvider></SocialProvider></AuthBoundary></PreferencesProvider>);

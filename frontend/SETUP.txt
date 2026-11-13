@@ -1,24 +1,37 @@
-AURAMEME — STITCH-FIRST REACT FRONTEND (STANDALONE DEMO)
+AURAMEME — STITCH REACT + AUTH API
 
-Frontend chính tại D:\Big\du_an_lon\aura_meme\frontend.
+Frontend chính là thư mục frontend/ của checkout Auth đang review.
 Nguồn đã được Owner nghiệm thu sơ bộ: docs/plan/master/stitch-react-preview.
 Giữ 14 màn Stitch và các nguồn tham chiếu; header/footer đã dùng chung theo Owner 2026-11-12.
-Không sử dụng lại component, CSS, API, auth, backend hoặc DB cũ.
+Giữ UI Stitch; tái sử dụng Auth backend hiện có, chưa nối Social hoặc Game Mechanics.
 
 CHẠY TRÊN WINDOWS:
 1. Cần Node.js >=22.12.0 và npm.
-2. Mở terminal: cd D:\Big\du_an_lon\aura_meme\frontend
+2. Mở terminal tại checkout Auth: cd frontend
 3. npm ci
 4. npm run dev
-5. Truy cập http://127.0.0.1:5173 (xem cổng thực tế trong terminal nếu bị chiếm).
+5. Truy cập http://localhost:5173; cổng 5173 cố định. Backend chạy tại 127.0.0.1:8000.
+   Vite proxy /api giữ Origin; backend development phải cho phép http://localhost:5173.
 
 BUILD / KIỂM THỬ:
 npm run build
-npm run preview -- --port 4173
+npm run preview -- --port 5173 (cần backend và allowed origin localhost:5173)
 node --test tests/*test.mjs
-npm test (Chrome đã cài; bộ test chỉ khởi động Vite preview, không backend/DB).
+npm test (build mock; Chrome đã cài, 149 regression demo, không backend/DB).
+Sau npm run build: npx playwright test --config=../.github/playwright.auth.config.mjs
+(8 Auth UI tests với HTTP stub; Chromium đi kèm Playwright).
+Auth E2E thật: từ backend chạy python tests/run_auth_browser.py [đường-dẫn-e2e.local/.env].
+Runner chỉ nhận aurameme_e2e/role aurameme_e2e_app rỗng, guard schema/revision;
+không migrate/reset; dọn đúng user/session/role tổng hợp do test tạo và kiểm 28 bảng rỗng.
+Cần build API mode và cài Chromium trước; DB development/demo không được sử dụng.
 
-Không dùng run.bat ở root cho frontend demo này: launcher cũ có khởi động backend/kiểm DB.
+run.bat demo/dev khởi động backend + frontend Auth API thật, có guard DB hiện có.
+Launcher cần .venv và demo.local của chính checkout; worktree mới không tự nhận secrets.
+Để review worktree với demo.local bên ngoài, chạy từ backend bằng Python đã cài dependencies:
+python -c "from pathlib import Path; from app.demo import activate_demo; import uvicorn; activate_demo(Path(r'C:\path\to\demo.local')); uvicorn.run('app.main:app',host='127.0.0.1',port=8000)"
+Sau đó chạy npm run dev từ frontend của cùng worktree. Không dùng -I với venv checkout khác,
+vì editable install có thể import sai source. Không sao chép secrets vào Git.
+Không chạy migration/seed trên development/demo để thử đăng nhập.
 Frontend trước thay thế có trong Git history và bản backup local (không đưa backup lên Git):
 docs/internal/backups/frontend-before-stitch-20261111
 SHA256 và báo cáo kiểm thử: docs/internal/stitch-promotion.
@@ -30,14 +43,31 @@ Home không có footer. Các trang còn lại dùng chung footer; /privacy.html 
 Auth dưới1024px chỉ hiện form; artwork/hiệu ứng vẫn giữ trên desktop.
 Contact/Rank/Vault dùng cùng màn bảo trì và baotri.png do Owner cung cấp.
 
-DEMO LOGIN:
-Ở /login nhập email Khang_dev@example.com (hoặc Kien_dev@example.com, Gigachad@example.com) và một mật khẩu demo
-bất kỳ, bấm submit. Frontend sẽ lưu CHỈ tên user demo (không lưu mật khẩu)
-trong localStorage. Đăng xuất để quay lại màn Guest. Không có backend thật.
+AUTH LOCAL:
+API mode là mặc định của npm run dev/build và run.bat demo/dev. Cookie HttpOnly + CSRF;
+danh tính/quyền lấy từ /api/v1/users/me. localStorage demo cũ không có quyền đăng nhập.
+Đăng ký thường chỉ USER, mật khẩu 12–128 ký tự; đăng ký xong chuyển về đăng nhập.
+Ba tài khoản demo dùng mật khẩu đã nhập riêng: khang_dev@example.com, kien_dev@example.com
+(USER + ADMIN), gigachad@example.com (USER). Không có mật khẩu trong source.
+
+SETUP TÀI KHOẢN (backend đã cài test dependencies để dùng TestClient):
+python -m app.demo_accounts
+Lệnh trên chỉ đọc plan, kiểm DB aurameme_demo/public và revision hiện hành.
+python -m app.demo_accounts --apply
+Chỉ chạy sau khi Owner duyệt ghi demo: gõ đúng câu xác nhận, nhập mật khẩu ẩn hai lần.
+Có thể chỉ rõ --config-root bằng đường dẫn tuyệt đối đến thư mục demo.local đã có cấu hình.
+Dùng register API, bootstrap Admin đầu tiên và Admin API có audit cho Admin thứ hai.
+Chạy lại giữ ID/password/user cũ; gặp xung đột thì dừng, không reset hoặc cấp vật phẩm.
+
+MOCK CHỈ ĐỂ REVIEW/TEST OFFLINE AUTH:
+npm run dev -- --mode mock hoặc npm run build -- --mode mock.
+Chỉ bundle mock mới dùng danh tính localStorage và mật khẩu mẫu bất kỳ.
+Không phát hành bundle mock như bản có xác thực thật. API mode không chuyển dữ liệu IndexedDB lên DB.
 Dữ liệu 3 nhân vật cùng post/XP trong các màn Stitch được giữ y nguyên cho demo.
 Avatar header/composer và hộp Thông tin lấy đúng user demo đang đăng nhập.
 Home có3bài mẫu ban đầu; bài tạo/xóa trong demo được tính thật theo tag và bộ lọc.
-Reaction, bình luận và xóa có xác nhận dùng state chung; bài/ảnh/GIF lưu IndexedDB theo browser/origin.
+Trong mock mode, reaction/bình luận/xóa và bài/ảnh/GIF dùng IndexedDB theo browser/origin.
+API mode chặn ghi Social và báo chưa tích hợp; dữ liệu demo vẫn xem được.
 Explore hiển thị tối đa3bài. Chỉ Standard reaction dùng được; My Meme chưa có inventory.
 
 GIỚI HẠN QUAN TRỌNG:
@@ -58,5 +88,5 @@ GIỚI HẠN QUAN TRỌNG:
   OAuth, thông báo và các nút tính năng tương lai vẫn là placeholder;
   các route/API chức năng của frontend cũ chỉ còn trong bản sao lưu.
 
-Gỡ phiên demo nếu không thấy nút đăng xuất: mở DevTools và chạy
+Chỉ gỡ danh tính MOCK bằng DevTools (không thay thế logout API):
 localStorage.removeItem("aurameme-stitch-demo-user"); location.assign("/");

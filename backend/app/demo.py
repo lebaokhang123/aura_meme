@@ -33,11 +33,13 @@ def validate_demo_url(value):
         raise ConfigurationError('Demo requires its dedicated local database and role on port 5432.') from None
 
 
-def demo_environment():
+def demo_environment(root=None):
+    root=DEMO_ROOT if root is None else Path(root)
     try:
-        if DEMO_ROOT.is_symlink() or DEMO_ROOT.is_junction() or (DEMO_ROOT/'.env').is_symlink():
+        if not root.is_absolute() or ".." in root.parts:raise ValueError
+        if root.is_symlink() or root.is_junction() or (root/'.env').is_symlink():
             raise ValueError
-        values = dict(dotenv_values(DEMO_ROOT/'.env', interpolate=False))
+        values = dict(dotenv_values(root/'.env', interpolate=False))
         if set(values) != FIELDS or any(not v for v in values.values()):
             raise ValueError
         validate_demo_url(values['DATABASE_URL'])
@@ -50,15 +52,15 @@ def demo_environment():
                                    ('CATALOG_STORAGE_ROOT', CatalogSettings, 'catalog')]:
             path = Path(values[field])
             cls(_env_file=None, **{field.lower(): path})
-            if path != DEMO_ROOT/folder or path.is_symlink() or (path.exists() and path.is_junction()):
+            if path != root/folder or path.is_symlink() or (path.exists() and path.is_junction()):
                 raise ValueError
         return values
     except Exception:
         raise ConfigurationError('Invalid demo.local/.env; require complete dedicated demo configuration.') from None
 
 
-def activate_demo():
-    values = demo_environment()
+def activate_demo(root=None):
+    values = demo_environment(root)
     # Avoid mixing a partial demo environment with development/test/E2E overrides.
     for key in list(os.environ):
         if key.startswith('AUTH_') or key.endswith('DATABASE_URL') or key in FIELDS:
