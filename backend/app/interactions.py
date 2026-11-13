@@ -1,5 +1,5 @@
 """P1 interactions only: stable per-user rows, no reward issuance."""
-from typing import Literal
+from typing import Literal, get_args
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -10,10 +10,10 @@ from sqlalchemy.dialects.postgresql import insert
 from app.auth import CSRF_HEADER, ERRORS, session_cookie
 from app.auth_schemas import ErrorResponse
 from app.blog import page_rows, post_dto, public_posts
-from app.blog_schemas import PostPage
+from app.blog_schemas import PostPage, ReactionType, REACTION_TYPES, ReactionCounts, PostInteractions
 from app.comments import lock_public_post, public_post_id
 from app.models import Category, Comment, Post, PostBookmark, PostReaction, Profile, User
-from app.permissions import authenticated_account, require_account_csrf, require_authenticated_user
+from app.permissions import optional_account_reader as interaction_reader, authenticated_account, require_account_csrf, require_authenticated_user
 from app.security import AuthError
 
 router = APIRouter(prefix="/api/v1", tags=["Aura"])
@@ -21,32 +21,13 @@ ERRORS = ERRORS | {404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}}
 
 
 class ReactionInput(BaseModel):
-    reaction_type: Literal["like", "laugh", "fire"]
+    reaction_type: ReactionType
 
 
 class ReactionResult(ReactionInput):
     post_id: UUID
 
 
-class ReactionCounts(BaseModel):
-    like: int = Field(ge=0)
-    laugh: int = Field(ge=0)
-    fire: int = Field(ge=0)
-
-
-class PostInteractions(BaseModel):
-    post_id: UUID
-    reaction_counts: ReactionCounts
-    comments_count: int = Field(ge=0)
-    viewer_reaction: Literal["like", "laugh", "fire"] | None
-    bookmarked: bool
-
-
-def interaction_reader(request: Request, response: Response, raw=Depends(session_cookie)):
-    with request.app.state.auth_session_factory() as db, db.begin():
-        # A supplied stale cookie must not silently change an authenticated request into a guest read.
-        account = authenticated_account(request, response, raw, db) if "am_session" in request.cookies else None
-        yield db, account.user.id if account else None
 
 
 @router.get("/posts/{post_id}/interactions", response_model=PostInteractions,
@@ -56,7 +37,7 @@ def get_post_interactions(post_id: UUID, reader=Depends(interaction_reader, scop
     db, viewer_id = reader
     counts = [select(func.count()).select_from(PostReaction).join(User, User.id == PostReaction.user_id).where(
         PostReaction.post_id == Post.id, PostReaction.reaction_type == kind, User.status == "active"
-    ).correlate(Post).scalar_subquery() for kind in ("like", "laugh", "fire")]
+    ).correlate(Post).scalar_subquery() for kind in REACTION_TYPES]
     comments = select(func.count()).select_from(Comment).join(User, User.id == Comment.author_id).join(
         Profile, Profile.user_id == User.id).where(Comment.post_id == Post.id, Comment.status == "visible",
         Comment.deleted_at.is_(None), User.status == "active").correlate(Post).scalar_subquery()
@@ -68,8 +49,8 @@ def get_post_interactions(post_id: UUID, reader=Depends(interaction_reader, scop
         Post.id == post_id, Post.id.in_(public_post_id(post_id)))).one_or_none()
     if row is None:
         raise AuthError(404, "NOT_FOUND", "Post not found.")
-    return PostInteractions(post_id=row[0], reaction_counts=ReactionCounts(like=row[1], laugh=row[2], fire=row[3]),
-                            comments_count=row[4], viewer_reaction=row[5], bookmarked=row[6])
+    return PostInteractions(post_id=row[0], reaction_counts=ReactionCounts(**dict(zip(REACTION_TYPES, row[1:7]))),
+                            comments_count=row[7], viewer_reaction=row[8], bookmarked=row[9])
 
 
 @router.get("/users/me/bookmarks", response_model=PostPage, operation_id="listSavedPosts", responses=ERRORS)

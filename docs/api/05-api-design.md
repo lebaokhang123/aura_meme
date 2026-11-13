@@ -167,7 +167,7 @@ M7.2a: GET common case chỉ công bố version published có policy effective v
 
 M7.2b Owner duyệt503/NOT_READY riêngPOSTcase-open, session/CSRF/Origin trước readiness; runtime không grant/debit/consumequota. Idempotency-Key12–128 theo contract. Atomicopen/weekly7of7/grants chỉ simulator aurameme_test/public với policy draft; các giá/odds/quota/duplicate-mode fixtures không phải luật sản phẩm. HTTP không nối simulator kể cả có policy fixture.
 
-**Đọc reaction/bookmark:** GET `/api/v1/posts/{post_id}/interactions` trả `post_id`, `reaction_counts` đủ `like/laugh/fire`, `comments_count`, `viewer_reaction` nullable và `bookmarked`. Counts chỉ gồm reaction của user active và comment visible/chưa xóa của author active. Bài không public trả404; counts và visibility được đọc cùng một SQL statement. Guest không có trạng thái cá nhân; cookie đã gửi nhưng sai/hết hạn/khóa trả401, không âm thầm thành Guest. Session hợp lệ dùng cùng cơ chế refresh/revoke hiện hành. Không trả actor IDs, danh sách người lưu hoặc tổng bookmark.
+**Đọc reaction/bookmark:** GET `/api/v1/posts/{post_id}/interactions` trả `post_id`, `reaction_counts` đủ `like/love/laugh/fire/sad/angry`, `comments_count`, `viewer_reaction` nullable và `bookmarked`. Counts chỉ gồm reaction của user active và comment visible/chưa xóa của author active. Bài không public trả404; counts và visibility được đọc cùng một SQL statement. Guest không có trạng thái cá nhân; cookie đã gửi nhưng sai/hết hạn/khóa trả401, không âm thầm thành Guest. Session hợp lệ dùng cùng cơ chế refresh/revoke hiện hành. Không trả actor IDs, danh sách người lưu hoặc tổng bookmark.
 
 GET `/api/v1/users/me/bookmarks` cần session, lấy owner từ phiên; trả PostPage bằng DTO/public visibility hiện hành với `page`, `page_size`, `search` title/content, `category` slug và `sort=created_desc|created_asc|title_asc`. Bài hidden/draft/deleted, tác giả locked, category hidden hoặc media không ready bị loại. Pagination/sort có UUID tie-break; không cho user chọn owner qua query. PUT/DELETE reaction/bookmark giữ nguyên idempotency và không cộng Aura. Giao diện chi tiết đọc trạng thái một lần, không gọi endpoint này cho từng card của feed.
 
@@ -185,3 +185,20 @@ GET `/api/v1/users/me/bookmarks` cần session, lấy owner từ phiên; trả P
 | `/admin/audit-logs` | action/target_type/target_id/actor_id | action exact, target_type exact, actor_id UUID | created_desc, created_asc, action_asc |
 
 Audit chỉ tìm và trả metadata hiện có, không tìm hoặc trả before/after snapshots. Contact là inbox có quyền Admin, không mở search nội dung cho public. Không thay trạng thái bài, quyền người dùng, schema hoặc cơ chế soft delete.
+
+
+### Social reaction foundation — DRAFT / REVIEW (0010)
+
+Chuẩn reaction: like/love/laugh/fire/sad/angry. Mỗi user có tối đa một reaction trên mỗi bài hoặc bình luận; PUT cùng loại là idempotent, PUT loại khác thay thế, DELETE lặp trả204 nếu nội dung còn hợp lệ. Không tạo Aura/XP hoặc reward ledger. Bookmark API legacy giữ nguyên, không đưa lại vào UI.
+
+Bổ sung PUT/DELETE `/api/v1/comments/{comment_id}/reactions` và GET `/api/v1/comments/{comment_id}/interactions`. Mutation dùng session + Origin + CSRF hiện có, lấy actor từ session, khóa parent post theo thứ tự hiện có rồi khóa comment, và upsert theo PK(comment_id,user_id). Chỉ comment visible/chưa xóa, author active/profile tồn tại, parent post/category/media public hợp lệ. Nội dung không hợp lệ trả404. Counts chỉ gồm actor active, viewer_reaction chỉ của phiên đang đọc; Guest null, cookie sai trả401.
+
+Migration0010 mới mở rộng CHECK post_reactions và thêm comment_reactions. Không chỉnh migration cũ, không rewrite reaction cũ. Downgrade từ chối trước DDL nếu comment_reactions có dữ liệu hoặc bài có love/sad/angry; không tự xóa/chuyển loại để downgrade. Bản nháp chưa được áp dụng DB; chỉ sau Owner review mới thử nghiệm PostgreSQL test/E2E cô lập. Chưa tích hợp Social UI, không migrate demo/development.
+
+### Social/Blog API integration
+
+GET posts nhận sort=reaction_desc cho Hot (active actor count DESC,created_at DESC,id DESC); created_desc cho New. Search chuẩn hóa dấu/đ theo tiếng Việt trong SQL bằng translate, không thêm extension. Public categories trả post_count của toàn bộ bài public, độc lập filter hiện tại. include_interactions=true trả counters và viewer state trong cùng response feed, tái dùng reader/query tương tác; Guest null, cookie không hợp lệ401. Public GET cũ không yêu cầu personalized counts giữ semantics cũ.
+
+POST posts/comments nhận request_id UUID tùy chọn. Session quyết định author; PK hiện có bảo đảm unique. Cùng ID/actor/payload trả lại record; khác payload/actor hoặc đã xóa trả409, không ghi đè. Không thêm bảng receipt. Title posts có thể thiếu: dòng text đầu160ký tự, hoặc Ảnh/GIF; title tường minh vẫn kiểm1–160 và không nhậnnull. PATCH content cập nhật title nếu title trước đó được tạo tự động. Frontend giữ request_id và media ID đã upload khi retry cùng draft.
+
+PATCH/DELETE admin/comments/{id} yêu cầu ADMIN+CSRF và tạo audit metadata; PATCH visible/hidden, DELETE soft-delete giữ body. Không đổi Profile, không phát Aura/XP. Schema0010 chỉ đã áp test; demo/E2E chưa migrate.

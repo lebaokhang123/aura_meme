@@ -28,8 +28,8 @@ from test_migrations import TABLES, REVISION
 from schema_guard import assert_auxiliary_objects
 
 
-def inventory(connection):
-    assert connection.scalar(text('SELECT current_database()')) == 'aurameme_e2e', 'E2E database required'
+def inventory(connection, database='aurameme_e2e'):
+    assert connection.scalar(text('SELECT current_database()')) == database, 'Isolated browser database required'
     assert connection.scalar(text('SELECT current_schema()')) == 'public', 'E2E public schema required'
     inspector = inspect(connection)
     assert set(inspector.get_table_names()) == TABLES | {'alembic_version'}, 'Unexpected E2E tables'

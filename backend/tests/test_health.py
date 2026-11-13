@@ -25,6 +25,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
                                           "/api/v1/posts", "/api/v1/posts/{post_id}", "/api/v1/media", "/api/v1/media/{media_id}",
                                           "/api/v1/posts/{post_id}/interactions", "/api/v1/users/me/bookmarks",
                                           "/api/v1/posts/{post_id}/comments", "/api/v1/comments/{comment_id}",
+                                          "/api/v1/comments/{comment_id}/reactions", "/api/v1/comments/{comment_id}/interactions", "/api/v1/admin/comments/{comment_id}",
                                           "/api/v1/admin/users", "/api/v1/admin/users/{user_id}",
                                           "/api/v1/admin/users/{user_id}/roles", "/api/v1/admin/posts",
                                           "/api/v1/admin/posts/{post_id}", "/api/v1/admin/audit-logs", "/api/v1/contact",

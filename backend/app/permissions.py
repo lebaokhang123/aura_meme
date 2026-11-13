@@ -45,3 +45,10 @@ def require_role(role: str):
             raise AuthError(403, "FORBIDDEN", "Insufficient permissions.")
         return account
     return check
+
+
+def optional_account_reader(request: Request, response: Response, raw=Depends(session_cookie)):
+    with request.app.state.auth_session_factory() as db, db.begin():
+        # A supplied stale cookie must not silently change an authenticated request into a guest read.
+        account = authenticated_account(request, response, raw, db) if "am_session" in request.cookies else None
+        yield db, account.user.id if account else None

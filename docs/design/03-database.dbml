@@ -135,7 +135,7 @@ Table comments {
 Table post_reactions {
   post_id uuid [not null]
   user_id uuid [not null]
-  reaction_type text [not null, note: 'like / laugh / fire']
+  reaction_type text [not null, note: 'like / love / laugh / fire / sad / angry']
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 
@@ -144,6 +144,20 @@ Table post_reactions {
   }
 
   Note: 'P1 | Bài viết, danh mục, bình luận, media, liên hệ'
+}
+
+// DRAFT0010: Owner review required before database application.
+Table comment_reactions {
+  comment_id uuid [not null]
+  user_id uuid [not null]
+  reaction_type text [not null, note: 'like / love / laugh / fire / sad / angry']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  indexes {
+    (comment_id, user_id) [pk]
+    (comment_id, reaction_type) [name: 'ix_comment_reactions_comment_type']
+    user_id [name: 'ix_comment_reactions_user_id']
+  }
 }
 
 Table post_bookmarks {
@@ -761,3 +775,6 @@ DiagramView view_admin_audit {
     admin_audit_logs
   }
 }
+
+Ref: comment_reactions.comment_id > comments.id [delete: restrict]
+Ref: comment_reactions.user_id > users.id [delete: restrict]

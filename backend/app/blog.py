@@ -1,20 +1,38 @@
 """Categories/audit and author-owned posts; no renderer/storage/moderation."""
+import unicodedata
 from typing import Literal
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import exists, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from app.account_schemas import UserPublic
-from app.auth import CSRF_HEADER, ERRORS
+from app.auth import CSRF_HEADER, ERRORS, session_cookie
 from app.auth_schemas import ErrorResponse
-from app.blog_schemas import CategoryInput, CategoryPage, CategoryPatch, CategoryResponse, Pagination, PostInput, PostPage, PostPatch, PostResponse
-from app.models import AdminAuditLog, Category, MediaUpload, Post, Profile, User
+from app.blog_schemas import CategoryFeedItem, CategoryFeedPage, CategoryInput, CategoryPage, CategoryPatch, CategoryResponse, Pagination, PostInput, PostPage, PostPatch, PostResponse
+from app.models import AdminAuditLog, Category, MediaUpload, Post, PostReaction, Profile, User
 from app.media import media_url
-from app.permissions import require_account_csrf, require_role
+from app.permissions import optional_account_reader, require_account_csrf, require_role
 from app.security import AuthError
 
 router = APIRouter(prefix="/api/v1", tags=["Blog"])
 
+
+def feed_reader(request:Request,response:Response,include_interactions:bool=False,raw=Depends(session_cookie)):
+    if include_interactions:
+        yield from optional_account_reader(request,response,raw)
+    else:
+        # Legacy public reads remain public; only personalized counters require a valid supplied session.
+        with request.app.state.auth_session_factory() as db:yield db,None
+
+def technical_title(content):
+    return next((line.strip()[:160] for line in content.splitlines() if line.strip()), "Ảnh/GIF")
+
+def search_text(value):
+    return "".join(c for c in unicodedata.normalize("NFD", value.lower().replace("đ","d")) if not 0x300<=ord(c)<=0x36f)
+
+_ACCENTS={chr(n):search_text(chr(n)) for n in [*range(0xc0,0x250),*range(0x1e00,0x1f00)] if len(search_text(chr(n)))==1 and search_text(chr(n)) in "abcdefghijklmnopqrstuvwxyz"}
+def searchable(column):
+    return func.translate(func.translate(func.lower(column),"".join(_ACCENTS),"".join(_ACCENTS.values())), "".join(chr(n) for n in range(0x300,0x370)), "")
 
 def page_rows(db, statement, page, size):
     total = db.scalar(select(func.count()).select_from(statement.order_by(None).subquery()))
@@ -62,7 +80,7 @@ def locked_category(db, category_id, active=False):
     return category
 
 
-@router.get("/categories", response_model=CategoryPage, operation_id="listCategories",
+@router.get("/categories", response_model=CategoryFeedPage, operation_id="listCategories",
             responses={s: ERRORS[s] for s in (422, 429, 500)})
 def list_categories(request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                     search: str | None = Query(None, max_length=100), slug: str | None = None,
@@ -75,7 +93,9 @@ def list_categories(request: Request, page: int = Query(1, ge=1), page_size: int
     if slug is not None:
         statement = statement.where(Category.slug == slug)
     with request.app.state.auth_session_factory() as db:
-        return category_list(db, statement, page, page_size, sort)
+        result=category_list(db, statement, page, page_size, sort)
+        counts=dict(db.execute(public_posts().with_only_columns(Post.category_id,func.count()).group_by(Post.category_id)).all())
+        return CategoryFeedPage(items=[CategoryFeedItem(**item.model_dump(),post_count=counts.get(item.id,0)) for item in result.items],pagination=result.pagination)
 
 
 @router.get("/admin/categories", response_model=CategoryPage, operation_id="adminListCategories", tags=["Admin"],
@@ -160,32 +180,58 @@ def validate_post(db, user_id, category_id, media_id, content, *, allow_hidden_c
 
 
 @router.get("/posts", response_model=PostPage, operation_id="listPosts",
-            responses={s: ERRORS[s] for s in (422, 429, 500)})
+            responses={s: ERRORS[s] for s in (401, 422, 429, 500)},
+            openapi_extra={"security":[{},{"sessionCookie":[]}]})
 def list_posts(request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                search: str | None = Query(None, max_length=100), category: str | None = None,
-               sort: Literal["created_desc", "created_asc", "title_asc"] = "created_desc"):
+               sort: Literal["created_desc", "created_asc", "title_asc", "reaction_desc"] = "created_desc",
+               include_interactions: bool = False, reader=Depends(feed_reader,scope="function")):
     if any(value is not None and "\x00" in value for value in (search, category)):
         raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
     statement = public_posts()
     if search is not None:
-        statement = statement.where(or_(Post.title.icontains(search, autoescape=True), Post.content.icontains(search, autoescape=True)))
+        statement = statement.where(or_(searchable(Post.title).contains(search_text(search), autoescape=True), searchable(Post.content).contains(search_text(search), autoescape=True)))
     if category is not None:
         statement = statement.where(Category.slug == category)
-    ordering = {"created_desc": (Post.created_at.desc(), Post.id.desc()),
+    score=select(func.count()).select_from(PostReaction).join(User,User.id==PostReaction.user_id).where(PostReaction.post_id==Post.id,User.status=="active").correlate(Post).scalar_subquery()
+    ordering = {"reaction_desc": (score.desc(),Post.created_at.desc(),Post.id.desc()),
+                "created_desc": (Post.created_at.desc(), Post.id.desc()),
                 "created_asc": (Post.created_at, Post.id), "title_asc": (Post.title, Post.id)}
-    with request.app.state.auth_session_factory() as db:
-        rows, pagination = page_rows(db, statement.order_by(*ordering[sort]), page, page_size)
-        return PostPage(items=[post_dto(*row) for row in rows], pagination=pagination)
+    db,viewer_id=reader
+    rows, pagination = page_rows(db, statement.order_by(*ordering[sort]), page, page_size)
+    items=[]
+    for row in rows:
+        dto=post_dto(*row)
+        if include_interactions:
+            from app.interactions import get_post_interactions
+            try:dto.interactions=get_post_interactions(dto.id,reader=(db,viewer_id))
+            except AuthError as error:
+                if error.status==404:continue
+                raise
+        items.append(dto)
+    return PostPage(items=items,pagination=pagination)
 
 
 @router.post("/posts", response_model=PostResponse, status_code=201, operation_id="createPost",
              responses=ERRORS, openapi_extra=CSRF_HEADER)
 def create_post(payload: PostInput, request: Request, account=Depends(require_account_csrf)):
+    values=payload.model_dump(exclude={"request_id"})
+    values["title"]=payload.title if payload.title is not None else technical_title(payload.content)
+    if payload.request_id is not None:
+        existing=account.db.get(Post,payload.request_id)
+        if existing is not None:
+            if existing.author_id!=account.user.id or existing.deleted_at is not None or any(getattr(existing,k)!=v for k,v in values.items()):
+                raise AuthError(409,"CONFLICT","Request ID already used.")
+            category=validate_post(account.db,account.user.id,existing.category_id,existing.media_id,existing.content)
+            return post_dto(existing,account.user,account.db.get(Profile,account.user.id),category)
     category = validate_post(account.db, account.user.id, payload.category_id, payload.media_id, payload.content)
     now = request.app.state.auth.now()
-    post = Post(id=uuid4(), author_id=account.user.id, created_at=now, updated_at=now, **payload.model_dump())
+    post = Post(id=payload.request_id or uuid4(), author_id=account.user.id, created_at=now, updated_at=now, **values)
     account.db.add(post)
-    account.db.flush()
+    try:account.db.flush()
+    except IntegrityError as error:
+        if getattr(error.orig,"sqlstate",None)=="23505":raise AuthError(409,"CONFLICT","Request ID already used.") from None
+        raise
     return post_dto(post, account.user, account.db.get(Profile, account.user.id), category)
 
 
@@ -214,6 +260,7 @@ def owned_post(db, user_id, post_id, editing=False):
 def update_post(post_id: UUID, payload: PostPatch, request: Request, account=Depends(require_account_csrf)):
     post = owned_post(account.db, account.user.id, post_id, editing=True)
     values = payload.model_dump(exclude_unset=True)
+    if "content" in values and "title" not in values and post.title==technical_title(post.content):values["title"]=technical_title(values["content"])
     category = validate_post(account.db, account.user.id, values.get("category_id", post.category_id),
                              values.get("media_id", post.media_id), values.get("content", post.content))
     for name, value in values.items():

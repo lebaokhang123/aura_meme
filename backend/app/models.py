@@ -28,8 +28,22 @@ class PostReaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
-        CheckConstraint("reaction_type IN ('like','laugh','fire')", name="reaction_type"),
+        CheckConstraint("reaction_type IN ('like','love','laugh','fire','sad','angry')", name="reaction_type"),
         Index("ix_post_reactions_user_created_post", "user_id", "created_at", "post_id"),
+    )
+
+
+class CommentReaction(Base):
+    __tablename__ = "comment_reactions"
+    comment_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("comments.id", ondelete="RESTRICT"), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
+    reaction_type: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint("reaction_type IN ('like','love','laugh','fire','sad','angry')", name="reaction_type"),
+        Index("ix_comment_reactions_comment_type", "comment_id", "reaction_type"),
+        Index("ix_comment_reactions_user_id", "user_id"),
     )
 
 
