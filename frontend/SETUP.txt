@@ -1,11 +1,14 @@
-AURAMEME — STITCH REACT + AUTH API
+AURAMEME — FRONTEND + AUTH/SOCIAL API
 
-Frontend chính là thư mục frontend/ của checkout Social đang review.
+Frontend chính là thư mục frontend/ của checkout đã đồng bộ Auth/Social.
 Nguồn đã được Owner nghiệm thu sơ bộ: docs/plan/master/stitch-react-preview.
 Giữ 14 màn Stitch và các nguồn tham chiếu; header/footer đã dùng chung theo Owner 2026-11-12.
 Giữ UI Stitch; tái sử dụng Auth backend hiện có, Social đã nối API; Game Mechanics chưa tích hợp.
 
 CHẠY TRÊN WINDOWS:
+- Từ root đã cài dependencies/cấu hình: run.bat demo (hoặc bấm đúp run.bat).
+- Enter/Ctrl+C tại launcher để dừng đúng cây dịch vụ. Không mở launcher từ checkout cũ để thử source mới.
+- Các bước sau chỉ chạy frontend riêng khi backend đã sẵn sàng:
 1. Cần Node.js >=22.12.0 và npm.
 2. Mở terminal tại checkout Social: cd frontend
 3. npm ci
@@ -19,7 +22,7 @@ npm run preview -- --port 5173 (cần backend và allowed origin localhost:5173)
 node --test tests/*test.mjs
 npm test (build mock; Chrome đã cài, 149 regression demo, không backend/DB).
 Sau npm run build: npx playwright test --config=../.github/playwright.auth.config.mjs
-(12 Auth/Social UI tests với HTTP stub; Chromium đi kèm Playwright).
+(20 Auth/Social UI tests với HTTP stub; Chromium đi kèm Playwright).
 Auth E2E thật: từ backend chạy python tests/run_auth_browser.py [đường-dẫn-e2e.local/.env].
 Runner chỉ nhận aurameme_e2e/role aurameme_e2e_app rỗng, guard schema/revision;
 không migrate/reset; dọn đúng user/session/role tổng hợp do test tạo và kiểm schema hiện hành rỗng.
@@ -27,12 +30,15 @@ Cần build API mode và cài Chromium trước; DB development/demo không đư
 
 run.bat demo/dev khởi động backend + frontend Auth API thật, có guard DB hiện có.
 Launcher cần .venv và demo.local của chính checkout; worktree mới không tự nhận secrets.
-Backend Social cần0010; demo/E2E local còn0009, chưa được duyệt migrate.
-Không dùng lệnh activate_demo để chạy backend Social lên demo0009.
+Auth/Social và guard demo cần0010_social_reactions; schema0009 sẽ bị từ chối.
+Nâng demo chỉ sau Owner duyệt/backup/restore drill; launcher không tự migrate.
 Kiểm thử full-stack bằng DB test riêng đã được Owner duyệt:
 từ backend: python tests/run_social_browser.py C:\path\to\private-config-with-TEST_DATABASE_URL
 Runner yêu cầu aurameme_test/public0010 rỗng, role test, source hiện tại; không dùng dữ liệu demo.
-Cài backend dependencies của checkout đang dùng, frontend npm ci và Chromium trước; build API mode.
+Backend venv cần cài requirements-ci.txt và python -m pip install -e . --no-deps từ backend của chính checkout.
+Cài frontend npm ci và Chromium trước; build API mode.
+E2E riêng: python tests/run_social_browser.py C:\path\to\private-e2e-config --e2e
+Chỉ aurameme_e2e/role aurameme_e2e_app/public0010 rỗng; không chạy khi phiên preview Owner đang dùng fixture.
 Không chạy migration/seed trên development/demo để thử đăng nhập.
 Frontend trước thay thế có trong Git history và bản backup local (không đưa backup lên Git):
 docs/internal/backups/frontend-before-stitch-20261111

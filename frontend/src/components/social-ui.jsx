@@ -2,6 +2,17 @@ import React from 'react';
 import {useLocalized} from '../localize.jsx';
 export const icon=(name,size=20)=><span className="material-symbols-outlined leading-none" style={{fontSize:size}} aria-hidden="true">{name}</span>;
 export const pillClass='flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container hover:bg-surface-container-high border border-surface-container-high hover:border-secondary/40 transition-all cursor-pointer active:scale-95';
+export function CategorySelect({label,categories,value,onChange,disabled=false,placeholder,className=''}) {
+  const render=useLocalized();
+  return render(<div className={`social-category-select ${className}`} data-selected={Boolean(value)}>
+    <span className="social-category-select__icon" aria-hidden="true">{icon('sell',16)}</span>
+    <select className="social-category-select__control" aria-label={label} value={value} onChange={event=>onChange(event.target.value)} disabled={disabled}>
+      {placeholder&&<option value="">{placeholder}</option>}
+      {categories.map(item=><option key={item.id} value={item.id} translate="no">#{item.label}</option>)}
+    </select>
+    <span className="social-category-select__arrow" aria-hidden="true">{icon('expand_more',16)}</span>
+  </div>);
+}
 export function SocialMessage({error}) {
   const render=useLocalized();
   if(!error)return null;
