@@ -5,5 +5,5 @@ export const pillClass='flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-su
 export function SocialMessage({error}) {
   const render=useLocalized();
   if(!error)return null;
-  return render(<div role="alert" className="font-body-sm text-body-sm text-error mt-2">{error==='LOGIN_REQUIRED'?<><a href="/login" className="text-secondary underline">Đăng nhập</a> để tương tác.</>:error==='INVALID_COMMENT'?'Bình luận cần từ 1 đến 2000 ký tự.':error==='NOT_OWNER'?'Bạn chỉ được xóa bình luận của mình.':'Không lưu được thay đổi. Vui lòng thử lại; dữ liệu chưa được cập nhật.'}</div>);
+  return render(<div role="alert" className="font-body-sm text-body-sm text-error mt-2">{error==='LOGIN_REQUIRED'?<><a href="/login" className="text-secondary underline">Đăng nhập</a> để tương tác.</>:error==='AUTH_DEMO_ONLY'?'Social đang dùng dữ liệu demo, chưa kết nối máy chủ.':error==='INVALID_COMMENT'?'Bình luận cần từ 1 đến 2000 ký tự.':error==='NOT_OWNER'?'Bạn chỉ được xóa bình luận của mình.':'Không lưu được thay đổi. Vui lòng thử lại; dữ liệu chưa được cập nhật.'}</div>);
 }

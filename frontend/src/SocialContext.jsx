@@ -2,6 +2,7 @@ import React,{createContext,useContext,useEffect,useRef,useState} from 'react';
 import { allPosts, emptyState } from './social-model.js';
 import { loadSocial,saveSocial } from './social-storage.js';
 import { readDemoUser } from './demo.js';
+import {MOCK_AUTH} from './auth.js';
 
 const SocialContext=createContext(null);
 export const useSocial=()=>useContext(SocialContext);
@@ -32,6 +33,7 @@ export function SocialProvider({children}) {
   useEffect(()=>{document.getElementById('root').dataset.socialReady=String(ready);},[ready]);
   const commit=async(action,file)=>{
     const user=readDemoUser();if(!user)throw Error('LOGIN_REQUIRED');
+    if(!MOCK_AUTH)throw Error('AUTH_DEMO_ONLY');
     if(!ready||!loaded.current)throw Error('STORAGE_FAILED');
     const next=await saveSocial(action,user.username,file);
     if(file&&!urls.current.has(action.mediaId))urls.current.set(action.mediaId,URL.createObjectURL(file));

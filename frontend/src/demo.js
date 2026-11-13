@@ -1,3 +1,4 @@
+import {auth,MOCK_AUTH} from './auth.js';
 import { readPreferences, translate } from './preferences.js';
 export const USER_KEY = 'aurameme-stitch-demo-user';
 export const DEMO_USERS = [
@@ -7,6 +8,11 @@ export const DEMO_USERS = [
 ];
 
 export function readDemoUser() {
+  if(!MOCK_AUTH){
+    const user=auth.snapshot().user;if(!user)return null;
+    const fallback=DEMO_USERS.find(item=>item.username.toLowerCase()===user.username);
+    return {...user,displayName:user.display_name,avatar:user.avatar_url||fallback?.avatar||'/assets/brand/favicon-64.png'};
+  }
   try {
     const raw = localStorage.getItem(USER_KEY);
     if (raw === null) return null;

@@ -1,6 +1,6 @@
 # AuraMeme
 
-AuraMeme là đồ án web cộng đồng chia sẻ meme. Frontend chính hiện là bản Stitch React đã được Owner duyệt; backend FastAPI/PostgreSQL được giữ riêng để phát triển tiếp.
+AuraMeme là đồ án web cộng đồng chia sẻ meme. Frontend chính hiện là bản Stitch React đã được Owner duyệt; Auth đã nối với FastAPI/PostgreSQL; các phần Social/Game Mechanics vẫn chưa tích hợp.
 
 ## Frontend hiện tại
 
@@ -8,12 +8,13 @@ AuraMeme là đồ án web cộng đồng chia sẻ meme. Frontend chính hiện
 - Responsive, dark/light, VI/EN; header/footer dùng chung.
 - Home/Explore: category, search, New/Hot; số danh mục đếm theo bài hiện có.
 - Demo tạo bài text/PNG/JPEG/GIF, reaction, bình luận, chèn emoji, xóa có xác nhận và chia sẻ đúng bài.
-- Dữ liệu tương tác và file lưu trong IndexedDB theo browser/origin. Frontend chưa kết nối API; đăng nhập mẫu không phải xác thực thật.
+- Auth mặc định dùng API thật, cookie HttpOnly và CSRF; danh tính/quyền lấy từ `/users/me`, không tin localStorage.
+- Dữ liệu Social cũ vẫn ở IndexedDB, không chuyển lên PostgreSQL. Chế độ API chỉ xem feed demo; thao tác ghi Social chưa được tích hợp.
 - Rank/Vault/Contact và các chức năng tương lai có trạng thái demo/bảo trì, không phát thưởng hoặc thanh toán thật.
 
-## Chạy demo
+## Chạy local
 
-Cần Node.js >=22.12.0 và npm. Không cần khởi động backend hoặc database để xem frontend.
+Cần Node.js >=22.12.0, backend và PostgreSQL đã cấu hình. `run.bat demo`/`run.bat dev` dùng Auth API thật, frontend tại `http://localhost:5173`; không trộn hostname với 127.0.0.1. Không tự migrate hoặc seed DB đang có dữ liệu.
 
 ```powershell
 cd frontend
@@ -21,7 +22,9 @@ npm ci
 npm run dev
 ```
 
-Mở http://127.0.0.1:5173. Đăng nhập bằng Khang_dev@example.com, Kien_dev@example.com hoặc Gigachad@example.com với mật khẩu demo bất kỳ; ứng dụng không lưu mật khẩu.
+Vite proxy `/api` đến `http://127.0.0.1:8000`, giữ Origin. Backend local cần cho phép chính xác `http://localhost:5173` trong cấu hình Auth development; cấu hình production vẫn yêu cầu HTTPS. Đăng nhập bằng email và mật khẩu local thực tế; ứng dụng không lưu mật khẩu hoặc session token trong web storage.
+
+Ba tài khoản demo: `khang_dev@example.com`, `kien_dev@example.com` (USER + ADMIN), `gigachad@example.com` (USER). Công cụ `python -m app.demo_accounts` chỉ đọc kế hoạch mặc định; `--apply` yêu cầu xác nhận và nhập mật khẩu ẩn. Xem [hướng dẫn frontend](frontend/SETUP.txt).
 
 ```powershell
 npm run build
@@ -36,12 +39,12 @@ Browser tests dùng Chrome qua Playwright. Tailwind Play CDN, Google Fonts và m
 | Thư mục | Vai trò |
 |---|---|
 | [frontend/](frontend/) | Frontend Stitch demo hiện hành, source/reference/assets/tests |
-| [backend/](backend/) | FastAPI modular monolith, Alembic, PostgreSQL; chưa tích hợp vào frontend demo |
+| [backend/](backend/) | FastAPI modular monolith, Alembic, PostgreSQL; Auth đã tích hợp |
 | [docs/design/](docs/design/) | Sitemap, use case và thiết kế dữ liệu |
 | [docs/architecture/](docs/architecture/) | Kiến trúc và các quyết định thiết kế |
 | [docs/api/](docs/api/) | Hợp đồng API và data flow; một phần phản ánh runtime legacy |
 
-Các thay đổi backend local chưa thuộc checkpoint frontend này. Không tự migrate/seed database development. Code frontend cũ có thể phục hồi qua Git history; backup/evidence nội bộ không được đưa lên GitHub.
+Frontend/backend nền đã checkpoint qua PR #26/#27. Không tự migrate/seed database development. Code frontend cũ có thể phục hồi qua Git history; backup/evidence nội bộ không được đưa lên GitHub.
 
 ## Game Mechanics V1 — đặc tả, chưa bật runtime
 
@@ -49,7 +52,7 @@ Owner đã chốt 10 cảnh giới ×10 Level; XP lên cấp ` 10 + Level ` từ
 
 ## Phạm vi kiểm chứng
 
-Frontend có unit tests và browser regression cho14màn, Guest/3user demo,375/768/1440px, theme/language, filter/history và lưu trữ lỗi/reload. Đây là demo frontend để review UI/logic; chưa chứng minh triển khai production hoặc vận hành backend/DevOps.
+Frontend có unit tests và browser regression cho14màn, Guest/3user demo,375/768/1440px, theme/language, filter/history và lưu trữ lỗi/reload. Auth có unit, kiểm thử UI với HTTP stub và E2E thật trên DB riêng qua `backend/tests/run_auth_browser.py`. Chưa chứng minh triển khai production hoặc vận hành backend/DevOps.
 
 Nguồn/license và xác nhận của Owner đối với asset được ghi riêng trong [asset ledger](frontend/ASSET_SOURCES.md); license mã nguồn không tự áp dụng cho mọi ảnh bên thứ ba.
 
@@ -59,6 +62,6 @@ Một workflow `.github/workflows/ci.yml` chạy khi mở/cập nhật PR vào `
 
 - **Backend non-DB (Windows):** chạy các test không mang marker integration, gồm filesystem/launcher Windows. Loại module migration và các ca gọi Alembic demo; không có PostgreSQL service hoặc URL DB thật.
 - **Frontend build and unit (Ubuntu):** cài lockfile, build và chạy các test Node hiện có.
-- **Frontend browser regression (Ubuntu):** chạy toàn bộ suite hiện có bằng Chromium đi kèm phiên bản Playwright đã khóa; config riêng trong `.github/` giữ config frontend gốc. Không retry để che lỗi; upload evidence khi fail, giữ 7 ngày. Suite vẫn cần Internet cho Tailwind CDN, Google Fonts và ảnh từ xa.
+- **Frontend browser regression (Ubuntu):** kiểm tra Auth UI ở API mode với HTTP stub, sau đó build rõ `--mode mock` và chạy suite demo bằng Chromium đi kèm phiên bản Playwright đã khóa; config riêng trong `.github/` giữ config frontend gốc. Không retry để che lỗi; upload evidence khi fail, giữ 7 ngày. Suite vẫn cần Internet cho Tailwind CDN, Google Fonts và ảnh từ xa.
 
 **NOT COVERED:** PostgreSQL integration/schema guard trên DB thật, migration/downgrade, backend browser E2E và launcher chạy trọn dịch vụ. Job backend xanh chỉ chứng minh nhóm non-DB; không có nghĩa toàn bộ backend hoặc Game Mechanics đã PASS. Không tạo/migrate DB development/demo/production trong workflow này.

@@ -1,6 +1,7 @@
 import { useLocalized } from '../localize.jsx';
 import React, { useEffect, useRef, useState } from 'react';
-import { readDemoUser, USER_KEY } from '../demo.js';
+import { readDemoUser } from '../demo.js';
+import {logoutAccount} from '../runtime.js';
 import { useFeed } from '../FeedContext.jsx';
 import { LanguageSwitch } from './LanguageSwitch.jsx';
 import { ThemeSwitch } from './ThemeSwitch.jsx';
@@ -58,7 +59,7 @@ export function SiteHeader() {
           {user ? <>
             <button type="button" className="site-icon-button" aria-label="Thông báo" title="Thông báo">{symbol('notifications')}</button>
             <div className="site-account" data-header-popup="account"><button ref={accountButton} type="button" className="account-trigger" aria-label="Mở menu tài khoản" aria-haspopup="true" aria-expanded={open === 'account'} aria-controls="site-account-menu" onClick={() => toggle('account')}><img className="account-avatar" src={user.avatar} alt={`Ảnh đại diện ${user.displayName}`} width="32" height="32" /></button>
-              {open === 'account' && <div className="site-dropdown" id="site-account-menu"><button type="button" onClick={() => { setOpen(null); profile.current.showModal(); }}>{symbol('person')}Thông tin</button><button type="button" className="logout-action" onClick={() => { localStorage.removeItem(USER_KEY); location.assign('/'); }}>{symbol('logout')}Đăng xuất</button></div>}
+              {open === 'account' && <div className="site-dropdown" id="site-account-menu"><button type="button" onClick={() => { setOpen(null); profile.current.showModal(); }}>{symbol('person')}Thông tin</button><button type="button" className="logout-action" onClick={event => logoutAccount(event.currentTarget)}>{symbol('logout')}Đăng xuất</button></div>}
             </div>
           </> : <div className="site-auth">{auth}</div>}
           <div className="site-menu" data-header-popup="navigation"><button type="button" className="site-icon-button compact-menu-trigger" aria-label="Mở menu điều hướng" aria-expanded={open === 'navigation'} aria-controls="compact-navigation" onClick={() => toggle('navigation')}>{symbol(open === 'navigation' ? 'close' : 'menu')}</button>
