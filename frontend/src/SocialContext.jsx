@@ -144,5 +144,5 @@ export function SocialProvider({children}) {
     try{channel.current?.postMessage('updated')}catch{}
     refresh().catch(()=>{if(active.current)setError('Đã lưu thay đổi, nhưng chưa đồng bộ được dữ liệu hiển thị. Vui lòng tải lại.');});
   };
-  return <SocialContext.Provider value={{...snapshot,posts:MOCK_AUTH?allPosts(snapshot.state,snapshot.media):serverPosts,categories,pagination,loading,commentPages,loadComments,loadFeed,loadMore:()=>loadFeed(query.current,true),retry:refresh,ready,error,commit}}>{children}</SocialContext.Provider>;
+  return <SocialContext.Provider value={{...snapshot,posts:MOCK_AUTH?allPosts(snapshot.state,snapshot.media):serverPosts,categories,pagination,loading,commentPages,loadComments,loadFeed,loadMore:()=>loadFeed(query.current,true),retry:async()=>{await refresh();if(!MOCK_AUTH)await loadFeed();},ready,error,commit}}>{children}</SocialContext.Provider>;
 }

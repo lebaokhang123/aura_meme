@@ -3,7 +3,7 @@ const uid='00000000-0000-4000-8000-000000000001',cid='00000000-0000-4000-8000-00
 const kinds=['like','love','laugh','fire','sad','angry'],counts=()=>Object.fromEntries(kinds.map(k=>[k,0]));
 const user={id:uid,username:'constructor',display_name:'New Author',email:'new@example.com',roles:['USER'],status:'active',avatar_url:null};
 async function server(context){
- const state={user:null,posts:[],comments:[],requests:[],dropReplyOnce:false};
+ const state={user:null,posts:[],comments:[],requests:[],dropReplyOnce:false,failFeedOnce:false};
  await context.route('**/api/v1/**',async route=>{
   const req=route.request(),url=new URL(req.url()),p=url.pathname.replace('/api/v1',''),method=req.method();
   let body;try{body=req.postDataJSON()}catch{}
@@ -18,7 +18,10 @@ async function server(context){
   if(p==='/auth/login'){state.user=user;return send(200,user)}
   if(p==='/auth/logout'){state.user=null;return send(204)}
   if(p==='/categories')return send(200,page([{id:cid,slug:'gaming',name:'Gaming',status:'active',post_count:state.posts.length}]));
-  if(method==='GET'&&p==='/posts')return send(200,page(state.posts.map(dto)));
+  if(method==='GET'&&p==='/posts'){
+   if(state.failFeedOnce){state.failFeedOnce=false;return fail(503,'SERVICE_UNAVAILABLE')}
+   return send(200,page(state.posts.map(dto)));
+  }
   const post=state.posts.find(v=>p==='/posts/'+v.id||p.startsWith('/posts/'+v.id+'/'));
   if(method==='GET'&&p.endsWith('/interactions')&&post)return send(200,interactions(post));
   if(method==='GET'&&p.endsWith('/comments'))return send(200,page(state.comments.filter(c=>c.post_id===post?.id)));
@@ -75,4 +78,12 @@ test('lost POST response retains draft request_id and retry does not create a se
  await expect(page.getByRole('alert')).toBeVisible();await expect(page.getByLabel('Nội dung bài mới')).toHaveValue('Retry me');
  await page.getByRole('button',{name:'Đăng bài',exact:true}).click();await expect(page.locator('[data-post-id]')).toHaveCount(1);
  const ids=api.requests.filter(v=>v.p==='/posts'&&v.method==='POST').map(v=>v.body.request_id);expect(ids).toHaveLength(2);expect(ids[0]).toBe(ids[1]);expect(api.posts).toHaveLength(1);
+});
+test('feed retry reloads posts after a temporary read failure',async({page,context})=>{
+ const api=await server(context);api.failFeedOnce=true;
+ api.posts.push({id:'00000000-0000-4000-8000-000000000003',title:'Recovered feed',content:'Recovered feed',counts:counts(),reaction:null});
+ await page.goto('/');await expect(page.getByRole('alert')).toBeVisible();
+ await page.getByRole('button',{name:'Thử lại',exact:true}).click();
+ await expect(page.locator('[data-post-id]')).toContainText('Recovered feed');
+ await expect(page.getByRole('alert')).toHaveCount(0);
 });

@@ -19,7 +19,7 @@ npm run preview -- --port 5173 (cần backend và allowed origin localhost:5173)
 node --test tests/*test.mjs
 npm test (build mock; Chrome đã cài, 149 regression demo, không backend/DB).
 Sau npm run build: npx playwright test --config=../.github/playwright.auth.config.mjs
-(11 Auth/Social UI tests với HTTP stub; Chromium đi kèm Playwright).
+(12 Auth/Social UI tests với HTTP stub; Chromium đi kèm Playwright).
 Auth E2E thật: từ backend chạy python tests/run_auth_browser.py [đường-dẫn-e2e.local/.env].
 Runner chỉ nhận aurameme_e2e/role aurameme_e2e_app rỗng, guard schema/revision;
 không migrate/reset; dọn đúng user/session/role tổng hợp do test tạo và kiểm schema hiện hành rỗng.
