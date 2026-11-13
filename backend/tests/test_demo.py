@@ -75,7 +75,7 @@ def test_demo_migration_rejects_downgrade_before_connecting():
     result = subprocess.run([sys.executable, '-m', 'alembic', '-x', 'target=demo', 'downgrade', 'base'],
         cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True)
     assert result.returncode != 0
-    assert 'Demo migrations allow only current or upgrade to 0009_vault_open' in result.stderr
+    assert 'Demo migrations allow only current or upgrade to 0010_social_reactions' in result.stderr
 
 
 def test_bootstrap_invalid_uuid_never_connects(monkeypatch):
@@ -213,4 +213,59 @@ def test_demo_migration_rejects_other_operations(command):
     result = subprocess.run([sys.executable, '-m', 'alembic', '-x', 'target=demo']+command,
         cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True)
     assert result.returncode != 0
-    assert 'Demo migrations allow only current or upgrade to 0009_vault_open' in result.stderr
+    assert 'Demo migrations allow only current or upgrade to 0010_social_reactions' in result.stderr
+
+
+@pytest.mark.parametrize('revision,allow_previous,accepted', [
+    ('0010_social_reactions', False, True),
+    ('0009_vault_open', False, False),
+    ('0009_vault_open', True, True),
+    ('unknown', True, False),
+])
+def test_demo_schema_pins_current_head_and_previous_only_for_upgrade(monkeypatch, revision, allow_previous, accepted):
+    from unittest.mock import Mock
+    import alembic.autogenerate
+    import alembic.migration
+    import sqlalchemy
+    from app.models import Base
+    connection = Mock()
+    connection.scalar.return_value = revision
+    inspector = Mock()
+    tables = set(Base.metadata.tables) | {'alembic_version'}
+    if revision == '0009_vault_open':
+        tables.remove('comment_reactions')
+    inspector.get_table_names.return_value = tables
+    kinds = ('like', 'laugh', 'fire') if revision == '0009_vault_open' else ('like', 'love', 'laugh', 'fire', 'sad', 'angry')
+    inspector.get_check_constraints.return_value = [{'name': 'ck_post_reactions_reaction_type',
+        'sqltext': "reaction_type = ANY (ARRAY[" + ', '.join("'"+kind+"'::text" for kind in kinds) + '])'}]
+    monkeypatch.setattr(sqlalchemy, 'inspect', lambda _: inspector)
+    monkeypatch.setattr(alembic.migration.MigrationContext, 'configure', lambda *a, **k: object())
+    compared = []
+    monkeypatch.setattr(alembic.autogenerate, 'compare_metadata', lambda _, metadata: compared.append(set(metadata.tables)) or [])
+    if accepted:
+        demo.reviewed_demo_schema(connection, allow_previous=allow_previous)
+        assert compared == [tables - {'alembic_version'}]
+        assert 'comment_reactions' in Base.metadata.tables
+        inspector.get_check_constraints.return_value = [{'name': 'ck_post_reactions_reaction_type', 'sqltext': 'true'}]
+        with pytest.raises(ConfigurationError):
+            demo.reviewed_demo_schema(connection, allow_previous=allow_previous)
+    else:
+        with pytest.raises(ConfigurationError):
+            demo.reviewed_demo_schema(connection, allow_previous=allow_previous)
+        assert not compared
+
+
+def test_demo_schema_refuses_drift_even_at_reviewed_revision(monkeypatch):
+    from unittest.mock import Mock
+    import alembic.autogenerate
+    import alembic.migration
+    import sqlalchemy
+    from app.models import Base
+    connection = Mock(); connection.scalar.return_value = '0010_social_reactions'
+    inspector = Mock(); inspector.get_table_names.return_value = set(Base.metadata.tables) | {'alembic_version'}
+    inspector.get_check_constraints.return_value = [{'name': 'ck_post_reactions_reaction_type', 'sqltext': "reaction_type = ANY (ARRAY['like'::text, 'love'::text, 'laugh'::text, 'fire'::text, 'sad'::text, 'angry'::text])"}]
+    monkeypatch.setattr(sqlalchemy, 'inspect', lambda _: inspector)
+    monkeypatch.setattr(alembic.migration.MigrationContext, 'configure', lambda *a, **k: object())
+    monkeypatch.setattr(alembic.autogenerate, 'compare_metadata', lambda *a: ['unexpected column'])
+    with pytest.raises(ConfigurationError):
+        demo.reviewed_demo_schema(connection)

@@ -186,11 +186,11 @@ def database_probe():
                 if connection.scalar(text('SELECT version_num FROM alembic_version')) == head:
                     schema = 'ready'
                     if DEMO:
-                        from alembic.autogenerate import compare_metadata
-                        from alembic.migration import MigrationContext
-                        if head != '0009_vault_open' or compare_metadata(MigrationContext.configure(
-                                connection, opts={'compare_server_default': True}), Base.metadata):
+                        from app.demo import DEMO_REVISION, reviewed_demo_schema
+                        if head != DEMO_REVISION:
                             schema = 'mismatch'
+                        else:
+                            reviewed_demo_schema(connection)
             print(json.dumps({'schema':schema}))
     finally:
         engine.dispose()

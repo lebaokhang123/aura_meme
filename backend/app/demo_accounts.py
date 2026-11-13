@@ -9,9 +9,9 @@ from uuid import UUID
 from sqlalchemy import or_, select, text
 from sqlalchemy.orm import Session
 
-from app.demo import DEMO_ROOT, activate_demo, bootstrap_admin, demo_connection, demo_environment, validate_demo_url
+from app.demo import DEMO_ROOT, activate_demo, bootstrap_admin, demo_connection, demo_environment, validate_demo_url, reviewed_demo_schema
 from app.db import create_db_engine
-from app.models import Base, Profile, Role, User, UserRole
+from app.models import Profile, Role, User, UserRole
 
 ACCOUNTS=(
     {"username":"khang_dev","email":"khang_dev@example.com","display_name":"Khang Dev","roles":["ADMIN","USER"]},
@@ -36,14 +36,10 @@ def account_plan(records,active_admins):
             "conflicts":conflicts,"writes":any(r["create"] or r["grant_admin"] for r in accounts)}
 
 def read_plan(engine):
-    from sqlalchemy import inspect
     with engine.connect() as connection:
         connection.exec_driver_sql("SET TRANSACTION READ ONLY")
         demo_connection(connection)
-        if connection.scalar(text("SELECT version_num FROM alembic_version"))!="0009_vault_open":
-            raise ValueError("Demo schema revision mismatch.")
-        if set(inspect(connection).get_table_names())!=set(Base.metadata.tables)|{"alembic_version"}:
-            raise ValueError("Unexpected demo tables.")
+        reviewed_demo_schema(connection)
         names=[u["username"] for u in ACCOUNTS];emails=[u["email"] for u in ACCOUNTS]
     with Session(engine) as db:
         db.execute(text("SET TRANSACTION READ ONLY"))

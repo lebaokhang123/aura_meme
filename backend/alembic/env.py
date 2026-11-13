@@ -16,14 +16,15 @@ if target not in {"test", "e2e", "demo"}:
     raise RuntimeError("Migration target must be test, e2e or demo; development is forbidden.")
 
 if target == 'demo':
+    from app.demo import DEMO_REVISION
     options = context.config.cmd_opts
     operation = getattr(options, 'cmd', (None,))[0]
     if (getattr(operation, '__name__', '') not in {'current', 'upgrade'}
-            or (operation.__name__ == 'upgrade' and getattr(options, 'revision', None) not in {'head', '0009_vault_open'})):
-        raise RuntimeError('Demo migrations allow only current or upgrade to 0009_vault_open.')
+            or (operation.__name__ == 'upgrade' and getattr(options, 'revision', None) not in {'head', DEMO_REVISION})):
+        raise RuntimeError('Demo migrations allow only current or upgrade to ' + DEMO_REVISION + '.')
     from alembic.script import ScriptDirectory
-    if ScriptDirectory.from_config(context.config).get_current_head() != '0009_vault_open':
-        raise RuntimeError('Demo requires reviewed migration head 0009_vault_open.')
+    if ScriptDirectory.from_config(context.config).get_current_head() != DEMO_REVISION:
+        raise RuntimeError('Demo requires reviewed migration head ' + DEMO_REVISION + '.')
 database = "aurameme_" + target
 variable = {"test": "TEST_DATABASE_URL", "e2e": "E2E_DATABASE_URL", "demo": "DEMO_DATABASE_URL"}[target]
 
@@ -47,19 +48,17 @@ def run_with_connection(connection):
             raise RuntimeError('Unexpected demo schema objects; stop for review.')
         tables = set(inspect(connection).get_table_names())
         if tables:
-            if (tables != set(Base.metadata.tables) | {'alembic_version'}
-                    or connection.scalar(text('SELECT version_num FROM alembic_version')) != '0009_vault_open'):
-                raise RuntimeError('Existing demo schema must be at reviewed head; stop for review.')
-            from alembic.autogenerate import compare_metadata
-            from alembic.migration import MigrationContext
-            if compare_metadata(MigrationContext.configure(connection, opts={'compare_server_default': True}), Base.metadata):
-                raise RuntimeError('Demo schema drift; stop for review.')
+            from app.demo import reviewed_demo_schema
+            reviewed_demo_schema(connection, allow_previous=operation.__name__ == 'upgrade')
         elif connection.scalar(text("SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public'")):
             raise RuntimeError('Unexpected functions in empty demo; stop for review.')
     context.configure(connection=connection, target_metadata=Base.metadata,
                       compare_type=True, compare_server_default=True)
     with context.begin_transaction():
         context.run_migrations()
+        if target == 'demo':
+            from app.demo import reviewed_demo_schema
+            reviewed_demo_schema(connection)
 
 
 def run_online():
