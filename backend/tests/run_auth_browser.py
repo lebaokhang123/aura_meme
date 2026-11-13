@@ -73,7 +73,7 @@ def main():
             assert not any(inventory(connection).values())
             assert connection.execute(text("SELECT oid,relname,relfilenode FROM pg_class WHERE relnamespace='public'::regnamespace ORDER BY relname")).all()==objects
         engine.dispose()
-        print('E2E cleanup PASS: 28 empty tables; revision/schema unchanged; no DROP/reset.')
+        print('E2E cleanup PASS: 29 empty tables; revision/schema unchanged; no DROP/reset.')
     return result
 
 

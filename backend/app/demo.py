@@ -16,6 +16,7 @@ from app.db import create_db_engine
 from app.models import AdminAuditLog, Role, User, UserRole
 
 DEMO_ROOT = Path(__file__).resolve().parents[1] / 'demo.local'
+DEMO_REVISION = '0010_social_reactions'
 FIELDS = {'DATABASE_URL', 'DB_CONNECT_TIMEOUT', 'AUTH_SIGNING_KEY', 'AUTH_ENVIRONMENT',
           'AUTH_ALLOWED_ORIGINS', 'MEDIA_STORAGE_ROOT', 'CATALOG_STORAGE_ROOT'}
 
@@ -79,6 +80,34 @@ def demo_connection(connection):
         raise ConfigurationError('Demo role must not have administrative privileges.')
 
 
+def reviewed_demo_schema(connection, *, allow_previous=False):
+    from sqlalchemy import MetaData, inspect
+    from alembic.autogenerate import compare_metadata
+    from alembic.migration import MigrationContext
+    from app.models import Base
+    revision = connection.scalar(text('SELECT version_num FROM alembic_version'))
+    previous = revision == '0009_vault_open' and allow_previous
+    if revision != DEMO_REVISION and not previous:
+        raise ConfigurationError('Demo schema is not at the reviewed revision.')
+    metadata = Base.metadata
+    if previous:
+        # Validate the exact pre-0010 shape without mutating the current ORM metadata.
+        metadata = MetaData(naming_convention=Base.metadata.naming_convention)
+        for table in Base.metadata.sorted_tables:
+            if table.name != 'comment_reactions':
+                table.to_metadata(metadata)
+    inspector = inspect(connection)
+    if set(inspector.get_table_names()) != set(metadata.tables) | {'alembic_version'}:
+        raise ConfigurationError('Unexpected demo schema tables.')
+    kinds = ('like', 'laugh', 'fire') if previous else ('like', 'love', 'laugh', 'fire', 'sad', 'angry')
+    expected = "reaction_type = ANY (ARRAY[" + ', '.join("'"+kind+"'::text" for kind in kinds) + '])'
+    checks = {c['name']: ''.join(c['sqltext'].split()) for c in inspector.get_check_constraints('post_reactions')}
+    if checks != {'ck_post_reactions_reaction_type': ''.join(expected.split())}:
+        raise ConfigurationError('Demo reaction constraint drift; stop for review.')
+    if compare_metadata(MigrationContext.configure(connection, opts={'compare_server_default': True}), metadata):
+        raise ConfigurationError('Demo schema drift; stop for review.')
+
+
 def bootstrap_admin(db, user_id, ask=input):
     # Serialize first-admin creation, including the case where no ADMIN role exists yet.
     db.execute(text('LOCK TABLE roles, user_roles IN SHARE ROW EXCLUSIVE MODE'))
@@ -131,8 +160,7 @@ def main(argv=None, ask=input):
         with Session(engine) as db, db.begin():
             db.execute(text("SET LOCAL lock_timeout='5s'"))
             demo_connection(db.connection())
-            if db.scalar(text('SELECT version_num FROM alembic_version')) != '0009_vault_open':
-                raise ConfigurationError('Demo requires revision 0009_vault_open.')
+            reviewed_demo_schema(db.connection())
             message = bootstrap_admin(db, user_id, lambda prompt: confirmation)
         print(message)
         return 0

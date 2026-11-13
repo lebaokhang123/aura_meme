@@ -14,7 +14,17 @@ AuraMeme là đồ án web cộng đồng chia sẻ meme. Frontend chính hiện
 
 ## Chạy local
 
-Cần Node.js >=22.12.0, backend và PostgreSQL đã cấu hình. `run.bat demo`/`run.bat dev` dùng Auth API thật, frontend tại `http://localhost:5173`; không trộn hostname với 127.0.0.1. Backend Social cần revision0010. Demo/E2E local hiện còn0009 và chưa được duyệt migrate; launcher phải dừng khi schema mismatch. Không tự migrate hoặc seed DB đang có dữ liệu.
+Cần Node.js >=22.12.0, backend và PostgreSQL đã cấu hình. `run.bat demo`/`run.bat dev` dùng Auth API thật, frontend tại `http://localhost:5173`; không trộn hostname với 127.0.0.1. Auth/Social cần revision `0010_social_reactions`; launcher dừng nếu DB rỗng hoặc schema không khớp và không tự migrate/seed. Nâng demo từ0009 chỉ sau khi Owner duyệt, có backup và restore drill; development giữ nguyên.
+
+Tại root repository đã cấu hình demo và cài dependencies, chạy:
+
+```powershell
+.\run.bat demo
+```
+
+Backend venv cần cài package của chính checkout (`cd backend`, `python -m pip install -r requirements-ci.txt`, rồi `python -m pip install -e . --no-deps` trong venv). Frontend cần `npm ci`. Launcher không tự sửa secrets hoặc dùng môi trường của checkout khác. `run.bat dev` chỉ chạy khi development đã có schema được chuẩn bị riêng; không dùng nó để tự khởi tạo DB.
+
+Khi chỉ cần chạy frontend riêng (backend đã chạy):
 
 ```powershell
 cd frontend
@@ -64,6 +74,8 @@ Một workflow `.github/workflows/ci.yml` chạy khi mở/cập nhật PR vào `
 - **Frontend build and unit (Ubuntu):** cài lockfile, build và chạy các test Node hiện có.
 - **Frontend browser regression (Ubuntu):** kiểm tra Auth UI ở API mode với HTTP stub, sau đó build rõ `--mode mock` và chạy suite demo bằng Chromium đi kèm phiên bản Playwright đã khóa; config riêng trong `.github/` giữ config frontend gốc. Không retry để che lỗi; upload evidence khi fail, giữ 7 ngày. Suite vẫn cần Internet cho Tailwind CDN, Google Fonts và ảnh từ xa.
 
-**NOT COVERED:** PostgreSQL integration/schema guard trên DB thật, migration/downgrade, backend browser E2E và launcher chạy trọn dịch vụ. Job backend xanh chỉ chứng minh nhóm non-DB; không có nghĩa toàn bộ backend hoặc Game Mechanics đã PASS. Không tạo/migrate DB development/demo/production trong workflow này.
+**NOT COVERED TRÊN CI:** PostgreSQL integration/schema guard trên DB thật, migration/downgrade, backend browser E2E và launcher chạy trọn dịch vụ. Các lượt local được ghi riêng, không cộng vào CI. Job backend xanh chỉ chứng minh nhóm non-DB; không có nghĩa toàn bộ backend hoặc Game Mechanics đã PASS. Không tạo/migrate DB development/demo/production trong workflow này.
 
 Social E2E thật chạy trên **aurameme_test/public0010 rỗng**: sau build API và cài Chromium, từ backend chạy `python tests/run_social_browser.py <private-config-containing-TEST_DATABASE_URL>`. Runner tạo ba tài khoản/role tổng hợp, kiểm Guest/User/Admin và4định dạng ảnh, dọn đúng fixture rồi xác minh29bảng rỗng/schema không đổi. Không sử dụng ba tài khoản/mật khẩu demo thật, không migrate hoặc dùng DB development/demo. Không có Auth/Blog fixture tự seed trong startup. `request_id` UUID tùy chọn giúp retry POST bài/bình luận trả lại cùng record; thay payload/actor trả409.
+
+Social E2E cũng hỗ trợ DB E2E riêng: `python tests/run_social_browser.py <private-e2e-config> --e2e`, chỉ nhận `aurameme_e2e`/role `aurameme_e2e_app`/public0010 rỗng. Không chạy suite khi Owner đang dùng phiên preview có fixture. Sáu reaction post/comment được kiểm chọn/đổi/gỡ. UI Ẩn/Xóa yêu cầu xác nhận; Hủy/Escape không gửi mutation.

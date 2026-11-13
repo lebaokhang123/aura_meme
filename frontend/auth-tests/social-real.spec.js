@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-test.skip(!process.env.AURA_SOCIAL_E2E,'Run via guarded run_social_browser.py on aurameme_test');
+test.skip(!process.env.AURA_SOCIAL_E2E,'Run via guarded run_social_browser.py on isolated test/E2E');
 test.setTimeout(60000);
 const password='Synthetic-browser-password!';
 async function login(page,name='khang_dev'){
@@ -22,17 +22,26 @@ test('crud text, category/search/Hot, emoji comment, reaction, edit, delete and 
  await page.getByLabel('Danh mục bài mới').selectOption('gaming');await page.getByRole('button',{name:'Đăng bài',exact:true}).click();
  const card=page.locator('[data-post-id]').filter({hasText:'Social E2E Công nghệ'});await expect(card).toHaveCount(1);
  const id=await card.getAttribute('data-post-id');
- await card.getByRole('button',{name:'Thả biểu cảm',exact:true}).click();await page.locator('[data-reaction=love]').click();
- await expect(card.locator('[data-reaction-pill=love]')).toContainText('1');
+ for(const kind of ['like','love','laugh','fire','sad','angry']){
+  await card.getByRole('button',{name:'Thả biểu cảm',exact:true}).click();await page.locator('[data-reaction='+kind+']').click();
+  await expect(card.locator('[data-reaction-pill='+kind+']')).toContainText('1');await expect(card.locator('[data-reaction-pill]')).toHaveCount(1);
+ }
+ await card.locator('[data-reaction-pill=angry]').click();await expect(card.locator('[data-reaction-pill]')).toHaveCount(0);
  await card.getByRole('button',{name:'Bình luận',exact:true}).click();
  await card.getByLabel('Nội dung bình luận').fill('Social E2E Comment 🔥');await card.getByRole('button',{name:/^Gửi/}).click();
  const row=card.locator('[data-comment-id]').filter({hasText:'Social E2E Comment'});await expect(row).toHaveCount(1);
- await row.getByRole('button',{name:'Thả biểu cảm bình luận'}).click();await page.locator('[data-reaction=fire]').click();
- await expect(row.locator('[data-reaction-pill=fire]')).toContainText('1');
+ for(const kind of ['like','love','laugh','fire','sad','angry']){
+  await row.getByRole('button',{name:'Thả biểu cảm bình luận'}).click();await page.locator('[data-reaction='+kind+']').click();
+  await expect(row.locator('[data-reaction-pill='+kind+']')).toContainText('1');await expect(row.locator('[data-reaction-pill]')).toHaveCount(1);
+ }
+ await row.locator('[data-reaction-pill=angry]').click();await expect(row.locator('[data-reaction-pill]')).toHaveCount(0);
  await page.goto('/?q=cong+nghe&category=gaming&sort=hot');await expect(page.locator('[data-post-id]')).toHaveCount(1);
  await page.reload();await expect(page.locator('[data-post-id]')).toHaveCount(1);
  const edited=page.locator('[data-post-id="'+id+'"]');await edited.getByRole('button',{name:'Tùy chọn bài viết'}).click();await page.getByRole('menuitem',{name:'Sửa bài',exact:true}).click();
- await page.getByLabel('Nội dung sửa bài').fill('Social E2E Edited');await page.getByRole('button',{name:'Lưu thay đổi'}).click();
+ await page.getByLabel('Nội dung sửa bài').fill('Social E2E Edited');
+ const saved=page.waitForResponse(response=>response.request().method()==='PATCH'&&new URL(response.url()).pathname==='/api/v1/posts/'+id);
+ await page.getByRole('button',{name:'Lưu thay đổi'}).click();expect((await saved).status()).toBe(200);
+ await expect(page.getByRole('form',{name:'Sửa bài viết'})).toHaveCount(0);
  await page.goto('/#post-'+id);await expect(page.locator('[data-post-id="'+id+'"]')).toContainText('Social E2E Edited');
  await page.locator('[data-post-id="'+id+'"]').getByRole('button',{name:'Tùy chọn bài viết'}).click();await page.getByRole('menuitem',{name:'Xóa bài',exact:true}).click();await page.getByRole('button',{name:'Xác nhận xóa',exact:true}).click();
  await expect(page.locator('[data-post-id="'+id+'"]')).toHaveCount(0);
@@ -59,7 +68,9 @@ test('admin hides another author post; USER cannot edit or moderate it',async({p
  },id);expect(denied).toBe(403);
  await page.getByRole('button',{name:'Mở menu tài khoản'}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();await expect(page.locator('.account-avatar')).toHaveCount(0);await login(page,'khang_dev');
  const other=page.locator('[data-post-id="'+id+'"]');await other.getByRole('button',{name:'Tùy chọn bài viết'}).click();await expect(page.getByRole('menuitem',{name:'Sửa bài',exact:true})).toHaveCount(0);
- await page.getByRole('menuitem',{name:'Ẩn bài (Admin)'}).click();await expect(page.locator('[data-post-id="'+id+'"]')).toHaveCount(0);
+ await page.getByRole('menuitem',{name:'Ẩn bài (Admin)'}).click();
+ const confirmation=page.getByRole('alertdialog',{name:'Xác nhận ẩn bài'});await expect(confirmation).toBeVisible();
+ await confirmation.getByRole('button',{name:'Xác nhận ẩn',exact:true}).click();await expect(page.locator('[data-post-id="'+id+'"]')).toHaveCount(0);
  expect((await page.request.get('/api/v1/posts/'+id)).status()).toBe(404);
 });
 

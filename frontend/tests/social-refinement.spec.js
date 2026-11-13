@@ -10,6 +10,9 @@ test('category counts use all active posts and update after owner deletion and r
  await post.getByRole('button',{name:'Tùy chọn bài viết'}).click();
  await expect(page.getByText('Lưu bài',{exact:true})).toHaveCount(0);
  await page.getByRole('menuitem',{name:'Xóa bài',exact:true}).click();await page.getByRole('button',{name:'Hủy',exact:true}).click();await expect(post).toBeVisible();
+ await expect(page.getByRole('alertdialog',{name:'Xác nhận xóa bài'})).toHaveCount(0);
+ await expect(post.getByRole('button',{name:'Tùy chọn bài viết'})).toBeFocused();
+ await post.getByRole('button',{name:'Tùy chọn bài viết'}).click();
  await page.getByRole('menuitem',{name:'Xóa bài',exact:true}).click();await page.getByRole('button',{name:'Xác nhận xóa',exact:true}).click();
  await expect(post).toHaveCount(0);await expect(count('Gaming')).toHaveText('0');
  await page.reload();await ready(page);await expect(post).toHaveCount(0);await expect(count('Gaming')).toHaveText('0');

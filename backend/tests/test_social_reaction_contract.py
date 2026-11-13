@@ -88,3 +88,20 @@ def test_six_count_sql_compiles_and_dto_positions_match(target):
     assert result.reaction_counts.model_dump()==dict(zip(KINDS,range(1,7)))
     assert result.viewer_reaction==("love" if target=="post" else "sad")
     if target=="post":assert result.comments_count==7 and result.bookmarked is True
+@pytest.mark.parametrize('e2e,key,url,allowed', [
+    (False, 'TEST_DATABASE_URL', 'postgresql+psycopg://aurameme_test:synthetic@127.0.0.1:5432/aurameme_test', True),
+    (True, 'E2E_DATABASE_URL', 'postgresql+psycopg://aurameme_e2e_app:synthetic@127.0.0.1:5432/aurameme_e2e', True),
+    (True, 'E2E_DATABASE_URL', 'postgresql+psycopg://aurameme_demo:synthetic@127.0.0.1:5432/aurameme_demo', False),
+    (True, 'E2E_DATABASE_URL', 'postgresql+psycopg://postgres:synthetic@127.0.0.1:5432/aurameme_e2e', False),
+    (True, 'E2E_DATABASE_URL', 'postgresql+psycopg://aurameme_e2e_app:synthetic@example.com:5432/aurameme_e2e', False),
+    (True, 'E2E_DATABASE_URL', 'postgresql+psycopg://aurameme_e2e_app:synthetic@127.0.0.1:5432/aurameme_e2e?options=bad', False),
+    (True, 'TEST_DATABASE_URL', 'postgresql+psycopg://aurameme_test:synthetic@127.0.0.1:5432/aurameme_test', False),
+])
+def test_social_browser_explicit_target_guard(tmp_path, e2e, key, url, allowed):
+    from run_social_browser import browser_target
+    config = tmp_path / '.env'; config.write_text(key+'='+url, encoding='utf-8')
+    if allowed:
+        assert browser_target(config, e2e)[0] == url
+    else:
+        with pytest.raises((AssertionError, ValueError)):
+            browser_target(config, e2e)

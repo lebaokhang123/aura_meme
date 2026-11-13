@@ -237,5 +237,8 @@
   "Thông tin hoặc ảnh chưa hợp lệ. Vui lòng kiểm tra lại.": "Invalid details or image. Please check and try again.",
   "Không tải được dữ liệu máy chủ. Vui lòng thử lại.": "Could not load server data. Please try again.",
   "PLANNED — cần inventory sở hữu.": "PLANNED — owned inventory required.",
-  "Ảnh tối đa 12 triệu pixel mỗi frame.": "Images support up to 12 million pixels per frame."
+  "Ảnh tối đa 12 triệu pixel mỗi frame.": "Images support up to 12 million pixels per frame.",
+  "Xác nhận ẩn bài": "Confirm post hiding",
+  "Ẩn bài này khỏi bảng tin?": "Hide this post from the feed?",
+  "Xác nhận ẩn": "Confirm hiding"
 }
