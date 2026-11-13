@@ -29,9 +29,10 @@ export function repairDemoComments(state) {
   return {...state,deletedComments,khangCommentRepairV1:true,revision:state.revision+(deletedComments.length!==state.deletedComments.length?1:0)};
 }
 export function commentsFor(state,postId) {
-  return [...baseline.comments,...state.comments].filter(comment=>comment.postId===postId&&!state.deletedComments.includes(comment.id));
+  return [...(state.api?[]:baseline.comments),...state.comments].filter(comment=>comment.postId===postId&&!state.deletedComments.includes(comment.id));
 }
 export function reactionCounts(state,target,id) {
+  if(state.api)return REACTIONS.map(r=>({...r,count:state.apiInteractions?.[target]?.[id]?.reaction_counts?.[r.id]||0})).filter(r=>r.count>0);
   const original=target==='post'?(baseline.reactions[id]||[]):(baseline.comments.find(c=>c.id===id)?.reactions||[]);
   const counts=[];
   for(const row of original){const r=row.emoji==='💀'?{...REACTIONS.find(r=>r.id==='laugh'),count:row.count}:row;const existing=counts.find(c=>c.id===r.id);if(existing)existing.count+=r.count;else counts.push({...r});}

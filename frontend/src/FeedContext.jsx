@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import {MOCK_AUTH} from './auth.js';
 import { filterUrl, readFilters } from './feed-data.js';
 import { useLocalized } from './localize.jsx';
 import { useSocial } from './SocialContext.jsx';
@@ -9,7 +10,7 @@ export const useFeed = () => useContext(FeedContext);
 export function PostLink({ post, ...props }) {
   const render = useLocalized();
   const { url } = useFeed();
-  return render(<a {...props} href={url('/', `post-${post.id}`)} aria-label={`Xem bài của ${post.authorName} trên Trang chủ`}>{post.authorName}</a>);
+  return render(<a {...props} href={url('/', `post-${post.id}`)} aria-label={`Xem bài của ${post.authorName} trên Trang chủ`}><span translate="no">{post.authorName}</span></a>);
 }
 export function PostCategory({ post, ...props }) {
   const render = useLocalized();
@@ -19,12 +20,12 @@ export function PostCategory({ post, ...props }) {
   }}>#{post.category}</a>);
 }
 export function FeedProvider({ children }) {
-  const {posts,ready}=useSocial();
+  const {posts,ready,loadFeed}=useSocial();
   const readTarget=()=>location.hash.match(/^#post-([\w-]+)$/)?.[1]||'';
   const [targetId,setTargetId]=useState(readTarget);
-  const [filters, setFilters] = useState(() => readFilters(location.search));
+  const [filters, setFilters] = useState(() => readFilters(location.search,!MOCK_AUTH));
   useEffect(() => {
-    const restore = () => {setFilters(readFilters(location.search));setTargetId(readTarget())};
+    const restore = () => {setFilters(readFilters(location.search,!MOCK_AUTH));setTargetId(readTarget())};
     addEventListener('popstate', restore);
     addEventListener('hashchange',restore);
     return () => {removeEventListener('popstate', restore);removeEventListener('hashchange',restore)};
@@ -34,6 +35,7 @@ export function FeedProvider({ children }) {
     const next={...filters,category:'',q:''};
     history.replaceState(null,'',filterUrl(location.pathname,next,location.hash));setFilters(next);
   },[ready,targetId,posts,filters]);
+  useEffect(()=>{if(!MOCK_AUTH)loadFeed(filters).catch(()=>{});},[filters,targetId]);
   const update = patch => {
     const next = { ...filters, ...patch };
     const path = ['/', '/explore'].includes(location.pathname) ? location.pathname : '/explore';

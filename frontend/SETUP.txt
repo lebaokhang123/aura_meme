@@ -1,13 +1,13 @@
 AURAMEME — STITCH REACT + AUTH API
 
-Frontend chính là thư mục frontend/ của checkout Auth đang review.
+Frontend chính là thư mục frontend/ của checkout Social đang review.
 Nguồn đã được Owner nghiệm thu sơ bộ: docs/plan/master/stitch-react-preview.
 Giữ 14 màn Stitch và các nguồn tham chiếu; header/footer đã dùng chung theo Owner 2026-11-12.
-Giữ UI Stitch; tái sử dụng Auth backend hiện có, chưa nối Social hoặc Game Mechanics.
+Giữ UI Stitch; tái sử dụng Auth backend hiện có, Social đã nối API; Game Mechanics chưa tích hợp.
 
 CHẠY TRÊN WINDOWS:
 1. Cần Node.js >=22.12.0 và npm.
-2. Mở terminal tại checkout Auth: cd frontend
+2. Mở terminal tại checkout Social: cd frontend
 3. npm ci
 4. npm run dev
 5. Truy cập http://localhost:5173; cổng 5173 cố định. Backend chạy tại 127.0.0.1:8000.
@@ -19,18 +19,20 @@ npm run preview -- --port 5173 (cần backend và allowed origin localhost:5173)
 node --test tests/*test.mjs
 npm test (build mock; Chrome đã cài, 149 regression demo, không backend/DB).
 Sau npm run build: npx playwright test --config=../.github/playwright.auth.config.mjs
-(8 Auth UI tests với HTTP stub; Chromium đi kèm Playwright).
+(11 Auth/Social UI tests với HTTP stub; Chromium đi kèm Playwright).
 Auth E2E thật: từ backend chạy python tests/run_auth_browser.py [đường-dẫn-e2e.local/.env].
 Runner chỉ nhận aurameme_e2e/role aurameme_e2e_app rỗng, guard schema/revision;
-không migrate/reset; dọn đúng user/session/role tổng hợp do test tạo và kiểm 28 bảng rỗng.
+không migrate/reset; dọn đúng user/session/role tổng hợp do test tạo và kiểm schema hiện hành rỗng.
 Cần build API mode và cài Chromium trước; DB development/demo không được sử dụng.
 
 run.bat demo/dev khởi động backend + frontend Auth API thật, có guard DB hiện có.
 Launcher cần .venv và demo.local của chính checkout; worktree mới không tự nhận secrets.
-Để review worktree với demo.local bên ngoài, chạy từ backend bằng Python đã cài dependencies:
-python -c "from pathlib import Path; from app.demo import activate_demo; import uvicorn; activate_demo(Path(r'C:\path\to\demo.local')); uvicorn.run('app.main:app',host='127.0.0.1',port=8000)"
-Sau đó chạy npm run dev từ frontend của cùng worktree. Không dùng -I với venv checkout khác,
-vì editable install có thể import sai source. Không sao chép secrets vào Git.
+Backend Social cần0010; demo/E2E local còn0009, chưa được duyệt migrate.
+Không dùng lệnh activate_demo để chạy backend Social lên demo0009.
+Kiểm thử full-stack bằng DB test riêng đã được Owner duyệt:
+từ backend: python tests/run_social_browser.py C:\path\to\private-config-with-TEST_DATABASE_URL
+Runner yêu cầu aurameme_test/public0010 rỗng, role test, source hiện tại; không dùng dữ liệu demo.
+Cài backend dependencies của checkout đang dùng, frontend npm ci và Chromium trước; build API mode.
 Không chạy migration/seed trên development/demo để thử đăng nhập.
 Frontend trước thay thế có trong Git history và bản backup local (không đưa backup lên Git):
 docs/internal/backups/frontend-before-stitch-20261111
@@ -67,7 +69,7 @@ Dữ liệu 3 nhân vật cùng post/XP trong các màn Stitch được giữ y 
 Avatar header/composer và hộp Thông tin lấy đúng user demo đang đăng nhập.
 Home có3bài mẫu ban đầu; bài tạo/xóa trong demo được tính thật theo tag và bộ lọc.
 Trong mock mode, reaction/bình luận/xóa và bài/ảnh/GIF dùng IndexedDB theo browser/origin.
-API mode chặn ghi Social và báo chưa tích hợp; dữ liệu demo vẫn xem được.
+API mode dùng DB thật cho post/media/comment/reaction; không trộn bài IndexedDB hoặc baseline vào feed.
 Explore hiển thị tối đa3bài. Chỉ Standard reaction dùng được; My Meme chưa có inventory.
 
 GIỚI HẠN QUAN TRỌNG:
@@ -78,7 +80,7 @@ GIỚI HẠN QUAN TRỌNG:
 - Những hiệu ứng script gốc được nạp theo vị trí của script trong HTML nguồn.
 - Khung so sánh /reference/*.png và nguyên bản /stitch-original/*/code.html.
 - Dữ liệu demo không thể dùng thay xác thực, DB, catalog, quyền asset thật.
-- Ảnh/GIF tạo bài chỉ được lưu cục bộ trong IndexedDB, không upload server; chưa có mở hòm trả thưởng.
+- Chỉ mock mode lưu ảnh/GIF trong IndexedDB; API mode upload qua media API. Chưa có mở hòm trả thưởng.
 - Bản promotion ban đầu trùng byte với preview; bản stabilization tiếp theo
   sửa ảnh local và responsive dưới768px. Khung ảnh desktop được giữ theo số đo trước sửa;
   bản chỉnh 2026-11-12 tiếp tục chuẩn hóa shell, Home/Auth và bảo trì theo nhận xét Owner.
@@ -90,3 +92,14 @@ GIỚI HẠN QUAN TRỌNG:
 
 Chỉ gỡ danh tính MOCK bằng DevTools (không thay thế logout API):
 localStorage.removeItem("aurameme-stitch-demo-user"); location.assign("/");
+
+SOCIAL API:
+Home tải20bài/trang, Explore tối đa3bài; Home có nút Xem thêm.
+New: created_at DESC,id DESC. Hot: tổng reaction của actor active DESC,created_at DESC,id DESC.
+Search title/content không dấu; category URL dùng slug, API mutation dùng UUID thực tế.
+Composer không có title riêng: server dùng dòng text đầu tối đa160ký tự, hoặc Ảnh/GIF cho ảnh-only.
+request_id UUID giữ nguyên khi retry một draft; đổi nội dung/actor với ID đã dùng trả409, không ghi đè.
+Owner có Sửa/Xóa, Admin có Ẩn bài; comment moderation qua API admin có audit.
+Guest chỉ đọc, 401/CSRF/error phải hiển thị lỗi. My Meme/inventory và Aura/Level/Rank/Vault/Payment chưa bật.
+Ảnh <=5MiB,<=12triệu pixel/frame; GIF<=60frames,tổng<=40triệu pixel, server kiểm MIME/signature/ownership.
+Không copy các mật khẩu demo vào source, lệnh, test logs hoặc PR.
