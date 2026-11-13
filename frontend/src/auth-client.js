@@ -35,15 +35,20 @@ export function createAuthClient({fetch=globalThis.fetch,notify=()=>{}}={}){
       publish({...state,status:state.user?'authenticated':'unavailable',error});throw error;
     }
   }
-  async function mutation(path,body){
-    const csrf=await request('/auth/csrf');
-    if(typeof csrf?.csrf_token!=='string'||!csrf.csrf_token)throw new AuthError(0,'PROTOCOL_ERROR');
-    return request('/auth/'+path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf.csrf_token},...(body?{body:JSON.stringify(body)}:{})});
+  async function write(method,path,body){
+    try{
+      const csrf=await request('/auth/csrf');
+      if(typeof csrf?.csrf_token!=='string'||!csrf.csrf_token)throw new AuthError(0,'PROTOCOL_ERROR');
+      const multipart=typeof FormData!=='undefined'&&body instanceof FormData;
+      return await request(path,{method,headers:{'X-CSRF-Token':csrf.csrf_token,...(body&&!multipart?{'Content-Type':'application/json'}:{})},...(body?{body:multipart?body:JSON.stringify(body)}:{})});
+    }catch(error){if(error.status===401)await refresh().catch(()=>{});throw error;}
   }
+  const mutation=(path,body)=>write('POST','/auth/'+path,body);
   return {
     snapshot:()=>state,
     subscribe:listener=>{listeners.add(listener);return()=>listeners.delete(listener);},
     refresh,
+    read:request,write,
     async login(email,password){await mutation('login',{email,password});if(!await refresh())throw new AuthError(401,'SESSION_EXPIRED');notify();},
     async register({username,email,password,display_name}){return mutation('register',{username,email,password,display_name});},
     async logout(){await mutation('logout');generation++;publish({status:'guest',user:null,error:null});notify();},

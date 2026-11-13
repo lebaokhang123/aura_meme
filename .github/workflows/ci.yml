@@ -89,7 +89,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
-      - name: Check real-mode Auth UI with stubbed HTTP transport
+      - name: Check API-mode Auth and Social UI with stubbed HTTP transport
         run: npx playwright test --config=../.github/playwright.auth.config.mjs --forbid-only --workers=1 --retries=0 --max-failures=1
       - name: Build explicit mock bundle for demo regression
         run: npm run build -- --mode mock

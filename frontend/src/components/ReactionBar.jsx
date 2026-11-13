@@ -1,3 +1,4 @@
+import {MOCK_AUTH} from '../auth.js';
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {REACTIONS,reactionCounts} from '../social-model.js';
@@ -13,7 +14,7 @@ export function ReactionBar({target='post',id,compact=false,onPick}) {
   const root=useRef(null),trigger=useRef(null),popup=useRef(null),pending=useRef(false);
   const [position,setPosition]=useState({left:16,top:90,width:340});
   const records=target==='post'?state.postReactions:state.commentReactions;
-  const selected=onPick?undefined:records[id]?.[user?.username];
+  const selected=onPick?undefined:state.api?(user?state.apiInteractions?.[target]?.[id]?.viewer_reaction:null):records[id]?.[user?.username];
   const counts=onPick?[]:reactionCounts(state,target,id);
   const visible=counts.length>5?[...counts].sort((a,b)=>b.count-a.count).slice(0,5):counts;
   const primary=target==='post'&&id==='khang';
@@ -64,7 +65,7 @@ export function ReactionBar({target='post',id,compact=false,onPick}) {
         {open&&createPortal(render(<div ref={popup} id={popoverId} className="social-picker-position" style={position} role="dialog" aria-label="Bộ chọn reaction">
           {picker}
           <div className="bg-surface-container-high p-3 border border-outline-variant rounded-lg" aria-label="Tất cả reaction">
-            <p className="font-label-sm text-label-sm text-on-surface-variant">Bảo Khố chưa hỗ trợ trong demo</p>
+            <p className="font-label-sm text-label-sm text-on-surface-variant">{MOCK_AUTH?'Bảo Khố chưa hỗ trợ trong demo':'PLANNED — cần inventory sở hữu.'}</p>
             <div className="flex flex-wrap gap-2 mt-2">{counts.map(r=><span key={r.id} className="font-body-sm text-body-sm">{r.src?<img className="inline w-4 h-4 rounded-full" src={r.src} alt="meme"/>:r.emoji} {r.count}</span>)}</div>
             {selected&&<p className="text-secondary font-body-sm text-body-sm mt-2">{REACTIONS.find(r=>r.id===selected)?.emoji} Đã chọn</p>}
           </div>

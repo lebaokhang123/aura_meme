@@ -11,7 +11,8 @@ export function translate(source, language) {
   const core = source.trim();
   let translated = english[core];
   if (translated === undefined) {
-    if (core.startsWith('Ảnh đại diện ')) translated = 'Avatar of ' + core.slice(13);
+    if (/^Bạn đã xem hết (\d+) bài viết\.$/.test(core)) translated = core.replace(/^Bạn đã xem hết (\d+) bài viết\.$/, 'You have seen all $1 posts.');
+    else if (core.startsWith('Ảnh đại diện ')) translated = 'Avatar of ' + core.slice(13);
     else if (/^Xem bài của (.+) trên Trang chủ$/.test(core)) translated = core.replace(/^Xem bài của (.+) trên Trang chủ$/, 'View $1\'s post on Home');
   }
   return translated === undefined ? source : source.slice(0, source.indexOf(core)) + translated + source.slice(source.indexOf(core) + core.length);

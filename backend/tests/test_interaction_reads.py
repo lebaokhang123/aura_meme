@@ -31,7 +31,7 @@ def test_counts_and_private_viewer_state_do_not_leak_to_guests(target):
     assert mutation(client, "PUT", f"/posts/{post_id}/bookmark").status_code == 204
     assert mutation(client, "POST", f"/posts/{post_id}/comments", {"body": "Visible comment"}).status_code == 201
     path = f"/api/v1/posts/{post_id}/interactions"
-    expected = {"post_id": str(post_id), "reaction_counts": {"like": 1, "laugh": 0, "fire": 0},
+    expected = {"post_id": str(post_id), "reaction_counts": {"like": 1, "love": 0, "laugh": 0, "fire": 0, "sad": 0, "angry": 0},
                 "comments_count": 1, "viewer_reaction": "like", "bookmarked": True}
     response = client.get(path)
     assert response.status_code == 200 and response.json() == expected
@@ -67,7 +67,7 @@ def test_other_viewer_gets_own_state_and_only_visible_active_actor_counts(target
     connection.execute(text("UPDATE users SET status='locked' WHERE id=:id"), {"id": actor})
     client.cookies.clear()
     result = client.get(path).json()
-    assert result["reaction_counts"] == {"like": 0, "laugh": 0, "fire": 0}
+    assert result["reaction_counts"] == {"like": 0, "love": 0, "laugh": 0, "fire": 0, "sad": 0, "angry": 0}
 
 
 @pytest.mark.integration

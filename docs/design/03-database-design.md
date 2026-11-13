@@ -218,14 +218,14 @@ Tài liệu này quy định cấu trúc dữ liệu dự kiến của AuraMeme,
 |---|---|---|---|
 | `post_id` | `uuid` | NN | PK; FK |
 | `user_id` | `uuid` | NN | PK; FK |
-| `reaction_type` | `text` | NN | like / laugh / fire |
+| `reaction_type` | `text` | NN | like / love / laugh / fire / sad / angry |
 | `created_at` | `timestamptz` | NN |  |
 | `updated_at` | `timestamptz` | NN |  |
 
 - PK: `(post_id,user_id)`
 - FK: `(user_id) -> users(id)`
 - FK: `(post_id) -> posts(id)`
-- CHECK / validation: reaction_type IN (like,laugh,fire).
+- CHECK / validation: reaction_type IN (like,love,laugh,fire,sad,angry).
 - Quy tắc nghiệp vụ: Thiết kế: chỉ một reaction hiện hành/user/post; đổi loại cập nhật cùng hàng. Unlike–re-like không tạo sự kiện thưởng mới; event reward có khóa nghiệp vụ ổn định theo policy, không theo request UUID.
 
 ### `post_bookmarks` [P1]
@@ -783,3 +783,8 @@ Các điểm dưới đây là **tham số nghiệp vụ chưa phê duyệt chí
 - `03-erd-aurameme.drawio` — sơ đồ dữ liệu chính thức (các tab theo phân hệ).
 - [PostgreSQL — Constraints](https://www.postgresql.org/docs/current/ddl-constraints.html).
 - [OWASP — Business Logic Security](https://cheatsheetseries.owasp.org/cheatsheets/Business_Logic_Security_Cheat_Sheet.html).
+
+
+### Reaction bình luận — DRAFT0010 / REVIEW
+
+`comment_reactions`: comment_id UUID FK comments.id RESTRICT; user_id UUID FK users.id RESTRICT; reaction_type TEXT CHECK sáu loại; created_at/updated_at TIMESTAMPTZ NOT NULL. PK(comment_id,user_id), index(comment_id,reaction_type) cho counts và index(user_id) cho FK. Xóa mềm giữ nguyên các hàng reaction, public reads loại nội dung hidden/deleted và actor inactive. Không có cascade hoặc reward. Upgrade không đổi dữ liệu cũ; downgrade chỉ khi bảng mới rỗng và post_reactions không có loại mới. Chưa apply test/E2E/demo/development.

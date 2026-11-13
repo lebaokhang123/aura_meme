@@ -1,9 +1,30 @@
 """P0 category/post DTOs and strict input allowlists."""
 from datetime import datetime
-from typing import Literal
+from typing import Literal, get_args
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from app.account_schemas import UserPublic
+
+
+ReactionType = Literal["like", "love", "laugh", "fire", "sad", "angry"]
+REACTION_TYPES = get_args(ReactionType)
+
+
+class ReactionCounts(BaseModel):
+    like: int = Field(ge=0)
+    love: int = Field(ge=0)
+    laugh: int = Field(ge=0)
+    fire: int = Field(ge=0)
+    sad: int = Field(ge=0)
+    angry: int = Field(ge=0)
+
+
+class PostInteractions(BaseModel):
+    post_id: UUID
+    reaction_counts: ReactionCounts
+    comments_count: int = Field(ge=0)
+    viewer_reaction: ReactionType | None
+    bookmarked: bool
 
 
 class StrictInput(BaseModel):
@@ -40,7 +61,8 @@ class CategoryPatch(NonemptyPatch):
 
 
 class PostInput(StrictInput):
-    title: str = Field(min_length=1, max_length=160)
+    title: str = Field(default=None, min_length=1, max_length=160)
+    request_id: UUID | None = None
     content: str = Field(max_length=20000)
     category_id: UUID
     media_id: UUID | None = None
@@ -63,6 +85,7 @@ class CategoryResponse(BaseModel):
 
 
 class PostResponse(BaseModel):
+    interactions: PostInteractions | None = Field(default=None, exclude_if=lambda value: value is None)
     id: UUID
     author: UserPublic
     category: CategoryResponse
@@ -88,4 +111,12 @@ class CategoryPage(BaseModel):
 
 class PostPage(BaseModel):
     items: list[PostResponse]
+    pagination: Pagination
+
+
+class CategoryFeedItem(CategoryResponse):
+    post_count: int = Field(ge=0)
+
+class CategoryFeedPage(BaseModel):
+    items: list[CategoryFeedItem]
     pagination: Pagination

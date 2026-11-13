@@ -1,20 +1,20 @@
 # AuraMeme
 
-AuraMeme là đồ án web cộng đồng chia sẻ meme. Frontend chính hiện là bản Stitch React đã được Owner duyệt; Auth đã nối với FastAPI/PostgreSQL; các phần Social/Game Mechanics vẫn chưa tích hợp.
+AuraMeme là đồ án web cộng đồng chia sẻ meme. Frontend chính hiện là bản Stitch React đã được Owner duyệt; Auth đã nối với FastAPI/PostgreSQL; Social/Blog đã nối API; Game Mechanics chưa tích hợp.
 
 ## Frontend hiện tại
 
 - React 19, JavaScript/JSX, Vite 7; 14 màn Guest/User/Auth trên 8 route.
 - Responsive, dark/light, VI/EN; header/footer dùng chung.
 - Home/Explore: category, search, New/Hot; số danh mục đếm theo bài hiện có.
-- Demo tạo bài text/PNG/JPEG/GIF, reaction, bình luận, chèn emoji, xóa có xác nhận và chia sẻ đúng bài.
+- API thật: feed/category/search/New–Hot/pagination, tạo/sửa/xóa bài, upload PNG/JPEG/GIF/WebP, sáu reaction bài/bình luận, chèn emoji và moderation có RBAC/audit.
 - Auth mặc định dùng API thật, cookie HttpOnly và CSRF; danh tính/quyền lấy từ `/users/me`, không tin localStorage.
-- Dữ liệu Social cũ vẫn ở IndexedDB, không chuyển lên PostgreSQL. Chế độ API chỉ xem feed demo; thao tác ghi Social chưa được tích hợp.
+- API mode chỉ dùng PostgreSQL, không đọc/nhập IndexedDB demo. Category và counts lấy từ DB. Mock mode riêng vẫn giữ bộ demo/UI regression cũ. Level/danh xưng trên card API là placeholder, chưa tính Aura/XP.
 - Rank/Vault/Contact và các chức năng tương lai có trạng thái demo/bảo trì, không phát thưởng hoặc thanh toán thật.
 
 ## Chạy local
 
-Cần Node.js >=22.12.0, backend và PostgreSQL đã cấu hình. `run.bat demo`/`run.bat dev` dùng Auth API thật, frontend tại `http://localhost:5173`; không trộn hostname với 127.0.0.1. Không tự migrate hoặc seed DB đang có dữ liệu.
+Cần Node.js >=22.12.0, backend và PostgreSQL đã cấu hình. `run.bat demo`/`run.bat dev` dùng Auth API thật, frontend tại `http://localhost:5173`; không trộn hostname với 127.0.0.1. Backend Social cần revision0010. Demo/E2E local hiện còn0009 và chưa được duyệt migrate; launcher phải dừng khi schema mismatch. Không tự migrate hoặc seed DB đang có dữ liệu.
 
 ```powershell
 cd frontend
@@ -65,3 +65,5 @@ Một workflow `.github/workflows/ci.yml` chạy khi mở/cập nhật PR vào `
 - **Frontend browser regression (Ubuntu):** kiểm tra Auth UI ở API mode với HTTP stub, sau đó build rõ `--mode mock` và chạy suite demo bằng Chromium đi kèm phiên bản Playwright đã khóa; config riêng trong `.github/` giữ config frontend gốc. Không retry để che lỗi; upload evidence khi fail, giữ 7 ngày. Suite vẫn cần Internet cho Tailwind CDN, Google Fonts và ảnh từ xa.
 
 **NOT COVERED:** PostgreSQL integration/schema guard trên DB thật, migration/downgrade, backend browser E2E và launcher chạy trọn dịch vụ. Job backend xanh chỉ chứng minh nhóm non-DB; không có nghĩa toàn bộ backend hoặc Game Mechanics đã PASS. Không tạo/migrate DB development/demo/production trong workflow này.
+
+Social E2E thật chạy trên **aurameme_test/public0010 rỗng**: sau build API và cài Chromium, từ backend chạy `python tests/run_social_browser.py <private-config-containing-TEST_DATABASE_URL>`. Runner tạo ba tài khoản/role tổng hợp, kiểm Guest/User/Admin và4định dạng ảnh, dọn đúng fixture rồi xác minh29bảng rỗng/schema không đổi. Không sử dụng ba tài khoản/mật khẩu demo thật, không migrate hoặc dùng DB development/demo. Không có Auth/Blog fixture tự seed trong startup. `request_id` UUID tùy chọn giúp retry POST bài/bình luận trả lại cùng record; thay payload/actor trả409.

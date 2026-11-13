@@ -328,7 +328,7 @@ paths:
                   items:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Category'
+                      $ref: '#/components/schemas/CategoryFeedItem'
                   pagination:
                     $ref: '#/components/schemas/Pagination'
                 required:
@@ -419,13 +419,20 @@ paths:
       - Blog
       summary: 'Danh sách bài viết công khai: tìm/lọc/sắp xếp/phân trang'
       operationId: listPosts
-      security: []
+      security:
+      - {}
+      - sessionCookie: []
       parameters:
       - $ref: '#/components/parameters/Page'
       - $ref: '#/components/parameters/PageSize'
       - $ref: '#/components/parameters/PostSearch'
       - $ref: '#/components/parameters/PostCategory'
-      - $ref: '#/components/parameters/PostSort'
+      - in: query
+        name: sort
+        schema: {type: string, enum: [created_desc, created_asc, title_asc, reaction_desc], default: created_desc}
+      - in: query
+        name: include_interactions
+        schema: {type: boolean, default: false}
       responses:
         '200':
           description: Thành công
@@ -443,6 +450,8 @@ paths:
                 required:
                 - items
                 - pagination
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
         '429':
@@ -1444,6 +1453,150 @@ paths:
           $ref: '#/components/responses/InternalError'
       x-phase: P0
       description: '**Yêu cầu role ADMIN tại backend**, không chỉ ẩn nút ở React.'
+  /api/v1/admin/comments/{comment_id}:
+    patch:
+      tags: [Admin]
+      operationId: adminModerateComment
+      summary: Moderate comments with an audit
+      security: [{sessionCookie: []}]
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentModeration'
+      responses:
+        '204': {description: Updated; soft deletion preserves text}
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Admin]
+      operationId: adminDeleteComment
+      summary: Moderate comments with an audit
+      security: [{sessionCookie: []}]
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': {description: Updated; soft deletion preserves text}
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/comments/{comment_id}/reactions:
+    put:
+      tags: [Blog]
+      operationId: setCommentReaction
+      summary: setCommentReaction
+      description: Sáu reaction chuẩn; chỉ bình luận visible của bài public và tác giả active. Không phát thưởng.
+      security:
+      - sessionCookie: []
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReactionInput'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentReactionResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Blog]
+      operationId: removeCommentReaction
+      summary: removeCommentReaction
+      description: Sáu reaction chuẩn; chỉ bình luận visible của bài public và tác giả active. Không phát thưởng.
+      security:
+      - sessionCookie: []
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Thành công
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/comments/{comment_id}/interactions:
+    get:
+      tags: [Blog]
+      operationId: getCommentInteractions
+      summary: getCommentInteractions
+      description: Sáu reaction chuẩn; chỉ bình luận visible của bài public và tác giả active. Không phát thưởng.
+      security:
+      - {}
+      - sessionCookie: []
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentInteractions'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/posts/{post_id}/interactions:
     get:
       tags: [Aura]
@@ -2120,48 +2273,56 @@ components:
       - roles
       - status
     Post:
-      type: object
       properties:
+        interactions:
+          $ref: "#/components/schemas/PostInteractions"
+          nullable: true
         id:
           type: string
           format: uuid
+          title: Id
         author:
-          $ref: '#/components/schemas/UserPublic'
+          $ref: "#/components/schemas/UserPublic"
         category:
-          $ref: '#/components/schemas/Category'
+          $ref: "#/components/schemas/Category"
         title:
           type: string
+          title: Title
         content:
           type: string
+          title: Content
         media_url:
-          type: string
           format: uri-reference
+          title: Media Url
+          type: string
           nullable: true
         status:
           type: string
           enum:
-          - draft
-          - published
-          - hidden
-          - deleted
+            - draft
+            - published
+            - hidden
+            - deleted
+          title: Status
         created_at:
           type: string
           format: date-time
+          title: Created At
         updated_at:
           type: string
           format: date-time
-        comments_count:
-          type: integer
-          minimum: 0
+          title: Updated At
+      type: object
       required:
-      - id
-      - author
-      - category
-      - title
-      - content
-      - status
-      - created_at
-      - updated_at
+        - id
+        - author
+        - category
+        - title
+        - content
+        - status
+        - created_at
+        - updated_at
+      title: PostResponse
     OwnPost:
       allOf:
       - $ref: '#/components/schemas/Post'
@@ -2172,32 +2333,43 @@ components:
             format: uuid
         required: [media_id]
     PostInput:
-      type: object
-      additionalProperties: false
       properties:
         title:
           type: string
-          minLength: 1
           maxLength: 160
+          minLength: 1
+          title: Title
+        request_id:
+          title: Request Id
+          type: string
+          format: uuid
+          nullable: true
         content:
           type: string
           maxLength: 20000
+          title: Content
         category_id:
           type: string
           format: uuid
+          title: Category Id
         media_id:
+          title: Media Id
           type: string
           format: uuid
           nullable: true
         status:
           type: string
           enum:
-          - draft
-          - published
+            - draft
+            - published
+          title: Status
+          default: draft
+      additionalProperties: false
+      type: object
       required:
-      - title
-      - content
-      - category_id
+        - content
+        - category_id
+      title: PostInput
     PostPatch:
       type: object
       additionalProperties: false
@@ -2245,15 +2417,22 @@ components:
       - body
       - created_at
     CommentInput:
-      type: object
-      additionalProperties: false
       properties:
         body:
           type: string
-          minLength: 1
           maxLength: 4000
+          minLength: 1
+          title: Body
+        request_id:
+          title: Request Id
+          type: string
+          format: uuid
+          nullable: true
+      additionalProperties: false
+      type: object
       required:
-      - body
+        - body
+      title: CommentInput
     Media:
       type: object
       properties:
@@ -2658,13 +2837,22 @@ components:
         like:
           type: integer
           minimum: 0
+        love:
+          type: integer
+          minimum: 0
         laugh:
           type: integer
           minimum: 0
         fire:
           type: integer
           minimum: 0
-      required: [like, laugh, fire]
+        sad:
+          type: integer
+          minimum: 0
+        angry:
+          type: integer
+          minimum: 0
+      required: [like, love, laugh, fire, sad, angry]
     PostInteractions:
       type: object
       properties:
@@ -2679,7 +2867,7 @@ components:
         viewer_reaction:
           type: string
           nullable: true
-          enum: [like, laugh, fire, null]
+          enum: [like, love, laugh, fire, sad, angry, null]
         bookmarked:
           type: boolean
       required: [post_id, reaction_counts, comments_count, viewer_reaction, bookmarked]
@@ -2690,8 +2878,11 @@ components:
           type: string
           enum:
           - like
+          - love
           - laugh
           - fire
+          - sad
+          - angry
       required:
       - reaction_type
     ReactionResult:
@@ -2701,14 +2892,92 @@ components:
           type: string
           enum:
           - like
+          - love
           - laugh
           - fire
+          - sad
+          - angry
         post_id:
           type: string
           format: uuid
       required:
       - reaction_type
       - post_id
+    CommentReactionResult:
+      allOf:
+      - $ref: '#/components/schemas/ReactionInput'
+      - type: object
+        properties:
+          comment_id: {type: string, format: uuid}
+        required: [comment_id]
+    CommentInteractions:
+      type: object
+      properties:
+        comment_id: {type: string, format: uuid}
+        reaction_counts:
+          $ref: '#/components/schemas/ReactionCounts'
+        viewer_reaction:
+          type: string
+          nullable: true
+          enum: [like, love, laugh, fire, sad, angry, null]
+      required: [comment_id, reaction_counts, viewer_reaction]
+    CategoryFeedItem:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        slug:
+          type: string
+          title: Slug
+        name:
+          type: string
+          title: Name
+        status:
+          type: string
+          enum:
+            - active
+            - hidden
+          title: Status
+        post_count:
+          type: integer
+          minimum: 0
+          title: Post Count
+      type: object
+      required:
+        - id
+        - slug
+        - name
+        - status
+        - post_count
+      title: CategoryFeedItem
+    CategoryFeedPage:
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/CategoryFeedItem"
+          type: array
+          title: Items
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      type: object
+      required:
+        - items
+        - pagination
+      title: CategoryFeedPage
+    CommentModeration:
+      properties:
+        status:
+          type: string
+          enum:
+            - visible
+            - hidden
+          title: Status
+      additionalProperties: false
+      type: object
+      required:
+        - status
+      title: CommentModeration
     CaseDefinition:
       type: object
       properties:

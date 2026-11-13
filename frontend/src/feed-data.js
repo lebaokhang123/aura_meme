@@ -8,9 +8,9 @@ export const CATEGORIES = [
   { id: 'TruongHoc', label: 'Trường học', icon: 'school' },
   { id: 'Random', label: 'Random', icon: 'casino' },
 ];
-export function readFilters(search) {
+export function readFilters(search,api=false) {
   const params = new URLSearchParams(search);
-  return { category: CATEGORIES.some(c => c.id === params.get('category')) ? params.get('category') : '',
+  return { category: !api?(CATEGORIES.some(c => c.id === params.get('category')) ? params.get('category') : ''):(/^[-a-z0-9]{1,80}$/.test(params.get('category')||'')?params.get('category'):''),
     q: (params.get('q') || '').trim(), sort: params.get('sort') === 'hot' ? 'hot' : 'new' };
 }
 const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();

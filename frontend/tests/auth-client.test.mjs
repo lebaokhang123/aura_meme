@@ -52,3 +52,11 @@ test('a blocked session cookie rejects login and a forbidden session read stays 
  const forbidden=createAuthClient({fetch:transport([failure(403,'FORBIDDEN')]).fetch});
  await assert.rejects(forbidden.refresh(),{status:403});assert.equal(forbidden.snapshot().status,'unavailable');
 });
+
+test('generic Social mutation reuses session CSRF and supports multipart without a JSON content type',async()=>{
+ const t=transport([ok({csrf_token:'csrf'}),ok({id:user.id}),ok({csrf_token:'next'}),ok({reaction_type:'love'})]);
+ const c=createAuthClient({fetch:t.fetch}),data=new FormData();data.append('file',new Blob(['synthetic']), 'fixture.png');
+ await c.write('POST','/media',data);assert.equal(t.calls[1].body,data);assert.equal(t.calls[1].headers['Content-Type'],undefined);
+ await c.write('PUT','/posts/'+user.id+'/reactions',{reaction_type:'love'});
+ assert.equal(t.calls[3].headers['X-CSRF-Token'],'next');assert.equal(t.calls[3].credentials,'include');
+});
