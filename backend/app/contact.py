@@ -1,19 +1,18 @@
-"""Private contact inbox: Guest pre-session or User session CSRF, no email sending."""
-from contextlib import contextmanager
+"""Authenticated private contact inbox with session CSRF; no email sending."""
 from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import or_, select
 
 from app.admin_users import require_admin_mutation
-from app.auth import CSRF_HEADER, ERRORS, guest_guard
+from app.auth import CSRF_HEADER, ERRORS
 from app.auth_schemas import ErrorResponse
 from app.blog import page_rows
 from app.blog_schemas import Pagination, StrictInput
 from app.models import AdminAuditLog, ContactMessage
-from app.permissions import require_account_csrf, require_authenticated_user, require_role
+from app.permissions import require_account_csrf, require_role
 from app.security import AuthError
 
 router=APIRouter(prefix="/api/v1",tags=["Contact"])
@@ -56,27 +55,10 @@ class AdminContactPatch(StrictInput):
     status:Literal["new","in_review","resolved"]
 
 
-def contact_writer(request:Request,response:Response):
-    raw=request.cookies.get("am_session")
-    if raw:
-        try:
-            with contextmanager(require_authenticated_user)(request,response,raw) as account:
-                require_account_csrf(request,account)
-                yield account.db,account.user.id
-        except AuthError as error:
-            if error.status==401:
-                raise AuthError(403,"CSRF_INVALID","Contact session binding expired; refresh CSRF.") from None
-            raise
-    else:
-        guest_guard(request)
-        with request.app.state.auth_session_factory() as db,db.begin():
-            yield db,None
-
-
 @router.post("/contact",status_code=201,response_model=ContactCreated,operation_id="sendContact",
-    responses={code:ERRORS[code] for code in (403,409,422,429,500)},openapi_extra=CSRF_HEADER)
-def send_contact(payload:ContactInput,request:Request,writer=Depends(contact_writer,scope="function")):
-    db,user_id=writer
+    responses={code:ERRORS[code] for code in (401,403,409,422,429,500)},openapi_extra=CSRF_HEADER)
+def send_contact(payload:ContactInput,request:Request,account=Depends(require_account_csrf)):
+    db,user_id=account.db,account.user.id
     now=request.app.state.auth.now()
     row=ContactMessage(id=uuid4(),user_id=user_id,**payload.model_dump(),status="new",created_at=now,updated_at=now)
     db.add(row);db.flush()

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Path, Query, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -17,7 +17,6 @@ from app.models import AdminAuditLog, Category, Comment, MediaUpload, Post, Prof
 from app.permissions import require_account_csrf
 from app.admin_users import require_admin_mutation
 from app.security import AuthError
-from app.media import media_url
 
 
 router = APIRouter(prefix="/api/v1", tags=["Blog"])
@@ -51,7 +50,7 @@ class CommentPage(BaseModel):
 
 def comment_dto(comment, user, profile):
     author = UserPublic(id=user.id, username=user.username, display_name=profile.display_name,
-                        created_at=user.created_at, bio=profile.bio, avatar_url=media_url(profile.avatar_media_id))
+                        created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url)
     return CommentResponse(id=comment.id, post_id=comment.post_id, author=author,
                            body=comment.body, created_at=comment.created_at)
 
@@ -154,3 +153,18 @@ def moderate_comment(comment_id:UUID,payload:CommentModeration,request:Request,a
                responses=ERRORS|NOT_FOUND,openapi_extra=CSRF_HEADER)
 def admin_delete_comment(comment_id:UUID,request:Request,account=Depends(require_admin_mutation,scope="function")):
     moderate_comment_record(comment_id,request,account,"deleted")
+
+
+@router.get("/users/{username}/comments", response_model=CommentPage, operation_id="listUserComments",
+            responses={status: {"model": ErrorResponse} for status in (404, 422, 429, 500)})
+def list_user_comments(request: Request, username: str = Path(min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$"),
+                       page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
+    with request.app.state.auth_session_factory() as db:
+        if db.scalar(select(User.id).where(User.username == username, User.status == "active")) is None:
+            raise AuthError(404, "NOT_FOUND", "Profile not found.")
+        statement = select(Comment, User, Profile).join(User, User.id == Comment.author_id).join(
+            Profile, Profile.user_id == User.id).where(User.username == username, User.status == "active",
+                Comment.status == "visible", Comment.deleted_at.is_(None),
+                Comment.post_id.in_(public_posts().with_only_columns(Post.id)))
+        rows, pagination = page_rows(db, statement.order_by(Comment.created_at.desc(), Comment.id.desc()), page, page_size)
+        return CommentPage(items=[comment_dto(*row) for row in rows], pagination=pagination)

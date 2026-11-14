@@ -63,7 +63,7 @@ def main():
                 for slug in ("gaming","anime","cong-nghe","truong-hoc","random"):
                     api_mutation(client,"POST","/admin/categories",{"slug":slug,"name":slug},origin="http://localhost:4187")
                 api_mutation(client,"POST","/auth/logout",origin="http://localhost:4187")
-            for flow in ("identity","crud","media","admin","pagination"):
+            for flow in ("identity","crud","media","admin","pagination","profile-contact"):
                 api=subprocess.Popen([sys.executable,"-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8001"],cwd=ROOT,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
                 for _ in range(100):
                     if api.poll() is not None:raise RuntimeError("Owned API stopped")
@@ -84,14 +84,16 @@ def main():
                 assert all(r.username in expected and r.email==expected[r.username] for r in users),"Unknown identity; refuse cleanup"
                 owned=[r.id for r in users]
                 assert all(r.code in {"USER","ADMIN"} for r in c.execute(select(Role.code)))
-                allowed={"users","profiles","roles","user_roles","auth_sessions","categories","posts","comments","post_reactions","comment_reactions","media_uploads","admin_audit_logs"}
+                allowed={"users","profiles","roles","user_roles","auth_sessions","categories","posts","comments","post_reactions","comment_reactions","media_uploads","admin_audit_logs","contact_messages"}
                 assert not any(count for name,count in counts.items() if name not in allowed),"Unrelated data; refuse cleanup"
-                for name,column in (("posts","author_id"),("comments","author_id"),("post_reactions","user_id"),("comment_reactions","user_id"),("media_uploads","owner_id"),("admin_audit_logs","actor_id"),("profiles","user_id"),("user_roles","user_id"),("auth_sessions","user_id")):
+                for name,column in (("contact_messages","user_id"),("posts","author_id"),("comments","author_id"),("post_reactions","user_id"),("comment_reactions","user_id"),("media_uploads","owner_id"),("admin_audit_logs","actor_id"),("profiles","user_id"),("user_roles","user_id"),("auth_sessions","user_id")):
                     table=Base.metadata.tables[name]
                     assert all(v in owned for v in c.scalars(select(table.c[column]))),"Unknown owner; refuse cleanup"
+                contact=Base.metadata.tables['contact_messages']
+                assert all(row.body=='Synthetic Profile Contact E2E message' for row in c.execute(select(contact))),"Unexpected Contact content; refuse cleanup"
                 uploads=c.execute(select(MediaUpload.object_key)).scalars().all()
                 assert {p.name for p in media.iterdir()}==set(uploads),"Unexpected private media"
-                for name in ("comment_reactions","post_reactions","comments","posts","media_uploads","admin_audit_logs","categories","auth_sessions","user_roles","profiles","users","roles"):
+                for name in ("contact_messages","comment_reactions","post_reactions","comments","posts","media_uploads","admin_audit_logs","categories","auth_sessions","user_roles","profiles","users","roles"):
                     table=Base.metadata.tables[name]
                     if "user_id" in table.c:condition=table.c.user_id.in_(owned)
                     elif "author_id" in table.c:condition=table.c.author_id.in_(owned)

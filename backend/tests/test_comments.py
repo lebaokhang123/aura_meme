@@ -260,3 +260,30 @@ def test_delete_boundary_reuses_https_and_limiter(comments):
     path = "/api/v1/comments/" + str(uuid4())
     statuses = [client.delete(path).status_code for _ in range(61)]
     assert statuses[:60] == [401] * 60 and statuses[-1] == 429
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize('hidden', [None, 'comment', 'deleted_comment', 'post', 'category', 'post_media', 'author'])
+def test_public_user_comments_visibility_and_pagination(comments, hidden):
+    from test_auth import ACCOUNT
+    client,c,owner,post_id,category=comments
+    created=add(client,post_id)
+    assert created.status_code==201,created.text
+    if hidden=='comment':c.execute(text("UPDATE comments SET status='hidden'"))
+    if hidden=='deleted_comment':c.execute(text("UPDATE comments SET status='deleted',deleted_at=created_at"))
+    if hidden=='post':c.execute(text("UPDATE posts SET status='draft'"))
+    if hidden=='category':c.execute(text("UPDATE categories SET status='hidden'"))
+    if hidden=='post_media':
+        media=uuid4();now=client.app.state.auth.now()
+        c.execute(MediaUpload.__table__.insert().values(id=media,owner_id=owner,object_key='test/profile',mime='image/png',size_bytes=1,status='pending',created_at=now,updated_at=now))
+        c.execute(Post.__table__.update().values(media_id=media))
+    if hidden=='author':c.execute(text("UPDATE users SET status='locked'"))
+    client.cookies.clear()
+    response=client.get('/api/v1/users/'+ACCOUNT['username']+'/comments?page_size=1')
+    assert response.status_code==(404 if hidden=='author' else 200),response.text
+    if hidden!='author':
+        assert response.json()['items']==([created.json()] if hidden is None else [])
+        assert response.json()['pagination']['total']==(1 if hidden is None else 0)
+        assert client.get('/api/v1/users/'+ACCOUNT['username']+'/comments?page=99999999999999999999').json()['items']==[]
+    assert client.get('/api/v1/users/unknown_user/comments').status_code==404
+    assert client.get('/api/v1/users/'+ACCOUNT['username']+'/comments?page_size=101').status_code==422

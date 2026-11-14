@@ -1,4 +1,4 @@
-"""Guest/User Contact and private Admin workflow against real PostgreSQL."""
+"""Authenticated Contact and private Admin workflow against real PostgreSQL."""
 from uuid import UUID,uuid4
 from datetime import timedelta
 import pytest
@@ -15,14 +15,11 @@ def send(client,**changes):
 
 
 @pytest.mark.integration
-def test_guest_contact_stores_nullable_identity_and_minimal_response(auth):
+def test_guest_contact_requires_authentication(auth):
     client,connection=auth
     response=send(client)
-    assert response.status_code==201,response.text
-    assert set(response.json())=={"id","status"} and response.json()["status"]=="new"
-    row=connection.execute(select(ContactMessage.__table__)).mappings().one()
-    assert row["id"]==UUID(response.json()["id"]) and row["user_id"] is None
-    assert row["created_at"]==row["updated_at"] and row["body"]==MESSAGE["body"]
+    assert response.status_code==401,response.text
+    assert list(connection.scalars(select(ContactMessage.id)))==[]
 
 
 @pytest.mark.integration
@@ -36,8 +33,8 @@ def test_authenticated_contact_links_session_user(blog):
 @pytest.mark.parametrize('changes',[{'name':' '},{'subject':'\n'},{'body':'\t'},{'email':'bad'},
     {'name':'x'*101},{'subject':'x'*161},{'body':'x'*4001},{'body':None},{'body':1},{'body':'x\x00'},
     {'user_id':'forged'},{'status':'resolved'},{'roles':['ADMIN']}])
-def test_contact_input_validation_and_identity_allowlist(auth,changes):
-    client,connection=auth
+def test_contact_input_validation_and_identity_allowlist(blog,changes):
+    client,connection,*_=blog
     response=send(client,**changes)
     assert response.status_code==422,response.text
     assert list(connection.scalars(select(ContactMessage.id)))==[]
@@ -45,12 +42,10 @@ def test_contact_input_validation_and_identity_allowlist(auth,changes):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize('fault',['missing','bad','origin','expired'])
-def test_guest_contact_csrf_origin_and_expiry(auth,fault):
-    client,connection=auth
+@pytest.mark.parametrize('fault',['missing','bad','origin'])
+def test_contact_session_csrf_and_origin(blog,fault):
+    client,connection,*_=blog
     token=csrf(client)
-    if fault=='expired':
-        now=client.app.state.auth.now();client.app.state.auth.now=lambda:now+timedelta(minutes=20)
     headers={'Origin':'https://evil.example' if fault=='origin' else ORIGIN,'X-CSRF-Token':'bad' if fault=='bad' else token}
     if fault=='missing':headers.pop('X-CSRF-Token')
     assert client.post('/api/v1/contact',json=MESSAGE,headers=headers).status_code==403
@@ -67,14 +62,14 @@ def test_user_contact_requires_live_session_binding(blog,fault):
         now=client.app.state.auth.now()
         connection.execute(AuthSession.__table__.update().values(created_at=now-timedelta(hours=1),expires_at=now-timedelta(seconds=1)))
     if fault=='pre_token':token=client.app.state.auth.csrf('pre:wrong')
-    assert client.post('/api/v1/contact',json=MESSAGE,headers={'Origin':ORIGIN,'X-CSRF-Token':token}).status_code==403
+    assert client.post('/api/v1/contact',json=MESSAGE,headers={'Origin':ORIGIN,'X-CSRF-Token':token}).status_code==(403 if fault=='pre_token' else 401)
     assert list(connection.scalars(select(ContactMessage.id)))==[]
 
 
 @pytest.mark.integration
-def test_contact_maximum_unicode_and_chunked_body_limit(auth):
+def test_contact_maximum_unicode_and_chunked_body_limit(blog):
     import json
-    client,connection=auth
+    client,connection,*_=blog
     headers={'Origin':ORIGIN,'X-CSRF-Token':csrf(client),'Content-Type':'application/json'}
     response=client.post('/api/v1/contact',content=json.dumps(MESSAGE|{'body':'🐱'*4000}),headers=headers)
     assert response.status_code==201,response.text
@@ -91,8 +86,8 @@ def test_no_public_contact_inbox(auth):
 
 
 @pytest.mark.integration
-def test_contact_rate_limit(auth):
-    client,connection=auth
+def test_contact_rate_limit(blog):
+    client,connection,*_=blog
     codes=[send(client).status_code for _ in range(6)]
     assert codes==[201]*5+[429]
     assert len(list(connection.scalars(select(ContactMessage.id))))==5
@@ -152,8 +147,8 @@ def test_admin_contact_page_bounds_filter_and_unknown_ids(admin):
 
 @pytest.mark.integration
 @pytest.mark.parametrize('fault',['insert','audit'])
-def test_contact_failure_rolls_back_without_pii(auth,fault):
-    client,connection=auth
+def test_contact_failure_rolls_back_without_pii(blog,fault):
+    client,connection,*_=blog
     if fault=='insert':
         connection.exec_driver_sql("CREATE FUNCTION m42a_insert_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic contact failure'; END $$")
         connection.exec_driver_sql('CREATE TRIGGER m42a_insert_fail BEFORE INSERT ON contact_messages FOR EACH ROW EXECUTE FUNCTION m42a_insert_fail()')
@@ -163,7 +158,6 @@ def test_contact_failure_rolls_back_without_pii(auth,fault):
         assert all(value not in response.text for value in MESSAGE.values())
     else:
         from app.models import Role,User,UserRole
-        assert register(client).status_code==201 and login(client).status_code==200
         actor=connection.scalar(select(User.id));role=uuid4();now=client.app.state.auth.now()
         connection.execute(Role.__table__.insert().values(id=role,code='ADMIN',description='Synthetic admin'))
         connection.execute(UserRole.__table__.insert().values(user_id=actor,role_id=role,granted_at=now))
@@ -174,8 +168,8 @@ def test_contact_failure_rolls_back_without_pii(auth,fault):
         assert connection.scalar(select(ContactMessage.status))=='new'
 
 
-def test_contact_openapi_is_public_and_forbidden_response_declared():
+def test_contact_openapi_requires_session_and_forbidden_response_declared():
     from app.main import app
     schema=app.openapi();operation=schema['paths']['/api/v1/contact']['post']
-    assert not operation.get('security') and '403' in operation['responses']
+    assert operation.get('security')==[{'sessionCookie':[]}] and '401' in operation['responses'] and '403' in operation['responses']
     assert schema['components']['schemas']['ContactInput']['additionalProperties'] is False

@@ -293,6 +293,44 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
       x-phase: P0
+  /api/v1/users/{username}/comments:
+    get:
+      tags:
+      - Blog
+      summary: Bình luận công khai của tài khoản, mới nhất trước
+      operationId: listUserComments
+      description: Chỉ trả comment visible/chưa xóa của user active trên bài public; tài khoản thiếu hoặc không active trả 404.
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Username'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
   /api/v1/categories:
     get:
       tags:
@@ -427,6 +465,11 @@ paths:
       - $ref: '#/components/parameters/PageSize'
       - $ref: '#/components/parameters/PostSearch'
       - $ref: '#/components/parameters/PostCategory'
+      - in: query
+        name: author
+        description: Username tác giả, so khớp chính xác; chỉ lọc bài public.
+        required: false
+        schema: {type: string, maxLength: 32}
       - in: query
         name: sort
         schema: {type: string, enum: [created_desc, created_asc, title_asc, reaction_desc], default: created_desc}
@@ -798,9 +841,10 @@ paths:
     post:
       tags:
       - Contact
-      summary: Gửi liên hệ từ Guest hoặc User
+      summary: Gửi liên hệ bằng tài khoản đã đăng nhập
       operationId: sendContact
-      security: []
+      security: *id001
+      description: Yêu cầu session active và CSRF ràng buộc session; giữ limiter và inbox Admin. Liên hệ Guest cũ được bảo toàn.
       parameters:
       - $ref: '#/components/parameters/CsrfHeader'
       requestBody:
@@ -828,6 +872,8 @@ paths:
                 required:
                 - id
                 - status
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
         '429':
@@ -2188,6 +2234,7 @@ components:
         display_name:
           type: string
         avatar_url:
+          description: Đường dẫn /api/v1/catalog/assets/{asset_id} của avatar đang equip, owned, quantity > 0, active và approved; null dùng avatar mặc định.
           type: string
           format: uri-reference
           nullable: true
@@ -2203,14 +2250,9 @@ components:
       - display_name
       - created_at
     PublicProfile:
+      description: Hồ sơ public chỉ gồm UserPublic; không cover, PII hoặc roles.
       allOf:
       - $ref: '#/components/schemas/UserPublic'
-      - type: object
-        properties:
-          cover_url:
-            type: string
-            format: uri-reference
-            nullable: true
     UserPrivate:
       type: object
       properties:
@@ -2245,6 +2287,7 @@ components:
           format: uuid
           nullable: true
         avatar_url:
+          description: Đường dẫn /api/v1/catalog/assets/{asset_id} của avatar đang equip, owned, quantity > 0, active và approved; null dùng avatar mặc định.
           type: string
           format: uri-reference
           nullable: true
@@ -2556,6 +2599,7 @@ components:
       - email
       - password
     ProfilePatch:
+      description: Chỉ cập nhật field hồ sơ; avatar qua PUT /inventory/equipment/avatar. Không cho sửa cover.
       type: object
       additionalProperties: false
       properties:
@@ -2580,10 +2624,15 @@ components:
           maxLength: 30
           nullable: true
         avatar_media_id:
+          description: Chỉ chấp nhận null để bỏ liên kết legacy; UUID khác null trả 422. Không thay avatar đang equip.
+          enum: [null]
           type: string
           format: uuid
           nullable: true
         cover_media_id:
+          description: Field legacy chỉ đọc; gửi bất kỳ giá trị nào, kể cả null, trả 422. Bỏ qua field để giữ dữ liệu cũ.
+          deprecated: true
+          not: {}
           type: string
           format: uuid
           nullable: true
