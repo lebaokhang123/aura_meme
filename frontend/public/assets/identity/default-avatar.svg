@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="AuraMeme Abstract Geometric avatar">
+
+<defs>
+ <linearGradient id="v" x1="115" y1="115" x2="382" y2="380" gradientUnits="userSpaceOnUse"><stop stop-color="#DEAFF9"/><stop offset=".42" stop-color="#A35DF2"/><stop offset=".72" stop-color="#735CF4"/><stop offset="1" stop-color="#4C7DF4"/></linearGradient>
+ <linearGradient id="c" x1="136" y1="290" x2="380" y2="155" gradientUnits="userSpaceOnUse"><stop stop-color="#4AF2CF"/><stop offset=".54" stop-color="#34ECE7"/><stop offset="1" stop-color="#4C9DFF"/></linearGradient>
+ <linearGradient id="vc" x1="166" y1="130" x2="367" y2="398" gradientUnits="userSpaceOnUse"><stop stop-color="#D894F7"/><stop offset=".49" stop-color="#9B66FF"/><stop offset=".78" stop-color="#4C7DF4"/><stop offset="1" stop-color="#34ECE7"/></linearGradient>
+ <linearGradient id="pale" x1="222" y1="183" x2="308" y2="285" gradientUnits="userSpaceOnUse"><stop stop-color="#D3B4FF"/><stop offset="1" stop-color="#7778F2"/></linearGradient>
+ <radialGradient id="disk" cx=".36" cy=".20" r=".96"><stop stop-color="#25224C"/><stop offset=".45" stop-color="#141B38"/><stop offset="1" stop-color="#0B1025"/></radialGradient>
+ <radialGradient id="vglow"><stop stop-color="#A35DF2" stop-opacity=".22"/><stop offset=".50" stop-color="#7258F9" stop-opacity=".09"/><stop offset="1" stop-color="#7258F9" stop-opacity="0"/></radialGradient>
+ <radialGradient id="cglow"><stop stop-color="#34ECE7" stop-opacity=".19"/><stop offset=".60" stop-color="#34ECE7" stop-opacity=".06"/><stop offset="1" stop-color="#34ECE7" stop-opacity="0"/></radialGradient>
+ <radialGradient id="pearl" cx=".30" cy=".20" r="1.0"><stop stop-color="#DDEBFF"/><stop offset=".23" stop-color="#A8BAFC"/><stop offset=".57" stop-color="#8878EF"/><stop offset="1" stop-color="#474CB6"/></radialGradient>
+ </defs>
+<circle cx="256" cy="256" r="232" fill="url(#disk)"/>
+<circle cx="256" cy="256" r="231" fill="none" stroke="#7E71D9" stroke-opacity=".33" stroke-width="2"/>
+<ellipse cx="252" cy="272" rx="166" ry="158" fill="url(#vglow)" opacity=".6"/>
+<g stroke-linejoin="round">
+ <path d="M145 286 C132 238 151 179 195 155" fill="none" stroke="url(#v)" stroke-width="12" stroke-linecap="round"/>
+ <path d="M316 161 C352 182 376 221 370 268" fill="none" stroke="url(#c)" stroke-width="11" stroke-linecap="round"/>
+ <path d="M228 167 L275 158 Q286 159 295 174 L307 208 Q311 220 305 233 L278 263 Q268 274 253 274 L224 258 Q215 252 210 239 L200 207 Q197 193 208 181 Z" fill="url(#pale)"/>
+ <path d="M259 163 L275 158 Q286 159 295 174 L307 208 Q311 220 305 233 L278 263 L258 274 L258 166Z" fill="url(#vc)" opacity=".63"/>
+ <path d="M219 228 L256 246 L296 222" fill="none" stroke="#0F1A33" stroke-opacity=".58" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M149 355 C153 318 179 297 211 287 L239 279 L256 294 L273 279 L301 287 C336 299 358 323 362 355" fill="none" stroke="url(#vc)" stroke-width="24" stroke-linecap="round"/>
+ <path d="M178 353 L216 344 L247 357 L284 341 L334 350" fill="none" stroke="url(#c)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

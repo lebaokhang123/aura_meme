@@ -11,7 +11,7 @@ export function readDemoUser() {
   if(!MOCK_AUTH){
     const user=auth.snapshot().user;if(!user)return null;
 
-    return {...user,displayName:user.display_name,avatar:user.avatar_url||'/assets/brand/favicon-64.png'};
+    return {...user,displayName:user.display_name,avatar:user.avatar_url||'/assets/identity/default-avatar.svg'};
   }
   try {
     const raw = localStorage.getItem(USER_KEY);

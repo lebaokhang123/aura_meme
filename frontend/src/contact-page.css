@@ -27,11 +27,7 @@
 .am-contact-topics button:hover{color:var(--am-on-surface)}
 .am-contact-message-label{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .am-contact-message-label>span{flex:none;color:var(--am-on-surface-variant);font:500 13px/16px 'Times New Roman',serif;letter-spacing:-.01em}
-.am-contact-acknowledgment{display:flex;align-items:flex-start;gap:12px;cursor:pointer;color:var(--am-on-surface-variant);font:400 15px/24.375px Inter,sans-serif}
-.am-contact-acknowledgment input{appearance:none;flex:none;width:20px;height:20px;padding:0;margin:2px 0 0;border:0;border-radius:4px;background:var(--am-surface-container);cursor:pointer;display:grid;place-content:center}
-.am-contact-acknowledgment input:checked{background:var(--am-secondary);color:var(--am-on-secondary)}
-.am-contact-acknowledgment input:checked:after{content:'✓';font:700 15px/20px Inter,sans-serif}
-.am-contact-acknowledgment:hover{color:var(--am-on-surface)}
+.am-contact-acknowledgment{margin:0;color:var(--am-on-surface-variant);font:400 15px/24.375px Inter,sans-serif}
 .am-contact-actions{padding-top:16px;display:flex;align-items:center;justify-content:space-between;gap:16px}
 .am-contact-submit{min-width:320px;height:48px;padding:0 48px;border:0;border-radius:8px;background:linear-gradient(90deg,var(--am-secondary),var(--am-primary-fixed-dim),var(--am-tertiary));color:var(--am-on-secondary-fixed);font:700 16px/20px 'Times New Roman',serif;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 0 20px rgb(var(--am-rgb-secondary) / .4);cursor:pointer;transition:transform .15s,box-shadow .15s}
 .am-contact-submit>.material-symbols-outlined{font-size:20px}

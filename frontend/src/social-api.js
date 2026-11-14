@@ -9,7 +9,7 @@ export function apiMedia(value){if(value===null||value===undefined)return null;i
 export function apiAuthor(value){
  apiId(value?.id);if(typeof value.username!=='string'||typeof value.display_name!=='string')bad();
  return {author:value.username,authorId:value.id,authorName:value.display_name,handle:'@'+value.username,
- avatar:apiMedia(value.avatar_url)||'/assets/brand/favicon-64.png',
+ avatar:apiMedia(value.avatar_url)||'/assets/identity/default-avatar.svg',
  level:'Lvl —',nickname:'Đang phát triển'};
 }
 export function apiCategory(value){

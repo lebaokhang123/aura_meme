@@ -20,9 +20,9 @@ export async function profileServer(context,{signed=true,admin=false,empty=false
   if(p==='/auth/logout'){state.viewer=null;return send(204)}
   if(p==='/users/me'&&method==='PATCH'){Object.assign(state.profile,body);Object.assign(state.viewer,body);return send(200,state.viewer)}
   if(p==='/users/me')return state.viewer?send(200,state.viewer):fail(401,'UNAUTHORIZED');
-  if(p==='/users/profile_owner')return send(200,state.profile);
-  if(p==='/users/profile_owner/activity'){const value=activity();if(empty){value.days.forEach(d=>d.posts=d.comments=d.count=0);value.total=0}return send(200,value)}
-  if(p==='/users/profile_owner/comments')return send(200,pageOf(state.comments));
+  if(p==='/users/'+state.profile.username)return send(200,state.profile);
+  if(p==='/users/'+state.profile.username+'/activity'){const value=activity();if(empty){value.days.forEach(d=>d.posts=d.comments=d.count=0);value.total=0}return send(200,value)}
+  if(p==='/users/'+state.profile.username+'/comments')return send(200,pageOf(state.comments));
   if(p==='/categories')return send(200,pageOf([category]));
   if(p==='/inventory/me')return send(200,pageOf(empty?[]:Array.from({length:9},(_,i)=>({asset:{id:uid.slice(0,-3)+(201+i),slug:'Synthetic-owned-'+i,kind:'avatar',rarity:'D',media_url:'/api/v1/catalog/assets/'+uid.slice(0,-3)+(201+i)},quantity:1,equipped:i===0}))));
   if(p==='/posts'&&method==='GET')return send(200,pageOf(state.posts.map(post=>({...post,author:state.profile,interactions:interactions()}))));
