@@ -60,10 +60,10 @@ test('register uses USER-only payload, password12 policy, keeps VI/EN theme fiel
  expect(payload.username).toBe('new_user');expect(payload.display_name).toBe('New_User');expect(payload.roles).toBeUndefined();
 });
 test('logout uses bound csrf; server revocation is reflected on focus and reload',async({page,context})=>{
- const server=await api(context);await login(page);await expect(page.locator('.account-avatar')).toBeVisible();
+ const server=await api(context);await login(page);await expect(page).toHaveURL(/\/$/);await expect(page.locator('.account-avatar')).toBeVisible();
  server.user=null;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
  await expect(page.getByRole('button',{name:'Mở menu tài khoản'})).toHaveCount(0);
- await login(page);await expect(page.locator('.account-avatar')).toBeVisible();
+ await login(page);await expect(page).toHaveURL(/\/$/);await expect(page.locator('.account-avatar')).toBeVisible();
  await page.getByRole('button',{name:'Mở menu tài khoản'}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();
  await expect(page.getByRole('button',{name:'Mở menu tài khoản'})).toHaveCount(0);expect(server.user).toBeNull();
  expect(server.requests.find(row=>row.path.endsWith('/logout')).csrf).toBe('server-csrf');
@@ -72,7 +72,7 @@ test('multiple tabs revalidate with server after login/logout without exchanging
  await api(context);await page.goto('/');await expect(page.getByRole('button',{name:'Mở menu tài khoản'})).toHaveCount(0);
  const other=await context.newPage(),reads=[];other.on('request',request=>{if(new URL(request.url()).pathname==='/api/v1/users/me')reads.push(request.url())});
  await other.goto('/');await expect(other.getByRole('link',{name:'Đăng nhập',exact:true}).first()).toBeVisible();
- const beforeLogin=reads.length;await login(page,'kien_dev@example.com');await expect(page.locator('.account-avatar')).toBeVisible();
+ const beforeLogin=reads.length;await login(page,'kien_dev@example.com');await expect(page).toHaveURL(/\/$/);await expect(page.locator('.account-avatar')).toBeVisible();
  // Verify background server revalidation first; activate the tab only to inspect its painted UI.
  await expect.poll(()=>reads.length).toBeGreaterThan(beforeLogin);await other.bringToFront();await expect(other.locator('.account-avatar')).toHaveAttribute('alt','Ảnh đại diện Kien Dev');
  await page.bringToFront();const beforeLogout=reads.length;await page.getByRole('button',{name:'Mở menu tài khoản'}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();
