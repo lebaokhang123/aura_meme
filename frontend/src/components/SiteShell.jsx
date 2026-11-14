@@ -70,13 +70,13 @@ export function SiteHeader() {
         </div>
       </div>
     </header>
-    {user && <dialog ref={profile} className="demo-profile" aria-labelledby="demo-profile-title" onClose={() => accountButton.current?.focus()}><button type="button" className="site-icon-button profile-close" aria-label="Đóng thông tin" onClick={() => profile.current.close()}>{symbol('close')}</button><img src={user.avatar} width="80" height="80" alt={`Ảnh đại diện ${user.displayName}`} /><h2 id="demo-profile-title">Thông tin demo</h2><strong>{user.displayName}</strong><p>@{user.username}</p><small>Dữ liệu frontend demo.</small></dialog>}
+    {user && <dialog ref={profile} className="demo-profile" aria-labelledby="demo-profile-title" onClose={() => accountButton.current?.focus()}><button type="button" className="site-icon-button profile-close" aria-label="Đóng thông tin" onClick={() => profile.current.close()}>{symbol('close')}</button><img src={user.avatar} width="80" height="80" alt={`Ảnh đại diện ${user.displayName}`} /><h2 id="demo-profile-title">{user.roles?'Thông tin tài khoản':'Thông tin demo'}</h2><strong>{user.displayName}</strong><p>@{user.username}</p><small>{user.roles?'Phiên được xác minh bởi máy chủ.':'Dữ liệu frontend demo.'}</small>{user.roles?.includes('ADMIN')&&<p><a href="/admin">Không gian quản trị</a></p>}<p><a href="/premium">Aura Plus / Prime</a></p></dialog>}
   </>);
 }
 
 export function SiteFooter() {
   const render = useLocalized();
-  return render(<footer className="site-footer"><div>© 2026 AuraMeme. All rights reserved.</div><div className="site-footer-links"><a href="/privacy.html" target="_blank" rel="noopener noreferrer">Chính sách bảo mật</a><a href="https://github.com/lebaokhang123/aura_meme" target="_blank" rel="noopener noreferrer"><GithubIcon /><span>Github</span></a></div></footer>);
+  return render(<footer className="site-footer"><div>© 2026 AuraMeme. All rights reserved.</div><div className="site-footer-links"><a href="/premium">Aura Plus / Prime</a><a href="/privacy.html" target="_blank" rel="noopener noreferrer">Chính sách bảo mật</a><a href="https://github.com/lebaokhang123/aura_meme" target="_blank" rel="noopener noreferrer"><GithubIcon /><span>Github</span></a></div></footer>);
 }
 
 export function MaintenancePage() {

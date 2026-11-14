@@ -30,7 +30,7 @@ async function api(context){
 }
 const submit=page=>page.locator('#loginForm button[type=submit]').click();
 async function login(page,email='khang_dev@example.com',value=password){
- await page.goto('/login');await page.locator('#identifier').fill(email);await page.locator('#password').fill(value);await submit(page);
+ await page.bringToFront();await page.goto('/login');await page.locator('#identifier').fill(email);await page.locator('#password').fill(value);await submit(page);
 }
 test('real mode ignores forged localStorage identity; wrong password stays on form; valid identity comes from me',async({page,context})=>{
  const server=await api(context);
@@ -70,11 +70,15 @@ test('logout uses bound csrf; server revocation is reflected on focus and reload
 });
 test('multiple tabs revalidate with server after login/logout without exchanging trusted role data',async({page,context})=>{
  await api(context);await page.goto('/');await expect(page.getByRole('button',{name:'Mở menu tài khoản'})).toHaveCount(0);
- const other=await context.newPage();await other.goto('/');await expect(other.getByRole('link',{name:'Đăng nhập',exact:true}).first()).toBeVisible();
- await login(page,'kien_dev@example.com');await expect(page.locator('.account-avatar')).toBeVisible();await expect(other.locator('.account-avatar')).toHaveAttribute('alt','Ảnh đại diện Kien Dev');
- await page.getByRole('button',{name:'Mở menu tài khoản'}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();
- await expect(other.getByRole('button',{name:'Mở menu tài khoản'})).toHaveCount(0);
+ const other=await context.newPage(),reads=[];other.on('request',request=>{if(new URL(request.url()).pathname==='/api/v1/users/me')reads.push(request.url())});
+ await other.goto('/');await expect(other.getByRole('link',{name:'Đăng nhập',exact:true}).first()).toBeVisible();
+ const beforeLogin=reads.length;await login(page,'kien_dev@example.com');await expect(page.locator('.account-avatar')).toBeVisible();
+ // Verify background server revalidation first; activate the tab only to inspect its painted UI.
+ await expect.poll(()=>reads.length).toBeGreaterThan(beforeLogin);await other.bringToFront();await expect(other.locator('.account-avatar')).toHaveAttribute('alt','Ảnh đại diện Kien Dev');
+ await page.bringToFront();const beforeLogout=reads.length;await page.getByRole('button',{name:'Mở menu tài khoản'}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();
+ await expect.poll(()=>reads.length).toBeGreaterThan(beforeLogout);await other.bringToFront();await expect(other.getByRole('button',{name:'Mở menu tài khoản'})).toHaveCount(0);
 });
+
 test('network loss never restores a fake session and retry recovers',async({page,context})=>{
  const server=await api(context);server.offline=true;await page.goto('/login');
  await expect(page.getByRole('alert')).toContainText('Không kết nối được');

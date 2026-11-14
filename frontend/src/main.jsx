@@ -16,6 +16,9 @@ import { LocalizedPage, useLocalized } from './localize.jsx';
 import './preferences-theme.css';
 import { SocialProvider } from './SocialContext.jsx';
 import './social.css';
+import AdminPage from './components/AdminPage.jsx';
+import PremiumPage from './components/PremiumPage.jsx';
+import {loginUrl} from './return-url.js';
 const pages=import.meta.glob('./generated/*.js');
 const cssFiles=import.meta.glob('./generated/*.css',{query:'?raw',import:'default'});
 const effectsFiles=import.meta.glob('./generated/*.effects.json');
@@ -33,7 +36,8 @@ function App() {
     document.body.dataset.screen=page.key;
     const style=document.createElement('style');style.id='stitch-active-styles';
     const maintenance=['/contact','/rank','/vault'].includes(page.path);
-    const pageLoader=maintenance ? Promise.resolve(MaintenancePage) : pages[`./generated/${page.key}.js`]().then(mod=>mod.default);
+    const custom={'/admin':AdminPage,'/premium':PremiumPage}[page.path];
+    const pageLoader=custom?Promise.resolve(custom):maintenance ? Promise.resolve(MaintenancePage) : pages[`./generated/${page.key}.js`]().then(mod=>mod.default);
     const cssLoader=cssFiles[`./generated/${page.key}.css`]();
     // Mount with its own CSS ready, avoiding an unstyled frame during navigation.
     Promise.all([pageLoader,cssLoader]).then(([component,css])=>{
@@ -41,10 +45,11 @@ function App() {
       style.textContent=css;document.head.appendChild(style);setScreen(()=>component);
     }).catch(()=>{if(active)setFailed(true)});
     return () => {active=false;style.remove()};
-  },[page.key]);
+  },[page.key,page.path]);
   useEffect(() => {
     if(!screen)return;
     applyDemoIdentity();
+    if(['/admin','/premium'].includes(page.path))return;
     let stopped=false;let cleanup=()=>{};
     const loader=effectsFiles[`./generated/${page.key}.effects.json`]; if(loader&&!['/','/explore'].includes(page.path))loader().then(mod=>{
       if(stopped)return;cleanup=initLegacyEffects(mod.default);
@@ -55,9 +60,11 @@ function App() {
   useEffect(()=>{if(!MOCK_AUTH&&screen&&page.path==='/login'&&new URLSearchParams(location.search).has('registered'))showDemoMessage(language==='en'?'Account created. Please sign in.':'Đăng ký thành công. Vui lòng đăng nhập.');},[screen]);
   useEffect(()=>{if(screen)prepareAuthForm();},[screen,language]);
   useEffect(()=>{if(!MOCK_AUTH&&authState.error)showDemoMessage(authMessage(authState.error,language));},[authState.error]);
+  useEffect(()=>{if(!MOCK_AUTH&&page.path==='/admin'&&authState.status==='guest')location.replace(loginUrl());},[page.path,authState.status]);
+  if(!MOCK_AUTH&&page.path==='/admin'&&authState.status!=='authenticated')return null;
   // Reveal the header and page together after the lazy content and CSS are ready.
   if(!screen&&!failed)return null;
-  return render(<><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : <LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}</>);
+  return render(<><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : screen===AdminPage||screen===PremiumPage?React.createElement(screen):<LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}</>);
 }
 
 applyPreferences(readPreferences());
