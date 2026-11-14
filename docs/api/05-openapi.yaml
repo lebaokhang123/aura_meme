@@ -293,6 +293,32 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
       x-phase: P0
+  /api/v1/users/{username}/activity:
+    get:
+      tags:
+      - Account
+      summary: Hoạt động public theo ngày lịch Việt Nam trong 53 tuần
+      operationId: getPublicUserActivity
+      description: Đếm post public do tài khoản viết và comment visible/chưa xóa trên post public. Không tính timestamp sau server now; tuần bắt đầu thứ Hai, gồm 371 ngày tới Chủ nhật tuần hiện tại, ngày tương lai bằng 0. Không bao gồm Aura/XP/Vault hoặc thông tin riêng tư.
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Username'
+      responses:
+        '200':
+          description: Thành công; end_date là hôm nay theo Asia/Ho_Chi_Minh
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicActivity'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
   /api/v1/users/{username}/comments:
     get:
       tags:
@@ -2253,6 +2279,50 @@ components:
       description: Hồ sơ public chỉ gồm UserPublic; không cover, PII hoặc roles.
       allOf:
       - $ref: '#/components/schemas/UserPublic'
+    ActivityDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        posts:
+          type: integer
+          minimum: 0
+        comments:
+          type: integer
+          minimum: 0
+        count:
+          type: integer
+          minimum: 0
+          description: posts + comments
+      required: [date, posts, comments, count]
+    PublicActivity:
+      type: object
+      properties:
+        timezone:
+          type: string
+          enum: [Asia/Ho_Chi_Minh]
+          default: Asia/Ho_Chi_Minh
+        start_date:
+          type: string
+          format: date
+          description: Thứ Hai 52 tuần trước thứ Hai của tuần hiện tại
+        end_date:
+          type: string
+          format: date
+          description: Hôm nay theo lịch Việt Nam, không phải Chủ nhật cuối danh sách
+        days:
+          type: array
+          minItems: 371
+          maxItems: 371
+          description: Ngày liên tục tăng dần tới Chủ nhật tuần hiện tại; ngày tương lai count bằng 0
+          items:
+            $ref: '#/components/schemas/ActivityDay'
+        total:
+          type: integer
+          minimum: 0
+          description: Tổng count của 371 ngày
+      required: [start_date, end_date, days, total]
     UserPrivate:
       type: object
       properties:

@@ -6,6 +6,7 @@ import {auth,MOCK_AUTH} from './auth.js';
 import {authMessage} from './auth-client.js';
 import {ProfilePage,ContactPage,VaultPage,ContactInbox} from './components/AccountPages.jsx';
 import './account-pages.css';
+import './profile-page.css';
 import {loginUrl} from './return-url.js';
 import {usePreferences} from './PreferencesContext.jsx';
 import { applyDemoIdentity } from './demo.js';

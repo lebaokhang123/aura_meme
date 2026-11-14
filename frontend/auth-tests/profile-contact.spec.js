@@ -1,3 +1,4 @@
+import {activity} from './profile-fixture.js';
 import {test,expect} from '@playwright/test';
 const owner={id:'00000000-0000-4000-8000-000000000001',username:'profile_owner',display_name:'Synthetic Owner',email:'private@example.com',phone:'private-phone',address:'private-address',roles:['USER'],status:'active',bio:'Synthetic public bio',created_at:'2026-11-01T00:00:00Z',avatar_url:null};
 const pageOf=items=>({items,pagination:{page:1,page_size:20,total:items.length,total_pages:items.length?1:0}});
@@ -15,6 +16,7 @@ async function api(context,{signed=true,admin=false}={}){
   if(p==='/auth/login'){state.user={...owner};return send(200,state.user)}
   if(p==='/auth/logout'){state.user=null;return send(204)}
   if(p==='/users/profile_owner')return send(200,{id:owner.id,username:owner.username,display_name:state.profile.display_name,bio:state.profile.bio,created_at:owner.created_at,avatar_url:null});
+  if(p==='/users/profile_owner/activity'){const value=activity();value.days.forEach(d=>d.posts=d.comments=d.count=0);value.total=0;return send(200,value)}
   if(p==='/users/profile_owner/comments')return send(200,pageOf([]));
   if(p==='/posts'||p==='/categories'||p==='/inventory/me'||p==='/admin/contacts')return send(200,pageOf([]));
   if(p==='/contact'){

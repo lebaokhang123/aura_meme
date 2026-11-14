@@ -18,7 +18,8 @@ export function apiCategory(value){
 }
 export function apiPost(value){
  apiId(value?.id);if(typeof value.title!=='string'||typeof value.content!=='string'||!Number.isFinite(Date.parse(value.created_at)))bad();
- return {...apiAuthor(value.author),id:value.id,title:value.title,content:value.content,category:apiCategory(value.category).id,
+ const category=apiCategory(value.category);
+ return {...apiAuthor(value.author),id:value.id,title:value.title,content:value.content,category:category.id,categoryLabel:category.label,
  reactions:Object.values(value.interactions?.reaction_counts||{}),createdAt:Date.parse(value.created_at),ageMinutes:Math.max(0,(Date.now()-Date.parse(value.created_at))/60000),media:apiMedia(value.media_url),interactions:value.interactions,api:true};
 }
 export function apiComment(value){

@@ -16,7 +16,7 @@ export function relativeTime(createdAt,language) {
 }
 function CommentRow({comment}) {
   const render=useLocalized(),{commit}=useSocial(),current=readDemoUser(),{language}=usePreferences();
-  const author=comment.api?{avatar:comment.avatar,displayName:comment.authorName}:DEMO_USERS.find(user=>user.username===comment.author);
+  const author=comment.api?{avatar:comment.authorId===current?.id?current.avatar:comment.avatar,displayName:comment.authorId===current?.id?current.displayName:comment.authorName}:DEMO_USERS.find(user=>user.username===comment.author);
   const profile=comment.api?{handle:comment.handle,level:comment.level,nickname:comment.nickname}:POSTS.find(post=>post.id===({Khang_dev:'khang',Kien_dev:'kien',Gigachad:'gigachad'}[comment.author]));
   const classes=authorClasses(comment.api?'Khang_dev':comment.author,true);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[menuOpen,setMenuOpen]=useState(false),[confirm,setConfirm]=useState(false);

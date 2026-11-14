@@ -52,6 +52,11 @@ POST `/api/v1/contact` yêu cầu tài khoản active, session cookie và `requi
 
 GET `/api/v1/posts?author={username}` lọc username chính xác và giữ toàn bộ điều kiện public hiện có. GET `/api/v1/users/{username}/comments?page=1&page_size=20` trả items Comment cùng Pagination, mới nhất trước với UUID tie-break; chỉ comment visible/chưa xóa, tác giả active và parent post/category/author/media vẫn public. Profile thiếu/khóa/xóa trả404; trang vượt phạm vi trả items rỗng, không trả dữ liệu riêng tư.
 
+
+**Public activity heatmap · 2026-11-14:** GET `/api/v1/users/{username}/activity` trả `{timezone: "Asia/Ho_Chi_Minh", start_date, end_date, days: [{date, posts, comments, count}], total}`. `end_date` là hôm nay theo ngày lịch Việt Nam (00:00), khác ngày Aura bắt đầu07:00. `start_date` là thứ Hai 52 tuần trước thứ Hai của tuần hiện tại; `days` luôn đúng371 ngày tăng dần, tức53 tuần ×7 ngày, tới Chủ nhật tuần hiện tại. Ngày sau hôm nay bằng0; mọi record có created_at sau server now bị loại, kể cả cùng ngày. Count bằng posts + comments; total là tổng count, không phải XP/Aura/Vault.
+
+Chỉ đếm post do tài khoản viết đang public theo `public_posts` (published, chưa deleted, category/author active, media ready/owned nếu có) và comment do tài khoản viết visible/chưa xóa trên parent post vẫn public. Username có cùng validation với public profile; tài khoản thiếu/inactive hoặc thiếu profile trả404. Hai truy vấn GROUP BY ngày Việt Nam cộng một lookup public user, không phân trang/N+1, không thêm table/schema/migration hoặc dữ liệu riêng tư. Thay đổi moderation hiện tại được phản ánh khi đọc lại.
+
 ### Public và tài khoản
 
 | HTTP | Endpoint | Quyền | Công dụng |
@@ -64,6 +69,7 @@ GET `/api/v1/posts?author={username}` lọc username chính xác và giữ toàn
 | GET/PATCH | `/api/v1/users/me` | User | Xem/sửa hồ sơ riêng |
 | PUT | `/api/v1/users/me/password` | User | Đổi mật khẩu |
 | GET | `/api/v1/users/{username}` | Public | Hồ sơ công khai |
+| GET | `/api/v1/users/{username}/activity` | Public | Hoạt động post/comment public theo lịch Việt Nam, 53 tuần |
 
 ### Blog, Media, Contact
 
