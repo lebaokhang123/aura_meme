@@ -1,15 +1,15 @@
 // DTO mapping only; all HTTP/cookies/CSRF use the existing Auth client.
-import {DEMO_USERS} from './demo.js';
+
 const TYPES=['like','love','laugh','fire','sad','angry'];
 const ICONS={gaming:'sports_esports',anime:'movie_filter','cong-nghe':'terminal','truong-hoc':'school',random:'casino'};
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const bad=()=>{throw Error('PROTOCOL_ERROR')};
 export const apiId=value=>typeof value==='string'&&UUID.test(value)?value:bad();
-export function apiMedia(value){if(value===null||value===undefined)return null;if(typeof value!=='string'||!/^\/api\/v1\/media\/[0-9a-f-]{36}$/.test(value))bad();return value;}
+export function apiMedia(value){if(value===null||value===undefined)return null;if(typeof value!=='string'||!/^\/api\/v1\/(?:media|catalog\/assets)\/[0-9a-f-]{36}$/.test(value))bad();return value;}
 export function apiAuthor(value){
  apiId(value?.id);if(typeof value.username!=='string'||typeof value.display_name!=='string')bad();
  return {author:value.username,authorId:value.id,authorName:value.display_name,handle:'@'+value.username,
- avatar:apiMedia(value.avatar_url)||DEMO_USERS.find(v=>v.username.toLowerCase()===value.username)?.avatar||'/assets/brand/favicon-64.png',
+ avatar:apiMedia(value.avatar_url)||'/assets/brand/favicon-64.png',
  level:'Lvl —',nickname:'Đang phát triển'};
 }
 export function apiCategory(value){
