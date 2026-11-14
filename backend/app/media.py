@@ -232,6 +232,19 @@ class Media(BaseModel):
     url: str | None = Field(default=None, json_schema_extra={"format": "uri-reference"})
 
 
+def image_response(media, *, still=False):
+    unavailable = AuthError(404, 'NOT_FOUND', 'Image not available.')
+    try:
+        payload = read_private_object(MediaSettings().media_storage_root, media.object_key, MAX_FILE_BYTES)
+        if len(payload) != media.size_bytes:
+            raise ValueError('Private image size changed.')
+        data, mime = normalize_image(payload, media.mime, still=still)
+    # shortcut: GIF delay coalescing can overflow; use still=true until the encoder supports that case.
+    except (OSError, ValueError, OverflowError, ValidationError, AuthError):
+        raise unavailable from None
+    return Response(data, media_type=mime, headers={'Content-Security-Policy': "default-src 'none'; sandbox"})
+
+
 @router.get('/api/v1/media/{media_id}', name='userMedia', operation_id='getMedia', response_class=Response,
             tags=['Media'], responses={200: {'content': {
                 mime: {'schema': {'type': 'string', 'format': 'binary'}} for mime in ('image/png', 'image/gif')}},
@@ -273,15 +286,7 @@ def get_media(media_id: UUID, request: Request, still: bool = False, raw=Depends
                           .with_for_update(read=True).execution_options(populate_existing=True))
         if media is None:
             raise unavailable
-        try:
-            payload = read_private_object(MediaSettings().media_storage_root, media.object_key, MAX_FILE_BYTES)
-            if len(payload) != media.size_bytes:
-                raise ValueError('Private image size changed.')
-            data, mime = normalize_image(payload, media.mime, still=still)
-        # shortcut: GIF delay coalescing can overflow; use still=true until the encoder supports that case.
-        except (OSError, ValueError, OverflowError, ValidationError, AuthError):
-            raise unavailable from None
-        return Response(data, media_type=mime, headers={'Content-Security-Policy': "default-src 'none'; sandbox"})
+        return image_response(media, still=still)
 
 
 @router.post("/api/v1/media", status_code=201, response_model=Media, operation_id="uploadMedia", tags=["Media"],

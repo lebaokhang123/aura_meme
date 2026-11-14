@@ -18,6 +18,7 @@ from app.media import router as media_router
 from app.comments import router as comments_router
 from app.admin_users import router as admin_users_router
 from app.admin_posts import router as admin_posts_router
+from app.admin_workspace import router as admin_workspace_router
 from app.contact import router as contact_router
 from app.own_posts import router as own_posts_router
 from app.interactions import router as interactions_router
@@ -53,6 +54,7 @@ app.include_router(media_router)
 app.include_router(comments_router)
 app.include_router(admin_users_router)
 app.include_router(admin_posts_router)
+app.include_router(admin_workspace_router)
 app.include_router(contact_router)
 app.include_router(own_posts_router)
 app.include_router(interactions_router)
