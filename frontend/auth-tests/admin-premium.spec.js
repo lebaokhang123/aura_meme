@@ -32,4 +32,41 @@ test('Content/category/inbox workflows and safe audit/catalog views',async({page
 
 test('Failed reads retry; revoked Admin role removes private workspace',async({page,context})=>{const s=await api(context);s.fail=true;await enter(page);await expect(page.getByRole('alert')).toBeVisible();s.fail=false;await page.getByRole('button',{name:'Thử lại',exact:true}).click();await expect(row(page,1)).toBeVisible();s.user.roles=['USER'];await page.getByRole('button',{name:'Liên hệ',exact:true}).click();await expect(page.getByRole('heading',{name:'Không có quyền truy cập'})).toBeVisible();await expect(page.locator('[data-admin-id]')).toHaveCount(0)});
 
-test('Admin/Premium responsive VI/EN dark/light and disabled Premium without transactions',async({page,context})=>{test.setTimeout(90000);const s=await api(context);await enter(page);for(const width of [375,768,1440])for(const theme of ['dark','light'])for(const language of ['vi','en']){await page.setViewportSize({width,height:900});await page.evaluate(p=>localStorage.setItem('aurameme-ui-preferences',JSON.stringify(p)),{theme,language});for(const path of ['/admin','/premium']){await page.goto(path);await expect(page.locator('main h1')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);if(path==='/admin')await expect(row(page,1)).toBeVisible();else{await expect(page.locator('.premium-plan')).toHaveCount(2);await expect(page.locator('.premium-plus')).toContainText('30');await expect(page.locator('.premium-prime')).toContainText('365');for(const button of await page.locator('.premium-plan button').all())await expect(button).toBeDisabled();}}}expect(s.requests.some(r=>r.method==='POST'||r.path.includes('entitlement')||r.path.includes('payment'))).toBe(false)});
+test('Admin sidebar geometry and keyboard dialog focus survive resource changes',async({page,context})=>{
+ await api(context);await page.setViewportSize({width:1440,height:1000});await enter(page);
+ const sidebar=await page.locator('.admin-sidebar').boundingBox(),content=await page.locator('.admin-main').boundingBox();
+ expect(sidebar.x+sidebar.width).toBeLessThanOrEqual(content.x);await expect(row(page,1)).toBeVisible();
+ const button=row(page,3).getByRole('button',{name:'Sửa vai trò'});await button.focus();await page.keyboard.press('Enter');await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(button).toBeFocused();
+ await page.getByRole('button',{name:'Nội dung',exact:true}).click();await expect(row(page,10)).toBeVisible();await expect(row(page,1)).toHaveCount(0);
+ await page.setViewportSize({width:375,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('Premium plan selection, arrows and reduced motion keep real benefits without writes',async({page,context})=>{
+ const s=await api(context,null);await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/premium');
+ const plus=page.getByRole('radio',{name:'Aura Plus',exact:true}),prime=page.getByRole('radio',{name:'Aura Prime',exact:true});
+ const liveRegion=await page.locator('.u056-feat').elementHandle();await expect(plus).toBeChecked();await plus.focus();await page.keyboard.press('ArrowRight');await expect(prime).toBeChecked();expect(await liveRegion.evaluate(el=>el.isConnected)).toBe(true);
+ await expect(page.locator('.u056-od')).toHaveAttribute('aria-label','365 ngày');expect(await page.locator('.u056-col').evaluateAll(es=>es.map(e=>e.style.getPropertyValue('--d')).join(''))).toBe('365');await expect(page.locator('.u056-feat')).toContainText('×3');await expect(page.locator('.u056-cta')).toBeDisabled();await expect(page.locator('.u056-cta')).toContainText('Aura Prime');
+ await page.getByRole('radio',{name:'30 ngày',exact:true}).click();await expect(plus).toBeChecked();await expect(page.locator('.u056-od')).toHaveAttribute('aria-label','30 ngày');await expect(page.locator('.u056-feat')).toContainText('×2');
+ for(const feature of await page.locator('.u056-feat li').all())await expect(feature).toHaveCSS('opacity','1');
+ expect(await page.locator('.u056-ring').evaluate(el=>getComputedStyle(el).transitionDuration)).toBe('1e-06s');
+ expect(s.requests.filter(r=>!['GET','HEAD'].includes(r.method))).toEqual([]);expect(await page.locator('main').innerText()).not.toMatch(/\$|2 months free|Basic|Start Pro/);
+});
+
+test('Premium moving frame follows selection through live language/theme switches and resize',async({page,context})=>{
+ await api(context,null);await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:1440,height:1000});await page.goto('/premium');
+ for(const button of await page.locator('.u056-sw button').all())expect((await button.boundingBox()).height).toBeGreaterThanOrEqual(44);
+ await page.locator('.premium-prime').click();await expect(page.getByRole('radio',{name:'Aura Prime',exact:true})).toBeChecked();
+ const aligned=async()=>page.locator('.u056').evaluate(el=>{
+  const card=el.querySelector('input:checked').closest('label').getBoundingClientRect(),ring=el.querySelector('.u056-ring').getBoundingClientRect();
+  const option=el.querySelector('[role=radio][aria-checked=true]').getBoundingClientRect(),knob=el.querySelector('.u056-knob').getBoundingClientRect();
+  return Math.max(Math.abs(card.top-ring.top),Math.abs(card.height-ring.height),Math.abs(option.left-knob.left),Math.abs(option.width-knob.width));
+ });
+ await expect.poll(aligned).toBeLessThan(1);
+ await page.locator('.u056-sw button').last().evaluate(el=>el.style.fontSize='20px');await expect.poll(aligned).toBeLessThan(1);
+ await page.locator('.site-language>button').click();await page.getByRole('option',{name:'English'}).click();await expect(page.locator('.u056-od')).toHaveAttribute('aria-label','365 days');
+ await page.locator('.u219-control button').click();await expect(page.locator('.u219').first()).toHaveAttribute('data-theme','light');
+ for(const width of [320,375,768,1024,1440]){await page.setViewportSize({width,height:1000});await expect.poll(aligned).toBeLessThan(1);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+ await expect(page.locator('.u056-cta')).toBeDisabled();await expect(page.locator('.u056-cta')).toContainText('Aura Prime');for(const feature of await page.locator('.u056-feat li').all())await expect(feature).toHaveCSS('opacity','1');
+});
+
+test('Admin/Premium responsive VI/EN dark/light and disabled Premium without transactions',async({page,context})=>{test.setTimeout(90000);const s=await api(context);await enter(page);for(const width of [375,768,1440])for(const theme of ['dark','light'])for(const language of ['vi','en']){await page.setViewportSize({width,height:900});await page.evaluate(p=>localStorage.setItem('aurameme-ui-preferences',JSON.stringify(p)),{theme,language});for(const path of ['/admin','/premium']){await page.goto(path);await expect(page.locator('main h1')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);if(path==='/admin')await expect(row(page,1)).toBeVisible();else{await expect(page.locator('.premium-plan')).toHaveCount(2);await expect(page.locator('.premium-plus')).toContainText('30');await expect(page.locator('.premium-prime')).toContainText('365');await expect(page.locator('.u056-cta')).toBeDisabled();await expect(page.locator('.u056-cta')).toContainText('Aura Plus');await expect(page.locator('.u056-feat li')).toHaveCount(4);}}}expect(s.requests.some(r=>r.method==='POST'||r.path.includes('entitlement')||r.path.includes('payment'))).toBe(false)});
