@@ -117,3 +117,40 @@ def test_inventory_auth_csrf_origin_and_revoked_session_before_write(inventory):
 @pytest.mark.integration
 def test_inventory_anonymous_requires_session(auth):
     assert auth[0].get('/api/v1/inventory/me').status_code==401
+
+
+def add_avatar_fixture(client, c, owner, template, *, active=True, approved=True, quantity=1, kind='avatar'):
+    asset=uuid4()
+    c.execute(text("INSERT INTO asset_items SELECT :asset,:slug,:kind,collection,rarity,media_key,source_rights || CAST(:rights AS jsonb),:active,created_at,updated_at FROM asset_items WHERE id=:template"),
+        dict(asset=asset,slug='avatar-'+asset.hex,kind=kind,rights=json.dumps({'review_status':'approved' if approved else 'pending'}),active=active,template=template))
+    c.execute(text('INSERT INTO user_inventory VALUES (:owner,:asset,:quantity,:now,:now)'),dict(owner=owner,asset=asset,quantity=quantity,now=client.app.state.auth.now()))
+    return asset
+
+
+@pytest.mark.integration
+def test_equipped_avatar_identity_and_unequip_fallback(inventory):
+    from test_auth import ACCOUNT, post
+    client,c,owner,other,ids,_=inventory
+    asset=add_avatar_fixture(client,c,owner,ids[0])
+    assert client.get('/api/v1/users/me').json()['avatar_url'] is None
+    response=mutation(client,'PUT','/inventory/equipment/avatar',{'asset_id':str(asset)})
+    assert response.status_code==200,response.text
+    expected='/api/v1/catalog/assets/'+str(asset)
+    assert client.get('/api/v1/users/me').json()['avatar_url']==expected
+    assert client.get('/api/v1/users/'+ACCOUNT['username']).json()['avatar_url']==expected
+    assert post(client,'logout').status_code==204
+    assert login(client).status_code==200
+    assert client.get('/api/v1/users/me').json()['avatar_url']==expected
+    assert mutation(client,'PUT','/inventory/equipment/avatar',{'asset_id':None}).status_code==200
+    assert client.get('/api/v1/users/me').json()['avatar_url'] is None
+    assert client.get('/api/v1/users/'+ACCOUNT['username']).json()['avatar_url'] is None
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize('invalid', ['inactive', 'unapproved', 'unowned', 'zero', 'wrong_kind'])
+def test_avatar_equip_rejects_invalid_inventory(inventory, invalid):
+    client,c,owner,other,ids,_=inventory
+    asset=add_avatar_fixture(client,c,other if invalid=='unowned' else owner,ids[0],
+        active=invalid not in ('inactive','unapproved'),approved=invalid!='unapproved',quantity=0 if invalid=='zero' else 1,
+        kind='icon' if invalid=='wrong_kind' else 'avatar')
+    assert mutation(client,'PUT','/inventory/equipment/avatar',{'asset_id':str(asset)}).status_code==(409 if invalid=='wrong_kind' else 404)

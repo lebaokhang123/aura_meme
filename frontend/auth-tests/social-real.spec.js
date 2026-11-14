@@ -94,3 +94,23 @@ test('pagination loads the next server page, resolves direct post links and keep
  const card=page.locator('[data-post-id]').first();await card.getByRole('button',{name:'Thả biểu cảm',exact:true}).click();await page.locator('[data-reaction=fire]').click();
  await expect(page.getByRole('alert')).toContainText('Đăng nhập');
 });
+
+test('profile-contact real edit, public privacy and private inbox storage',async({page,context})=>{
+ await page.goto('/contact');await expect(page).toHaveURL(/\/login\?next=%2Fcontact$/);
+ await login(page,'gigachad');await page.goto('/profile');
+ await page.getByRole('button',{name:'Chỉnh sửa hồ sơ',exact:true}).click();
+ await page.getByLabel('Tiểu sử',{exact:true}).fill('Synthetic Profile Contact E2E bio');await page.getByRole('button',{name:'Lưu thay đổi',exact:true}).click();
+ await expect(page.getByText('Synthetic Profile Contact E2E bio',{exact:true})).toBeVisible();
+ await page.reload();await expect(page.getByText('Synthetic Profile Contact E2E bio',{exact:true})).toBeVisible();
+ await page.goto('/contact');await page.locator('#contact-message').fill('Synthetic Profile Contact E2E message');
+ const saved=page.waitForResponse(r=>r.request().method()==='POST'&&new URL(r.url()).pathname==='/api/v1/contact');
+ await page.getByRole('button',{name:'Gửi tin nhắn ngay',exact:true}).click();expect((await saved).status()).toBe(201);await expect(page.getByRole('status')).toContainText('Đã gửi');
+ const guest=await context.browser().newContext(),view=await guest.newPage();
+ await view.goto('http://localhost:4187/profile/gigachad');await expect(view.getByText('Synthetic Profile Contact E2E bio',{exact:true})).toBeVisible();
+ await expect(view.getByRole('button',{name:'Chỉnh sửa hồ sơ',exact:true})).toHaveCount(0);await expect(view.getByText('gigachad@example.com',{exact:true})).toHaveCount(0);
+ expect((await view.request.post('http://localhost:4187/api/v1/contact',{data:{name:'Guest',email:'guest@example.com',subject:'No',body:'No'}})).status()).toBe(401);await guest.close();
+ await page.getByRole('button',{name:'Mở menu tài khoản'}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();await expect(page.locator('.account-avatar')).toHaveCount(0);
+ await login(page,'khang_dev');await page.goto('/admin/contacts');const message=page.locator('article').filter({hasText:'Synthetic Profile Contact E2E message'});await expect(message).toHaveCount(1);
+ await message.getByLabel('Trạng thái').selectOption('resolved');await expect(message.getByLabel('Trạng thái')).toHaveValue('resolved');
+ await page.reload();await expect(page.locator('article').filter({hasText:'Synthetic Profile Contact E2E message'}).getByLabel('Trạng thái')).toHaveValue('resolved');
+});

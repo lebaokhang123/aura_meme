@@ -5,7 +5,7 @@ from sqlalchemy import select, update
 from app.account_schemas import AccountPrivate, PasswordChange, ProfilePatch, PublicProfile
 from app.auth import CSRF_HEADER, ERRORS, user_private
 from app.auth_schemas import ErrorResponse
-from app.models import AuthSession, MediaUpload, Profile, User
+from app.models import AuthSession, Profile, User
 from app.permissions import require_account_csrf, require_authenticated_user
 from app.security import AuthError
 from app.media import media_url
@@ -19,7 +19,7 @@ def private_profile(account):
     basic = user_private(account.db, account.user)
     profile = account.db.get(Profile, account.user.id)
     return AccountPrivate(**basic.model_dump(), **{name: getattr(profile, name) for name in PROFILE_FIELDS},
-                          avatar_url=media_url(profile.avatar_media_id), cover_url=media_url(profile.cover_media_id))
+                          avatar_url=profile.avatar_url, cover_url=media_url(profile.cover_media_id))
 
 
 @router.get("/me", response_model=AccountPrivate, operation_id="getMe",
@@ -34,12 +34,6 @@ def update_me(payload: ProfilePatch, request: Request, account=Depends(require_a
     values = payload.model_dump(exclude_unset=True)
     if values.get("birth_year") is not None and values["birth_year"] > request.app.state.auth.now().year:
         raise AuthError(422, "VALIDATION_ERROR", "Birth year must not be in the future.")
-    ids = {values[name] for name in ("avatar_media_id", "cover_media_id") if values.get(name) is not None}
-    if ids:
-        media = account.db.scalars(select(MediaUpload).where(
-            MediaUpload.id.in_(ids), MediaUpload.owner_id == account.user.id).order_by(MediaUpload.id).with_for_update()).all()
-        if len(media) != len(ids) or any(item.status != "ready" for item in media):
-            raise AuthError(422, "VALIDATION_ERROR", "Media must be ready and belong to this account.")
     profile = account.db.get(Profile, account.user.id)
     if profile is None:
         raise AuthError(500, "INTERNAL_ERROR", "Account data is unavailable.")
@@ -74,5 +68,4 @@ def get_public_user(request: Request, username: str = Path(min_length=3, max_len
             raise AuthError(404, "NOT_FOUND", "Profile not found.")
         user, profile = row
         return PublicProfile(id=user.id, username=user.username, display_name=profile.display_name,
-                          created_at=user.created_at, bio=profile.bio, avatar_url=media_url(profile.avatar_media_id),
-                          cover_url=media_url(profile.cover_media_id))
+                          created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url)

@@ -62,22 +62,23 @@ def test_post_and_comment_author_serializers_use_relative_media_paths():
     from app.comments import comment_dto
     now, user_id, media_id, post_id, category_id = datetime.now(timezone.utc), uuid4(), uuid4(), uuid4(), uuid4()
     user = SimpleNamespace(id=user_id, username='writer', created_at=now)
-    profile = SimpleNamespace(display_name='Writer', bio=None, avatar_media_id=media_id)
+    avatar_path = '/api/v1/catalog/assets/' + str(uuid4())
+    profile = SimpleNamespace(display_name='Writer', bio=None, avatar_media_id=media_id, avatar_url=avatar_path)
     category = SimpleNamespace(id=category_id, slug='pictures', name='Pictures', status='active')
     post = SimpleNamespace(id=post_id, title='Picture', content='', media_id=media_id, status='published', created_at=now, updated_at=now)
     comment = SimpleNamespace(id=uuid4(), post_id=post_id, body='A comment', created_at=now)
     path = '/api/v1/media/' + str(media_id)
     assert post_dto(post, user, profile, category).model_dump()['media_url'] == path
-    assert post_dto(post, user, profile, category).author.avatar_url == path
-    assert comment_dto(comment, user, profile).author.avatar_url == path
+    assert post_dto(post, user, profile, category).author.avatar_url == avatar_path
+    assert comment_dto(comment, user, profile).author.avatar_url == avatar_path
 
 
-def test_public_profile_cover_contract_does_not_expand_author_dtos():
+def test_public_profile_contract_omits_cover():
     from app.main import app
     contract = app.openapi()
     response = contract['paths']['/api/v1/users/{username}']['get']['responses']['200']['content']['application/json']['schema']
     assert response['$ref'].endswith('/PublicProfile')
-    assert 'cover_url' in contract['components']['schemas']['PublicProfile']['properties']
+    assert 'cover_url' not in contract['components']['schemas']['PublicProfile']['properties']
     assert 'cover_url' not in contract['components']['schemas']['UserPublic']['properties']
 
 
@@ -187,16 +188,18 @@ def test_profile_attachment_and_other_user_cannot_read_private_upload(media):
     owner = connection.execute(select(MediaUpload.owner_id).where(MediaUpload.id == ident)).scalar_one()
     response = client.patch('/api/v1/users/me', json={'avatar_media_id': str(ident), 'cover_media_id': str(ident)},
                             headers={'Origin': ORIGIN, 'X-CSRF-Token': csrf(client)})
-    assert response.status_code == 200
-    assert response.json()['avatar_url'] == response.json()['cover_url'] == path
+    assert response.status_code == 422
+    connection.execute(Profile.__table__.update().where(Profile.user_id == owner).values(avatar_media_id=ident, cover_media_id=ident))
+    private=client.get('/api/v1/users/me').json()
+    assert private['avatar_url'] is None and private['cover_url']==path
+    assert private['avatar_media_id']==private['cover_media_id']==str(ident)
+    assert client.patch('/api/v1/users/me', json={'bio':'Updated'}, headers={'Origin':ORIGIN,'X-CSRF-Token':csrf(client)}).status_code==200
+    stored=connection.execute(select(Profile.avatar_media_id,Profile.cover_media_id).where(Profile.user_id==owner)).one()
+    assert stored==(ident,ident)
     client.cookies.clear()
     assert client.get(path).status_code == 200
-    assert client.get('/api/v1/users/alice_auth').json()['avatar_url'] == path
-    assert client.get('/api/v1/users/alice_auth').json()['cover_url'] == path
-    connection.execute(Profile.__table__.update().where(Profile.user_id == owner).values(avatar_media_id=None))
-    profile = client.get('/api/v1/users/alice_auth').json()
-    assert profile['avatar_url'] is None and profile['cover_url'] == path
-    assert client.get(profile['cover_url']).status_code == 200
+    public=client.get('/api/v1/users/alice_auth').json()
+    assert public['avatar_url'] is None and 'cover_url' not in public
     connection.execute(Profile.__table__.update().where(Profile.user_id == owner).values(avatar_media_id=None, cover_media_id=None))
     assert register(client, username='reader_display', email='reader-display@example.com').status_code == 201
     assert login(client, email='reader-display@example.com').status_code == 200

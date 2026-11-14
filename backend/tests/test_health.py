@@ -20,7 +20,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         contract = schema.json()
         assert set(contract["paths"]) == {"/health", "/api/v1/auth/csrf", "/api/v1/auth/register",
                                           "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/users/me",
-                                          "/api/v1/users/me/password", "/api/v1/users/{username}", "/api/v1/categories",
+                                          "/api/v1/users/me/password", "/api/v1/users/{username}", "/api/v1/users/{username}/comments", "/api/v1/categories",
                                           "/api/v1/admin/categories", "/api/v1/admin/categories/{category_id}",
                                           "/api/v1/posts", "/api/v1/posts/{post_id}", "/api/v1/media", "/api/v1/media/{media_id}",
                                           "/api/v1/posts/{post_id}/interactions", "/api/v1/users/me/bookmarks",
@@ -54,8 +54,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         assert public["properties"]["avatar_url"]["format"] == "uri-reference"
         assert {"type": "string"} in public["properties"]["avatar_url"]["anyOf"]
         profile = contract["components"]["schemas"]["PublicProfile"]
-        assert set(profile["properties"]) == set(public["properties"]) | {"cover_url"}
-        assert profile["properties"]["cover_url"]["format"] == "uri-reference"
+        assert set(profile["properties"]) == set(public["properties"])
         assert contract["components"]["schemas"]["PostResponse"]["properties"]["media_url"]["format"] == "uri-reference"
         upload_schema = contract["paths"]["/api/v1/media"]["post"]["responses"]["201"]["content"]["application/json"]["schema"]["$ref"].rsplit("/", 1)[-1]
         assert contract["components"]["schemas"][upload_schema]["properties"]["url"]["format"] == "uri-reference"

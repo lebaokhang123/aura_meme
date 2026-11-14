@@ -4,6 +4,9 @@ import { resolveScreen, initLegacyEffects, attachNavigation, prepareAuthForm, sh
 import {AuthBoundary} from './AuthBoundary.jsx';
 import {auth,MOCK_AUTH} from './auth.js';
 import {authMessage} from './auth-client.js';
+import {ProfilePage,ContactPage,VaultPage,ContactInbox} from './components/AccountPages.jsx';
+import './account-pages.css';
+import {loginUrl} from './return-url.js';
 import {usePreferences} from './PreferencesContext.jsx';
 import { applyDemoIdentity } from './demo.js';
 import { SiteHeader, SiteFooter, MaintenancePage } from './components/SiteShell.jsx';
@@ -32,8 +35,9 @@ function App() {
     document.body.className=page.bodyClass;
     document.body.dataset.screen=page.key;
     const style=document.createElement('style');style.id='stitch-active-styles';
-    const maintenance=['/contact','/rank','/vault'].includes(page.path);
-    const pageLoader=maintenance ? Promise.resolve(MaintenancePage) : pages[`./generated/${page.key}.js`]().then(mod=>mod.default);
+    const custom=!MOCK_AUTH&&(page.path.startsWith('/profile')?ProfilePage:page.path==='/contact'?ContactPage:page.path==='/vault'?VaultPage:page.path==='/admin/contacts'?ContactInbox:null);
+    const maintenance=page.path==='/rank'||MOCK_AUTH&&['/contact','/vault'].includes(page.path);
+    const pageLoader=custom?Promise.resolve(custom):maintenance ? Promise.resolve(MaintenancePage) : pages[`./generated/${page.key}.js`]().then(mod=>mod.default);
     const cssLoader=cssFiles[`./generated/${page.key}.css`]();
     // Mount with its own CSS ready, avoiding an unstyled frame during navigation.
     Promise.all([pageLoader,cssLoader]).then(([component,css])=>{
@@ -45,6 +49,7 @@ function App() {
   useEffect(() => {
     if(!screen)return;
     applyDemoIdentity();
+    if(!MOCK_AUTH&&!['/','/explore','/about','/login','/register','/rank'].includes(page.path))return;
     let stopped=false;let cleanup=()=>{};
     const loader=effectsFiles[`./generated/${page.key}.effects.json`]; if(loader&&!['/','/explore'].includes(page.path))loader().then(mod=>{
       if(stopped)return;cleanup=initLegacyEffects(mod.default);
@@ -55,9 +60,12 @@ function App() {
   useEffect(()=>{if(!MOCK_AUTH&&screen&&page.path==='/login'&&new URLSearchParams(location.search).has('registered'))showDemoMessage(language==='en'?'Account created. Please sign in.':'Đăng ký thành công. Vui lòng đăng nhập.');},[screen]);
   useEffect(()=>{if(screen)prepareAuthForm();},[screen,language]);
   useEffect(()=>{if(!MOCK_AUTH&&authState.error)showDemoMessage(authMessage(authState.error,language));},[authState.error]);
+  const protectedPage=['/contact','/vault','/admin/contacts','/profile'].includes(page.path);
+  useEffect(()=>{if(!MOCK_AUTH&&protectedPage&&authState.status==='guest')location.replace(loginUrl());},[protectedPage,authState.status]);
+  if(!MOCK_AUTH&&protectedPage&&authState.status!=='authenticated')return null;
   // Reveal the header and page together after the lazy content and CSS are ready.
   if(!screen&&!failed)return null;
-  return render(<><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : <LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}</>);
+  return render(<><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : [ProfilePage,ContactPage,VaultPage,ContactInbox].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}</>);
 }
 
 applyPreferences(readPreferences());

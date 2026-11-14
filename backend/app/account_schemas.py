@@ -1,4 +1,4 @@
-"""Account boundary allowlists; M2.1 Auth response models remain unchanged."""
+"""Public identity and private account field allowlists."""
 from datetime import datetime
 from uuid import UUID
 
@@ -28,7 +28,7 @@ class UserPublic(BaseModel):
 
 
 class PublicProfile(UserPublic):
-    cover_url: str | None = Field(default=None, json_schema_extra={"format": "uri-reference"})
+    pass
 
 
 class ProfilePatch(BaseModel):
@@ -58,6 +58,10 @@ class ProfilePatch(BaseModel):
 
     @model_validator(mode="after")
     def nonempty_patch(self):
+        if "cover_media_id" in self.model_fields_set:
+            raise ValueError("Cover changes are no longer supported.")
+        if self.avatar_media_id is not None:
+            raise ValueError("Choose an owned avatar through inventory equipment.")
         if not self.model_fields_set:
             raise ValueError("Provide at least one profile field.")
         return self

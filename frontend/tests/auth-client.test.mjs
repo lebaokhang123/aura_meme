@@ -60,3 +60,8 @@ test('generic Social mutation reuses session CSRF and supports multipart without
  await c.write('PUT','/posts/'+user.id+'/reactions',{reaction_type:'love'});
  assert.equal(t.calls[3].headers['X-CSRF-Token'],'next');assert.equal(t.calls[3].credentials,'include');
 });
+test('session avatar accepts only local approved-catalog paths, never external URLs',async()=>{
+ for(const [avatar,expected] of [['/api/v1/catalog/assets/'+user.id,'/api/v1/catalog/assets/'+user.id],['https://evil.test/avatar.png',undefined]]){
+  const t=transport([ok({...user,avatar_url:avatar})]),c=createAuthClient({fetch:t.fetch});await c.refresh();assert.equal(c.snapshot().user.avatar_url,expected);
+ }
+});

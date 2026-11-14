@@ -10,8 +10,8 @@ export const DEMO_USERS = [
 export function readDemoUser() {
   if(!MOCK_AUTH){
     const user=auth.snapshot().user;if(!user)return null;
-    const fallback=DEMO_USERS.find(item=>item.username.toLowerCase()===user.username);
-    return {...user,displayName:user.display_name,avatar:user.avatar_url||fallback?.avatar||'/assets/brand/favicon-64.png'};
+
+    return {...user,displayName:user.display_name,avatar:user.avatar_url||'/assets/brand/favicon-64.png'};
   }
   try {
     const raw = localStorage.getItem(USER_KEY);
