@@ -14,9 +14,16 @@ def migrate(connection,direction,revision,monkeypatch):
         env.setenv("DATABASE_URL","postgresql+psycopg://unused:synthetic@127.0.0.1:1/aurameme_dev")
         getattr(command,direction)(config,revision)
 
+@pytest.fixture
+def historical_comments(auth,monkeypatch):
+    # Exercise historical0010 in the empty outer rollback transaction before any fixture rows.
+    client,connection=auth
+    migrate(connection,"downgrade","0010_social_reactions",monkeypatch)
+    return comments.__wrapped__(blog.__wrapped__(auth))
+
 @pytest.mark.integration
-def test_upgrade_keeps_legacy_reaction_fields_and_post_objects(comments,monkeypatch):
-    client,c,_,post_id,_=comments
+def test_upgrade_keeps_legacy_reaction_fields_and_post_objects(historical_comments,monkeypatch):
+    client,c,_,post_id,_=historical_comments
     assert mutation(client,"PUT",f"/posts/{post_id}/reactions",{"reaction_type":"like"}).status_code==200
     before=c.execute(text("SELECT * FROM post_reactions")).all()
     objects=c.execute(text("SELECT oid,relfilenode FROM pg_class WHERE oid='public.posts'::regclass")).one()
@@ -29,8 +36,8 @@ def test_upgrade_keeps_legacy_reaction_fields_and_post_objects(comments,monkeypa
 
 @pytest.mark.integration
 @pytest.mark.parametrize("kind",["comment","new_post"])
-def test_downgrade_never_erases_new_reactions(comments,monkeypatch,kind):
-    client,c,_,post_id,_=comments
+def test_downgrade_never_erases_new_reactions(historical_comments,monkeypatch,kind):
+    client,c,_,post_id,_=historical_comments
     if kind=="comment":
         comment=add(client,post_id).json()["id"]
         assert mutation(client,"PUT",f"/comments/{comment}/reactions",{"reaction_type":"fire"}).status_code==200

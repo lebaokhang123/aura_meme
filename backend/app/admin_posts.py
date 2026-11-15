@@ -95,6 +95,10 @@ def moderate_post(post_id: UUID, payload: AdminPostPatch, request: Request,
     for name, value in values.items():
         setattr(post, name, value)
     post.updated_at = request.app.state.auth.now()
+    if before["status"] == "published" and (post.status != "published" or
+            before["category_id"] != str(post.category_id) and category.status == "hidden"):
+        from app.aura_runtime import reverse_post
+        reverse_post(account.db, post.id, post.updated_at)
     audit_post(account, post, "post.update", before, post.updated_at, **text_flags)
     return post_dto(post, account.db.get(User, post.author_id), account.db.get(Profile, post.author_id), category)
 
@@ -106,6 +110,8 @@ def delete_admin_post(post_id: UUID, request: Request, account=Depends(require_a
     before = post_state(post)
     post.status, post.deleted_at = "deleted", request.app.state.auth.now()
     post.updated_at = post.deleted_at
+    from app.aura_runtime import reverse_post
+    reverse_post(account.db, post.id, post.updated_at)
     audit_post(account, post, "post.delete", before, post.updated_at)
 
 

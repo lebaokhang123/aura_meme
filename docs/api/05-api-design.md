@@ -111,7 +111,7 @@ Các màn hình Home giới thiệu/About/Team có thể là **React static cont
 |---|---|---|---|
 | PUT/DELETE | `/api/v1/posts/{post_id}/reactions` | User | Một reaction hiện hành/user/post (đề xuất M0.3) |
 | PUT/DELETE | `/api/v1/posts/{post_id}/bookmark` | User | Lưu/bỏ lưu, không thưởng XP |
-| GET | `/api/v1/aura/progress` | User | earned, bonus, total, level, streak, Khí Vận |
+| GET | `/api/v1/aura/progress` | User | XP gốc/bonus/total, level/cảnh giới, tiến trình cấp, streak, ngày hiệu lực/reset server |
 | POST | `/api/v1/aura/check-in` | User | Tính ngày theo 07:00 giờ VN; một ngày một lần |
 | GET | `/api/v1/leaderboard` | Public | `period=week|all`; chỉ Aura gốc |
 | GET | `/api/v1/vault/cases` | Public | Danh mục hòm đang mở |
@@ -168,9 +168,13 @@ Các màn hình Home giới thiệu/About/Team có thể là **React static cont
 
 **M5.2 · Owner duyệt 2026-11-06:** thêm GET `/api/v1/users/me/posts` (page/page_size/status draft/published/hidden) và GET `/api/v1/users/me/posts/{post_id}`. Cần session active, lọc author_id từ session và loại deleted; foreign/missing/deleted detail trả404. `OwnPost` kế thừa Post, thêm `media_id` UUID nullable cho editor private; không object_key/file path/PII mới. GET public và media_url=null giữ nguyên, không mở media delivery.
 
-Owner duyệt M6.1c: riêng GET `/api/v1/aura/progress` và GET `/api/v1/leaderboard` bổ sung503/`NOT_READY`, dùng error schema hiện có; không đổi response fields/endpoint. Progress vẫn cần session, leaderboard public. Missing/draft/invalid policy hoặc trạng thái P1 thiếu trả NOT_READY, không tự publish policy hoặc bật runtime rewards.
+Aura V1: GET `/api/v1/aura/progress` chỉ đọc tài khoản trong session; query `user_id` không đổi owner. DTO trả earned/bonus/total, level và fair_level (1–100), realm, level_xp trong cấp, next_level_xp (null ở Lv100), xp_to_next, streak_days, checked_in, effective_day, next_reset_at và server_time. Không trả ví hoặc PII. Level cần 10+L XP để lên cấp kế tiếp; tổng đến Lv100 là 5.940, XP tiếp tục được giữ sau mức tối đa. Leaderboard chỉ dùng XP gốc thực, không nhân bonus.
 
-Owner duyệt M6.2: POST `/api/v1/aura/check-in` bổ sung503/NOT_READY, error schema hiện có; session/CSRF/Origin trước readiness. Chưa mở runtime phát thưởng, không thay endpoint/response fields và không coi fixture schedule là chính sách được duyệt.
+POST `/api/v1/aura/check-in` giữ session/CSRF/Origin và DTO receipt hiện tại. Chính sách V1 đã publish thưởng 15 XP gốc/ngày hiệu lực 07:00 Asia/Ho_Chi_Minh; bonus=0, khi_van_delta=0, không tạo wallet transaction. Retry trả delta=0. Thiếu policy canonical hoặc cache/ledger không khớp trả503/NOT_READY; không tự publish, sửa cache hay dùng fixture draft. Operator dùng `python -m app.demo publish-aura-v1 --user <UUID>` sau khi schema demo đã được nâng có backup/restore; user phải là ADMIN active thực trong DB. Startup không publish policy.
+
+Các hoạt động hợp lệ ghi event claim bền vững và ledger cùng transaction với Social: bài +10 tối đa2/ngày; reaction không tự tương tác +1 cho actor tối đa10 và +2 cho tác giả tối đa20; comment không tự tương tác +2 cho actor tối đa10 và +3 cho tác giả tối đa10, chỉ một comment hợp lệ của một actor trên một bài/ngày. Tổng cap135 gồm điểm danh15. Reaction dùng key trọn đời post/actor; bài dùng post ID; comment dùng ngày/post/actor. Claim cả khi hết quota, reversal không hoàn quota. Xóa/ẩn/khóa nguồn ghi delta âm đúng original, không sửa ledger; restore không cấp lại. Avatar reaction bình luận, share, view và rương không cộng XP. Chưa có entitlement: FREE, multiplier1, bonus0.
+
+`daily_checkins.reward_mode=legacy` giữ nguyên receipt có ví cũ; `aura_v1` yêu cầu wallet_transaction_id=null. Migration0012 không xóa dữ liệu. Published policy và receipt/event/ledger bất biến; policy activation baseline nguồn cũ bằng claim0, không hồi tố XP. Mutation gate advisory được lấy trước lock session/user để tránh deadlock giữa hai người tương tác chéo; giới hạn hiện tại là serialize writes, chỉ thay bằng ordered participant locks khi có số đo tải cần thiết.
 
 M7.1b Owner duyệt GET `/api/v1/catalog/assets/{asset_id}` public chỉ cho catalog active/rights approved. Đọc bounded từ CATALOG_STORAGE_ROOT riêng, kiểm SHA256/MIME, decode và xuất PNG bỏ metadata, no-store/nosniff; missing/inactive/rights/hash/file không hợp lệ trả404. Không phục vụ media_uploads, không mount thư mục hoặc tự duyệt catalog. Inventory/equipment luôn kiểm owner từ session, quantity>0/active/slot, DB guard bảo vệ khi thay quantity/active.
 
@@ -180,7 +184,7 @@ M7.2b Owner duyệt503/NOT_READY riêngPOSTcase-open, session/CSRF/Origin trư�
 
 **Đọc reaction/bookmark:** GET `/api/v1/posts/{post_id}/interactions` trả `post_id`, `reaction_counts` đủ `like/love/laugh/fire/sad/angry`, `comments_count`, `viewer_reaction` nullable và `bookmarked`. Counts chỉ gồm reaction của user active và comment visible/chưa xóa của author active. Bài không public trả404; counts và visibility được đọc cùng một SQL statement. Guest không có trạng thái cá nhân; cookie đã gửi nhưng sai/hết hạn/khóa trả401, không âm thầm thành Guest. Session hợp lệ dùng cùng cơ chế refresh/revoke hiện hành. Không trả actor IDs, danh sách người lưu hoặc tổng bookmark.
 
-GET `/api/v1/users/me/bookmarks` cần session, lấy owner từ phiên; trả PostPage bằng DTO/public visibility hiện hành với `page`, `page_size`, `search` title/content, `category` slug và `sort=created_desc|created_asc|title_asc`. Bài hidden/draft/deleted, tác giả locked, category hidden hoặc media không ready bị loại. Pagination/sort có UUID tie-break; không cho user chọn owner qua query. PUT/DELETE reaction/bookmark giữ nguyên idempotency và không cộng Aura. Giao diện chi tiết đọc trạng thái một lần, không gọi endpoint này cho từng card của feed.
+GET `/api/v1/users/me/bookmarks` cần session, lấy owner từ phiên; trả PostPage bằng DTO/public visibility hiện hành với `page`, `page_size`, `search` title/content, `category` slug và `sort=created_desc|created_asc|title_asc`. Bài hidden/draft/deleted, tác giả locked, category hidden hoặc media không ready bị loại. Pagination/sort có UUID tie-break; không cho user chọn owner qua query. PUT/DELETE reaction/bookmark giữ nguyên idempotency; chỉ reaction bài đủ điều kiện nhận Aura V1 như trên, bookmark không cộng XP. Giao diện chi tiết đọc trạng thái một lần, không gọi endpoint này cho từng card của feed.
 
 **Điều khiển danh sách theo đề tài:** mọi route dưới giữ `page/page_size`, quyền hiện hành và UUID tie-break. Search là substring literal (escape `%/_`), tối đa100 ký tự, NUL bị422; sort chỉ nhận allowlist, không ghép SQL từ input.
 

@@ -1886,7 +1886,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
         '503':
-          description: NOT_READY — policy hoặc trạng thái P1 chưa sẵn sàng; không trả số giả.
+          description: NOT_READY — policy Aura V1 hoặc trạng thái chưa sẵn sàng; không trả số giả.
           content:
             application/json:
               schema:
@@ -1923,7 +1923,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
         '503':
-          description: NOT_READY — chưa mở phát thưởng; không cấp XP hoặc Khí Vận.
+          description: NOT_READY — thiếu policy Aura V1 canonical hoặc trạng thái chưa sẵn sàng; không cấp Khí Vận.
           content:
             application/json:
               schema:
@@ -1964,7 +1964,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
         '503':
-          description: NOT_READY — policy hoặc trạng thái P1 chưa sẵn sàng; không trả số giả.
+          description: NOT_READY — policy Aura V1 hoặc trạng thái chưa sẵn sàng; không trả số giả.
           content:
             application/json:
               schema:
@@ -3182,34 +3182,60 @@ components:
         earned_xp:
           type: integer
           minimum: 0
-          description: Aura gốc cho Rank và odds
         bonus_xp:
           type: integer
           minimum: 0
-          description: Aura thưởng VIP
         total_xp:
           type: integer
           minimum: 0
         level:
           type: integer
           minimum: 1
+          maximum: 100
         fair_level:
           type: integer
           minimum: 1
+          maximum: 100
+        realm:
+          type: string
+        level_xp:
+          type: integer
+          minimum: 0
+        next_level_xp:
+          type: integer
+          minimum: 0
+          nullable: true
+        xp_to_next:
+          type: integer
+          minimum: 0
         streak_days:
           type: integer
           minimum: 0
-        khi_van_balance:
-          type: integer
-          minimum: 0
+        checked_in:
+          type: boolean
+        effective_day:
+          type: string
+          format: date
+        next_reset_at:
+          type: string
+          format: date-time
+        server_time:
+          type: string
+          format: date-time
       required:
       - earned_xp
       - bonus_xp
       - total_xp
       - level
       - fair_level
+      - realm
+      - level_xp
+      - xp_to_next
       - streak_days
-      - khi_van_balance
+      - checked_in
+      - effective_day
+      - next_reset_at
+      - server_time
     CheckInResult:
       type: object
       properties:

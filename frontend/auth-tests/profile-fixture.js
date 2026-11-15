@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 export const uid='00000000-0000-4000-8000-000000000101',pid='00000000-0000-4000-8000-000000000102',cid='00000000-0000-4000-8000-000000000103';
 export const profile={id:uid,username:'profile_owner',display_name:'Khang Dev',bio:'Nhà phát triển & Tín đồ sưu tầm meme độc bản tại AuraMeme.\n// git commit -m \'push and pray\'',created_at:'2026-01-01T00:00:00Z',avatar_url:'/api/v1/catalog/assets/'+uid};
+export const auraProgressFixture={earned_xp:0,bonus_xp:0,total_xp:0,level:1,fair_level:1,realm:'Luyện Khí',level_xp:0,next_level_xp:11,xp_to_next:11,streak_days:0,checked_in:false,effective_day:'2026-11-14',next_reset_at:'2026-11-15T00:00:00Z',server_time:'2026-11-14T12:00:00Z'};
 export const category={id:cid,slug:'gaming',name:'Gaming',status:'active',post_count:1};
 const countBase={like:284,love:119,laugh:64,fire:88,sad:42,angry:0};
 export const pageOf=items=>({items,pagination:{page:1,page_size:20,total:items.length,total_pages:items.length?1:0}});
@@ -18,6 +19,7 @@ export async function profileServer(context,{signed=true,admin=false,empty=false
   if(p.startsWith('/media/'))return route.fulfill({status:200,contentType:'image/png',body:fs.readFileSync(process.env.AURA_PROFILE_IMAGE||new URL('../public/assets/brand/symbol-dark-2048.png',import.meta.url))});
   if(p==='/auth/csrf')return send(200,{csrf_token:'fixture-csrf'});
   if(p==='/auth/logout'){state.viewer=null;return send(204)}
+  if(p==='/aura/progress')return state.viewer?send(200,auraProgressFixture):fail(401,'UNAUTHORIZED');
   if(p==='/users/me'&&method==='PATCH'){Object.assign(state.profile,body);Object.assign(state.viewer,body);return send(200,state.viewer)}
   if(p==='/users/me')return state.viewer?send(200,state.viewer):fail(401,'UNAUTHORIZED');
   if(p==='/users/'+state.profile.username)return send(200,state.profile);

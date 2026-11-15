@@ -75,7 +75,7 @@ def test_demo_migration_rejects_downgrade_before_connecting():
     result = subprocess.run([sys.executable, '-m', 'alembic', '-x', 'target=demo', 'downgrade', 'base'],
         cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True)
     assert result.returncode != 0
-    assert 'Demo migrations allow only current or upgrade to 0010_social_reactions' in result.stderr
+    assert 'Demo migrations allow only current or upgrade to '+demo.DEMO_REVISION in result.stderr
 
 
 def test_bootstrap_invalid_uuid_never_connects(monkeypatch):
@@ -213,59 +213,196 @@ def test_demo_migration_rejects_other_operations(command):
     result = subprocess.run([sys.executable, '-m', 'alembic', '-x', 'target=demo']+command,
         cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True)
     assert result.returncode != 0
-    assert 'Demo migrations allow only current or upgrade to 0010_social_reactions' in result.stderr
+    assert 'Demo migrations allow only current or upgrade to '+demo.DEMO_REVISION in result.stderr
+
+
+
+def schema_checks(revision):
+    kinds = ('like','laugh','fire') if revision == '0009_vault_open' else ('like','love','laugh','fire','sad','angry')
+    vault = revision in {'0011_vault_v1','0012_aura_v1'}
+    if vault:
+        kinds += ('meme',)
+    expression = "reaction_type = ANY (ARRAY["+', '.join("'"+kind+"'::text" for kind in kinds)+'])'
+    checks = {}
+    for table in ('post_reactions','comment_reactions'):
+        if table == 'comment_reactions' and revision == '0009_vault_open':
+            continue
+        checks[table] = {'ck_'+table+'_reaction_type':expression}
+        if vault:
+            checks[table]['ck_'+table+'_meme_reference'] = "(reaction_type = 'meme'::text) = (meme_asset_id IS NOT NULL)"
+    checks['daily_checkins'] = {'ck_daily_checkins_effective_day':"effective_day = ((claimed_at AT TIME ZONE 'Asia/Ho_Chi_Minh'::text) - '07:00:00'::interval)::date"}
+    if revision == '0012_aura_v1':
+        checks['daily_checkins']['ck_daily_checkins_reward_mode'] = "reward_mode = 'legacy'::text AND wallet_transaction_id IS NOT NULL OR reward_mode = 'aura_v1'::text AND wallet_transaction_id IS NULL"
+        checks['aura_reward_events'] = {
+            'ck_aura_reward_events_kind':"kind = ANY (ARRAY['post'::text, 'reaction'::text, 'comment'::text])",
+            'ck_aura_reward_events_comment_binding':"(kind = 'comment'::text) = (comment_id IS NOT NULL)",
+            'ck_aura_reward_events_effective_day':"effective_day = ((occurred_at AT TIME ZONE 'Asia/Ho_Chi_Minh'::text) - '07:00:00'::interval)::date",
+        }
+    return checks
+
+
+def schema_mocks(monkeypatch,revision):
+    from unittest.mock import Mock
+    import alembic.autogenerate
+    import alembic.migration
+    import sqlalchemy
+    from app.models import reviewed_metadata
+    connection = Mock();connection.scalar.return_value = revision
+    inspector = Mock()
+    known = revision if revision != 'unknown' else '0012_aura_v1'
+    inspector.get_table_names.return_value = set(reviewed_metadata(known).tables)|{'alembic_version'}
+    checks = schema_checks(known)
+    inspector.get_check_constraints.side_effect = lambda table:[{'name':name,'sqltext':value} for name,value in checks[table].items()]
+    monkeypatch.setattr(sqlalchemy,'inspect',lambda _:inspector)
+    monkeypatch.setattr(alembic.migration.MigrationContext,'configure',lambda *a,**k:object())
+    compared = []
+    monkeypatch.setattr(alembic.autogenerate,'compare_metadata',lambda _,metadata:compared.append(metadata) or [])
+    monkeypatch.setattr(__import__('alembic.command',fromlist=['upgrade']),'upgrade',lambda *a,**k:pytest.fail('Schema readiness must never migrate'))
+    return connection,inspector,checks,compared
 
 
 @pytest.mark.parametrize('revision,allow_previous,accepted', [
-    ('0010_social_reactions', False, True),
-    ('0009_vault_open', False, False),
-    ('0009_vault_open', True, True),
-    ('unknown', True, False),
+    ('0012_aura_v1',False,True),
+    ('0012_aura_v1',True,True),
+    ('0011_vault_v1',False,False),
+    ('0011_vault_v1',True,True),
+    ('0010_social_reactions',False,False),
+    ('0010_social_reactions',True,True),
+    ('0009_vault_open',False,False),
+    ('0009_vault_open',True,True),
+    ('unknown',True,False),
 ])
-def test_demo_schema_pins_current_head_and_previous_only_for_upgrade(monkeypatch, revision, allow_previous, accepted):
-    from unittest.mock import Mock
-    import alembic.autogenerate
-    import alembic.migration
-    import sqlalchemy
-    from app.models import Base
-    connection = Mock()
-    connection.scalar.return_value = revision
-    inspector = Mock()
-    tables = set(Base.metadata.tables) | {'alembic_version'}
-    if revision == '0009_vault_open':
-        tables.remove('comment_reactions')
-    inspector.get_table_names.return_value = tables
-    kinds = ('like', 'laugh', 'fire') if revision == '0009_vault_open' else ('like', 'love', 'laugh', 'fire', 'sad', 'angry')
-    inspector.get_check_constraints.return_value = [{'name': 'ck_post_reactions_reaction_type',
-        'sqltext': "reaction_type = ANY (ARRAY[" + ', '.join("'"+kind+"'::text" for kind in kinds) + '])'}]
-    monkeypatch.setattr(sqlalchemy, 'inspect', lambda _: inspector)
-    monkeypatch.setattr(alembic.migration.MigrationContext, 'configure', lambda *a, **k: object())
-    compared = []
-    monkeypatch.setattr(alembic.autogenerate, 'compare_metadata', lambda _, metadata: compared.append(set(metadata.tables)) or [])
+def test_demo_schema_pins_current_head_and_previous_only_for_upgrade(monkeypatch,revision,allow_previous,accepted):
+    from app.models import Base,reviewed_metadata
+    connection,inspector,checks,compared = schema_mocks(monkeypatch,revision)
     if accepted:
-        demo.reviewed_demo_schema(connection, allow_previous=allow_previous)
-        assert compared == [tables - {'alembic_version'}]
-        assert 'comment_reactions' in Base.metadata.tables
-        inspector.get_check_constraints.return_value = [{'name': 'ck_post_reactions_reaction_type', 'sqltext': 'true'}]
-        with pytest.raises(ConfigurationError):
-            demo.reviewed_demo_schema(connection, allow_previous=allow_previous)
+        demo.reviewed_demo_schema(connection,allow_previous=allow_previous)
+        assert len(compared) == 1
+        metadata = compared[0]
+        assert set(metadata.tables) == set(reviewed_metadata(revision).tables)
+        assert ('reward_mode' in metadata.tables['daily_checkins'].c) == (revision == '0012_aura_v1')
+        assert metadata.tables['daily_checkins'].c.wallet_transaction_id.nullable == (revision == '0012_aura_v1')
+        assert ('runtime_kind' in metadata.tables['case_definitions'].c) == (revision in {'0011_vault_v1','0012_aura_v1'})
+        assert 'aura_reward_events' in Base.metadata.tables
+        assert 'reward_mode' in Base.metadata.tables['daily_checkins'].c
     else:
-        with pytest.raises(ConfigurationError):
-            demo.reviewed_demo_schema(connection, allow_previous=allow_previous)
+        with pytest.raises(ConfigurationError):demo.reviewed_demo_schema(connection,allow_previous=allow_previous)
         assert not compared
 
 
-def test_demo_schema_refuses_drift_even_at_reviewed_revision(monkeypatch):
-    from unittest.mock import Mock
+@pytest.mark.parametrize('revision',['0009_vault_open','0010_social_reactions','0011_vault_v1','0012_aura_v1'])
+def test_demo_schema_refuses_drift_even_at_reviewed_revision(monkeypatch,revision):
     import alembic.autogenerate
-    import alembic.migration
-    import sqlalchemy
-    from app.models import Base
-    connection = Mock(); connection.scalar.return_value = '0010_social_reactions'
-    inspector = Mock(); inspector.get_table_names.return_value = set(Base.metadata.tables) | {'alembic_version'}
-    inspector.get_check_constraints.return_value = [{'name': 'ck_post_reactions_reaction_type', 'sqltext': "reaction_type = ANY (ARRAY['like'::text, 'love'::text, 'laugh'::text, 'fire'::text, 'sad'::text, 'angry'::text])"}]
-    monkeypatch.setattr(sqlalchemy, 'inspect', lambda _: inspector)
-    monkeypatch.setattr(alembic.migration.MigrationContext, 'configure', lambda *a, **k: object())
-    monkeypatch.setattr(alembic.autogenerate, 'compare_metadata', lambda *a: ['unexpected column'])
-    with pytest.raises(ConfigurationError):
+    connection,_,_,_ = schema_mocks(monkeypatch,revision)
+    monkeypatch.setattr(alembic.autogenerate,'compare_metadata',lambda *a:['unexpected column'])
+    with pytest.raises(ConfigurationError,match='schema drift'):
+        demo.reviewed_demo_schema(connection,allow_previous=True)
+
+
+@pytest.mark.parametrize('table',['post_reactions','comment_reactions','daily_checkins','aura_reward_events'])
+@pytest.mark.parametrize('tamper',['missing','extra','weakened'])
+def test_demo_schema_refuses_missing_extra_or_weakened_checks(monkeypatch,table,tamper):
+    connection,_,checks,compared = schema_mocks(monkeypatch,'0012_aura_v1')
+    demo.reviewed_demo_schema(connection)
+    first = next(iter(checks[table]))
+    if tamper == 'missing':checks[table].pop(first)
+    elif tamper == 'extra':checks[table]['unreviewed'] = 'true'
+    else:checks[table][first] = 'true'
+    compared.clear()
+    with pytest.raises(ConfigurationError,match='constraint drift'):
         demo.reviewed_demo_schema(connection)
+    assert not compared
+
+
+def test_demo_schema_refuses_unknown_tables_before_comparing(monkeypatch):
+    connection,inspector,_,compared = schema_mocks(monkeypatch,'0012_aura_v1')
+    inspector.get_table_names.return_value.add('unreviewed')
+    with pytest.raises(ConfigurationError,match='Unexpected demo schema tables'):
+        demo.reviewed_demo_schema(connection)
+    assert not compared
+
+
+@pytest.mark.parametrize('arguments',[
+    ['publish-aura-v1'],
+    ['publish-aura-v1','--user','not-a-uuid'],
+    ['bootstrap-admin','--user',str(uuid4())],
+])
+def test_aura_publication_requires_explicit_valid_operator_id_before_connection(monkeypatch,arguments):
+    monkeypatch.setattr(demo,'create_db_engine',lambda *a:pytest.fail('Unexpected connection'))
+    with pytest.raises(SystemExit) as error:
+        demo.main(arguments,ask=lambda _:pytest.fail('Publication must not prompt'))
+    assert error.value.code == 2
+
+
+@pytest.fixture
+def publication_cli(monkeypatch):
+    from unittest.mock import MagicMock
+    engine,db = MagicMock(),MagicMock()
+    session = MagicMock();session.__enter__.return_value=db
+    monkeypatch.setattr(demo,'demo_environment',lambda:{'DATABASE_URL':'postgresql+psycopg://aurameme_demo:SYNTHETIC_PRIVATE@127.0.0.1:5432/aurameme_demo'})
+    monkeypatch.setattr(demo,'create_db_engine',lambda _:engine)
+    monkeypatch.setattr(demo,'Session',lambda _:session)
+    calls=[]
+    monkeypatch.setattr(demo,'activate_demo',lambda:calls.append('environment'))
+    monkeypatch.setattr(demo,'demo_connection',lambda _:calls.append('identity'))
+    monkeypatch.setattr(demo,'reviewed_demo_schema',lambda _:calls.append('schema'))
+    monkeypatch.setattr(demo,'bootstrap_admin',lambda *a:pytest.fail('Publication must not bootstrap/grant roles'))
+    return engine,db,calls
+
+
+def test_aura_publication_runs_existing_snapshot_service_in_guarded_transaction(publication_cli,monkeypatch,capsys):
+    from datetime import datetime,timezone
+    from unittest.mock import Mock
+    import app.aura_runtime
+    engine,db,calls=publication_cli
+    user_id=uuid4()
+    def publish(session,actor,now):
+        calls.append('publish')
+        assert session is db and actor == user_id
+        assert now.tzinfo is not None and abs((datetime.now(timezone.utc)-now).total_seconds())<5
+    publish=Mock(side_effect=publish)
+    monkeypatch.setattr(app.aura_runtime,'publish_v1',publish)
+    assert demo.main(['publish-aura-v1','--user',str(user_id)],ask=lambda _:pytest.fail('Publication must not prompt')) == 0
+    assert calls==['environment','identity','schema','publish']
+    publish.assert_called_once()
+    db.begin.assert_called_once()
+    db.begin.return_value.__exit__.assert_called_once_with(None,None,None)
+    engine.connect.assert_not_called()
+    engine.dispose.assert_called_once()
+    output=capsys.readouterr().out
+    assert 'Aura V1 policy is ready' in output and 'SYNTHETIC_PRIVATE' not in output
+
+
+@pytest.mark.parametrize('guard',['identity','schema'])
+def test_aura_publication_refuses_guard_failure_before_publishing(publication_cli,monkeypatch,guard,capsys):
+    import app.aura_runtime
+    engine,db,_=publication_cli
+    def refuse(_):raise ConfigurationError('Unreviewed '+guard)
+    monkeypatch.setattr(demo,'demo_connection' if guard=='identity' else 'reviewed_demo_schema',refuse)
+    monkeypatch.setattr(app.aura_runtime,'publish_v1',lambda *a:pytest.fail('Guard must refuse before publication'))
+    assert demo.main(['publish-aura-v1','--user',str(uuid4())],ask=lambda _:pytest.fail('No prompt')) == 1
+    assert db.begin.return_value.__exit__.call_args.args[0] is ConfigurationError
+    engine.dispose.assert_called_once()
+    assert 'SYNTHETIC_PRIVATE' not in capsys.readouterr().out
+
+
+def test_aura_publication_requires_existing_active_database_admin(publication_cli,capsys):
+    engine,db,_=publication_cli
+    db.scalar.return_value=None
+    assert demo.main(['publish-aura-v1','--user',str(uuid4())],ask=lambda _:pytest.fail('No prompt')) == 1
+    db.add.assert_not_called()
+    assert db.begin.return_value.__exit__.call_args.args[0] is ValueError
+    assert 'SYNTHETIC_PRIVATE' not in capsys.readouterr().out
+    engine.dispose.assert_called_once()
+
+
+def test_aura_publication_failure_rolls_back_and_redacts_private_details(publication_cli,monkeypatch,capsys):
+    import app.aura_runtime
+    engine,db,_=publication_cli
+    def fail(*args):raise RuntimeError('SYNTHETIC_PRIVATE')
+    monkeypatch.setattr(app.aura_runtime,'publish_v1',fail)
+    assert demo.main(['publish-aura-v1','--user',str(uuid4())],ask=lambda _:pytest.fail('No prompt')) == 1
+    assert db.begin.return_value.__exit__.call_args.args[0] is RuntimeError
+    output=capsys.readouterr().out
+    assert 'transaction rolled back' in output and 'SYNTHETIC_PRIVATE' not in output
+    engine.dispose.assert_called_once()

@@ -1,3 +1,4 @@
+import {auraProgressFixture} from './profile-fixture.js';
 import {test,expect} from '@playwright/test';
 import english from '../src/translations.json' with {type:'json'};
 const uid='00000000-0000-4000-8000-000000000001',cid='00000000-0000-4000-8000-000000000002';
@@ -15,6 +16,7 @@ async function server(context,{roles=['USER']}={}){
   const interactions=post=>({post_id:post.id,reaction_counts:post.counts,viewer_reaction:state.user?post.reaction:null,comments_count:state.comments.filter(c=>c.post_id===post.id).length,bookmarked:false});
   const dto=post=>({...post,author:user,category:categories.find(c=>c.id===(post.category_id||cid)),created_at:'2026-11-13T00:00:00Z',updated_at:'2026-11-13T00:00:00Z',status:'published',media_url:null,interactions:interactions(post)});
   const page=items=>({items,pagination:{page:1,page_size:20,total:items.length,total_pages:items.length?1:0}});
+  if(p==='/aura/progress')return state.user?send(200,auraProgressFixture):fail(401,'UNAUTHORIZED');
   if(p==='/users/me')return state.user?send(200,state.user):fail(401,'UNAUTHORIZED');
   if(p==='/auth/csrf')return send(200,{csrf_token:'bound-csrf'});
   if(p==='/auth/login'){state.user={...user,roles};return send(200,state.user)}

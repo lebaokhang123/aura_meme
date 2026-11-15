@@ -25,10 +25,13 @@ class PostReaction(Base):
     post_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("posts.id", ondelete="RESTRICT"), primary_key=True)
     user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
     reaction_type: Mapped[str] = mapped_column(Text)
+    meme_asset_id: Mapped[UUID | None] = mapped_column(Uuid, deferred=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
-        CheckConstraint("reaction_type IN ('like','love','laugh','fire','sad','angry')", name="reaction_type"),
+        ForeignKeyConstraint(['user_id', 'meme_asset_id'], ['user_inventory.user_id', 'user_inventory.asset_id'], ondelete='RESTRICT', name='fk_post_reactions_owner_meme'),
+        CheckConstraint("(reaction_type='meme')=(meme_asset_id IS NOT NULL)", name='meme_reference'),
+        CheckConstraint("reaction_type IN ('like','love','laugh','fire','sad','angry','meme')", name="reaction_type"),
         Index("ix_post_reactions_user_created_post", "user_id", "created_at", "post_id"),
     )
 
@@ -38,10 +41,13 @@ class CommentReaction(Base):
     comment_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("comments.id", ondelete="RESTRICT"), primary_key=True)
     user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
     reaction_type: Mapped[str] = mapped_column(Text)
+    meme_asset_id: Mapped[UUID | None] = mapped_column(Uuid, deferred=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
-        CheckConstraint("reaction_type IN ('like','love','laugh','fire','sad','angry')", name="reaction_type"),
+        ForeignKeyConstraint(['user_id', 'meme_asset_id'], ['user_inventory.user_id', 'user_inventory.asset_id'], ondelete='RESTRICT', name='fk_comment_reactions_owner_meme'),
+        CheckConstraint("(reaction_type='meme')=(meme_asset_id IS NOT NULL)", name='meme_reference'),
+        CheckConstraint("reaction_type IN ('like','love','laugh','fire','sad','angry','meme')", name="reaction_type"),
         Index("ix_comment_reactions_comment_type", "comment_id", "reaction_type"),
         Index("ix_comment_reactions_user_id", "user_id"),
     )
@@ -86,6 +92,27 @@ class UserProgress(Base):
         CheckConstraint("aura_xp_earned >= 0 AND aura_xp_bonus >= 0", name="xp_nonnegative"),
         CheckConstraint("level_cached >= 1 AND fair_level_cached >= 1 AND streak_days >= 0", name="progress_bounds"),
         Index("ix_user_progress_earned_user", aura_xp_earned.desc(), "user_id"),
+    )
+
+
+class AuraRewardEvent(Base):
+    __tablename__ = "aura_reward_events"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    event_key: Mapped[str] = mapped_column(Text, unique=True)
+    kind: Mapped[str] = mapped_column(Text)
+    actor_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"))
+    post_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("posts.id", ondelete="RESTRICT"))
+    comment_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("comments.id", ondelete="RESTRICT"))
+    policy_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("reward_policy_versions.id", ondelete="RESTRICT"))
+    effective_day: Mapped[date] = mapped_column(Date)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint("kind IN ('post','reaction','comment')", name="kind"),
+        CheckConstraint("(kind='comment')=(comment_id IS NOT NULL)", name="comment_binding"),
+        CheckConstraint("effective_day = ((occurred_at AT TIME ZONE 'Asia/Ho_Chi_Minh') - interval '7 hours')::date", name="effective_day"),
+        Index("ix_aura_reward_events_post_id", "post_id"),
+        Index("ix_aura_reward_events_actor_id", "actor_id"),
+        Index("ix_aura_reward_events_comment_id", "comment_id"),
     )
 
 
@@ -155,11 +182,15 @@ class CaseDefinition(Base):
     slug: Mapped[str] = mapped_column(Text, unique=True)
     label: Mapped[str] = mapped_column(Text)
     cost_khi_van: Mapped[int] = mapped_column(BigInteger)
+    runtime_kind: Mapped[str | None] = mapped_column(Text, deferred=True)
     status: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
         CheckConstraint("cost_khi_van >= 0", name="cost_nonnegative"),
+        CheckConstraint("runtime_kind IS NULL OR runtime_kind IN ('avatar','background')", name="runtime_kind"),
+        CheckConstraint("runtime_kind IS NULL OR cost_khi_van=0", name="runtime_free"),
+        Index("uq_case_definitions_runtime_kind", "runtime_kind", unique=True, postgresql_where=text("runtime_kind IS NOT NULL")),
         CheckConstraint("status IN ('draft','active','retired')", name="status"),
         CheckConstraint("btrim(slug) <> '' AND btrim(label) <> ''", name="nonempty"),
     )
@@ -230,7 +261,7 @@ class UserEquipment(Base):
     __table_args__ = (
         ForeignKeyConstraint(["user_id", "asset_id"], ["user_inventory.user_id", "user_inventory.asset_id"], ondelete="RESTRICT", name="fk_user_equipment_owner_asset"),
         ForeignKeyConstraint(["asset_id", "slot_kind"], ["asset_items.id", "asset_items.kind"], ondelete="RESTRICT", name="fk_user_equipment_asset_kind"),
-        CheckConstraint("slot_kind IN ('avatar','frame','icon','effect')", name="slot_kind"),
+        CheckConstraint("slot_kind IN ('avatar','frame','icon','effect','background')", name="slot_kind"),
     )
 
 
@@ -242,6 +273,9 @@ class AssetItem(Base):
     collection: Mapped[str] = mapped_column(Text)
     rarity: Mapped[str] = mapped_column(Text)
     media_key: Mapped[str] = mapped_column(Text)
+    # Deferred columns preserve baseline reads before the separately approved migration.
+    display_name: Mapped[str | None] = mapped_column(Text, deferred=True)
+    effect_key: Mapped[str | None] = mapped_column(Text, deferred=True)
     source_rights: Mapped[dict] = mapped_column(JSONB)
     active: Mapped[bool] = mapped_column(Boolean)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -249,7 +283,9 @@ class AssetItem(Base):
     __table_args__ = (
         UniqueConstraint("id", "kind", name="uq_asset_items_id_kind"),
         UniqueConstraint("id", "rarity", name="uq_asset_items_id_rarity"),
-        CheckConstraint("kind IN ('avatar','frame','icon','effect','generator')", name="kind"),
+        CheckConstraint("kind IN ('avatar','frame','icon','effect','generator','background')", name="kind"),
+        CheckConstraint("display_name IS NULL OR btrim(display_name) <> ''", name="display_name"),
+        CheckConstraint("effect_key IS NULL OR (kind='background' AND effect_key IN ('violet-base','lucian-363','lucian-352-deep-sea','lucian-226','lucian-330'))", name="effect_key"),
         CheckConstraint("rarity IN ('D','C','B','A','S')", name="rarity"),
         CheckConstraint("btrim(slug) <> '' AND btrim(media_key) <> '' AND btrim(collection) <> ''", name="nonempty"),
         CheckConstraint("jsonb_typeof(source_rights) = 'object'", name="rights_object"),
@@ -284,9 +320,11 @@ class DailyCheckin(Base):
     user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
     effective_day: Mapped[date] = mapped_column(Date, primary_key=True)
     aura_ledger_id: Mapped[UUID] = mapped_column(Uuid, unique=True)
-    wallet_transaction_id: Mapped[UUID] = mapped_column(Uuid, unique=True)
+    wallet_transaction_id: Mapped[UUID | None] = mapped_column(Uuid, unique=True)
+    reward_mode: Mapped[str] = mapped_column(Text, default="legacy", server_default=text("'legacy'"))
     claimed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
+        CheckConstraint("(reward_mode='legacy' AND wallet_transaction_id IS NOT NULL) OR (reward_mode='aura_v1' AND wallet_transaction_id IS NULL)", name="reward_mode"),
         ForeignKeyConstraint(["user_id", "aura_ledger_id"], ["aura_ledger.user_id", "aura_ledger.id"], ondelete="RESTRICT", name="fk_daily_checkins_owner_aura"),
         ForeignKeyConstraint(["user_id", "wallet_transaction_id"], ["wallet_transactions.user_id", "wallet_transactions.id"], ondelete="RESTRICT", name="fk_daily_checkins_owner_wallet"),
         CheckConstraint("effective_day = ((claimed_at AT TIME ZONE 'Asia/Ho_Chi_Minh') - interval '7 hours')::date", name="effective_day"),
@@ -508,3 +546,62 @@ class AdminAuditLog(Base):
         CheckConstraint("btrim(action) <> '' AND btrim(target_type) <> '' AND btrim(target_id) <> ''", name="identity_nonempty"),
         CheckConstraint("before_json IS NOT NULL OR after_json IS NOT NULL", name="snapshot_present"),
     )
+
+
+def reviewed_metadata(revision):
+    """Exact reviewed predecessor shapes; never mutate mapped runtime metadata."""
+    if revision not in {'0009_vault_open','0010_social_reactions','0011_vault_v1','0012_aura_v1'}:
+        raise ValueError('Unknown reviewed schema revision')
+    metadata = MetaData(naming_convention=Base.metadata.naming_convention)
+    for table in Base.metadata.sorted_tables:
+        if revision != '0012_aura_v1' and table.name == 'aura_reward_events':
+            continue
+        if revision == '0009_vault_open' and table.name == 'comment_reactions':
+            continue
+        table.to_metadata(metadata)
+    if revision == '0012_aura_v1':
+        return metadata
+
+    def remove_constraint(table, name):
+        constraint = next(c for c in table.constraints if c.name == name)
+        if isinstance(constraint, ForeignKeyConstraint):
+            for foreign_key in constraint.elements:
+                table.foreign_keys.remove(foreign_key)
+                foreign_key.parent.foreign_keys.remove(foreign_key)
+        table.constraints.remove(constraint)
+
+    def remove_columns(table, names):
+        # SQLAlchemy has no public removal API; only this detached clone is changed.
+        for name in names:
+            table._columns.remove(table.c[name])
+
+    checkin = metadata.tables['daily_checkins']
+    remove_constraint(checkin, 'ck_daily_checkins_reward_mode')
+    remove_columns(checkin, ['reward_mode'])
+    checkin.c.wallet_transaction_id.nullable = False
+    if revision == '0011_vault_v1':
+        return metadata
+
+    for name in ('post_reactions','comment_reactions'):
+        if name not in metadata.tables:
+            continue
+        table = metadata.tables[name]
+        for constraint in ('fk_'+name+'_owner_meme','ck_'+name+'_meme_reference','ck_'+name+'_reaction_type'):
+            remove_constraint(table, constraint)
+        remove_columns(table, ['meme_asset_id'])
+        kinds = "'like','laugh','fire'" if revision == '0009_vault_open' else "'like','love','laugh','fire','sad','angry'"
+        table.append_constraint(CheckConstraint('reaction_type IN ('+kinds+')', name='reaction_type'))
+    assets = metadata.tables['asset_items']
+    for name in ('kind','display_name','effect_key'):
+        remove_constraint(assets, 'ck_asset_items_'+name)
+    remove_columns(assets, ['display_name','effect_key'])
+    assets.append_constraint(CheckConstraint("kind IN ('avatar','frame','icon','effect','generator')", name='kind'))
+    cases = metadata.tables['case_definitions']
+    for name in ('runtime_kind','runtime_free'):
+        remove_constraint(cases, 'ck_case_definitions_'+name)
+    cases.indexes.remove(next(i for i in cases.indexes if i.name == 'uq_case_definitions_runtime_kind'))
+    remove_columns(cases, ['runtime_kind'])
+    equipment = metadata.tables['user_equipment']
+    remove_constraint(equipment, 'ck_user_equipment_slot_kind')
+    equipment.append_constraint(CheckConstraint("slot_kind IN ('avatar','frame','icon','effect')", name='slot_kind'))
+    return metadata

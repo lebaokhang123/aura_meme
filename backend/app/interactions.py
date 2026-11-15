@@ -76,20 +76,26 @@ def list_saved_posts(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1
             responses=ERRORS, openapi_extra=CSRF_HEADER)
 def set_reaction(post_id: UUID, payload: ReactionInput, request: Request, account=Depends(require_account_csrf)):
     lock_public_post(account.db, post_id)
+    first = account.db.get(PostReaction, (post_id, account.user.id)) is None
     now = request.app.state.auth.now()
     statement = insert(PostReaction).values(post_id=post_id, user_id=account.user.id,
         reaction_type=payload.reaction_type, created_at=now, updated_at=now)
     account.db.execute(statement.on_conflict_do_update(index_elements=["post_id", "user_id"],
         set_={"reaction_type": payload.reaction_type, "updated_at": now},
         where=PostReaction.reaction_type != payload.reaction_type))
+    if first:
+        from app.aura_runtime import award_reaction
+        award_reaction(account.db, post_id, account.user.id, now)
     return ReactionResult(post_id=post_id, reaction_type=payload.reaction_type)
 
 
 @router.delete("/posts/{post_id}/reactions", status_code=204, operation_id="removeReaction",
                responses=ERRORS, openapi_extra=CSRF_HEADER)
-def remove_reaction(post_id: UUID, account=Depends(require_account_csrf)):
+def remove_reaction(post_id: UUID, request: Request, account=Depends(require_account_csrf)):
     lock_public_post(account.db, post_id)
     account.db.execute(delete(PostReaction).where(PostReaction.post_id == post_id, PostReaction.user_id == account.user.id))
+    from app.aura_runtime import reverse_reaction
+    reverse_reaction(account.db, post_id, account.user.id, request.app.state.auth.now())
 
 
 @router.put("/posts/{post_id}/bookmark", status_code=204, operation_id="savePost",
