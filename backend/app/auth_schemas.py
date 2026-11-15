@@ -2,7 +2,7 @@
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, SecretStr, field_validator
+from pydantic import AwareDatetime, BaseModel, EmailStr, Field, SecretStr, field_validator
 
 
 class LoginInput(BaseModel):
@@ -57,11 +57,16 @@ class CsrfResponse(BaseModel):
     csrf_token: str
 
 
+class CooldownDetails(BaseModel):
+    model_config = {"extra": "forbid"}
+    next_open_at: AwareDatetime
+
+
 class ErrorDetail(BaseModel):
     code: str
     message: str
     request_id: str
-    details: dict | None = None
+    details: CooldownDetails | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class ErrorResponse(BaseModel):

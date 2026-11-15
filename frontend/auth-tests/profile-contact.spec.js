@@ -9,7 +9,10 @@ async function api(context,{signed=true,admin=false}={}){
   state.requests.push({p,method,body,csrf:r.headers()['x-csrf-token'],query:Object.fromEntries(url.searchParams)});
   const send=(status,value)=>route.fulfill({status,contentType:'application/json',body:status===204?'':JSON.stringify(value)}),fail=(status,code)=>send(status,{error:{code}});
   if(p==='/users/me'&&method==='PATCH'){Object.assign(state.user,body);Object.assign(state.profile,body);return send(200,state.user)}
-  if(p==='/inventory/equipment/avatar'){state.items.forEach(i=>i.equipped=i.asset.id===body.asset_id);return send(200,{slot_kind:'avatar',asset_id:body.asset_id})}
+  if(p==='/inventory/equipment/avatar'){state.items.forEach(i=>i.equipped=i.asset.id===body.asset_id);state.user.avatar_url=body.asset_id?'/api/v1/catalog/assets/'+body.asset_id:null;return send(200,{slot_kind:'avatar',asset_id:body.asset_id})}
+  if(p==='/catalog')return send(200,pageOf(state.items.map(item=>({asset:item.asset,owned:true}))));
+  if(p==='/inventory/equipment')return send(200,{items:state.items.filter(item=>item.equipped).map(item=>({slot_kind:item.asset.kind,asset:item.asset}))});
+  if(p==='/vault/cases')return send(200,{items:[]});
   if(p==='/inventory/me')return send(200,pageOf(state.items));
   if(p==='/users/me')return state.user?send(200,state.user):fail(401,'UNAUTHORIZED');
   if(p==='/auth/csrf')return send(200,{csrf_token:'bound-csrf'});
@@ -76,9 +79,9 @@ test('owner edits name/bio with CSRF; owned inventory avatar uses existing equip
  await page.getByLabel('Tên hiển thị',{exact:true}).fill('Updated Synthetic');await page.getByRole('textbox',{name:'Tiểu sử',exact:true}).fill('Updated public bio');await page.getByRole('button',{name:'Lưu thay đổi',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Updated Synthetic',exact:true})).toBeVisible();
  const patch=s.requests.find(r=>r.method==='PATCH');expect(patch.body).toEqual({display_name:'Updated Synthetic',bio:'Updated public bio'});expect(patch.csrf).toBe('bound-csrf');
- s.items=[{asset:{id:owner.id,kind:'avatar',slug:'synthetic-owned',media_url:'/api/v1/catalog/assets/'+owner.id},quantity:1,equipped:false}];
- await page.goto('/vault');await page.getByRole('button',{name:'Dùng làm Avatar',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Đã cập nhật Avatar'})).toBeVisible();expect(s.requests.find(r=>r.p==='/inventory/equipment/avatar').body).toEqual({asset_id:owner.id});
- await page.getByRole('button',{name:'Dùng Avatar mặc định',exact:true}).click();await expect.poll(()=>s.requests.filter(r=>r.p==='/inventory/equipment/avatar').at(-1).body).toEqual({asset_id:null});
+ s.items=[{asset:{id:owner.id,kind:'avatar',slug:'synthetic-owned',display_name:'Synthetic owned avatar',rarity:'D',effect_key:null,available:true,media_url:'/api/v1/catalog/assets/'+owner.id},quantity:1,equipped:false}];
+ await page.goto('/vault');await page.locator('.vault-item-card').click();await page.getByRole('button',{name:'Trang bị Avatar',exact:true}).click();await expect(page.locator('.vault-item-card')).toContainText('Đang trang bị');await expect(page.locator('.account-avatar')).toHaveAttribute('src','/api/v1/catalog/assets/'+owner.id);expect(s.requests.find(r=>r.p==='/inventory/equipment/avatar').body).toEqual({asset_id:owner.id});
+ await page.getByRole('button',{name:'Dùng Avatar mặc định',exact:true}).click();await expect.poll(()=>s.requests.filter(r=>r.p==='/inventory/equipment/avatar').at(-1).body).toEqual({asset_id:null});await expect(page.locator('.account-avatar')).toHaveAttribute('src','/assets/identity/default-avatar.svg');
 });
 test('VI EN and keyboard preserve Contact draft, native validity prevents invalid email submits',async({page,context})=>{
  const s=await api(context);await page.goto('/contact');await page.locator('#contact-message').fill('Draft retained');
@@ -88,7 +91,7 @@ test('VI EN and keyboard preserve Contact draft, native validity prevents invali
  await page.locator('#contact-email').fill('bad');await page.getByRole('button',{name:'Send message',exact:true}).click();expect(s.contact).toBeNull();
 });
 test('expired protected GET refreshes session before redirect',async({page,context})=>{
- const s=await api(context);await context.route('**/api/v1/inventory/me*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items:[],pagination:{page:1,page_size:20,total:21,total_pages:2}})}));await page.goto('/vault');await expect(page.getByRole('heading',{name:'Bảo Khố của tôi'})).toBeVisible();
+ const s=await api(context);await context.route('**/api/v1/inventory/me*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items:[],pagination:{page:1,page_size:20,total:21,total_pages:2}})}));await page.goto('/vault');await expect(page.getByRole('heading',{name:'Bảo Khố',exact:true})).toBeVisible();await page.getByRole('button',{name:'Kho của tôi',exact:true}).click();await expect(page.getByRole('button',{name:'Sau',exact:true})).toBeVisible();
  s.user=null;await context.route('**/api/v1/inventory/me*',route=>route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({error:{code:'UNAUTHORIZED'}})}));
- await page.getByRole('button',{name:'Tiếp',exact:true}).click();await expect(page).toHaveURL(/\/login\?next=%2Fvault$/);
+ await page.getByRole('button',{name:'Sau',exact:true}).click();await expect(page).toHaveURL(/\/login\?next=%2Fvault$/);
 });

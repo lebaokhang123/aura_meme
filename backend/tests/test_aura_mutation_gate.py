@@ -43,6 +43,7 @@ def test_reaction_creation_awards_but_replacement_does_not(monkeypatch, existing
     from app import interactions
     from uuid import uuid4
     awards = Mock()
+    monkeypatch.setattr("app.meme_reactions.set_owned_reaction", Mock())
     monkeypatch.setitem(sys.modules, "app.aura_runtime", SimpleNamespace(award_reaction=awards))
     monkeypatch.setattr(interactions, "lock_public_post", Mock())
     account = SimpleNamespace(db=Mock(), user=SimpleNamespace(id=uuid4()))

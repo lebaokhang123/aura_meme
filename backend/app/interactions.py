@@ -3,7 +3,7 @@ from typing import Literal, get_args
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import delete, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 
@@ -17,11 +17,19 @@ from app.permissions import optional_account_reader as interaction_reader, authe
 from app.security import AuthError
 
 router = APIRouter(prefix="/api/v1", tags=["Aura"])
-ERRORS = ERRORS | {404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}}
+ERRORS = ERRORS | {404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 503: {"model": ErrorResponse}}
 
 
 class ReactionInput(BaseModel):
-    reaction_type: ReactionType
+    model_config = ConfigDict(extra='ignore')
+    reaction_type: ReactionType | Literal['meme']
+    meme_asset_id: UUID | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @model_validator(mode='after')
+    def matching_asset(self):
+        if (self.reaction_type == 'meme') != (self.meme_asset_id is not None):
+            raise ValueError('Only meme reactions require an owned meme_asset_id.')
+        return self
 
 
 class ReactionResult(ReactionInput):
@@ -33,8 +41,12 @@ class ReactionResult(ReactionInput):
 @router.get("/posts/{post_id}/interactions", response_model=PostInteractions,
             operation_id="getPostInteractions", responses={s: ERRORS[s] for s in (401, 404, 422, 429, 500)},
             openapi_extra={"security": [{}, {"sessionCookie": []}]})
-def get_post_interactions(post_id: UUID, reader=Depends(interaction_reader, scope="function")):
+def get_post_interactions(post_id: UUID, request: Request = None, reader=Depends(interaction_reader, scope="function")):
     db, viewer_id = reader
+    return read_post_state(post_id, db, viewer_id, request)
+
+
+def read_post_state(post_id, db, viewer_id, request, meme_state=None):
     counts = [select(func.count()).select_from(PostReaction).join(User, User.id == PostReaction.user_id).where(
         PostReaction.post_id == Post.id, PostReaction.reaction_type == kind, User.status == "active"
     ).correlate(Post).scalar_subquery() for kind in REACTION_TYPES]
@@ -49,8 +61,11 @@ def get_post_interactions(post_id: UUID, reader=Depends(interaction_reader, scop
         Post.id == post_id, Post.id.in_(public_post_id(post_id)))).one_or_none()
     if row is None:
         raise AuthError(404, "NOT_FOUND", "Post not found.")
+    from app.meme_reactions import meme_reaction_states
+    meme = (meme_reaction_states(db, PostReaction, [post_id], viewer_id, request).get(post_id, {})
+            if meme_state is None else meme_state)
     return PostInteractions(post_id=row[0], reaction_counts=ReactionCounts(**dict(zip(REACTION_TYPES, row[1:7]))),
-                            comments_count=row[7], viewer_reaction=row[8], bookmarked=row[9])
+                            comments_count=row[7], viewer_reaction=row[8], bookmarked=row[9], **meme)
 
 
 @router.get("/users/me/bookmarks", response_model=PostPage, operation_id="listSavedPosts", responses=ERRORS)
@@ -78,15 +93,12 @@ def set_reaction(post_id: UUID, payload: ReactionInput, request: Request, accoun
     lock_public_post(account.db, post_id)
     first = account.db.get(PostReaction, (post_id, account.user.id)) is None
     now = request.app.state.auth.now()
-    statement = insert(PostReaction).values(post_id=post_id, user_id=account.user.id,
-        reaction_type=payload.reaction_type, created_at=now, updated_at=now)
-    account.db.execute(statement.on_conflict_do_update(index_elements=["post_id", "user_id"],
-        set_={"reaction_type": payload.reaction_type, "updated_at": now},
-        where=PostReaction.reaction_type != payload.reaction_type))
+    from app.meme_reactions import set_owned_reaction
+    set_owned_reaction(account, request, PostReaction, 'post_id', post_id, payload, now)
     if first:
         from app.aura_runtime import award_reaction
         award_reaction(account.db, post_id, account.user.id, now)
-    return ReactionResult(post_id=post_id, reaction_type=payload.reaction_type)
+    return ReactionResult(post_id=post_id, **payload.model_dump())
 
 
 @router.delete("/posts/{post_id}/reactions", status_code=204, operation_id="removeReaction",

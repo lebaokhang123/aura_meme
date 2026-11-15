@@ -1,0 +1,139 @@
+.vault-page { color: var(--am-on-surface); font: 14px/22px Inter, sans-serif; }
+.vault-page, .vault-page * { box-sizing: border-box; }
+.vault-content { width: 100%; max-width: 1280px; margin: auto; padding: 0 32px 32px; display: flex; flex-direction: column; gap: 32px; }
+.vault-page button, .vault-page input { font: inherit; color: inherit; }
+.vault-page button { cursor: pointer; }
+.vault-page button:disabled { cursor: not-allowed; opacity: .5; }
+.vault-page :is(button,input,a):focus-visible, .vault-detail button:focus-visible { outline: 2px solid var(--am-secondary, #d0bcff); outline-offset: 3px; }
+.vault-page h1, .vault-page h2, .vault-page h3 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
+.vault-hero { min-height: 152px; padding: 32px; display: flex; justify-content: space-between; align-items: center; gap: 24px; border-radius: 16px; background-color: var(--am-surface-container-low); position: relative; overflow: hidden; isolation: isolate; }
+.vault-hero-atmosphere { position: absolute; inset: 0; z-index: -1; opacity: .2; pointer-events: none; color: var(--am-secondary); }
+.vault-hero h1 { font-size: 40px; line-height: 48px; font-weight: 800; letter-spacing: -.02em; color: var(--am-primary); background: linear-gradient(100deg, var(--am-tertiary), var(--am-primary), var(--am-secondary)); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.vault-hero p { margin: 8px 0 0; color: var(--am-on-surface-variant); }
+.vault-stats { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 14px; border-radius: 12px; background: var(--am-surface-container-lowest); }
+.vault-stats > div { min-width: 88px; padding: 8px 12px; border-radius: 8px; background: var(--am-surface-container); display: flex; flex-direction: column; text-align: center; }
+.vault-stats span { font: 10px/16px 'JetBrains Mono', monospace; text-transform: uppercase; color: var(--am-on-surface-variant); }
+.vault-stats strong { font: 700 20px/26px 'Plus Jakarta Sans', sans-serif; color: var(--am-secondary); }
+.vault-stats > div:first-child strong { color: var(--am-tertiary); }
+.vault-chamber { display: flex; flex-direction: column; gap: 24px; }
+.vault-chamber-tools { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--am-surface-container-highest); }
+.vault-case-tabs { display: flex; padding: 4px; gap: 8px; border-radius: 12px; background: var(--am-surface-container-low); }
+.vault-case-tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 10px 20px; min-height: 44px; color: var(--am-on-surface-variant); font-weight: 600; }
+.vault-case-tabs button[aria-pressed="true"], .vault-rarity-filters button[aria-pressed="true"] { background: var(--am-secondary-container); color: var(--am-on-secondary-container); box-shadow: 0 0 16px #a078ff25; }
+.vault-page .material-symbols-outlined { font-size: 20px; line-height: 1; }
+.vault-sound-toggle, .vault-collection-actions button, .vault-pagination button, .vault-reset button, .vault-empty button { min-height: 44px; border: 1px solid var(--am-outline-variant); border-radius: 10px; padding: 8px 12px; background: var(--am-surface-container-low); color: var(--am-on-surface); }
+.vault-roulette { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 24px; }
+.vault-reel-frame { position: relative; width: 100%; height: 180px; flex: none; margin: 0; border-radius: 16px; border: 1px solid var(--am-surface-container-highest); background: var(--am-surface-container-lowest); box-shadow: inset 0 4px 20px #0006; }
+.vault-reel-frame::before, .vault-reel-frame::after { content: ''; position: absolute; top: 0; bottom: 0; width: min(96px, 18%); z-index: 2; pointer-events: none; }
+.vault-reel-frame::before { left: 0; background: linear-gradient(90deg, var(--am-surface-container-lowest), transparent); }
+.vault-reel-frame::after { right: 0; background: linear-gradient(270deg, var(--am-surface-container-lowest), transparent); }
+.vault-reel-frame { overflow: hidden; }
+.vault-needle { position: absolute; left: 50%; inset-block: 0; width: 2px; background: #ef4444; box-shadow: 0 0 10px #ef4444; z-index: 3; pointer-events: none; }
+.vault-needle::before, .vault-needle::after { content: ''; position: absolute; left: -5px; width: 0; height: 0; border-inline: 6px solid transparent; }
+.vault-needle::before { top: 0; border-top: 8px solid #ef4444; }
+.vault-needle::after { bottom: 0; border-bottom: 8px solid #ef4444; }
+.vault-reel { position: absolute; top: 9px; left: 50%; display: flex; gap: 10px; width: max-content; transform: translateX(calc(-50% + var(--reel-offset, 0px))); }
+.vault-reel.is-spinning { animation: vault-reel-reveal 1.8s cubic-bezier(.12,.8,.32,1) both; }
+@keyframes vault-reel-reveal { from { transform: translateX(calc(-50% + var(--reel-offset, 0px) + 584px)); } to { transform: translateX(calc(-50% + var(--reel-offset, 0px))); } }
+.vault-reel-card { width: 136px; height: 160px; flex: none; display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 12px; background: var(--am-surface-container); border: 1px solid var(--am-outline-variant); border-bottom: 4px solid var(--rarity-color, var(--am-outline)); overflow: hidden; }
+.vault-reel-card img { width: 100%; min-height: 0; flex: 1; object-fit: cover; border-radius: 8px; }
+.vault-reel-card strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; font-size: 12px; line-height: 16px; }
+.vault-open-button, .vault-equip-button { display: flex; justify-content: center; align-items: center; gap: 12px; min-width: 280px; min-height: 56px; padding: 14px 24px; border: 0; border-radius: 12px; background: linear-gradient(100deg, #d0bcff, #d0bcff 45%, #4cd7f6); color: #210f48 !important; font: 700 16px/22px 'Plus Jakarta Sans', sans-serif !important; }
+.vault-chamber-note { font-size: 12px; line-height: 18px; color: var(--am-on-surface-variant); text-align: center; margin: 0; }
+.vault-result { margin: 0; color: var(--am-secondary); }
+.vault-error { color: var(--am-error, #ffb4ab); padding: 12px 16px; border: 1px solid var(--am-error, #ffb4ab); border-radius: 10px; margin: 0; }
+.vault-collection { display: flex; flex-direction: column; gap: 24px; }
+.vault-collection-tools { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
+.vault-collection h2 { font-size: 28px; line-height: 36px; font-weight: 700; letter-spacing: -.015em; }
+.vault-collection-tools p { margin: 4px 0 0; color: var(--am-on-surface-variant); font-size: 12px; }
+.vault-collection-actions { display: flex; flex-wrap: wrap; gap: 12px; flex: none; }
+.vault-collection-actions input { min-height: 44px; width: 240px; max-width: 100%; padding: 10px 14px; border: 1px solid var(--am-outline-variant); border-radius: 12px; background: var(--am-surface-container-low); }
+.vault-collection-actions input::placeholder { color: var(--am-on-surface-variant); }
+.vault-rarity-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.vault-rarity-filters button { border: 0; border-radius: 999px; min-height: 44px; padding: 8px 14px; background: var(--am-surface-container-low); color: var(--am-on-surface-variant); font-size: 12px; font-weight: 600; }
+.vault-reset { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--am-on-surface-variant); font-size: 12px; }
+.vault-card-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; }
+.vault-item-card { min-width: 0; padding: 14px; border: 1px solid transparent; border-radius: 16px; text-align: left; background: var(--am-surface-container-low); display: flex; flex-direction: column; gap: 10px; transition: transform .3s, box-shadow .3s; }
+.vault-item-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px #a078ff25; border-color: var(--rarity-color, var(--am-outline)); }
+.vault-item-image { width: 100%; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: var(--am-surface-container-lowest); }
+.vault-item-image img { width: 100%; height: 100%; object-fit: cover; }
+.vault-item-label { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.vault-item-label h3 { min-width: 0; font-size: 16px; line-height: 22px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vault-rarity { display: inline-block; flex: none; padding: 2px 6px; border-radius: 4px; color: var(--rarity-color, var(--am-on-surface-variant)); background: var(--am-surface-container-highest); font: 600 11px/16px 'JetBrains Mono', monospace; }
+.vault-item-card small { color: var(--am-on-surface-variant); font-size: 11px; }
+.vault-page [data-rarity="D"] { --rarity-color: var(--am-on-surface-variant); }
+.vault-page [data-rarity="C"] { --rarity-color: var(--am-tertiary); }
+.vault-page [data-rarity="B"] { --rarity-color: #c084fc; }
+.vault-page [data-rarity="A"] { --rarity-color: #f87171; }
+.vault-page [data-rarity="S"] { --rarity-color: #fbbf24; }
+.vault-no-image { min-height: 80px; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 32px; color: var(--am-outline); }
+.vault-empty { padding: 32px 16px; text-align: center; margin: auto; color: var(--am-on-surface-variant); }
+.vault-empty a { color: var(--am-secondary); }
+.vault-pagination { display: flex; gap: 16px; align-items: center; justify-content: center; }
+.vault-detail { box-sizing: border-box; width: min(576px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; overscroll-behavior: contain; padding: 32px; border: 1px solid var(--am-outline-variant); border-radius: 16px; background: var(--am-surface-container-low); color: var(--am-on-surface); box-shadow: 0 24px 80px #0008; }
+.vault-detail::backdrop { background: #0d0e15cc; backdrop-filter: blur(8px); }
+.vault-detail-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 24px; }
+.vault-detail-bar button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--am-surface-container); font-size: 24px; }
+.vault-detail-main { display: flex; align-items: center; gap: 24px; }
+.vault-detail-main > div:last-child { min-width: 0; }
+.vault-detail-image { width: 192px; height: 192px; flex: none; overflow: hidden; border-radius: 12px; background: var(--am-surface-container-lowest); box-shadow: 0 0 24px #d0bcff22; }
+.vault-detail-image img { width: 100%; height: 100%; object-fit: cover; }
+.vault-detail h2 { font-size: 24px; line-height: 32px; overflow-wrap: anywhere; }
+.vault-detail p { font-size: 12px; line-height: 20px; color: var(--am-on-surface-variant); }
+.vault-detail .vault-detail-kicker { color: var(--am-secondary); }
+.vault-equip-button { margin-top: 24px; width: 100%; min-width: 0; }
+.vault-detail .vault-error { margin-top: 16px; color: var(--am-error); }
+.u219[data-theme="light"] .vault-page [data-rarity="B"] { --rarity-color: #7835b5; }
+.u219[data-theme="light"] .vault-page [data-rarity="A"] { --rarity-color: #bc2929; }
+.u219[data-theme="light"] .vault-page [data-rarity="S"] { --rarity-color: #895b00; }
+@media (max-width: 1100px) { .vault-hero { align-items: flex-start; flex-direction: column; } .vault-card-grid { grid-template-columns: repeat(3, minmax(0,1fr)); } .vault-collection-tools { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 767px) {
+  .vault-content { padding: 0 16px 24px; gap: 24px; }
+  .vault-hero { padding: 24px; gap: 20px; }
+  .vault-hero h1 { font-size: 30px; line-height: 38px; }
+  .vault-stats { width: 100%; gap: 6px; padding: 8px; }
+  .vault-stats > div { min-width: 0; padding: 8px 4px; }
+  .vault-stats span { font-size: 9px; }
+  .vault-chamber-tools { flex-wrap: wrap; gap: 12px; }
+  .vault-case-tabs { width: 100%; gap: 4px; }
+  .vault-case-tabs button { padding: 10px 8px; flex: 1; font-size: 12px; }
+  .vault-open-button { min-width: 0; width: 100%; padding-inline: 12px; }
+  .vault-collection h2 { font-size: 24px; line-height: 32px; }
+  .vault-card-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+  .vault-item-card { padding: 10px; gap: 8px; }
+  .vault-item-label { flex-wrap: wrap; gap: 4px; }
+  .vault-item-label h3 { width: 100%; font-size: 13px; line-height: 18px; }
+  .vault-collection-actions { width: 100%; }
+  .vault-collection-actions input { width: 100%; }
+  .vault-detail { padding: 24px; }
+  .vault-detail-main { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .vault-detail-image { width: 100%; height: auto; aspect-ratio: 1; }
+  .vault-reset { align-items: flex-start; flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) { .vault-page *, .vault-detail * { transition: none !important; animation: none !important; } }
+
+.vault-collection-heading { display: flex; align-items: center; gap: 8px; }
+.vault-odds-trigger { isolation: isolate; position: relative; width: 44px; height: 44px; flex: none; border: 0; border-radius: 50%; background: transparent; font-weight: 700 !important; color: var(--am-on-surface-variant) !important; }
+.vault-odds-trigger::before { content: ''; position: absolute; inset: 8px; border: 1px solid var(--am-outline-variant); border-radius: 50%; background: var(--am-surface-container-low); z-index: -1; }
+.vault-odds { width: min(640px, calc(100vw - 32px)); box-sizing: border-box; max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; border: 1px solid var(--am-outline-variant); border-radius: 16px; background: radial-gradient(circle at 90% 0, #a078ff22, transparent 60%), var(--am-surface-container-low); color: var(--am-on-surface); box-shadow: 0 24px 80px #0008; }
+.vault-odds::backdrop { background: #0d0e15bb; backdrop-filter: blur(6px); }
+.vault-odds-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+.vault-odds-heading h2 { display: flex; align-items: center; gap: 8px; margin: 0; font: 600 14px/20px Inter, sans-serif; }
+.vault-odds-heading h2 span { color: var(--am-secondary); font-size: 20px; }
+.vault-odds-heading button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--am-surface-container); color: var(--am-on-surface-variant); font-size: 24px; cursor: pointer; }
+.vault-odds :focus-visible { outline: 2px solid var(--am-secondary); outline-offset: 3px; }
+.vault-odds-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.vault-odds-card { --odds-color: var(--am-on-surface); min-width: 0; padding: 12px; border: 1px solid var(--odds-color); border-radius: 6px; background: var(--am-surface-container); color: var(--odds-color); font: 12px/18px Inter, sans-serif; }
+.vault-odds-card[data-rarity="C"] { --odds-color: var(--am-tertiary); }
+.vault-odds-card[data-rarity="B"] { --odds-color: #c084fc; box-shadow: 0 0 10px #a855f733; }
+.vault-odds-card[data-rarity="A"] { --odds-color: #f87171; }
+.vault-odds-card[data-rarity="S"] { --odds-color: #fbbf24; box-shadow: 0 0 10px #fbbf2422; }
+.vault-odds-card > div { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin: 8px 0; }
+.vault-odds-card b { font: 700 16px/22px 'JetBrains Mono', monospace; }
+.vault-odds-card i { width: 7px; height: 7px; border-radius: 50%; background: var(--odds-color); box-shadow: 0 0 6px var(--odds-color); }
+.vault-odds-track { display: block; height: 3px; border-radius: 3px; overflow: hidden; background: var(--am-surface-container-highest); }
+.vault-odds-track span { display: block; height: 100%; min-width: 2px; background: var(--odds-color); }
+.u219[data-theme="light"] .vault-odds-card[data-rarity="B"] { --odds-color: #7835b5; }
+.u219[data-theme="light"] .vault-odds-card[data-rarity="A"] { --odds-color: #bc2929; }
+.u219[data-theme="light"] .vault-odds-card[data-rarity="S"] { --odds-color: #895b00; }
+@media (max-width: 599px) { .vault-odds-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .vault-odds-card:last-child { grid-column: 1 / -1; } }

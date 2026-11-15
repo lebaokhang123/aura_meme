@@ -22,7 +22,9 @@ def migration():
 def test_six_reaction_contracts_and_session_security():
     from app.main import app
     contract=app.openapi();schemas=contract["components"]["schemas"]
-    assert schemas["ReactionInput"]["properties"]["reaction_type"]["enum"]==KINDS
+    variants=schemas["ReactionInput"]["properties"]["reaction_type"]["anyOf"]
+    assert len(variants)==2 and variants[0]["enum"]==KINDS
+    assert variants[1]["const"]=="meme"
     assert set(schemas["ReactionCounts"]["properties"])==set(KINDS)
     path=contract["paths"]["/api/v1/comments/{comment_id}/reactions"]
     assert set(path)=={"put","delete"}

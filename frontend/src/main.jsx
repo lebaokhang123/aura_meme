@@ -1,10 +1,13 @@
+import VaultPage from './components/VaultPage.jsx';
+import GlobalBackground from './components/GlobalBackground.jsx';
+import {vaultAsset} from './vault-api.js';
 import React,{useEffect,useSyncExternalStore} from 'react';
 import {createRoot} from 'react-dom/client';
 import { resolveScreen, initLegacyEffects, attachNavigation, prepareAuthForm, showDemoMessage } from './runtime.js';
 import {AuthBoundary} from './AuthBoundary.jsx';
 import {auth,MOCK_AUTH} from './auth.js';
 import {authMessage} from './auth-client.js';
-import {ProfilePage,ContactPage,VaultPage,ContactInbox} from './components/AccountPages.jsx';
+import {ProfilePage,ContactPage,ContactInbox} from './components/AccountPages.jsx';
 import './account-pages.css';
 import './profile-page.css';
 import {loginUrl} from './return-url.js';
@@ -25,6 +28,23 @@ import PremiumPage from './components/PremiumPage.jsx';
 const pages=import.meta.glob('./generated/*.js');
 const cssFiles=import.meta.glob('./generated/*.css',{query:'?raw',import:'default'});
 const effectsFiles=import.meta.glob('./generated/*.effects.json');
+
+function EquippedBackground(){
+ const session=useSyncExternalStore(auth.subscribe,auth.snapshot),owner=session.user?.id;
+ const [equipment,setEquipment]=React.useState({owner:null,effect:null});
+ useEffect(()=>{
+  if(MOCK_AUTH||!owner)return;
+  let active=true,generation=0;const channel=typeof BroadcastChannel==='undefined'?null:new BroadcastChannel('aurameme-equipment');
+  const refresh=async()=>{const token=++generation;try{const value=await auth.read('/inventory/equipment');if(!Array.isArray(value?.items))throw Error('PROTOCOL_ERROR');const entry=value.items.find(item=>item.slot_kind==='background');const asset=entry?vaultAsset(entry.asset):null;if(active&&token===generation)setEquipment({owner,effect:asset?.kind==='background'&&asset.available?asset.effect_key:null});}catch{if(active&&token===generation)setEquipment({owner,effect:null});}};
+  const changed=()=>{refresh();channel?.postMessage('changed')};
+  refresh();if(channel)channel.onmessage=refresh;
+  window.addEventListener('aurameme-equipment-changed',changed);window.addEventListener('focus',refresh);
+  return()=>{active=false;channel?.close();window.removeEventListener('aurameme-equipment-changed',changed);window.removeEventListener('focus',refresh)};
+ },[owner]);
+ const effect=!MOCK_AUTH&&session.status==='authenticated'&&equipment.owner===owner?equipment.effect:null;
+ useEffect(()=>{const root=document.getElementById('root');if(effect)root.dataset.vaultBackground=effect;else delete root.dataset.vaultBackground;return()=>{delete root.dataset.vaultBackground}},[effect]);
+ return <GlobalBackground effect={effect}/>;
+}
 
 function App() {
   const render = useLocalized();
@@ -68,7 +88,7 @@ function App() {
   if(!MOCK_AUTH&&protectedPage&&authState.status!=='authenticated')return null;
   // Reveal the header and page together after the lazy content and CSS are ready.
   if(!screen&&!failed)return null;
-  return render(<><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : [AdminPage,PremiumPage,ProfilePage,ContactPage,VaultPage,ContactInbox].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}</>);
+  return render(<><EquippedBackground/><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : [AdminPage,PremiumPage,ProfilePage,ContactPage,VaultPage,ContactInbox].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}</>);
 }
 
 applyPreferences(readPreferences());

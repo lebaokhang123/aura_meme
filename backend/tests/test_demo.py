@@ -406,3 +406,25 @@ def test_aura_publication_failure_rolls_back_and_redacts_private_details(publica
     output=capsys.readouterr().out
     assert 'transaction rolled back' in output and 'SYNTHETIC_PRIVATE' not in output
     engine.dispose.assert_called_once()
+
+
+def test_legacy_demo_config_does_not_inherit_vault_issuance(config,monkeypatch):
+    with monkeypatch.context() as scoped:
+        scoped.setattr(os,'environ',os.environ.copy())
+        scoped.setenv('VAULT_RUNTIME_ENABLED','true')
+        demo.activate_demo()
+        assert os.environ['VAULT_RUNTIME_ENABLED']=='false'
+
+@pytest.mark.parametrize('flag',['true','false'])
+def test_demo_vault_flag_requires_explicit_private_config(config,flag):
+    from dotenv import set_key
+    path,_=config
+    set_key(path/'.env','VAULT_RUNTIME_ENABLED',flag)
+    assert demo.demo_environment()['VAULT_RUNTIME_ENABLED']==flag
+
+@pytest.mark.parametrize('flag',['TRUE','1','on','','unexpected'])
+def test_demo_vault_flag_rejects_ambiguous_values(config,flag):
+    from dotenv import set_key
+    path,_=config
+    set_key(path/'.env','VAULT_RUNTIME_ENABLED',flag)
+    with pytest.raises(ConfigurationError):demo.demo_environment()

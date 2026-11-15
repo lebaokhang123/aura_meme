@@ -1,3 +1,4 @@
+from vault_test_rights import synthetic_rights
 """Synthetic probability fixtures; no approved prices, odds or released assets."""
 from collections import Counter
 from math import sqrt
@@ -57,7 +58,7 @@ def seed_vault(c,owner,now):
     c.execute(text("INSERT INTO reward_policy_versions VALUES (:id,1,CAST(:config AS jsonb),'draft',:now,:owner,:now)"),{'id':policy,'config':json.dumps(config),'owner':owner,'now':now})
     c.execute(text("INSERT INTO case_definitions VALUES (:id,'common','Synthetic case',3,'draft',:now,:now)"),{'id':case,'now':now})
     for rarity,asset in zip('DCBAS',assets):
-        digest=asset.hex*2;rights={'source':'synthetic fixture','author':'test','license':'CC0-1.0','attribution':'not released','review_status':'approved','sha256':digest,'mime':'image/png'}
+        digest=asset.hex*2;rights=synthetic_rights(digest)
         c.execute(text("INSERT INTO asset_items VALUES (:id,:slug,'icon','fixture',:rarity,:key,CAST(:rights AS jsonb),true,:now,:now)"),{'id':asset,'slug':'fixture-'+asset.hex,'rarity':rarity,'key':'catalog/'+digest+'.png','rights':json.dumps(rights),'now':now})
     for index,pool in enumerate(pools):
         c.execute(text("INSERT INTO case_loot_tables VALUES (:id,:case,1,:band,:min,:max,:policy,'draft',:now,:now)"),{'id':pool,'case':case,'band':index+1,'min':0 if index==0 else 100,'max':100 if index==0 else None,'policy':policy,'now':now})

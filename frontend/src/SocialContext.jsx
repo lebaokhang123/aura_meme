@@ -4,7 +4,7 @@ import { loadSocial,saveSocial } from './social-storage.js';
 import { readDemoUser } from './demo.js';
 import {auth,MOCK_AUTH} from './auth.js';
 import {CATEGORIES,readFilters} from './feed-data.js';
-import {apiId,apiCategory,apiPost,apiComment,apiPage,apiInteractions} from './social-api.js';
+import {apiId,apiCategory,apiPost,apiComment,apiPage,apiInteractions,apiOwnedMemePage,reactionMutation} from './social-api.js';
 
 const SocialContext=createContext(null);
 export const useSocial=()=>useContext(SocialContext);
@@ -16,10 +16,18 @@ export function SocialProvider({children}) {
   const [serverPosts,setServerPosts]=useState([]),[categories,setCategories]=useState(MOCK_AUTH?CATEGORIES:[]);
   const [pagination,setPagination]=useState(null),[loading,setLoading]=useState(!MOCK_AUTH),[commentPages,setCommentPages]=useState({});
   const query=useRef(readFilters(location.search,!MOCK_AUTH)),generation=useRef(0),page=useRef(1),uploads=useRef(new WeakMap());
-  const setInteraction=(target,id,value)=>setSnapshot(v=>({...v,state:{...v.state,api:true,apiInteractions:{...v.state.apiInteractions,[target]:{...v.state.apiInteractions?.[target],[id]:apiInteractions(value,id,target)}}}}));
+  const setInteraction=(target,id,value)=>{
+    const parsed=apiInteractions(value,id,target);
+    setSnapshot(v=>({...v,state:{...v.state,api:true,apiInteractions:{...v.state.apiInteractions,[target]:{...v.state.apiInteractions?.[target],[id]:parsed}}}}));
+  };
   const readInteraction=async(target,id)=>{
     const value=await auth.read('/'+(target==='post'?'posts':'comments')+'/'+apiId(id)+'/interactions');
     setInteraction(target,id,value);return value;
+  };
+  const loadOwnedMemes=async(next=1)=>{
+    if(MOCK_AUTH||!readDemoUser())throw Error('LOGIN_REQUIRED');
+    if(!Number.isSafeInteger(next)||next<1)throw Error('PROTOCOL_ERROR');
+    return apiOwnedMemePage(await auth.read('/inventory/me?page_size=20&page='+next));
   };
   const loadCategories=async()=>{
     let next=1,result=[];
@@ -94,8 +102,8 @@ export function SocialProvider({children}) {
     }else if(action.type==='delete-comment')await auth.write('DELETE','/comments/'+apiId(action.id));
     else if(action.type==='moderate-comment')await auth.write('PATCH','/admin/comments/'+apiId(action.id),{status:'hidden'});
     else if(action.type==='react'){
-      const current=snapshot.state.apiInteractions?.[action.target]?.[action.id]?.viewer_reaction;
-      await auth.write(current===action.reaction?'DELETE':'PUT','/'+(action.target==='post'?'posts':'comments')+'/'+apiId(action.id)+'/reactions',current===action.reaction?undefined:{reaction_type:action.reaction});
+      const mutation=reactionMutation(action,snapshot.state.apiInteractions?.[action.target]?.[action.id]);
+      await auth.write(mutation.method,mutation.path,mutation.body);
       try{
         await readInteraction(action.target,action.id);
         if(action.target==='post'&&query.current.sort==='hot')await loadFeed();
@@ -148,5 +156,5 @@ export function SocialProvider({children}) {
     try{channel.current?.postMessage('updated')}catch{}
     refresh().catch(()=>{if(active.current)setError('Đã lưu thay đổi, nhưng chưa đồng bộ được dữ liệu hiển thị. Vui lòng tải lại.');});
   };
-  return <SocialContext.Provider value={{...snapshot,posts:MOCK_AUTH?allPosts(snapshot.state,snapshot.media):serverPosts,categories,pagination,loading,commentPages,loadComments,loadFeed,loadMore:()=>loadFeed(query.current,true),retry:async()=>{await refresh();if(!MOCK_AUTH)await loadFeed();},ready,error,commit}}>{children}</SocialContext.Provider>;
+  return <SocialContext.Provider value={{...snapshot,posts:MOCK_AUTH?allPosts(snapshot.state,snapshot.media):serverPosts,categories,pagination,loading,commentPages,loadComments,loadFeed,loadOwnedMemes,loadMore:()=>loadFeed(query.current,true),retry:async()=>{await refresh();if(!MOCK_AUTH)await loadFeed();},ready,error,commit}}>{children}</SocialContext.Provider>;
 }

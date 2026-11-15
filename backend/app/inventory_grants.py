@@ -1,4 +1,4 @@
-"""Internal draft item grants; no endpoint or production issuance switch."""
+"""Atomic item grants shared by isolated simulations and explicitly enabled Vault."""
 from datetime import timedelta
 from uuid import uuid4
 from sqlalchemy import func, select
@@ -17,6 +17,10 @@ def inventory_state(db, owner, asset_id):
 
 def grant_item(db, owner, asset_id, policy_id, key, source, now, case_open_id=None):
     now = simulation_only(db, now)
+    return _grant_item(db, owner, asset_id, policy_id, key, source, now, case_open_id)
+
+
+def _grant_item(db, owner, asset_id, policy_id, key, source, now, case_open_id=None):
     existing = db.scalar(select(InventoryGrant).where(InventoryGrant.user_id == owner, InventoryGrant.event_key == key))
     if existing is not None:
         if existing.asset_id != asset_id or existing.source_type != source or existing.case_open_id != case_open_id:

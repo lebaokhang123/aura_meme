@@ -1,3 +1,4 @@
+from vault_test_rights import synthetic_rights
 """Inventory and approved catalog delivery use synthetic bytes and rollback-only identities."""
 from hashlib import sha256
 from io import BytesIO
@@ -23,7 +24,7 @@ def inventory(auth,tmp_path,monkeypatch):
         info=PngImagePlugin.PngInfo();info.add_text('private-fixture','must-not-survive')
         image.save(out,format='PNG',pnginfo=info);data=out.getvalue();digest=sha256(data).hexdigest()
         file=tmp_path/(digest+'.png');file.write_bytes(data);files.append(file)
-        rights={'review_status':'approved','source':'synthetic test fixture only','author':'test','license':'CC0-1.0','attribution':'not released','sha256':digest,'mime':'image/png'}
+        rights=synthetic_rights(digest)
         c.execute(text("INSERT INTO asset_items VALUES (:id,:slug,:kind,'synthetic','D',:key,CAST(:rights AS jsonb),true,:now,:now)"),
                   dict(id=asset,slug='fixture-'+str(index),kind='frame' if index==1 else 'icon',key='catalog/'+file.name,rights=json.dumps(rights),now=client.app.state.auth.now()))
         c.execute(text('INSERT INTO user_inventory VALUES (:user,:asset,:quantity,:now,:now)'),dict(user=other if index==2 else owner,asset=asset,quantity=0 if index==3 else 1,now=client.app.state.auth.now()))
@@ -38,7 +39,7 @@ def test_inventory_filters_owner_and_zero_quantity_with_stable_pagination(invent
     body=response.json();assert body['pagination']['total']==2 and len(body['items'])==1
     second=client.get('/api/v1/inventory/me?page=2&page_size=1').json()
     assert {body['items'][0]['asset']['id'],second['items'][0]['asset']['id']}=={str(ids[0]),str(ids[1])}
-    assert all(set(x['asset'])=={'id','slug','kind','rarity','media_url'} and not x['equipped'] for x in body['items'])
+    assert all(set(x['asset'])=={'id','slug','kind','rarity','media_url','display_name','effect_key','available'} and not x['equipped'] for x in body['items'])
     assert client.get('/api/v1/inventory/me?page=9999999999999999999').json()['items']==[]
     assert str(other) not in response.text and 'source_rights' not in response.text
 
@@ -154,3 +155,19 @@ def test_avatar_equip_rejects_invalid_inventory(inventory, invalid):
         active=invalid not in ('inactive','unapproved'),approved=invalid!='unapproved',quantity=0 if invalid=='zero' else 1,
         kind='icon' if invalid=='wrong_kind' else 'avatar')
     assert mutation(client,'PUT','/inventory/equipment/avatar',{'asset_id':str(asset)}).status_code==(409 if invalid=='wrong_kind' else 404)
+
+@pytest.mark.integration
+def test_owned_avatar_without_provenance_falls_back_without_erasing_inventory(inventory):
+    from test_auth import ACCOUNT
+    client,c,owner,_,ids,_=inventory
+    asset=add_avatar_fixture(client,c,owner,ids[0])
+    assert mutation(client,'PUT','/inventory/equipment/avatar',{'asset_id':str(asset)}).status_code==200
+    quantity=c.scalar(text('SELECT quantity FROM user_inventory WHERE user_id=:owner AND asset_id=:asset'),{'owner':owner,'asset':asset})
+    grants=c.scalar(text('SELECT count(*) FROM inventory_grants'))
+    c.execute(text("UPDATE asset_items SET source_rights=source_rights-'proof' WHERE id=:asset"),{'asset':asset})
+    assert client.get('/api/v1/users/me').json()['avatar_url'] is None
+    assert client.get('/api/v1/users/'+ACCOUNT['username']).json()['avatar_url'] is None
+    assert client.get('/api/v1/catalog/assets/'+str(asset)).status_code==404
+    assert c.scalar(text('SELECT quantity FROM user_inventory WHERE user_id=:owner AND asset_id=:asset'),{'owner':owner,'asset':asset})==quantity
+    assert c.scalar(text("SELECT asset_id FROM user_equipment WHERE user_id=:owner AND slot_kind='avatar'"),{'owner':owner})==asset
+    assert c.scalar(text('SELECT count(*) FROM inventory_grants'))==grants

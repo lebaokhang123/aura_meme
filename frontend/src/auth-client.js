@@ -1,5 +1,5 @@
 export class AuthError extends Error {
-  constructor(status,code){super(code);this.name='AuthError';this.status=status;this.code=code;}
+  constructor(status,code,metadata={}){super(code);this.name='AuthError';this.status=status;this.code=code;if(Number.isSafeInteger(metadata.retryAfter)&&metadata.retryAfter>0&&metadata.retryAfter<=86400)this.retryAfter=metadata.retryAfter;if(typeof metadata.nextOpenAt==='string'&&/^\d{4}-\d{2}-\d{2}T/.test(metadata.nextOpenAt)&&Number.isFinite(Date.parse(metadata.nextOpenAt)))this.nextOpenAt=metadata.nextOpenAt;}
 }
 function sessionUser(value){
   if(!value||!(/^[0-9a-f-]{36}$/i).test(value.id)||!(/^[a-z0-9_]{3,32}$/).test(value.username)
@@ -19,7 +19,7 @@ export function createAuthClient({fetch=globalThis.fetch,notify=()=>{}}={}){
       const response=await fetch('/api/v1'+path,{credentials:'include',cache:'no-store',redirect:'error',...options,signal:controller.signal,headers:{Accept:'application/json',...options.headers}});
       if(response.status===204)return null;
       let body;try{body=await response.json();}catch{throw new AuthError(response.status,'PROTOCOL_ERROR');}
-      if(!response.ok)throw new AuthError(response.status,typeof body?.error?.code==='string'?body.error.code:'API_ERROR');
+      if(!response.ok)throw new AuthError(response.status,typeof body?.error?.code==='string'?body.error.code:'API_ERROR',{retryAfter:Number(response.headers.get('Retry-After')),nextOpenAt:body?.error?.details?.next_open_at});
       return body;
     }catch(error){if(error instanceof AuthError)throw error;throw new AuthError(0,'NETWORK_ERROR');}
     finally{clearTimeout(timer);}
@@ -35,12 +35,13 @@ export function createAuthClient({fetch=globalThis.fetch,notify=()=>{}}={}){
       publish({...state,status:state.user?'authenticated':'unavailable',error});throw error;
     }
   }
-  async function write(method,path,body){
+  async function write(method,path,body,{idempotencyKey}={}){
+    if(idempotencyKey!==undefined&&(typeof idempotencyKey!=='string'||idempotencyKey.length<12||idempotencyKey.length>128||!idempotencyKey.trim()||idempotencyKey.includes('\x00')))throw new AuthError(422,'VALIDATION_ERROR');
     try{
       const csrf=await request('/auth/csrf');
       if(typeof csrf?.csrf_token!=='string'||!csrf.csrf_token)throw new AuthError(0,'PROTOCOL_ERROR');
       const multipart=typeof FormData!=='undefined'&&body instanceof FormData;
-      return await request(path,{method,headers:{'X-CSRF-Token':csrf.csrf_token,...(body&&!multipart?{'Content-Type':'application/json'}:{})},...(body?{body:multipart?body:JSON.stringify(body)}:{})});
+      return await request(path,{method,headers:{'X-CSRF-Token':csrf.csrf_token,...(idempotencyKey===undefined?{}:{'Idempotency-Key':idempotencyKey}),...(body&&!multipart?{'Content-Type':'application/json'}:{})},...(body?{body:multipart?body:JSON.stringify(body)}:{})});
     }catch(error){if(error.status===401)await refresh().catch(()=>{});throw error;}
   }
   const mutation=(path,body)=>write('POST','/auth/'+path,body);

@@ -4,6 +4,7 @@ from typing import Literal, get_args
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from app.account_schemas import UserPublic
+from app.asset_schemas import Asset
 
 
 ReactionType = Literal["like", "love", "laugh", "fire", "sad", "angry"]
@@ -19,7 +20,23 @@ class ReactionCounts(BaseModel):
     angry: int = Field(ge=0)
 
 
-class PostInteractions(BaseModel):
+class MemeReactionCount(BaseModel):
+    asset: Asset
+    count: int = Field(ge=1)
+
+
+class ReactionState(BaseModel):
+    viewer_reaction: ReactionType | None
+    viewer_meme_asset_id: UUID | None = Field(default=None, exclude_if=lambda value: value is None)
+    meme_reactions: list[MemeReactionCount] | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @field_validator('viewer_reaction', mode='before')
+    @classmethod
+    def legacy_viewer_reaction(cls, value):
+        return None if value == 'meme' else value
+
+
+class PostInteractions(ReactionState):
     post_id: UUID
     reaction_counts: ReactionCounts
     comments_count: int = Field(ge=0)

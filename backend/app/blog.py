@@ -205,18 +205,29 @@ def list_posts(request: Request, page: int = Query(1, ge=1), page_size: int = Qu
         statement = statement.where(Category.slug == category)
     if author is not None:
         statement = statement.where(User.username == author)
-    score=select(func.count()).select_from(PostReaction).join(User,User.id==PostReaction.user_id).where(PostReaction.post_id==Post.id,User.status=="active").correlate(Post).scalar_subquery()
+    from app.blog_schemas import REACTION_TYPES
+    from app.meme_reactions import enabled, valid_meme_reaction
+    score_filter=PostReaction.reaction_type.in_(REACTION_TYPES)
+    if sort == 'reaction_desc' and enabled(request):
+        from app.vault_runtime import require_schema
+        require_schema(reader[0])
+        score_filter=or_(score_filter,valid_meme_reaction(PostReaction))
+    score=select(func.count()).select_from(PostReaction).join(User,User.id==PostReaction.user_id).where(PostReaction.post_id==Post.id,User.status=="active",score_filter).correlate(Post).scalar_subquery()
     ordering = {"reaction_desc": (score.desc(),Post.created_at.desc(),Post.id.desc()),
                 "created_desc": (Post.created_at.desc(), Post.id.desc()),
                 "created_asc": (Post.created_at, Post.id), "title_asc": (Post.title, Post.id)}
     db,viewer_id=reader
     rows, pagination = page_rows(db, statement.order_by(*ordering[sort]), page, page_size)
+    meme_states={}
+    if include_interactions:
+        from app.meme_reactions import meme_reaction_states
+        meme_states=meme_reaction_states(db,PostReaction,[row[0].id for row in rows],viewer_id,request)
     items=[]
     for row in rows:
         dto=post_dto(*row)
         if include_interactions:
-            from app.interactions import get_post_interactions
-            try:dto.interactions=get_post_interactions(dto.id,reader=(db,viewer_id))
+            from app.interactions import read_post_state
+            try:dto.interactions=read_post_state(dto.id,db,viewer_id,request,meme_states.get(dto.id,{}))
             except AuthError as error:
                 if error.status==404:continue
                 raise
