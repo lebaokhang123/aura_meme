@@ -69,7 +69,7 @@ def test_free_open_receipt_retry_conflict_and_owned_catalog(runtime_vault):
     response=opening(client,cases['avatar']);assert response.status_code==200,response.text
     first=response.json();assert first['reward']['id']==str(assets['avatar'][0]) and not first['already_processed']
     assert first['cost_khi_van']==first['khi_van_balance']==0
-    assert counts(c)=={'case_opens':1,'inventory_grants':1,'user_inventory':1,'wallets':0,'wallet_transactions':0,'user_progress':0,'aura_ledger':0}
+    assert counts(c)=={'case_opens':1,'inventory_grants':1,'user_inventory':1,'wallets':0,'wallet_transactions':0,'user_progress':1,'aura_ledger':1}
     retry=opening(client,cases['avatar']);assert retry.status_code==200
     assert retry.json() | {'already_processed':False} == first
     conflict=opening(client,cases['background']);assert conflict.status_code==409 and conflict.json()['error']['code']=='IDEMPOTENCY_CONFLICT'

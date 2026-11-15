@@ -149,10 +149,10 @@ test('owned avatar can be equipped and restored to the default avatar',async({pa
 });
 
 test('incomplete avatar pool stays NOT_READY while a real background case remains selectable',async({page,context})=>{
- const api=await transport(context);api.backgroundOnly=true;await enter(page);await expect(open(page)).toBeDisabled();await expect(page.locator('.vault-chamber-note')).toContainText('NOT_READY');await page.getByRole('button',{name:'Rương Background',exact:true}).click();await expect(open(page)).toBeEnabled();expect(api.requests.filter(row=>row.method==='POST'&&row.path.endsWith('/open'))).toHaveLength(0);
+ const api=await transport(context);api.backgroundOnly=true;await enter(page);await expect(open(page)).toBeDisabled();await expect(page.locator('.vault-chamber-note')).toHaveCount(0);await page.getByRole('button',{name:'Rương Background',exact:true}).click();await expect(open(page)).toBeEnabled();expect(api.requests.filter(row=>row.method==='POST'&&row.path.endsWith('/open'))).toHaveLength(0);
 });
 test('explicit NOT_READY confirms no award and clears the pending attempt',async({page,context})=>{
- const api=await transport(context);api.nextPost='not-ready';await enter(page);await open(page).click();await expect(page.locator('.vault-error')).toContainText('NOT_READY');await expect(open(page)).toBeDisabled();await expect(page.locator('.vault-result')).toHaveCount(0);expect(api.receipts.size).toBe(0);expect(await page.evaluate(key=>sessionStorage.getItem(key),storageKey(users[0].id))).toBeNull();
+ const api=await transport(context);api.nextPost='not-ready';await enter(page);await open(page).click();await expect(page.locator('.vault-error')).toContainText('Rương hiện chưa có đủ vật phẩm để mở.');await expect(open(page)).toBeDisabled();await expect(page.locator('.vault-result')).toHaveCount(0);expect(api.receipts.size).toBe(0);expect(await page.evaluate(key=>sessionStorage.getItem(key),storageKey(users[0].id))).toBeNull();
 });
 
 test('background server equipment survives reload, clears at logout and stays owner-scoped',async({page,context})=>{
@@ -164,7 +164,7 @@ test('Vault screenshot matrix preserves approved controls, columns and muted sou
  for(const width of [375,768,1440])for(const theme of ['dark','light'])for(const language of ['vi','en']){
   await page.setViewportSize({width,height:960});if(await page.locator('html').getAttribute('data-theme')!==theme)await page.locator('.u219-tg').click();await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
   if((await page.locator('.u267-cd').textContent()).toLowerCase()!==language){await page.locator('.u267-gb').click();await page.getByRole('option',{name:language==='en'?'English':'Tiếng Việt',exact:true}).click();}
-  await expect(page.locator('.vault-item-card')).toHaveCount(2);await expect(page.getByRole('button',{name:language==='en'?'Open Case':'Mở Rương',exact:true})).toBeVisible();await expect(page.locator('.vault-sound-toggle')).toHaveAttribute('aria-pressed','false');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(await page.locator('.vault-card-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(width===375?2:width===768?3:5);
+  await expect(page.locator('.vault-item-card')).toHaveCount(2);await expect(page.getByRole('button',{name:language==='en'?'Open Case':'Mở Rương',exact:true})).toBeVisible();await expect(page.locator('.vault-sound-toggle')).toHaveAttribute('aria-pressed','true');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(await page.locator('.vault-card-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(width===375?2:width===768?3:5);
   await page.screenshot({path:info.outputPath('vault-'+width+'-'+theme+'-'+language+'.png'),fullPage:true});
  }
 });

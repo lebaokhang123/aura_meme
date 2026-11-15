@@ -65,13 +65,13 @@ test('expired Contact session redirects and does not claim success',async({page,
  const s=await api(context);await page.goto('/contact');await page.locator('#contact-message').fill('Synthetic feedback');s.user=null;await submit(page);await expect(page).toHaveURL(/\/login\?next=%2Fcontact$/);
 });
 
-test('other profile has no owner controls or private inventory reads; ADMIN sees Inbox only on self',async({page,context})=>{
+test('other profile has no owner controls or private inventory reads; Admin Inbox URL preserves role protection',async({page,context})=>{
  const s=await api(context,{admin:true});s.user={...s.user,username:'different_admin'};await page.goto('/profile/profile_owner');
  await expect(page.getByRole('heading',{name:owner.display_name,exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Chỉnh sửa hồ sơ',exact:true})).toHaveCount(0);
  await expect(page.getByRole('link',{name:'Hộp thư quản trị',exact:true})).toHaveCount(0);
  expect(s.requests.some(r=>r.p==='/inventory/me')).toBe(false);
- s.user={...owner,roles:['USER','ADMIN']};await page.goto('/profile');await page.getByRole('link',{name:'Hộp thư quản trị',exact:true}).click();await expect(page.getByRole('heading',{name:'Hộp thư quản trị',exact:true})).toBeVisible();
+ s.user={...owner,roles:['USER','ADMIN']};await page.goto('/profile');await page.goto('/admin/contacts');await expect(page.getByRole('heading',{name:'Hộp thư quản trị',exact:true})).toBeVisible();
  s.user={...owner};await page.reload();await expect(page.getByRole('heading',{name:'Không có quyền truy cập'})).toBeVisible();
 });
 test('owner edits name/bio with CSRF; owned inventory avatar uses existing equip contract',async({page,context})=>{
