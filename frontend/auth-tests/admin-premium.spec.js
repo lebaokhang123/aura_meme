@@ -1,0 +1,88 @@
+import {test,expect} from '@playwright/test';
+const pageErrors=new WeakMap();test.beforeEach(({page})=>{const errors=[];pageErrors.set(page,errors);page.on('pageerror',e=>errors.push(e.message))});test.afterEach(({page})=>{expect(pageErrors.get(page)).toEqual([])});
+const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`,now='2026-11-14T00:00:00Z';
+async function api(context,identity=0){
+ const users=['khang_fixture','kien_fixture','giga_fixture'].map((username,n)=>({id:id(n+1),username,display_name:username,roles:n<2?['USER','ADMIN']:['USER'],status:'active',email:'private-'+n+'@example.com',password_hash:'secret-hash'}));
+ const rows={users,posts:[{id:id(10),title:'Post fixture',content:'Private <script>plain text</script>',status:'published',author:users[2],created_at:now,media_url:'/api/v1/media/'+id(70)}],comments:[{id:id(20),post_id:id(10),body:'Hidden comment',status:'hidden',author:users[2],created_at:now}],categories:[{id:id(30),name:'Category fixture',slug:'fixture',status:'active'}],contacts:[{id:id(40),name:'Contact sender',email:'private-contact@example.com',subject:'Private subject',body:'Private inbox body',status:'new',created_at:now}],'audit-logs':[{id:id(50),actor_id:id(1),action:'user.update',target_type:'user',target_id:id(3),created_at:now,before_json:{password_hash:'secret-audit'}}],assets:[{id:id(60),slug:'pending-asset',kind:'avatar',rarity:'D',active:false,review_status:'pending',media_key:'secret-storage',source_rights:{source:'secret-source'}}]};
+ const state={user:identity===null?null:users[identity],rows,requests:[],fail:false};
+ await context.route('**/api/v1/**',async route=>{const request=route.request(),url=new URL(request.url()),path=url.pathname.slice('/api/v1'.length),method=request.method();let body;try{body=request.postDataJSON()}catch{}state.requests.push({path,method,body,csrf:request.headers()['x-csrf-token']});
+ const send=(status,data)=>route.fulfill({status,contentType:'application/json',body:status===204?'':JSON.stringify(data)}),fail=(status,code)=>send(status,{error:{code,message:'safe'}}),page=items=>({items,pagination:{page:1,page_size:20,total:items.length,total_pages:items.length?1:0}});
+ if(path==='/users/me')return state.user?send(200,state.user):fail(401,'UNAUTHORIZED');if(path==='/auth/csrf')return send(200,{csrf_token:'server-csrf'});if(path==='/posts'||path==='/categories')return send(200,page([]));
+ if(!state.user)return fail(401,'UNAUTHORIZED');if(!state.user.roles.includes('ADMIN'))return fail(403,'FORBIDDEN');
+ const [,prefix,resource,ident,action]=path.split('/');if(prefix!=='admin'||!rows[resource])return fail(404,'NOT_FOUND');
+ if(method==='GET'){if(state.fail)return fail(503,'NOT_READY');let items=rows[resource],q=url.searchParams.get('search'),status=url.searchParams.get('status')||url.searchParams.get('review_status'),role=url.searchParams.get('role');if(q)items=items.filter(r=>JSON.stringify(r).includes(q));if(status)items=items.filter(r=>(r.status||r.review_status)===status);if(role)items=items.filter(r=>r.roles?.includes(role));return send(200,page(items))}
+ if(request.headers()['x-csrf-token']!=='server-csrf')return fail(403,'CSRF_INVALID');
+ if(resource==='categories'&&method==='POST'){const row={id:id(31),...body,status:'active'};rows.categories.push(row);return send(201,row)}
+ const row=rows[resource].find(r=>r.id===ident);if(!row)return fail(404,'NOT_FOUND');
+ if(resource==='users'&&row.roles.includes('ADMIN')&&(body.status==='locked'||action==='roles'&&!body.roles.includes('ADMIN'))&&!users.some(u=>u.id!==ident&&u.status==='active'&&u.roles.includes('ADMIN')))return fail(409,'CONFLICT');
+ Object.assign(row,body);return send(resource==='comments'?204:200,row);
+ });return state;
+}
+const row=(p,n)=>p.locator('[data-admin-id="'+id(n)+'"]');
+async function enter(p){await p.emulateMedia({reducedMotion:'reduce'});await p.goto('/admin');await expect(p.getByRole('heading',{name:'Không gian quản trị',exact:true})).toBeVisible()}
+const save=p=>p.getByRole('dialog').getByRole('button',{name:'Xác nhận',exact:true}).click();
+
+test('Guest and USER cannot enter Admin by URL or forged local identity',async({page,context})=>{const s=await api(context,null);await page.addInitScript(()=>localStorage.setItem('aurameme-stitch-demo-user',JSON.stringify({username:'Khang_dev',roles:['ADMIN']})));await page.goto('/admin');await expect(page).toHaveURL(/\/login\?next=%2Fadmin$/);s.user=s.rows.users[2];await page.goto('/admin');await expect(page.getByRole('heading',{name:'Không có quyền truy cập'})).toBeVisible();expect(s.requests.filter(r=>r.path.startsWith('/admin/'))).toHaveLength(0);expect(await page.evaluate(async()=> (await fetch('/api/v1/admin/users')).status)).toBe(403)});
+
+test('Admin searches users and updates status/roles using CSRF contracts',async({page,context})=>{const s=await api(context);await enter(page);await page.getByRole('search',{name:'Tìm trong khu quản trị'}).getByLabel('Tìm kiếm',{exact:true}).fill('giga_fixture');await page.getByRole('button',{name:'Tìm',exact:true}).click();await expect(page.locator('[data-admin-id]')).toHaveCount(1);await row(page,3).getByRole('button',{name:'Khóa',exact:true}).click();await save(page);await expect(row(page,3)).toContainText('Đã khóa');await row(page,3).getByRole('button',{name:'Sửa vai trò'}).click();await page.getByRole('dialog').getByLabel('ADMIN',{exact:true}).check();await save(page);await expect(row(page,3)).toContainText('ADMIN');const writes=s.requests.filter(r=>['PATCH','PUT'].includes(r.method));expect(writes.map(r=>r.body)).toEqual([{status:'locked'},{roles:['USER','ADMIN']}]);expect(writes.every(r=>r.csrf==='server-csrf')).toBe(true);expect(await page.locator('body').innerText()).not.toContain('secret-hash')});
+
+test('Last Admin conflict keeps the confirmation and unchanged state',async({page,context})=>{const s=await api(context);s.rows.users[1].roles=['USER'];await enter(page);await row(page,1).getByRole('button',{name:'Khóa',exact:true}).click();await save(page);await expect(page.getByRole('dialog').getByRole('alert')).toContainText('ít nhất một Admin');expect(s.rows.users[0].status).toBe('active');await expect(page.getByText('Đã lưu thay đổi.',{exact:true})).toHaveCount(0)});
+
+test('Content/category/inbox workflows and safe audit/catalog views',async({page,context})=>{await api(context);await enter(page);await page.getByRole('button',{name:'Nội dung',exact:true}).click();await row(page,10).getByRole('button',{name:'Ẩn',exact:true}).click();await save(page);await expect(row(page,10)).toContainText('Đã ẩn');await row(page,10).locator('summary').click();await expect(row(page,10).getByRole('link',{name:'Xem ảnh bài viết'})).toHaveAttribute('href','/api/v1/admin/posts/'+id(10)+'/media');await page.getByRole('button',{name:'Bình luận',exact:true}).click();await row(page,20).getByRole('button',{name:'Hiển thị',exact:true}).click();await save(page);await expect(row(page,20)).toContainText('Hiển thị');await page.getByRole('button',{name:'Danh mục',exact:true}).click();await page.getByRole('button',{name:'Thêm danh mục'}).click();await page.getByRole('dialog').getByLabel('Tên danh mục').fill('New category');await page.getByRole('dialog').getByLabel('Slug').fill('new-category');await save(page);await expect(row(page,31)).toContainText('New category');await row(page,31).getByRole('button',{name:'Chỉnh sửa'}).click();await page.getByRole('dialog').getByLabel('Trạng thái').selectOption('hidden');await save(page);await expect(row(page,31)).toContainText('Đã ẩn');await page.getByRole('button',{name:'Liên hệ',exact:true}).click();await row(page,40).getByRole('button',{name:'Xem và xử lý'}).click();await expect(page.getByRole('dialog')).toContainText('Private inbox body');expect(await page.locator('body').innerText()).not.toContain('private-contact@example.com');await page.getByRole('dialog').getByLabel('Trạng thái').selectOption('in_review');await save(page);await expect(row(page,40)).toContainText('Đang xử lý');await page.getByRole('button',{name:'Kiểm duyệt',exact:true}).click();await expect(row(page,50)).toBeVisible();await page.getByRole('button',{name:'Trạng thái vật phẩm',exact:true}).click();await expect(row(page,60)).toContainText('Chờ duyệt');const text=await page.locator('body').innerText();for(const marker of ['secret-audit','secret-storage','secret-source'])expect(text).not.toContain(marker)});
+
+test('Failed reads retry; revoked Admin role removes private workspace',async({page,context})=>{const s=await api(context);s.fail=true;await enter(page);await expect(page.getByRole('alert')).toBeVisible();s.fail=false;await page.getByRole('button',{name:'Thử lại',exact:true}).click();await expect(row(page,1)).toBeVisible();s.user.roles=['USER'];await page.getByRole('button',{name:'Liên hệ',exact:true}).click();await expect(page.getByRole('heading',{name:'Không có quyền truy cập'})).toBeVisible();await expect(page.locator('[data-admin-id]')).toHaveCount(0)});
+
+test('Admin sidebar geometry and keyboard dialog focus survive resource changes',async({page,context})=>{
+ await api(context);await page.setViewportSize({width:1440,height:1000});await enter(page);
+ const sidebar=await page.locator('.admin-sidebar').boundingBox(),content=await page.locator('.admin-main').boundingBox();
+ expect(sidebar.x+sidebar.width).toBeLessThanOrEqual(content.x);await expect(row(page,1)).toBeVisible();
+ const button=row(page,3).getByRole('button',{name:'Sửa vai trò'});await button.focus();await page.keyboard.press('Enter');await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(button).toBeFocused();
+ await page.getByRole('button',{name:'Nội dung',exact:true}).click();await expect(row(page,10)).toBeVisible();await expect(row(page,1)).toHaveCount(0);
+ await page.setViewportSize({width:375,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('Membership minimal intro, unframed logo and home button honor reduced motion',async({page,context})=>{
+ await api(context,null);await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:1440,height:1000});await page.goto('/premium');
+ await expect(page.getByRole('heading',{level:1})).toHaveText('Aura Memberships');await expect(page.locator('.premium-coming')).toHaveText('Tính năng sắp ra mắt');
+ await expect(page.locator('.premium-invitation,.premium-closing,.premium-details,.premium-policy-grid')).toHaveCount(0);await expect(page.locator('.premium-home')).toHaveText('← Quay về Trang chủ');await expect(page.locator('.premium-home')).toHaveAttribute('href','/');
+ await expect(page.locator('.premium-intro img')).toHaveAttribute('src','/assets/brand/symbol-dark-2048.png');expect((await page.locator('.premium-intro img').boundingBox()).width).toBe(128);
+ expect(await page.locator('.premium-aura').evaluate(el=>getComputedStyle(el,'::after').content)).toBe('none');
+ await expect(page.locator('.premium-intro h1')).toHaveCSS('font-size','60px');await expect(page.locator('.premium-intro h1')).toHaveCSS('font-weight','800');await expect(page.locator('.premium-intro h1')).toHaveCSS('background-image','none');
+ expect(await page.locator('.premium-intro h1').evaluate(el=>getComputedStyle(el).color===getComputedStyle(el.closest('main')).color)).toBe(true);
+ await expect(page.locator('.premium-home')).toHaveCSS('border-top-style','solid');await expect(page.locator('.premium-home')).toHaveCSS('border-top-width','1px');await page.locator('.premium-home').focus();await expect(page.locator('.premium-home')).toBeFocused();await expect(page.locator('.premium-home')).toHaveCSS('outline-style','solid');
+ expect(await page.locator('.premium-aura').evaluate(el=>getComputedStyle(el,'::before').animationName)).toBe('none');
+ const intro=await page.locator('.premium-intro').boundingBox(),selector=await page.locator('.premium-selector-panel').boundingBox();expect(intro.x+intro.width).toBeLessThanOrEqual(selector.x);
+ await expect(page.locator('.u056-cta')).toHaveAccessibleName('Chưa mở đăng ký');await expect(page.locator('.u056-cta')).toBeDisabled();
+ await page.setViewportSize({width:375,height:900});const mobileIntro=await page.locator('.premium-intro').boundingBox(),mobileSelector=await page.locator('.premium-selector-panel').boundingBox();expect(mobileIntro.y+mobileIntro.height).toBeLessThanOrEqual(mobileSelector.y);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('Premium plan selection, arrows and reduced motion keep real benefits without writes',async({page,context})=>{
+ const s=await api(context,null);await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/premium');
+ const plus=page.getByRole('radio',{name:'Aura Plus',exact:true}),prime=page.getByRole('radio',{name:'Aura Prime',exact:true});
+ const liveRegion=await page.locator('.u056-feat').elementHandle();await expect(plus).toBeChecked();await plus.focus();await page.keyboard.press('ArrowRight');await expect(prime).toBeChecked();expect(await liveRegion.evaluate(el=>el.isConnected)).toBe(true);
+ await expect(page.locator('.u056-od')).toHaveAttribute('aria-label','365 ngày');expect(await page.locator('.u056-col').evaluateAll(es=>es.map(e=>e.style.getPropertyValue('--d')).join(''))).toBe('365');await expect(page.locator('.u056-feat')).toContainText('×3');await expect(page.locator('.u056-cta')).toBeDisabled();await expect(page.locator('.u056-cta')).toHaveAccessibleName('Chưa mở đăng ký');
+ await page.getByRole('radio',{name:'30 ngày',exact:true}).click();await expect(plus).toBeChecked();await expect(page.locator('.u056-od')).toHaveAttribute('aria-label','30 ngày');await expect(page.locator('.u056-feat')).toContainText('×2');
+ for(const feature of await page.locator('.u056-feat li').all())await expect(feature).toHaveCSS('opacity','1');
+ expect(await page.locator('.u056-ring').evaluate(el=>getComputedStyle(el).transitionDuration)).toBe('1e-06s');
+ expect(s.requests.filter(r=>!['GET','HEAD'].includes(r.method))).toEqual([]);expect(await page.locator('main').innerText()).not.toMatch(/\$|2 months free|Basic|Start Pro/);
+});
+
+test('Premium moving frame follows selection through live language/theme switches and resize',async({page,context})=>{
+ await api(context,null);await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:1440,height:1000});await page.goto('/premium');
+ expect(await page.locator('.premium-aura').evaluate(el=>getComputedStyle(el,'::before').animationDuration)).toBe('24s');
+ for(const button of await page.locator('.u056-sw button').all())expect((await button.boundingBox()).height).toBeGreaterThanOrEqual(44);
+ await page.locator('.premium-prime').click();await expect(page.getByRole('radio',{name:'Aura Prime',exact:true})).toBeChecked();
+ const aligned=async()=>page.locator('.u056').evaluate(el=>{
+  const card=el.querySelector('input:checked').closest('label').getBoundingClientRect(),ring=el.querySelector('.u056-ring').getBoundingClientRect();
+  const option=el.querySelector('[role=radio][aria-checked=true]').getBoundingClientRect(),knob=el.querySelector('.u056-knob').getBoundingClientRect();
+  return Math.max(Math.abs(card.top-ring.top),Math.abs(card.height-ring.height),Math.abs(option.left-knob.left),Math.abs(option.width-knob.width));
+ });
+ await expect.poll(aligned).toBeLessThan(1);
+ await page.locator('.u056-sw button').last().evaluate(el=>el.style.fontSize='20px');await expect.poll(aligned).toBeLessThan(1);
+ await page.locator('.site-language>button').click();await page.getByRole('option',{name:'English'}).click();await expect(page.locator('.u056-od')).toHaveAttribute('aria-label','365 days');
+ await page.locator('.u219-control button').click();await expect(page.locator('.u219').first()).toHaveAttribute('data-theme','light');
+ for(const width of [320,375,768,1024,1440]){await page.setViewportSize({width,height:1000});await expect.poll(aligned).toBeLessThan(1);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+ await expect(page.locator('.u056-cta')).toBeDisabled();await expect(page.locator('.u056-cta')).toHaveAccessibleName('Registration closed');for(const feature of await page.locator('.u056-feat li').all())await expect(feature).toHaveCSS('opacity','1');
+});
+
+test('Admin/Premium responsive VI/EN dark/light and disabled Premium without transactions',async({page,context})=>{test.setTimeout(90000);const s=await api(context);await enter(page);for(const width of [375,768,1440])for(const theme of ['dark','light'])for(const language of ['vi','en']){await page.setViewportSize({width,height:900});await page.evaluate(p=>localStorage.setItem('aurameme-ui-preferences',JSON.stringify(p)),{theme,language});for(const path of ['/admin','/premium']){await page.goto(path);await expect(page.locator('main h1')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);if(path==='/admin')await expect(row(page,1)).toBeVisible();else{await expect(page.locator('.premium-plan')).toHaveCount(2);await expect(page.locator('.premium-plus')).toContainText('30');await expect(page.locator('.premium-prime')).toContainText('365');await expect(page.locator('.u056-cta')).toBeDisabled();await expect(page.locator('.u056-cta')).toHaveAccessibleName(language==='en'?'Registration closed':'Chưa mở đăng ký');await expect(page.locator('.u056-feat li')).toHaveCount(4);}}}expect(s.requests.some(r=>r.method==='POST'||r.path.includes('entitlement')||r.path.includes('payment'))).toBe(false)});

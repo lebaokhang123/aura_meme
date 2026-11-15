@@ -2181,6 +2181,308 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
       x-phase: P1
+  /api/v1/admin/comments:
+    {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Comments",
+        "operationId": "adminListComments",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "title": "Search",
+              "type": "string",
+              "maxLength": 100,
+              "nullable": true
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "title": "Status",
+              "enum": [
+                "visible",
+                "hidden",
+                "deleted"
+              ],
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "post_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "title": "Post Id",
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCommentPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-phase": "P0"
+      }
+    }
+  /api/v1/admin/assets:
+    {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Assets",
+        "operationId": "adminListAssets",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "title": "Search",
+              "type": "string",
+              "maxLength": 100,
+              "nullable": true
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "title": "Kind",
+              "enum": [
+                "avatar",
+                "frame",
+                "icon",
+                "effect",
+                "background"
+              ],
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "title": "Active",
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "review_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "title": "Review Status",
+              "enum": [
+                "pending",
+                "approved",
+                "rejected",
+                "unknown"
+              ],
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAssetPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-phase": "P0"
+      }
+    }
+  /api/v1/admin/posts/{post_id}/media:
+    {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Post Image",
+        "operationId": "adminReadPostImage",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Post Id"
+            }
+          },
+          {
+            "name": "still",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Still"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "x-phase": "P0"
+      }
+    }
 components:
   schemas:
     Error:
@@ -3278,6 +3580,154 @@ components:
       required:
       - slot_kind
       - asset_id
+    AdminComment:
+      {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "post_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Post Id"
+          },
+          "author": {
+            "$ref": "#/components/schemas/UserPublic"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "hidden",
+              "deleted"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "post_id",
+          "author",
+          "body",
+          "created_at",
+          "status"
+        ],
+        "title": "AdminComment"
+      }
+    AdminCommentPage:
+      {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminComment"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "title": "AdminCommentPage"
+      }
+    AdminAsset:
+      {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "avatar",
+              "frame",
+              "icon",
+              "effect",
+              "background"
+            ],
+            "title": "Kind"
+          },
+          "rarity": {
+            "type": "string",
+            "enum": [
+              "D",
+              "C",
+              "B",
+              "A",
+              "S"
+            ],
+            "title": "Rarity"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "review_status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "unknown"
+            ],
+            "title": "Review Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "kind",
+          "rarity",
+          "active",
+          "review_status"
+        ],
+        "title": "AdminAsset"
+      }
+    AdminAssetPage:
+      {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminAsset"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "title": "AdminAssetPage"
+      }
   parameters:
     Page:
       in: query

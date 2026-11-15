@@ -20,6 +20,8 @@ import { LocalizedPage, useLocalized } from './localize.jsx';
 import './preferences-theme.css';
 import { SocialProvider } from './SocialContext.jsx';
 import './social.css';
+import AdminPage from './components/AdminPage.jsx';
+import PremiumPage from './components/PremiumPage.jsx';
 const pages=import.meta.glob('./generated/*.js');
 const cssFiles=import.meta.glob('./generated/*.css',{query:'?raw',import:'default'});
 const effectsFiles=import.meta.glob('./generated/*.effects.json');
@@ -36,7 +38,7 @@ function App() {
     document.body.className=page.bodyClass;
     document.body.dataset.screen=page.key;
     const style=document.createElement('style');style.id='stitch-active-styles';
-    const custom=!MOCK_AUTH&&(page.path.startsWith('/profile')?ProfilePage:page.path==='/contact'?ContactPage:page.path==='/vault'?VaultPage:page.path==='/admin/contacts'?ContactInbox:null);
+    const custom={'/admin':AdminPage,'/premium':PremiumPage}[page.path]||(!MOCK_AUTH&&(page.path.startsWith('/profile')?ProfilePage:page.path==='/contact'?ContactPage:page.path==='/vault'?VaultPage:page.path==='/admin/contacts'?ContactInbox:null));
     const maintenance=page.path==='/rank'||MOCK_AUTH&&['/contact','/vault'].includes(page.path);
     const pageLoader=custom?Promise.resolve(custom):maintenance ? Promise.resolve(MaintenancePage) : pages[`./generated/${page.key}.js`]().then(mod=>mod.default);
     const cssLoader=cssFiles[`./generated/${page.key}.css`]();
@@ -46,11 +48,11 @@ function App() {
       style.textContent=css;document.head.appendChild(style);setScreen(()=>component);
     }).catch(()=>{if(active)setFailed(true)});
     return () => {active=false;style.remove()};
-  },[page.key]);
+  },[page.key,page.path]);
   useEffect(() => {
     if(!screen)return;
     applyDemoIdentity();
-    if(!MOCK_AUTH&&!['/','/explore','/about','/login','/register','/rank'].includes(page.path))return;
+    if(['/admin','/premium'].includes(page.path)||!MOCK_AUTH&&!['/','/explore','/about','/login','/register','/rank'].includes(page.path))return;
     let stopped=false;let cleanup=()=>{};
     const loader=effectsFiles[`./generated/${page.key}.effects.json`]; if(loader&&!['/','/explore'].includes(page.path))loader().then(mod=>{
       if(stopped)return;cleanup=initLegacyEffects(mod.default);
@@ -61,12 +63,12 @@ function App() {
   useEffect(()=>{if(!MOCK_AUTH&&screen&&page.path==='/login'&&new URLSearchParams(location.search).has('registered'))showDemoMessage(language==='en'?'Account created. Please sign in.':'Đăng ký thành công. Vui lòng đăng nhập.');},[screen]);
   useEffect(()=>{if(screen)prepareAuthForm();},[screen,language]);
   useEffect(()=>{if(!MOCK_AUTH&&authState.error)showDemoMessage(authMessage(authState.error,language));},[authState.error]);
-  const protectedPage=['/contact','/vault','/admin/contacts','/profile'].includes(page.path);
+  const protectedPage=['/admin','/contact','/vault','/admin/contacts','/profile'].includes(page.path);
   useEffect(()=>{if(!MOCK_AUTH&&protectedPage&&authState.status==='guest')location.replace(loginUrl());},[protectedPage,authState.status]);
   if(!MOCK_AUTH&&protectedPage&&authState.status!=='authenticated')return null;
   // Reveal the header and page together after the lazy content and CSS are ready.
   if(!screen&&!failed)return null;
-  return render(<><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : [ProfilePage,ContactPage,VaultPage,ContactInbox].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}</>);
+  return render(<><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : [AdminPage,PremiumPage,ProfilePage,ContactPage,VaultPage,ContactInbox].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}</>);
 }
 
 applyPreferences(readPreferences());

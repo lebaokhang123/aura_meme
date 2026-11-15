@@ -215,3 +215,15 @@ GET posts nhận sort=reaction_desc cho Hot (active actor count DESC,created_at 
 POST posts/comments nhận request_id UUID tùy chọn. Session quyết định author; PK hiện có bảo đảm unique. Cùng ID/actor/payload trả lại record; khác payload/actor hoặc đã xóa trả409, không ghi đè. Không thêm bảng receipt. Title posts có thể thiếu: dòng text đầu160ký tự, hoặc Ảnh/GIF; title tường minh vẫn kiểm1–160 và không nhậnnull. PATCH content cập nhật title nếu title trước đó được tạo tự động. Frontend giữ request_id và media ID đã upload khi retry cùng draft.
 
 PATCH/DELETE admin/comments/{id} yêu cầu ADMIN+CSRF và tạo audit metadata; PATCH visible/hidden, DELETE soft-delete giữ body. Không đổi Profile, không phát Aura/XP. Schema0010 chỉ đã áp test; demo/E2E chưa migrate.
+
+### Minimal Admin Workspace / Premium introduction
+
+`GET /api/v1/admin/comments` lists visible/hidden/deleted comments for ADMIN only, with search/status/post_id/page/page_size. It returns the existing public-author DTO plus comment status, allowing moderation even when the parent post is hidden. Existing PATCH/DELETE moderation, audit and transaction guards are reused.
+
+`GET /api/v1/admin/assets` lists only id/slug/kind/rarity/active/review_status, with search/kind/active/review_status/page/page_size. It excludes media keys, source/license provenance and raw rights metadata. Missing/unrecognized review status is explicit `unknown`. No import/publish/upload mutation is added; guarded catalog CLI remains separate.
+
+`/admin` uses server session and database ADMIN role; usernames, Premium status and browser storage never confer permissions. The workspace reuses user/status/role, post/comment/category, private Contact inbox and audit APIs. Last-active-Admin protection and atomic audits remain in the existing backend; all mutations use session CSRF/Origin validation. Unnecessary user/contact email fields are excluded from the frontend view model.
+
+`/premium` is a public Coming Soon introduction: Plus30days x2 bonusLevelXP, Prime365days x3 bonusLevelXP; Rank uses original earned XP, Vault odds/cooldown unchanged, earned XP remains after expiry, no auto renewal. These are planned benefits, not an active entitlement or runtime multiplier. No price, payment endpoint, purchase action, entitlement grant or payment provider is implemented. VNPAY sandbox/IPN is a separate P2 task after business approval. No schema migration in this change.
+
+`GET /api/v1/admin/posts/{post_id}/media` is an ADMIN-only read of a non-deleted post’s bound ready image, including hidden posts. It reuses the existing bounded, metadata-stripping image response and private-path/link checks. Post/media SHARE locks keep the association and readiness stable while reading; unreferenced uploads remain inaccessible. The existing public/owner media authorization policy is unchanged. No upload or media mutation is added.
