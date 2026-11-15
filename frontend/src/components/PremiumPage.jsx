@@ -28,10 +28,8 @@ export default function PremiumPage(){
  return <main className="workspace-page premium-page"><div className="workspace-content premium-layout">
   <div className="premium-intro">
    <span className="premium-coming"><span/>{t('Tính năng sắp ra mắt','Coming Soon')}</span>
-   <div className="premium-aura"><img src="/assets/brand/symbol-dark-2048.png" alt="AuraMeme" width="104" height="104"/></div>
-   <h1>AURA MEMBERSHIPS</h1>
-   <blockquote className="premium-invitation" lang="vi" translate="no"><p>Sơn bất yếm cao, hải bất yếm thâm.</p><p>Chu Công thổ bộ, thiên hạ quy tâm.</p><p className="premium-attribution">- Tào Tháo -</p></blockquote>
-   <p className="premium-closing">{t('Ngày khai môn chưa định. Hẹn chư vị tại AuraMeme.','The opening day is yet to be set. Until we meet at AuraMeme.')}</p>
+   <div className="premium-aura"><img src="/assets/brand/symbol-dark-2048.png" alt="AuraMeme" width="128" height="128"/></div>
+   <h1>Aura Memberships</h1>
    <a className="premium-home" href="/">{t('← Quay về Trang chủ','← Back to Home')}</a>
   </div>
   <section className="premium-selector-panel" aria-labelledby="premium-selector-title"><div className="premium-selector-heading"><span className="workspace-kicker">{t('CHỌN DẤU ẤN CỦA BẠN','FIND YOUR AURA')}</span><h2 id="premium-selector-title">{t('Khám phá hai gói Aura','Explore Aura memberships')}</h2><p>{t('Xem trước quyền lợi · Không có giao dịch','Preview benefits · No transactions')}</p></div>

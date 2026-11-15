@@ -41,13 +41,15 @@ test('Admin sidebar geometry and keyboard dialog focus survive resource changes'
  await page.setViewportSize({width:375,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
-test('Membership recruitment copy, existing logo and minimal layout honor reduced motion',async({page,context})=>{
+test('Membership minimal intro, unframed logo and home button honor reduced motion',async({page,context})=>{
  await api(context,null);await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:1440,height:1000});await page.goto('/premium');
- await expect(page.getByRole('heading',{level:1})).toHaveText('AURA MEMBERSHIPS');await expect(page.locator('.premium-coming')).toHaveText('Tính năng sắp ra mắt');
- expect(await page.locator('.premium-invitation p').allTextContents()).toEqual(['Sơn bất yếm cao, hải bất yếm thâm.','Chu Công thổ bộ, thiên hạ quy tâm.','- Tào Tháo -']);
- await expect(page.locator('.premium-closing')).toHaveText('Ngày khai môn chưa định. Hẹn chư vị tại AuraMeme.');await expect(page.locator('.premium-home')).toHaveText('← Quay về Trang chủ');
- await expect(page.locator('.premium-details,.premium-policy-grid')).toHaveCount(0);await expect(page.locator('.premium-intro img')).toHaveAttribute('src','/assets/brand/symbol-dark-2048.png');
- const logo=await page.locator('.premium-intro img').boundingBox();expect(logo.width).toBeGreaterThanOrEqual(90);expect(logo.width).toBeLessThanOrEqual(110);
+ await expect(page.getByRole('heading',{level:1})).toHaveText('Aura Memberships');await expect(page.locator('.premium-coming')).toHaveText('Tính năng sắp ra mắt');
+ await expect(page.locator('.premium-invitation,.premium-closing,.premium-details,.premium-policy-grid')).toHaveCount(0);await expect(page.locator('.premium-home')).toHaveText('← Quay về Trang chủ');await expect(page.locator('.premium-home')).toHaveAttribute('href','/');
+ await expect(page.locator('.premium-intro img')).toHaveAttribute('src','/assets/brand/symbol-dark-2048.png');expect((await page.locator('.premium-intro img').boundingBox()).width).toBe(128);
+ expect(await page.locator('.premium-aura').evaluate(el=>getComputedStyle(el,'::after').content)).toBe('none');
+ await expect(page.locator('.premium-intro h1')).toHaveCSS('font-size','60px');await expect(page.locator('.premium-intro h1')).toHaveCSS('font-weight','800');await expect(page.locator('.premium-intro h1')).toHaveCSS('background-image','none');
+ expect(await page.locator('.premium-intro h1').evaluate(el=>getComputedStyle(el).color===getComputedStyle(el.closest('main')).color)).toBe(true);
+ await expect(page.locator('.premium-home')).toHaveCSS('border-top-style','solid');await expect(page.locator('.premium-home')).toHaveCSS('border-top-width','1px');await page.locator('.premium-home').focus();await expect(page.locator('.premium-home')).toBeFocused();await expect(page.locator('.premium-home')).toHaveCSS('outline-style','solid');
  expect(await page.locator('.premium-aura').evaluate(el=>getComputedStyle(el,'::before').animationName)).toBe('none');
  const intro=await page.locator('.premium-intro').boundingBox(),selector=await page.locator('.premium-selector-panel').boundingBox();expect(intro.x+intro.width).toBeLessThanOrEqual(selector.x);
  await expect(page.locator('.u056-cta')).toHaveAccessibleName('Chưa mở đăng ký');await expect(page.locator('.u056-cta')).toBeDisabled();
