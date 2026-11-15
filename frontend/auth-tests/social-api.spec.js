@@ -70,7 +70,18 @@ test('API mode renders an empty database without importing browser demo posts or
  await expect(page.locator('[data-post-id]')).toHaveCount(0);await expect(page.locator('.account-avatar')).toHaveCount(0);
  await expect(page.locator('[aria-label="Danh mục Home"] [data-category]')).toHaveCount(1);
  await expect(page.getByText('5 chủ đề',{exact:true})).toHaveCount(0);await expect(page.getByRole('link',{name:'Tham gia Discord',exact:true})).toHaveCount(0);
+ await expect(page.getByText('TOP AURA CREATORS',{exact:true})).toHaveCount(0);await expect(page.getByRole('link',{name:'View Full Leaderboard',exact:true})).toHaveCount(0);
+ await expect(page).toHaveTitle('AuraMeme');
  expect(api.requests.some(v=>v.p==='/posts'&&v.query.include_interactions==='true')).toBe(true);
+});
+test('API Explore keeps real filters and never shows fabricated Hall identities for guest or user',async({page,context})=>{
+ await server(context);
+ for(const identity of ['guest','user']){
+  if(identity==='user')await login(page);
+  await page.goto('/explore');await expect(page.getByRole('heading',{level:1})).toBeVisible();
+  await expect(page.locator('[data-category]')).toHaveCount(5);await expect(page.locator('[data-post-id]')).toHaveCount(0);
+  await expect(page.locator('.hall-identity')).toHaveCount(0);
+ }
 });
 test('server-owned posts/reactions/comments/edit/delete persist across reload for a non-demo author',async({page,context})=>{
  await server(context);await login(page);
