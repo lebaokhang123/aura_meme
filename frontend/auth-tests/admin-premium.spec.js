@@ -41,11 +41,24 @@ test('Admin sidebar geometry and keyboard dialog focus survive resource changes'
  await page.setViewportSize({width:375,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
+test('Membership recruitment copy, existing logo and minimal layout honor reduced motion',async({page,context})=>{
+ await api(context,null);await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:1440,height:1000});await page.goto('/premium');
+ await expect(page.getByRole('heading',{level:1})).toHaveText('AURA MEMBERSHIPS');await expect(page.locator('.premium-coming')).toHaveText('Tính năng sắp ra mắt');
+ expect(await page.locator('.premium-invitation p').allTextContents()).toEqual(['Sơn bất yếm cao, hải bất yếm thâm.','Chu Công thổ bộ, thiên hạ quy tâm.','- Tào Tháo -']);
+ await expect(page.locator('.premium-closing')).toHaveText('Ngày khai môn chưa định. Hẹn chư vị tại AuraMeme.');await expect(page.locator('.premium-home')).toHaveText('← Quay về Trang chủ');
+ await expect(page.locator('.premium-details,.premium-policy-grid')).toHaveCount(0);await expect(page.locator('.premium-intro img')).toHaveAttribute('src','/assets/brand/symbol-dark-2048.png');
+ const logo=await page.locator('.premium-intro img').boundingBox();expect(logo.width).toBeGreaterThanOrEqual(90);expect(logo.width).toBeLessThanOrEqual(110);
+ expect(await page.locator('.premium-aura').evaluate(el=>getComputedStyle(el,'::before').animationName)).toBe('none');
+ const intro=await page.locator('.premium-intro').boundingBox(),selector=await page.locator('.premium-selector-panel').boundingBox();expect(intro.x+intro.width).toBeLessThanOrEqual(selector.x);
+ await expect(page.locator('.u056-cta')).toHaveAccessibleName('Chưa mở đăng ký');await expect(page.locator('.u056-cta')).toBeDisabled();
+ await page.setViewportSize({width:375,height:900});const mobileIntro=await page.locator('.premium-intro').boundingBox(),mobileSelector=await page.locator('.premium-selector-panel').boundingBox();expect(mobileIntro.y+mobileIntro.height).toBeLessThanOrEqual(mobileSelector.y);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
 test('Premium plan selection, arrows and reduced motion keep real benefits without writes',async({page,context})=>{
  const s=await api(context,null);await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/premium');
  const plus=page.getByRole('radio',{name:'Aura Plus',exact:true}),prime=page.getByRole('radio',{name:'Aura Prime',exact:true});
  const liveRegion=await page.locator('.u056-feat').elementHandle();await expect(plus).toBeChecked();await plus.focus();await page.keyboard.press('ArrowRight');await expect(prime).toBeChecked();expect(await liveRegion.evaluate(el=>el.isConnected)).toBe(true);
- await expect(page.locator('.u056-od')).toHaveAttribute('aria-label','365 ngày');expect(await page.locator('.u056-col').evaluateAll(es=>es.map(e=>e.style.getPropertyValue('--d')).join(''))).toBe('365');await expect(page.locator('.u056-feat')).toContainText('×3');await expect(page.locator('.u056-cta')).toBeDisabled();await expect(page.locator('.u056-cta')).toContainText('Aura Prime');
+ await expect(page.locator('.u056-od')).toHaveAttribute('aria-label','365 ngày');expect(await page.locator('.u056-col').evaluateAll(es=>es.map(e=>e.style.getPropertyValue('--d')).join(''))).toBe('365');await expect(page.locator('.u056-feat')).toContainText('×3');await expect(page.locator('.u056-cta')).toBeDisabled();await expect(page.locator('.u056-cta')).toHaveAccessibleName('Chưa mở đăng ký');
  await page.getByRole('radio',{name:'30 ngày',exact:true}).click();await expect(plus).toBeChecked();await expect(page.locator('.u056-od')).toHaveAttribute('aria-label','30 ngày');await expect(page.locator('.u056-feat')).toContainText('×2');
  for(const feature of await page.locator('.u056-feat li').all())await expect(feature).toHaveCSS('opacity','1');
  expect(await page.locator('.u056-ring').evaluate(el=>getComputedStyle(el).transitionDuration)).toBe('1e-06s');
@@ -54,6 +67,7 @@ test('Premium plan selection, arrows and reduced motion keep real benefits witho
 
 test('Premium moving frame follows selection through live language/theme switches and resize',async({page,context})=>{
  await api(context,null);await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:1440,height:1000});await page.goto('/premium');
+ expect(await page.locator('.premium-aura').evaluate(el=>getComputedStyle(el,'::before').animationDuration)).toBe('24s');
  for(const button of await page.locator('.u056-sw button').all())expect((await button.boundingBox()).height).toBeGreaterThanOrEqual(44);
  await page.locator('.premium-prime').click();await expect(page.getByRole('radio',{name:'Aura Prime',exact:true})).toBeChecked();
  const aligned=async()=>page.locator('.u056').evaluate(el=>{
@@ -66,7 +80,7 @@ test('Premium moving frame follows selection through live language/theme switche
  await page.locator('.site-language>button').click();await page.getByRole('option',{name:'English'}).click();await expect(page.locator('.u056-od')).toHaveAttribute('aria-label','365 days');
  await page.locator('.u219-control button').click();await expect(page.locator('.u219').first()).toHaveAttribute('data-theme','light');
  for(const width of [320,375,768,1024,1440]){await page.setViewportSize({width,height:1000});await expect.poll(aligned).toBeLessThan(1);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
- await expect(page.locator('.u056-cta')).toBeDisabled();await expect(page.locator('.u056-cta')).toContainText('Aura Prime');for(const feature of await page.locator('.u056-feat li').all())await expect(feature).toHaveCSS('opacity','1');
+ await expect(page.locator('.u056-cta')).toBeDisabled();await expect(page.locator('.u056-cta')).toHaveAccessibleName('Registration closed');for(const feature of await page.locator('.u056-feat li').all())await expect(feature).toHaveCSS('opacity','1');
 });
 
-test('Admin/Premium responsive VI/EN dark/light and disabled Premium without transactions',async({page,context})=>{test.setTimeout(90000);const s=await api(context);await enter(page);for(const width of [375,768,1440])for(const theme of ['dark','light'])for(const language of ['vi','en']){await page.setViewportSize({width,height:900});await page.evaluate(p=>localStorage.setItem('aurameme-ui-preferences',JSON.stringify(p)),{theme,language});for(const path of ['/admin','/premium']){await page.goto(path);await expect(page.locator('main h1')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);if(path==='/admin')await expect(row(page,1)).toBeVisible();else{await expect(page.locator('.premium-plan')).toHaveCount(2);await expect(page.locator('.premium-plus')).toContainText('30');await expect(page.locator('.premium-prime')).toContainText('365');await expect(page.locator('.u056-cta')).toBeDisabled();await expect(page.locator('.u056-cta')).toContainText('Aura Plus');await expect(page.locator('.u056-feat li')).toHaveCount(4);}}}expect(s.requests.some(r=>r.method==='POST'||r.path.includes('entitlement')||r.path.includes('payment'))).toBe(false)});
+test('Admin/Premium responsive VI/EN dark/light and disabled Premium without transactions',async({page,context})=>{test.setTimeout(90000);const s=await api(context);await enter(page);for(const width of [375,768,1440])for(const theme of ['dark','light'])for(const language of ['vi','en']){await page.setViewportSize({width,height:900});await page.evaluate(p=>localStorage.setItem('aurameme-ui-preferences',JSON.stringify(p)),{theme,language});for(const path of ['/admin','/premium']){await page.goto(path);await expect(page.locator('main h1')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);if(path==='/admin')await expect(row(page,1)).toBeVisible();else{await expect(page.locator('.premium-plan')).toHaveCount(2);await expect(page.locator('.premium-plus')).toContainText('30');await expect(page.locator('.premium-prime')).toContainText('365');await expect(page.locator('.u056-cta')).toBeDisabled();await expect(page.locator('.u056-cta')).toHaveAccessibleName(language==='en'?'Registration closed':'Chưa mở đăng ký');await expect(page.locator('.u056-feat li')).toHaveCount(4);}}}expect(s.requests.some(r=>r.method==='POST'||r.path.includes('entitlement')||r.path.includes('payment'))).toBe(false)});

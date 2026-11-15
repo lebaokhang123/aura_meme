@@ -27,14 +27,12 @@ export default function PremiumPage(){
  const features=[t(`×${plan.boost} bonus XP cho Level`,`×${plan.boost} bonus XP for Level`),t(`${plan.days} ngày quyền lợi dự kiến`,`${plan.days} days of planned benefits`),t('Hết hạn vẫn giữ XP đã nhận','Keep earned XP after expiry'),t('Không tự động gia hạn','No automatic renewal')];
  return <main className="workspace-page premium-page"><div className="workspace-content premium-layout">
   <div className="premium-intro">
-   <span className="premium-coming"><span/>{t('Sắp ra mắt · Chưa mở đăng ký','Coming Soon · Registration closed')}</span>
-   <div className="premium-symbol" aria-hidden="true"><span className="material-symbols-outlined">auto_awesome</span><span className="premium-symbol-orbit"/></div>
-   <span className="workspace-kicker">AURA MEMBERSHIPS</span>
-   <h1>Aura Plus <span>&</span><br/>Aura Prime<span className="premium-title-dot">.</span></h1>
-   <p className="premium-lead">{t('Thêm động lực. Giữ trọn dấu ấn của bạn.','More momentum. The same unmistakable you.')}</p>
-   <p className="premium-description">{t('Hai gói dự kiến giúp tăng bonus XP cho hành trình lên Level. Chọn một gói để khám phá quyền lợi trước khi Aura mở đăng ký.','Two planned memberships to boost bonus XP on your Level journey. Select a plan to explore its benefits before registration opens.')}</p>
-   <div className="premium-principles"><div><span className="material-symbols-outlined" aria-hidden="true">trending_up</span><span>{t('Thêm XP cho Level','More Level XP')}</span></div><div><span className="material-symbols-outlined" aria-hidden="true">balance</span><span>{t('Rank vẫn tính XP gốc','Rank keeps original XP')}</span></div></div>
-   <a className="premium-home" href="/"><span className="material-symbols-outlined" aria-hidden="true">arrow_back</span>{t('Quay lại Trang chủ','Back to Home')}</a>
+   <span className="premium-coming"><span/>{t('Tính năng sắp ra mắt','Coming Soon')}</span>
+   <div className="premium-aura"><img src="/assets/brand/symbol-dark-2048.png" alt="AuraMeme" width="104" height="104"/></div>
+   <h1>AURA MEMBERSHIPS</h1>
+   <blockquote className="premium-invitation" lang="vi" translate="no"><p>Sơn bất yếm cao, hải bất yếm thâm.</p><p>Chu Công thổ bộ, thiên hạ quy tâm.</p><p className="premium-attribution">- Tào Tháo -</p></blockquote>
+   <p className="premium-closing">{t('Ngày khai môn chưa định. Hẹn chư vị tại AuraMeme.','The opening day is yet to be set. Until we meet at AuraMeme.')}</p>
+   <a className="premium-home" href="/">{t('← Quay về Trang chủ','← Back to Home')}</a>
   </div>
   <section className="premium-selector-panel" aria-labelledby="premium-selector-title"><div className="premium-selector-heading"><span className="workspace-kicker">{t('CHỌN DẤU ẤN CỦA BẠN','FIND YOUR AURA')}</span><h2 id="premium-selector-title">{t('Khám phá hai gói Aura','Explore Aura memberships')}</h2><p>{t('Xem trước quyền lợi · Không có giao dịch','Preview benefits · No transactions')}</p></div>
    <div className="ux u056" ref={root}>
@@ -42,10 +40,10 @@ export default function PremiumPage(){
     <fieldset className="u056-plans"><legend className="workspace-sr">{t('Hai gói dự kiến','Planned memberships')}</legend><span className="u056-ring" aria-hidden="true"/>{plans.map((item,i)=><label className={'u056-p premium-plan premium-'+item.name.toLowerCase()} key={item.name}><input type="radio" name={group} aria-label={'Aura '+item.name} checked={selected===i} onChange={()=>select(i)}/><span className="u056-dot" aria-hidden="true"/><span className="u056-nm"><b>Aura {item.name}{i===1&&<em className={wiggle?'wig':''} onAnimationEnd={()=>setWiggle(false)}>×3 XP</em>}</b><small>{item.days} {t('ngày','days')} · ×{item.boost} {t('bonus XP cho Level','bonus Level XP')}</small></span><span className="material-symbols-outlined u056-plan-icon" aria-hidden="true">{item.icon}</span></label>)}</fieldset>
     <div className="u056-current"><div><span className="u056-current-label">{t('THỜI HẠN DỰ KIẾN','PLANNED DURATION')}</span><div className="u056-duration"><RollingDays days={plan.days} label={plan.days+' '+t('ngày','days')}/><span>{t('ngày','days')}</span></div></div><span className="u056-badge">{t('Sắp ra mắt','Coming Soon')}</span></div>
     <ul className="u056-feat" aria-live="polite" aria-atomic="true">{features.map((feature,i)=><li key={selected+'-'+i} style={{'--i':i}}><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M4 9.4l3.2 3.2L14 5.6"/></svg>{feature}</li>)}</ul>
-    <button className="u056-cta" type="button" disabled><span className="material-symbols-outlined" aria-hidden="true">lock</span>Aura {plan.name} · {t('Chưa mở đăng ký','Registration closed')}</button>
+    <button className="u056-cta" type="button" disabled><span className="material-symbols-outlined" aria-hidden="true">lock</span>{t('Chưa mở đăng ký','Registration closed')}</button>
     <p className="u056-price-note">{t('Giá chưa công bố. Chọn gói chỉ để xem quyền lợi dự kiến.','Pricing is not announced. Selection only previews planned benefits.')}</p>
    </div>
   </section>
-  <section className="premium-details" aria-labelledby="premium-benefits"><div className="premium-details-heading"><span className="workspace-kicker">{t('QUYỀN LỢI V1 DỰ KIẾN','PLANNED V1 BENEFITS')}</span><h2 id="premium-benefits">{t('Thêm động lực, vẫn công bằng.','A boost that keeps things fair.')}</h2></div><div className="premium-policy-grid">{[['leaderboard',t('Rank theo XP gốc','Original XP for Rank'),t('Boost chỉ dành cho Level. Rank tính XP earned gốc, không nhân boost.','Boost applies to Level. Rank uses original earned XP, without the boost.')],['inventory_2',t('Bảo Khố giữ nguyên','Vault stays the same'),t('Giữ nguyên odds và cooldown Bảo Khố.','Vault odds and cooldown stay the same.')],['verified',t('XP đã nhận là của bạn','Your XP stays yours'),t('Hết hạn vẫn giữ XP đã nhận. Không tự động gia hạn.','Previously earned XP remains after expiry. No automatic renewal.')]].map(([icon,title,body])=><article key={icon}><span className="material-symbols-outlined" aria-hidden="true">{icon}</span><h3>{title}</h3><p>{body}</p></article>)}</div></section>
+
  </div></main>;
 }
