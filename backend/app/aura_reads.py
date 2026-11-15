@@ -16,7 +16,6 @@ from app.checkin import streak_length
 from app.models import AuraLedger, DailyCheckin, Profile, RewardPolicyVersion, User, UserProgress, Wallet, WalletTransaction
 from app.permissions import require_authenticated_user
 from app.security import AuthError
-from app.media import media_url
 
 router = APIRouter(prefix="/api/v1", tags=["Aura"])
 ERRORS = {code: {"model": ErrorResponse} for code in (422, 429, 500, 503)}
@@ -101,4 +100,4 @@ def leaderboard(request: Request, page: int = Query(1, ge=1), page_size: int = Q
         rows, pagination = page_rows(db, query, page, page_size)
         return LeaderboardPage(items=[LeaderboardEntry(rank=rank, earned_xp=score,
             user=UserPublic(id=user.id, username=user.username, display_name=profile.display_name,
-                created_at=user.created_at, bio=profile.bio, avatar_url=media_url(profile.avatar_media_id))) for user, profile, rank, score in rows], pagination=pagination)
+                created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url)) for user, profile, rank, score in rows], pagination=pagination)

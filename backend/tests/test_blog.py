@@ -273,3 +273,16 @@ def test_hidden_media_and_category_exclude_existing_posts(admin):
 def test_anonymous_cannot_create_posts(blog):
     blog[0].cookies.clear()
     assert create_post(blog).status_code==401
+
+
+@pytest.mark.integration
+def test_public_posts_exact_author_filter(blog):
+    from test_auth import ACCOUNT
+    client,c,owner,category,_=blog
+    published=create_post(blog,status='published')
+    assert published.status_code==201,published.text
+    assert create_post(blog,status='draft').status_code==201
+    assert client.get('/api/v1/posts?author='+ACCOUNT['username']).json()['items']==[published.json()]
+    assert client.get('/api/v1/posts?author='+ACCOUNT['username'][:-1]).json()['items']==[]
+    assert client.get('/api/v1/posts?author=unknown_user').json()['items']==[]
+    assert client.get('/api/v1/posts?author=%00').status_code==422

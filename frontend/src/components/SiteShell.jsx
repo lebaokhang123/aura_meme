@@ -1,6 +1,7 @@
 import { useLocalized } from '../localize.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { readDemoUser } from '../demo.js';
+import {MOCK_AUTH} from '../auth.js';
 import {logoutAccount} from '../runtime.js';
 import { useFeed } from '../FeedContext.jsx';
 import { LanguageSwitch } from './LanguageSwitch.jsx';
@@ -8,7 +9,7 @@ import { ThemeSwitch } from './ThemeSwitch.jsx';
 
 const navigation = [
   ['trang-chu', '/', 'Trang chủ'], ['kham-pha', '/explore', 'Khám phá'],
-  ['xep-hang', '/rank', 'Xếp hạng'], ['bao-kho', '/vault', 'Bảo Khố'],
+  ['bao-kho', '/vault', 'Bảo Khố'],
   ['gioi-thieu', '/about', 'Giới thiệu'], ['lien-he', '/contact', 'Liên hệ'],
 ];
 const symbol = name => <span className="material-symbols-outlined" aria-hidden="true">{name}</span>;
@@ -59,7 +60,7 @@ export function SiteHeader() {
           {user ? <>
             <button type="button" className="site-icon-button" aria-label="Thông báo" title="Thông báo">{symbol('notifications')}</button>
             <div className="site-account" data-header-popup="account"><button ref={accountButton} type="button" className="account-trigger" aria-label="Mở menu tài khoản" aria-haspopup="true" aria-expanded={open === 'account'} aria-controls="site-account-menu" onClick={() => toggle('account')}><img className="account-avatar" src={user.avatar} alt={`Ảnh đại diện ${user.displayName}`} width="32" height="32" /></button>
-              {open === 'account' && <div className="site-dropdown" id="site-account-menu"><button type="button" onClick={() => { setOpen(null); profile.current.showModal(); }}>{symbol('person')}Thông tin</button><button type="button" className="logout-action" onClick={event => logoutAccount(event.currentTarget)}>{symbol('logout')}Đăng xuất</button></div>}
+              {open === 'account' && <div className="site-dropdown" id="site-account-menu"><button type="button" onClick={() => { setOpen(null); if(MOCK_AUTH)profile.current.showModal();else location.assign('/profile'); }}>{symbol('person')}Thông tin</button><button type="button" className="logout-action" onClick={event => logoutAccount(event.currentTarget)}>{symbol('logout')}Đăng xuất</button></div>}
             </div>
           </> : <div className="site-auth">{auth}</div>}
           <div className="site-menu" data-header-popup="navigation"><button type="button" className="site-icon-button compact-menu-trigger" aria-label="Mở menu điều hướng" aria-expanded={open === 'navigation'} aria-controls="compact-navigation" onClick={() => toggle('navigation')}>{symbol(open === 'navigation' ? 'close' : 'menu')}</button>

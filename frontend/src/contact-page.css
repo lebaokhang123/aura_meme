@@ -1,0 +1,49 @@
+.am-contact{width:100%;padding-top:var(--site-header-height);color:var(--am-on-surface);font:14px/22px Inter,sans-serif;background:var(--am-surface)}
+.am-contact-inner{width:100%;max-width:1040px;margin:0 auto;padding:48px 32px;display:flex;flex-direction:column;gap:40px}
+.am-contact-heading{max-width:672px;margin:0 auto;text-align:center}
+.am-contact-heading h1{margin:0;font:800 40px/48px 'Times New Roman',serif;letter-spacing:-.025em}
+.am-contact-heading h1 span{background:linear-gradient(90deg,var(--am-secondary),var(--am-primary),var(--am-tertiary));background-clip:text;-webkit-background-clip:text;color:transparent}
+.am-contact-heading p{margin:16px 0 0;color:var(--am-on-surface-variant);line-height:22.75px}
+.am-contact-form{width:100%;max-width:820px;margin:0 auto;padding:40px;border-radius:12px;background:var(--am-surface-container-low);box-shadow:0 20px 25px -5px rgb(0 0 0 / .1),0 8px 10px -6px rgb(0 0 0 / .1);display:flex;flex-direction:column;gap:24px;min-width:0}
+.am-contact-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.am-contact-field{display:flex;flex-direction:column;gap:8px;min-width:0}
+.am-contact-form label:not(.am-contact-acknowledgment),.am-contact-topics legend{font:600 15px/20px 'Times New Roman',serif}
+.am-contact-required{color:var(--am-error)}
+.am-contact-input{position:relative;display:flex;align-items:center}
+.am-contact-input>.material-symbols-outlined{position:absolute;left:14px;font-size:20px;color:var(--am-on-surface-variant);pointer-events:none}
+.am-contact-input input,.am-contact-field textarea{width:100%;min-width:0;border:0;border-radius:8px;background:var(--am-surface-container);color:var(--am-on-surface);font:400 15px/22px Inter,sans-serif;transition:background .15s}
+.am-contact-input input{height:48px;padding:0 16px 0 40px}
+.am-contact-field textarea{height:160px;min-height:160px;padding:16px;resize:none}
+.am-contact-form :is(input,textarea)::placeholder{color:var(--am-on-surface-variant);opacity:1}
+.am-contact-form :is(input,textarea):focus{background:var(--am-surface-container-high)}
+.am-contact-form :is(input,textarea,button,a):focus-visible{outline:2px solid var(--am-secondary);outline-offset:3px}
+.am-contact-topics{margin:0;padding:0;border:0;min-width:0}
+.am-contact-topics legend{padding:0;margin-bottom:10px}
+.am-contact-topics>div{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.am-contact-topics button{min-width:0;min-height:44px;padding:8px 12px;display:flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:8px;background:var(--am-surface-container);color:var(--am-on-surface-variant);font:500 14px/20px 'Times New Roman',serif;cursor:pointer;transition:background .15s,color .15s,box-shadow .15s}
+.am-contact-topics button>span{width:8px;height:8px;border-radius:50%;flex:none}
+.am-contact-topics button[aria-pressed="true"]{background:var(--am-surface-container-high);color:var(--am-secondary);font-weight:600;box-shadow:0 0 12px rgb(var(--am-rgb-secondary) / .2)}
+.am-contact-topics button[aria-pressed="true"]>span{background:var(--am-secondary)}
+.am-contact-topics button:hover{color:var(--am-on-surface)}
+.am-contact-message-label{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.am-contact-message-label>span{flex:none;color:var(--am-on-surface-variant);font:500 13px/16px 'Times New Roman',serif;letter-spacing:-.01em}
+.am-contact-acknowledgment{margin:0;color:var(--am-on-surface-variant);font:400 15px/24.375px Inter,sans-serif}
+.am-contact-actions{padding-top:16px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.am-contact-submit{min-width:320px;height:48px;padding:0 48px;border:0;border-radius:8px;background:linear-gradient(90deg,var(--am-secondary),var(--am-primary-fixed-dim),var(--am-tertiary));color:var(--am-on-secondary-fixed);font:700 16px/20px 'Times New Roman',serif;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 0 20px rgb(var(--am-rgb-secondary) / .4);cursor:pointer;transition:transform .15s,box-shadow .15s}
+.am-contact-submit>.material-symbols-outlined{font-size:20px}
+.am-contact-submit:hover{box-shadow:0 0 28px rgb(var(--am-rgb-tertiary-fixed) / .6);transform:scale(1.01)}
+.am-contact-submit:active{transform:scale(.99)}
+.am-contact-submit:disabled{opacity:.55;cursor:wait;transform:none}
+.am-contact-channels{display:flex;gap:12px;padding:4px;border-radius:12px;background:rgb(var(--am-rgb-surface-container) / .6);border:1px solid var(--am-surface-container-high)}
+.am-contact-channels a{width:44px;height:44px;border:1px solid rgb(var(--am-rgb-outline-variant) / .4);border-radius:8px;background:var(--am-surface-container);color:var(--am-on-surface-variant);display:flex;align-items:center;justify-content:center}
+.am-contact-channels a:hover{background:var(--am-surface-container-high);border-color:var(--am-secondary);color:var(--am-primary)}
+.am-contact-channels svg{width:20px;height:20px}
+.am-contact-error{color:var(--am-error);margin:0}
+.am-contact-success{padding:16px;border-radius:8px;background:var(--am-surface-container-high);display:flex;align-items:center;gap:12px}
+.am-contact-success>.material-symbols-outlined{color:var(--am-tertiary)}
+.am-contact-success p{margin:0}
+@media(max-width:767px){.am-contact-inner{padding:32px 24px}.am-contact-form{padding:32px}.am-contact-form label:not(.am-contact-acknowledgment),.am-contact-topics legend{font-size:14px}.am-contact-topics button{font-size:13px}.am-contact-acknowledgment{font-size:14px}}
+@media(max-width:639px){.am-contact-inner{padding:32px 16px}.am-contact-fields{grid-template-columns:minmax(0,1fr)}.am-contact-topics>div{grid-template-columns:repeat(2,minmax(0,1fr))}.am-contact-message-label{align-items:flex-start;flex-wrap:wrap;gap:4px}.am-contact-actions{flex-direction:column}.am-contact-submit{width:100%;min-width:0;padding:0 24px}.am-contact-heading h1{overflow-wrap:anywhere}}
+@media(prefers-reduced-motion:reduce){.am-contact-form *{transition:none}.am-contact-submit:hover,.am-contact-submit:active{transform:none}}
+
+@media(min-width:640px) and (max-width:1023px){.am-contact-inner{padding-left:24px;padding-right:24px}}

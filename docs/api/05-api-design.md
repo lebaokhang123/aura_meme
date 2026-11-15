@@ -42,11 +42,20 @@ Một API backend phục vụ tất cả module; **không tạo microservices**.
 
 **M3.2 · chính sách Owner chốt 2026-11-05:** POST media nhận một multipart file; session/CSRF/Origin trước parse, MIME/signature/decode nhất quán. 5 MiB/file, 12.000.000 pixels/frame; GIF tối đa60 frames/40.000.000 pixels cộng dồn (cùng ngân sách áp dụng ảnh động PNG/WebP). Private local bytes ngoài webroot, PostgreSQL chỉ metadata; UUID key, exclusive write/fsync, COMMIT trước201/ready. Giữ original bytes; cleanup khi DB từ chối, safe reconciliation event khi cleanup thất bại hoặc COMMIT không xác định; filesystem không nằm trong DB transaction.
 
-**Media Display · overhaul 2026-11-08:** GET `/api/v1/media/{media_id}` chỉ phục vụ media ready khi đang gắn bài public (published, category/author active, chưa deleted) hoặc avatar/cover của tài khoản active; session owner được preview draft/chưa gắn. Mỗi GET kiểm lại visibility, masked404 cho foreign/private/missing/corrupt/link; không static mount hay object key trong response. Reader pin directory/file, từ chối reparse/symlink/hardlink và đọc tối đa5MiB, so size metadata. Decode theo giới hạn upload, bỏ metadata và EXIF orientation được áp vào pixels; static→PNG, animation→GIF giữ frame/timing/loop trong ngân sách, output tối đa80MiB. `?still=true` dùng cùng quyền và xuất PNG frame đầu cho reduced motion. no-store/nosniff/CSP sandbox. Upload.url, Post.media_url, UserPublic.avatar_url và AccountPrivate.avatar_url/cover_url là đường dẫn tương đối cùng origin để đi qua Vite proxy; private profile vẫn giữ các media ID. Không thêm migration/DELETE/retention hoặc đổi private writer.
+**Media Display · overhaul 2026-11-08:** GET `/api/v1/media/{media_id}` chỉ phục vụ media ready khi đang gắn bài public (published, category/author active, chưa deleted) hoặc avatar/cover của tài khoản active; session owner được preview draft/chưa gắn. Mỗi GET kiểm lại visibility, masked404 cho foreign/private/missing/corrupt/link; không static mount hay object key trong response. Reader pin directory/file, từ chối reparse/symlink/hardlink và đọc tối đa5MiB, so size metadata. Decode theo giới hạn upload, bỏ metadata và EXIF orientation được áp vào pixels; static→PNG, animation→GIF giữ frame/timing/loop trong ngân sách, output tối đa80MiB. `?still=true` dùng cùng quyền và xuất PNG frame đầu cho reduced motion. no-store/nosniff/CSP sandbox. Upload.url, Post.media_url và AccountPrivate.cover_url legacy là đường dẫn tương đối cùng origin để đi qua Vite proxy; private profile vẫn giữ các media ID. Không thêm migration/DELETE/retention hoặc đổi private writer.
 
 Giới hạn delivery: GIF có nhiều frame giống nhau và delay cực dài có thể vượt trường delay16-bit sau khi encoder gộp frame; normal GET masked404 thay vì500, `still=true` vẫn dùng được. Animated PNG/WebP được chuyển sang bảng màu GIF, không bảo đảm giữ toàn bộ màu gốc; bytes upload riêng tư không thay đổi.
 
-GET `/api/v1/users/{username}` trả `PublicProfile` kế thừa `UserPublic`, thêm `cover_url` nullable để hiển thị ảnh bìa đã lưu của tài khoản active. Các author DTO ở post/comment/leaderboard vẫn dùng `UserPublic`, không thêm cover hoặc thông tin riêng tư. Avatar/cover dùng cùng endpoint media kiểm visibility, không lộ storage key.
+**Profile & Contact · 2026-11-14:** GET `/api/v1/users/{username}` trả `PublicProfile` chỉ gồm allowlist `UserPublic`: id, username, display_name, created_at, bio, avatar_url; không cover, PII hoặc roles. `avatar_url` ở public profile, `/users/me` và author post/comment/leaderboard chỉ lấy từ avatar đang equip trong inventory của chính user, quantity > 0, asset kind avatar, active và review_status approved; URL tương đối `/api/v1/catalog/assets/{asset_id}`, null dùng avatar mặc định. PUT `/api/v1/inventory/equipment/avatar` tiếp tục dùng ownership/slot/approval checks hiện có. PATCH `/users/me` từ chối avatar_media_id khác null; null chỉ bỏ liên kết legacy, không thay equipment. Mọi cover_media_id PATCH, kể cả null, trả422. Columns, migrations, media service và IDs/avatar/cover legacy đã lưu vẫn giữ nguyên; private response còn field legacy, public không trình bày cover.
+
+POST `/api/v1/contact` yêu cầu tài khoản active, session cookie và `require_account_csrf` phía server (Origin + CSRF token ràng buộc session). Không có/session hết hạn hoặc revoked trả401; token/Origin sai trả403. Giữ input validation, limiter, response tối thiểu id/status và workflow Inbox/Admin; hàng Guest cũ user_id nullable không bị xóa hay sửa.
+
+GET `/api/v1/posts?author={username}` lọc username chính xác và giữ toàn bộ điều kiện public hiện có. GET `/api/v1/users/{username}/comments?page=1&page_size=20` trả items Comment cùng Pagination, mới nhất trước với UUID tie-break; chỉ comment visible/chưa xóa, tác giả active và parent post/category/author/media vẫn public. Profile thiếu/khóa/xóa trả404; trang vượt phạm vi trả items rỗng, không trả dữ liệu riêng tư.
+
+
+**Public activity heatmap · 2026-11-14:** GET `/api/v1/users/{username}/activity` trả `{timezone: "Asia/Ho_Chi_Minh", start_date, end_date, days: [{date, posts, comments, count}], total}`. `end_date` là hôm nay theo ngày lịch Việt Nam (00:00), khác ngày Aura bắt đầu07:00. `start_date` là thứ Hai 52 tuần trước thứ Hai của tuần hiện tại; `days` luôn đúng371 ngày tăng dần, tức53 tuần ×7 ngày, tới Chủ nhật tuần hiện tại. Ngày sau hôm nay bằng0; mọi record có created_at sau server now bị loại, kể cả cùng ngày. Count bằng posts + comments; total là tổng count, không phải XP/Aura/Vault.
+
+Chỉ đếm post do tài khoản viết đang public theo `public_posts` (published, chưa deleted, category/author active, media ready/owned nếu có) và comment do tài khoản viết visible/chưa xóa trên parent post vẫn public. Username có cùng validation với public profile; tài khoản thiếu/inactive hoặc thiếu profile trả404. Hai truy vấn GROUP BY ngày Việt Nam cộng một lookup public user, không phân trang/N+1, không thêm table/schema/migration hoặc dữ liệu riêng tư. Thay đổi moderation hiện tại được phản ánh khi đọc lại.
 
 ### Public và tài khoản
 
@@ -60,20 +69,22 @@ GET `/api/v1/users/{username}` trả `PublicProfile` kế thừa `UserPublic`, t
 | GET/PATCH | `/api/v1/users/me` | User | Xem/sửa hồ sơ riêng |
 | PUT | `/api/v1/users/me/password` | User | Đổi mật khẩu |
 | GET | `/api/v1/users/{username}` | Public | Hồ sơ công khai |
+| GET | `/api/v1/users/{username}/activity` | Public | Hoạt động post/comment public theo lịch Việt Nam, 53 tuần |
 
 ### Blog, Media, Contact
 
 | HTTP | Endpoint | Quyền | Công dụng |
 |---|---|---|---|
-| GET | `/api/v1/posts` | Public | Search, category, sort, pagination |
+| GET | `/api/v1/posts` | Public | Search, category, author username exact, sort, pagination |
 | POST | `/api/v1/posts` | User | Đăng bài |
 | GET/PATCH/DELETE | `/api/v1/posts/{post_id}` | Public / owner | Xem / sửa / xóa logic |
 | GET | `/api/v1/categories` | Public | Danh mục hiển thị |
 | GET/POST | `/api/v1/posts/{post_id}/comments` | Public / User | Đọc / thêm bình luận |
+| GET | `/api/v1/users/{username}/comments` | Public | Bình luận public của tài khoản, mới nhất trước |
 | DELETE | `/api/v1/comments/{comment_id}` | Owner | Xóa logic bình luận |
 | POST | `/api/v1/media` | User | Upload ảnh, nhận `media_id` |
 | GET | `/api/v1/media/{media_id}` | Public/owner | Ảnh đã bỏ metadata theo visibility hiện tại; `still=true` cho frame đầu |
-| POST | `/api/v1/contact` | Guest/User | Gửi liên hệ, lưu database |
+| POST | `/api/v1/contact` | User + session CSRF | Gửi liên hệ, lưu database |
 
 **Search:** Query `GET /posts?page=1&page_size=20&search=meme&category=gaming&sort=created_desc`. Search và sort phải tham số hóa/allowlist, không ghép trực tiếp SQL từ dữ liệu người dùng. **P0:** một category/post, không quá một ảnh/post, chỉ JPG/PNG/WebP/GIF.
 
@@ -175,6 +186,8 @@ GET `/api/v1/users/me/bookmarks` cần session, lấy owner từ phiên; trả P
 
 | GET | Search | Filter | Sort (đầu tiên là mặc định) |
 |---|---|---|---|
+| `/posts` | title/content | category slug, author username exact | created_desc, created_asc, title_asc, reaction_desc |
+| `/users/{username}/comments` | — | username path; chỉ comment và parent post public | created_desc |
 | `/posts/{post_id}/comments` | body | author username exact; public visibility giữ nguyên | created_asc, created_desc |
 | `/users/me/posts` | title/content | status, category slug; owner từ session | created_desc, created_asc, title_asc |
 | `/admin/users` | username/email/display_name | status, role USER/ADMIN | username_asc, username_desc, created_desc, created_asc |

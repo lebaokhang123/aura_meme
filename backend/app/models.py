@@ -4,10 +4,10 @@ from uuid import UUID
 
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Computed, Date, DateTime, ForeignKey, ForeignKeyConstraint,
-    Index, Integer, MetaData, SmallInteger, Text, UniqueConstraint, Uuid, false, text,
+    Index, Integer, MetaData, SmallInteger, Text, UniqueConstraint, Uuid, false, select, text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, column_property, mapped_column
 
 
 class Base(DeclarativeBase):
@@ -384,6 +384,15 @@ class Profile(Base):
     bio: Mapped[str | None] = mapped_column(Text)
     avatar_media_id: Mapped[UUID | None] = mapped_column(Uuid)
     cover_media_id: Mapped[UUID | None] = mapped_column(Uuid)
+    # Read with the profile so author lists do not issue one inventory query per row.
+    equipped_avatar_id = column_property(select(AssetItem.id).join(
+        UserEquipment, UserEquipment.asset_id == AssetItem.id).join(UserInventory,
+        (UserInventory.asset_id == AssetItem.id) & (UserInventory.user_id == UserEquipment.user_id)).where(
+        UserEquipment.user_id == user_id, UserEquipment.slot_kind == "avatar", AssetItem.kind == "avatar",
+        UserInventory.quantity > 0, AssetItem.active.is_(True),
+        AssetItem.source_rights["review_status"].astext == "approved").correlate_except(
+        AssetItem, UserEquipment, UserInventory).scalar_subquery())
+
     show_streak: Mapped[bool] = mapped_column(Boolean, server_default=false())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
@@ -393,6 +402,10 @@ class Profile(Base):
                              name="fk_profiles_cover_owner", ondelete="RESTRICT", match="SIMPLE"),
         CheckConstraint("birth_year IS NULL OR birth_year BETWEEN 1900 AND 9999", name="birth_year"),
     )
+
+    @property
+    def avatar_url(self):
+        return f"/api/v1/catalog/assets/{self.equipped_avatar_id}" if self.equipped_avatar_id is not None else None
 
 
 class AuthSession(Base):

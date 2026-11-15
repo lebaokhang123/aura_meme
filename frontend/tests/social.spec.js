@@ -16,11 +16,13 @@ test('reaction is persisted, replaces/toggles exactly once and is shared with Ex
   await page.locator('#post-khang').getByRole('button',{name:'Thả biểu cảm',exact:true}).click();
   await expect(page.locator('[data-reaction="love"]')).toHaveAttribute('aria-pressed','true');
   await page.locator('[data-reaction="fire"]').click();
+  await expect(page.getByRole('dialog',{name:'Bộ chọn reaction'})).toHaveCount(0);
   await page.reload();await ready(page);
   await page.locator('#post-khang').getByRole('button',{name:'Thả biểu cảm',exact:true}).click();
   await expect(page.locator('[data-reaction="fire"]')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('[data-reaction="love"]')).toHaveAttribute('aria-pressed','false');
   await page.locator('[data-reaction="fire"]').click();
+  await expect(page.getByRole('dialog',{name:'Bộ chọn reaction'})).toHaveCount(0);
   await page.goto('/explore');await ready(page);
   await page.locator('#post-khang').getByRole('button',{name:'Thả biểu cảm',exact:true}).click();
   await expect(page.locator('[data-reaction="fire"]')).toHaveAttribute('aria-pressed','false');
@@ -136,6 +138,7 @@ test('all three accounts have independent selections and atomic rapid actions do
  for(const [username,type] of [['Khang_dev','like'],['Kien_dev','love'],['Gigachad','fire']]){
    await page.evaluate(({username,userKey})=>localStorage.setItem(userKey,JSON.stringify({username})),{username,userKey});
    await page.reload();await ready(page);await react(page,'khang',type);
+   await expect(page.getByRole('dialog',{name:'Bộ chọn reaction'})).toHaveCount(0);
  }
  for(const [username,type] of [['Khang_dev','like'],['Kien_dev','love'],['Gigachad','fire']]){
    await page.evaluate(({username,userKey})=>localStorage.setItem(userKey,JSON.stringify({username})),{username,userKey});

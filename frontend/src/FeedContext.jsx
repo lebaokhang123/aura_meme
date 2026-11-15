@@ -12,12 +12,12 @@ export function PostLink({ post, ...props }) {
   const { url } = useFeed();
   return render(<a {...props} href={url('/', `post-${post.id}`)} aria-label={`Xem bài của ${post.authorName} trên Trang chủ`}><span translate="no">{post.authorName}</span></a>);
 }
-export function PostCategory({ post, ...props }) {
+export function PostCategory({ post, label, ...props }) {
   const render = useLocalized();
   const { filters, update } = useFeed();
-  return render(<a {...props} href={filterUrl(location.pathname, { ...filters, category: post.category })} onClick={event => {
+  return render(<a {...props} href={filterUrl(['/', '/explore'].includes(location.pathname)?location.pathname:'/explore', { ...filters, category: post.category })} onClick={event => {
     if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); update({ category: post.category }); }
-  }}>#{post.category}</a>);
+  }}>#{label||post.category}</a>);
 }
 export function FeedProvider({ children }) {
   const {posts,ready,loadFeed}=useSocial();
