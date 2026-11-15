@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 from uuid import uuid4
 from pydantic import BaseModel, ValidationError
 
-from app.config import AuthSettings, ConfigurationError, load_settings
+from app.config import AuthSettings, ConfigurationError, VaultSettings, load_settings
 from app.db import create_db_engine
+from app.auth_schemas import CooldownDetails
 from app.auth import router
 from app.account import router as account_router
 from app.profile_activity import router as profile_activity_router
@@ -29,6 +30,7 @@ from app.checkin import router as checkin_router
 from app.inventory import router as inventory_router
 from app.vault import router as vault_router
 from app.vault_open import router as vault_open_router
+from app.vault_runtime import router as vault_runtime_router
 from app.security import AuthBoundaryMiddleware, AuthError, AuthRuntime
 
 
@@ -42,6 +44,7 @@ async def lifespan(app: FastAPI):
         except ValidationError:
             raise ConfigurationError("Invalid authentication configuration; check AUTH_SIGNING_KEY, AUTH_ENVIRONMENT and AUTH_ALLOWED_ORIGINS.") from None
         app.state.auth_session_factory = lambda: Session(engine)
+        app.state.vault = VaultSettings()
         yield
     finally:
         engine.dispose()
@@ -66,21 +69,26 @@ app.include_router(checkin_router)
 app.include_router(inventory_router)
 app.include_router(vault_router)
 app.include_router(vault_open_router)
+app.include_router(vault_runtime_router)
 app.add_middleware(AuthBoundaryMiddleware)
 
 
-def error_response(status, code, message, retry_after=None):
+def error_response(status, code, message, retry_after=None, details=None):
     headers = {"Cache-Control": "no-store"}
     if retry_after:
         headers["Retry-After"] = str(retry_after)
-    return JSONResponse(status_code=status, content={"error": {
-        "code": code, "message": message, "request_id": "req_" + uuid4().hex,
-    }}, headers=headers)
+    error = {"code": code, "message": message, "request_id": "req_" + uuid4().hex}
+    if isinstance(details, dict) and isinstance(details.get("next_open_at"), str):
+        try:
+            error["details"] = CooldownDetails(next_open_at=details["next_open_at"]).model_dump(mode="json")
+        except ValidationError:
+            pass
+    return JSONResponse(status_code=status, content={"error": error}, headers=headers)
 
 
 @app.exception_handler(AuthError)
 async def auth_error(request, error):
-    return error_response(error.status, error.code, error.message, error.retry_after)
+    return error_response(error.status, error.code, error.message, error.retry_after, error.details)
 
 
 @app.exception_handler(RequestValidationError)

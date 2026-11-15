@@ -64,10 +64,12 @@ async function login(page){
  await page.locator('#loginForm button[type=submit]').click();await expect(page).toHaveURL(/\/$/);
 }
 test('API mode renders an empty database without importing browser demo posts or identity',async({page,context})=>{
- const api=await server(context);
+ const api=await server(context);api.categories.splice(1);
  await page.addInitScript(()=>localStorage.setItem('aurameme-stitch-demo-user',JSON.stringify({username:'Khang_dev',roles:['ADMIN']})));
  await page.goto('/');await expect(page.getByText('Không tìm thấy bài viết phù hợp.')).toBeVisible();
  await expect(page.locator('[data-post-id]')).toHaveCount(0);await expect(page.locator('.account-avatar')).toHaveCount(0);
+ await expect(page.locator('[aria-label="Danh mục Home"] [data-category]')).toHaveCount(1);
+ await expect(page.getByText('5 chủ đề',{exact:true})).toHaveCount(0);await expect(page.getByRole('link',{name:'Tham gia Discord',exact:true})).toHaveCount(0);
  expect(api.requests.some(v=>v.p==='/posts'&&v.query.include_interactions==='true')).toBe(true);
 });
 test('server-owned posts/reactions/comments/edit/delete persist across reload for a non-demo author',async({page,context})=>{

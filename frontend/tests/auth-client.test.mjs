@@ -65,3 +65,10 @@ test('session avatar accepts only local approved-catalog paths, never external U
   const t=transport([ok({...user,avatar_url:avatar})]),c=createAuthClient({fetch:t.fetch});await c.refresh();assert.equal(c.snapshot().user.avatar_url,expected);
  }
 });
+
+test('Vault retries retain idempotency headers with existing session CSRF',async()=>{
+ const t=transport([ok({csrf_token:'one'}),new TypeError('lost reply'),ok({csrf_token:'two'}),ok({open_id:user.id})]),c=createAuthClient({fetch:t.fetch});const options={idempotencyKey:user.id};await assert.rejects(c.write('POST','/vault/cases/'+user.id+'/open',undefined,options),{code:'NETWORK_ERROR'});await c.write('POST','/vault/cases/'+user.id+'/open',undefined,options);assert.equal(t.calls[1].headers['Idempotency-Key'],user.id);assert.equal(t.calls[3].headers['Idempotency-Key'],user.id);assert.equal(t.calls[3].headers['X-CSRF-Token'],'two');assert.equal(t.calls[3].body,undefined);
+});
+test('cooldown exposes bounded server retry metadata; catalog avatars stay valid',async()=>{
+ const next='2026-11-14T15:00:00Z',t=transport([Response.json({error:{code:'COOLDOWN',details:{next_open_at:next,private:'ignore'}}},{status:429,headers:{'Retry-After':'5'}}),ok({...user,avatar_url:'/api/v1/catalog/assets/'+user.id})]),c=createAuthClient({fetch:t.fetch});await assert.rejects(c.read('/catalog'),error=>error.retryAfter===5&&error.nextOpenAt===next&&!error.private);await c.refresh();assert.equal(c.snapshot().user.avatar_url,'/api/v1/catalog/assets/'+user.id);
+});

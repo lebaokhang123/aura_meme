@@ -8,6 +8,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, column_property, mapped_column
+from app.catalog_rights import reviewed_source_rights_sql
 
 
 class Base(DeclarativeBase):
@@ -428,7 +429,7 @@ class Profile(Base):
         (UserInventory.asset_id == AssetItem.id) & (UserInventory.user_id == UserEquipment.user_id)).where(
         UserEquipment.user_id == user_id, UserEquipment.slot_kind == "avatar", AssetItem.kind == "avatar",
         UserInventory.quantity > 0, AssetItem.active.is_(True),
-        AssetItem.source_rights["review_status"].astext == "approved").correlate_except(
+        reviewed_source_rights_sql(AssetItem.source_rights)).correlate_except(
         AssetItem, UserEquipment, UserInventory).scalar_subquery())
 
     show_streak: Mapped[bool] = mapped_column(Boolean, server_default=false())

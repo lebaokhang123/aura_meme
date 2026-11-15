@@ -4,7 +4,7 @@ from typing import Literal
 from uuid import UUID
 import secrets
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
@@ -14,10 +14,11 @@ from app.blog_schemas import Pagination
 from app.inventory import ready_asset
 from app.models import AssetItem, CaseDefinition as CaseRow, CaseLootTable, CaseLootRarity, CasePoolItem, RewardPolicyVersion
 from app.security import AuthError
+from app.permissions import optional_account_reader
 
 router = APIRouter(prefix='/api/v1/vault', tags=['Vault'])
 RARITIES = ('D', 'C', 'B', 'A', 'S')
-ERRORS = {code: {'model': ErrorResponse} for code in (422,429,500)}
+ERRORS = {code: {'model': ErrorResponse} for code in (401,403,422,429,500,503)}
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,7 @@ class CaseDefinition(BaseModel):
     label: str
     cost_khi_van: int = Field(ge=0)
     status: Literal['active', 'retired']
+    runtime_kind: Literal['avatar','background'] | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class CaseBand(BaseModel):
@@ -133,24 +135,52 @@ def available_case(db, now, case_id=None):
         pools = load_version(db, case.id, version, now, 'published')
     except ValueError:
         return None
-    return CaseDetail(case=CaseDefinition.model_validate(case, from_attributes=True), bands=[CaseBand(
+    return CaseDetail(case=CaseDefinition(id=case.id, slug=case.slug, label=case.label, cost_khi_van=case.cost_khi_van, status=case.status), bands=[CaseBand(
         min_earned_xp=p.minimum, max_earned_xp=p.maximum, odds_version=p.version,
         weights_bps=dict(zip(RARITIES, p.weights))) for p in pools])
 
 
+def available_runtime_cases(db, request):
+    from sqlalchemy.orm import undefer
+    from app.vault_runtime import load_runtime_pool, require_schema, runtime_enabled
+    if not runtime_enabled(request):
+        return []
+    require_schema(db)
+    cases = list(db.scalars(select(CaseRow).where(CaseRow.runtime_kind.is_not(None), CaseRow.status == 'active')
+                            .options(undefer(CaseRow.runtime_kind)).order_by(CaseRow.runtime_kind)
+                            .with_for_update(read=True)))
+    result = []
+    for case in cases:
+        try:
+            pool = load_runtime_pool(db, case, request.app.state.auth.now())
+        except ValueError:
+            continue
+        result.append(CaseDetail(case=CaseDefinition(id=case.id, slug=case.slug, label=case.label,
+            cost_khi_van=0, status=case.status, runtime_kind=case.runtime_kind), bands=[CaseBand(
+                min_earned_xp=0, max_earned_xp=None, odds_version=pool.version,
+                weights_bps=dict(zip(RARITIES, pool.weights)))]))
+    return result
+
+
 @router.get('/cases', response_model=CasePage, operation_id='listCases', responses=ERRORS)
-def list_cases(request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
-    with request.app.state.auth_session_factory() as db, db.begin():
-        detail = available_case(db, request.app.state.auth.now())
-        items = [detail.case] if detail else []
-        return CasePage(items=items[(page-1)*page_size:page*page_size],
-            pagination=Pagination(page=page, page_size=page_size, total=len(items), total_pages=len(items)))
+def list_cases(request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+               reader=Depends(optional_account_reader, scope='function')):
+    db, owner = reader
+    detail = available_case(db, request.app.state.auth.now())
+    items = [detail.case] if detail else []
+    if owner is not None:
+        items += [detail.case for detail in available_runtime_cases(db, request)]
+    return CasePage(items=items[(page-1)*page_size:page*page_size],
+        pagination=Pagination(page=page, page_size=page_size, total=len(items),
+                              total_pages=(len(items)+page_size-1)//page_size))
 
 
 @router.get('/cases/{case_id}', response_model=CaseDetail, operation_id='getCase', responses=ERRORS | {404: {'model': ErrorResponse}})
-def get_case(case_id: UUID, request: Request):
-    with request.app.state.auth_session_factory() as db, db.begin():
-        detail = available_case(db, request.app.state.auth.now(), case_id)
-        if detail is None:
-            raise AuthError(404, 'NOT_FOUND', 'Published common case not available.')
-        return detail
+def get_case(case_id: UUID, request: Request, reader=Depends(optional_account_reader, scope='function')):
+    db, owner = reader
+    detail = available_case(db, request.app.state.auth.now(), case_id)
+    if detail is None and owner is not None:
+        detail = next((row for row in available_runtime_cases(db, request) if row.case.id == case_id), None)
+    if detail is None:
+        raise AuthError(404, 'NOT_FOUND', 'Published case not available.')
+    return detail

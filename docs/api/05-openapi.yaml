@@ -28,6 +28,249 @@ tags:
 - name: Vault
   description: Rương, inventory, trang bị
 paths:
+  /api/v1/vault/opens/by-request:
+    get:
+      tags: ["Vault"]
+      summary: "Get Open By Request"
+      operationId: "getOpenByRequest"
+      security:
+        -
+          sessionCookie: []
+      parameters:
+        -
+          name: "key"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+            minLength: 12
+            maxLength: 128
+      responses:
+        "200":
+          description: "Successful Response"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CaseOpenResult"
+        "401":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Unauthorized"
+        "403":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Forbidden"
+        "409":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Conflict"
+        "422":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Unprocessable Entity"
+        "429":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Too Many Requests"
+        "500":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Internal Server Error"
+        "404":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Not Found"
+        "503":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Service Unavailable"
+    x-phase: "P1"
+  /api/v1/inventory/equipment:
+    get:
+      tags: ["Vault"]
+      summary: "Equipment"
+      operationId: "getEquipment"
+      responses:
+        "200":
+          description: "Successful Response"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/EquipmentPage"
+        "401":
+          description: "Unauthorized"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+        "403":
+          description: "Forbidden"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+        "409":
+          description: "Conflict"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+        "422":
+          description: "Unprocessable Entity"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+        "429":
+          description: "Too Many Requests"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+        "500":
+          description: "Internal Server Error"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+        "404":
+          description: "Not Found"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+        "503":
+          description: "Service Unavailable"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+      security:
+        -
+          sessionCookie: []
+    x-phase: "P1"
+  /api/v1/catalog:
+    get:
+      tags: ["Vault"]
+      summary: "Catalog"
+      operationId: "listCatalog"
+      security:
+        -
+          sessionCookie: []
+      parameters:
+        -
+          name: "kind"
+          in: "query"
+          required: false
+          schema:
+            enum: ["avatar","background",null]
+            type: "string"
+            nullable: true
+        -
+          name: "rarity"
+          in: "query"
+          required: false
+          schema:
+            enum: ["D","C","B","A","S",null]
+            type: "string"
+            nullable: true
+        -
+          name: "q"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            maxLength: 100
+            default: ""
+        -
+          name: "page"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 1
+            default: 1
+        -
+          name: "page_size"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            maximum: 100
+            minimum: 1
+            default: 20
+      responses:
+        "200":
+          description: "Successful Response"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CatalogPage"
+        "401":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Unauthorized"
+        "403":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Forbidden"
+        "409":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Conflict"
+        "422":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Unprocessable Entity"
+        "429":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Too Many Requests"
+        "500":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Internal Server Error"
+        "404":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Not Found"
+        "503":
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/Error"
+          description: "Service Unavailable"
+    x-phase: "P1"
   /health:
     get:
       tags:
@@ -2114,6 +2357,12 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Page'
       - $ref: '#/components/parameters/PageSize'
+      - name: kind
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [avatar, frame, icon, effect, background]
       responses:
         '200':
           description: Thành công
@@ -2485,31 +2734,77 @@ paths:
     }
 components:
   schemas:
+    CatalogPage:
+      properties:
+        items:
+          items:
+            "$ref": "#/components/schemas/CatalogEntry"
+          type: "array"
+        pagination:
+          "$ref": "#/components/schemas/Pagination"
+      type: "object"
+      required: ["items","pagination"]
+    EquipmentPage:
+      properties:
+        items:
+          items:
+            "$ref": "#/components/schemas/EquippedItem"
+          type: "array"
+      type: "object"
+      required: ["items"]
+    EquippedItem:
+      properties:
+        slot_kind:
+          type: "string"
+          enum: ["avatar","frame","icon","effect","background"]
+        asset:
+          "$ref": "#/components/schemas/Asset"
+      type: "object"
+      required: ["slot_kind","asset"]
+    MemeReactionCount:
+      properties:
+        asset:
+          "$ref": "#/components/schemas/Asset"
+        count:
+          type: "integer"
+          minimum: 1.0
+      type: "object"
+      required: ["asset","count"]
+    CatalogEntry:
+      properties:
+        asset:
+          "$ref": "#/components/schemas/Asset"
+        owned:
+          type: "boolean"
+      type: "object"
+      required: ["asset","owned"]
+    CooldownDetails:
+      properties:
+        next_open_at:
+          type: "string"
+          format: "date-time"
+      additionalProperties: false
+      type: "object"
+      required: ["next_open_at"]
     Error:
-      type: object
       properties:
         error:
-          type: object
           properties:
             code:
-              type: string
-              example: VALIDATION_ERROR
+              type: "string"
             message:
-              type: string
-              example: Dữ liệu không hợp lệ
+              type: "string"
             request_id:
-              type: string
-              example: req_abc123
+              type: "string"
             details:
-              type: object
-              additionalProperties: true
+              allOf:
+                -
+                  "$ref": "#/components/schemas/CooldownDetails"
               nullable: true
-          required:
-          - code
-          - message
-          - request_id
-      required:
-      - error
+          type: "object"
+          required: ["code","message","request_id"]
+      type: "object"
+      required: ["error"]
     Pagination:
       type: object
       properties:
@@ -3301,73 +3596,108 @@ components:
           minimum: 0
       required: [like, love, laugh, fire, sad, angry]
     PostInteractions:
-      type: object
       properties:
+        viewer_reaction:
+          type: "string"
+          enum: ["like","love","laugh","fire","sad","angry",null]
+          nullable: true
+        viewer_meme_asset_id:
+          type: "string"
+          format: "uuid"
+          nullable: true
+        meme_reactions:
+          items:
+            "$ref": "#/components/schemas/MemeReactionCount"
+          type: "array"
+          nullable: true
         post_id:
-          type: string
-          format: uuid
+          type: "string"
+          format: "uuid"
         reaction_counts:
-          $ref: '#/components/schemas/ReactionCounts'
+          "$ref": "#/components/schemas/ReactionCounts"
         comments_count:
-          type: integer
-          minimum: 0
-        viewer_reaction:
-          type: string
-          nullable: true
-          enum: [like, love, laugh, fire, sad, angry, null]
+          type: "integer"
+          minimum: 0.0
         bookmarked:
-          type: boolean
-      required: [post_id, reaction_counts, comments_count, viewer_reaction, bookmarked]
+          type: "boolean"
+      type: "object"
+      required: ["viewer_reaction","post_id","reaction_counts","comments_count","bookmarked"]
     ReactionInput:
-      type: object
       properties:
         reaction_type:
-          type: string
-          enum:
-          - like
-          - love
-          - laugh
-          - fire
-          - sad
-          - angry
-      required:
-      - reaction_type
-    ReactionResult:
-      type: object
-      properties:
-        reaction_type:
-          type: string
-          enum:
-          - like
-          - love
-          - laugh
-          - fire
-          - sad
-          - angry
-        post_id:
-          type: string
-          format: uuid
-      required:
-      - reaction_type
-      - post_id
-    CommentReactionResult:
-      allOf:
-      - $ref: '#/components/schemas/ReactionInput'
-      - type: object
-        properties:
-          comment_id: {type: string, format: uuid}
-        required: [comment_id]
-    CommentInteractions:
-      type: object
-      properties:
-        comment_id: {type: string, format: uuid}
-        reaction_counts:
-          $ref: '#/components/schemas/ReactionCounts'
-        viewer_reaction:
-          type: string
+          anyOf:
+            -
+              type: "string"
+              enum: ["like","love","laugh","fire","sad","angry"]
+            -
+              type: "string"
+              enum: ["meme"]
+        meme_asset_id:
+          type: "string"
+          format: "uuid"
           nullable: true
-          enum: [like, love, laugh, fire, sad, angry, null]
-      required: [comment_id, reaction_counts, viewer_reaction]
+      type: "object"
+      required: ["reaction_type"]
+    ReactionResult:
+      properties:
+        reaction_type:
+          anyOf:
+            -
+              type: "string"
+              enum: ["like","love","laugh","fire","sad","angry"]
+            -
+              type: "string"
+              enum: ["meme"]
+        meme_asset_id:
+          type: "string"
+          format: "uuid"
+          nullable: true
+        post_id:
+          type: "string"
+          format: "uuid"
+      type: "object"
+      required: ["reaction_type","post_id"]
+    CommentReactionResult:
+      properties:
+        reaction_type:
+          anyOf:
+            -
+              type: "string"
+              enum: ["like","love","laugh","fire","sad","angry"]
+            -
+              type: "string"
+              enum: ["meme"]
+        meme_asset_id:
+          type: "string"
+          format: "uuid"
+          nullable: true
+        comment_id:
+          type: "string"
+          format: "uuid"
+      type: "object"
+      required: ["reaction_type","comment_id"]
+    CommentInteractions:
+      properties:
+        viewer_reaction:
+          type: "string"
+          enum: ["like","love","laugh","fire","sad","angry",null]
+          nullable: true
+        viewer_meme_asset_id:
+          type: "string"
+          format: "uuid"
+          nullable: true
+        meme_reactions:
+          items:
+            "$ref": "#/components/schemas/MemeReactionCount"
+          type: "array"
+          nullable: true
+        comment_id:
+          type: "string"
+          format: "uuid"
+        reaction_counts:
+          "$ref": "#/components/schemas/ReactionCounts"
+      type: "object"
+      required: ["viewer_reaction","comment_id","reaction_counts"]
     CategoryFeedItem:
       properties:
         id:
@@ -3426,29 +3756,26 @@ components:
         - status
       title: CommentModeration
     CaseDefinition:
-      type: object
       properties:
         id:
-          type: string
-          format: uuid
+          type: "string"
+          format: "uuid"
         slug:
-          type: string
+          type: "string"
         label:
-          type: string
+          type: "string"
         cost_khi_van:
-          type: integer
-          minimum: 0
+          type: "integer"
+          minimum: 0.0
         status:
-          type: string
-          enum:
-          - active
-          - retired
-      required:
-      - id
-      - slug
-      - label
-      - cost_khi_van
-      - status
+          type: "string"
+          enum: ["active","retired"]
+        runtime_kind:
+          type: "string"
+          enum: ["avatar","background",null]
+          nullable: true
+      type: "object"
+      required: ["id","slug","label","cost_khi_van","status"]
     CaseBand:
       type: object
       properties:
@@ -3508,64 +3835,58 @@ components:
       - case
       - bands
     Asset:
-      type: object
       properties:
         id:
-          type: string
-          format: uuid
+          type: "string"
+          format: "uuid"
         slug:
-          type: string
+          type: "string"
         kind:
-          type: string
-          enum:
-          - avatar
-          - frame
-          - icon
-          - effect
-          - generator
+          type: "string"
+          enum: ["avatar","frame","icon","effect","generator","background"]
         rarity:
-          type: string
-          enum:
-          - D
-          - C
-          - B
-          - A
-          - S
+          type: "string"
+          enum: ["D","C","B","A","S"]
         media_url:
-          type: string
-          format: uri
-      required:
-      - id
-      - slug
-      - kind
-      - rarity
-      - media_url
+          type: "string"
+          minLength: 1
+          format: "uri"
+          nullable: true
+        display_name:
+          type: "string"
+          default: ""
+        effect_key:
+          type: "string"
+          nullable: true
+        available:
+          type: "boolean"
+          default: true
+      type: "object"
+      required: ["id","slug","kind","rarity","media_url"]
     CaseOpenResult:
-      type: object
       properties:
         open_id:
-          type: string
-          format: uuid
+          type: "string"
+          format: "uuid"
         case_id:
-          type: string
-          format: uuid
+          type: "string"
+          format: "uuid"
         reward:
-          $ref: '#/components/schemas/Asset'
+          "$ref": "#/components/schemas/Asset"
         cost_khi_van:
-          type: integer
-          minimum: 0
+          type: "integer"
+          minimum: 0.0
         khi_van_balance:
-          type: integer
-          minimum: 0
+          type: "integer"
+          minimum: 0.0
         already_processed:
-          type: boolean
-      required:
-      - open_id
-      - case_id
-      - reward
-      - cost_khi_van
-      - khi_van_balance
-      - already_processed
+          type: "boolean"
+        next_open_at:
+          type: "string"
+          format: "date-time"
+          nullable: true
+      type: "object"
+      required: ["open_id","case_id","reward","cost_khi_van","khi_van_balance","already_processed"]
     InventoryItem:
       type: object
       properties:
@@ -3581,31 +3902,24 @@ components:
       - quantity
       - equipped
     EquipmentInput:
-      type: object
       properties:
         asset_id:
-          type: string
-          format: uuid
+          type: "string"
+          format: "uuid"
           nullable: true
-      required:
-      - asset_id
+      type: "object"
+      required: ["asset_id"]
     EquipmentResult:
-      type: object
       properties:
         slot_kind:
-          type: string
-          enum:
-          - avatar
-          - frame
-          - icon
-          - effect
+          type: "string"
+          enum: ["avatar","frame","icon","effect","background"]
         asset_id:
-          type: string
-          format: uuid
+          type: "string"
+          format: "uuid"
           nullable: true
-      required:
-      - slot_kind
-      - asset_id
+      type: "object"
+      required: ["slot_kind","asset_id"]
     AdminComment:
       {
         "properties": {
@@ -3830,6 +4144,7 @@ components:
         - frame
         - icon
         - effect
+        - background
     CsrfHeader:
       in: header
       name: X-CSRF-Token

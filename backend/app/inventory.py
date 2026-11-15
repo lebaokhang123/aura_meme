@@ -12,9 +12,11 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from PIL import Image, ImageOps
 from pydantic import AnyHttpUrl, BaseModel, Field, ValidationError
 from sqlalchemy import and_, select
+from sqlalchemy.orm import undefer
 
 from app.auth import CSRF_HEADER, ERRORS
 from app.auth_schemas import ErrorResponse
+from app.asset_schemas import Asset
 from app.blog import page_rows
 from app.blog_schemas import Pagination
 from app.config import CatalogSettings, MediaSettings
@@ -22,18 +24,12 @@ from app.media import validate_image
 from app.models import AssetItem, UserEquipment, UserInventory
 from app.permissions import require_account_csrf, require_authenticated_user
 from app.security import AuthError
+from app.catalog_rights import reviewed_source_rights_sql
 from app.storage import close_handle, windows_handle
 
 router = APIRouter(prefix='/api/v1', tags=['Vault'])
-Slot = Literal['avatar', 'frame', 'icon', 'effect']
-
-
-class Asset(BaseModel):
-    id: UUID
-    slug: str
-    kind: Literal['avatar', 'frame', 'icon', 'effect', 'generator']
-    rarity: Literal['D', 'C', 'B', 'A', 'S']
-    media_url: AnyHttpUrl
+ERRORS = ERRORS | {503: {'model': ErrorResponse}}
+Slot = Literal['avatar', 'frame', 'icon', 'effect', 'background']
 
 
 class InventoryItem(BaseModel):
@@ -57,23 +53,34 @@ class EquipmentResult(BaseModel):
 
 
 def ready_asset(asset):
-    return asset is not None and asset.active and asset.source_rights.get('review_status') == 'approved'
+    from app.catalog_rights import reviewed_source_rights
+    return asset is not None and asset.active and reviewed_source_rights(asset.source_rights)
 
 
-def asset_dto(asset, request):
+def asset_dto(asset, request, *, metadata=False):
+    available = ready_asset(asset)
     return Asset(id=asset.id, slug=asset.slug, kind=asset.kind, rarity=asset.rarity,
-        media_url=str(request.url_for('catalogAsset', asset_id=asset.id)))
+        display_name=(asset.display_name if metadata else None) or asset.slug,
+        effect_key=asset.effect_key if metadata else None,
+        media_url=str(request.url_for('catalogAsset', asset_id=asset.id)) if available else None, available=available)
 
 
 @router.get('/inventory/me', response_model=InventoryPage, operation_id='getInventory', responses=ERRORS)
 def inventory(request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
-              account=Depends(require_authenticated_user, scope='function')):
+              kind: Slot | None = None, account=Depends(require_authenticated_user, scope='function')):
     query = select(UserInventory, AssetItem, UserEquipment.asset_id).join(AssetItem, AssetItem.id == UserInventory.asset_id).outerjoin(
         UserEquipment, and_(UserEquipment.user_id == UserInventory.user_id, UserEquipment.asset_id == UserInventory.asset_id)).where(
         UserInventory.user_id == account.user.id, UserInventory.quantity > 0, AssetItem.active.is_(True),
-        AssetItem.source_rights['review_status'].astext == 'approved').order_by(UserInventory.acquired_at.desc(), AssetItem.id)
+        reviewed_source_rights_sql(AssetItem.source_rights)).order_by(UserInventory.acquired_at.desc(), AssetItem.id)
+    if kind is not None:
+        query = query.where(AssetItem.kind == kind)
+    from app.vault_runtime import runtime_enabled, require_schema
+    metadata = runtime_enabled(request)
+    if metadata:
+        require_schema(account.db)
+        query = query.options(undefer(AssetItem.display_name), undefer(AssetItem.effect_key))
     rows, pagination = page_rows(account.db, query, page, page_size)
-    return InventoryPage(items=[InventoryItem(asset=asset_dto(asset, request), quantity=item.quantity,
+    return InventoryPage(items=[InventoryItem(asset=asset_dto(asset, request, metadata=metadata), quantity=item.quantity,
         equipped=equipped is not None) for item, asset, equipped in rows], pagination=pagination)
 
 
@@ -81,6 +88,9 @@ def inventory(request: Request, page: int = Query(1, ge=1), page_size: int = Que
             responses=ERRORS | {404: {'model': ErrorResponse}, 409: {'model': ErrorResponse}}, openapi_extra=CSRF_HEADER)
 def equip(slot_kind: Slot, body: EquipmentInput, request: Request, account=Depends(require_account_csrf)):
     db, owner = account.db, account.user.id  # Auth locks the user, serializing this owner's slot changes.
+    if slot_kind == 'background':
+        from app.vault_runtime import require_enabled
+        require_enabled(request, db)
     if body.asset_id is not None:
         item = db.scalar(select(UserInventory).where(UserInventory.user_id == owner, UserInventory.asset_id == body.asset_id).with_for_update().execution_options(populate_existing=True))
         asset = db.scalar(select(AssetItem).where(AssetItem.id == body.asset_id).with_for_update(read=True).execution_options(populate_existing=True))

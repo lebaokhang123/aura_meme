@@ -22,9 +22,10 @@ ABSOLUTE_SECONDS = 43200
 
 
 class AuthError(Exception):
-    def __init__(self, status, code, message, retry_after=None):
+    def __init__(self, status, code, message, retry_after=None, details=None):
         self.status, self.code, self.message = status, code, message
         self.retry_after = retry_after
+        self.details = details
 
 
 def digest(token):

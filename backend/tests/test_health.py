@@ -31,7 +31,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
                                           "/api/v1/admin/posts/{post_id}", "/api/v1/admin/comments", "/api/v1/admin/assets", "/api/v1/admin/posts/{post_id}/media", "/api/v1/admin/audit-logs", "/api/v1/contact",
                                           "/api/v1/admin/contacts", "/api/v1/admin/contacts/{contact_id}",
                                           "/api/v1/users/me/posts", "/api/v1/users/me/posts/{post_id}",
-                                          "/api/v1/posts/{post_id}/reactions", "/api/v1/posts/{post_id}/bookmark", "/api/v1/aura/progress", "/api/v1/leaderboard", "/api/v1/aura/check-in", "/api/v1/inventory/me", "/api/v1/inventory/equipment/{slot_kind}", "/api/v1/catalog/assets/{asset_id}", "/api/v1/vault/cases", "/api/v1/vault/cases/{case_id}", "/api/v1/vault/cases/{case_id}/open"}
+                                          "/api/v1/posts/{post_id}/reactions", "/api/v1/posts/{post_id}/bookmark", "/api/v1/aura/progress", "/api/v1/leaderboard", "/api/v1/aura/check-in", "/api/v1/inventory/me", "/api/v1/inventory/equipment/{slot_kind}", "/api/v1/catalog/assets/{asset_id}", "/api/v1/vault/cases", "/api/v1/vault/cases/{case_id}", "/api/v1/vault/cases/{case_id}/open", "/api/v1/catalog", "/api/v1/inventory/equipment", "/api/v1/vault/opens/by-request"}
         assert contract["paths"]["/health"]["get"]["operationId"] == "health"
         model = contract["components"]["schemas"]["HealthResponse"]
         assert model["required"] == ["status"]

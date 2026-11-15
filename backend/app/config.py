@@ -42,6 +42,11 @@ class CatalogSettings(BaseSettings):
         return MediaSettings.private_absolute_root(value)
 
 
+class VaultSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
+    vault_runtime_enabled: bool = False
+
+
 class AuthSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
     auth_signing_key: SecretStr

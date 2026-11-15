@@ -16,7 +16,7 @@ def test_interaction_read_contract():
     assert detail["operationId"] == "getPostInteractions"
     assert {} in detail["security"] and {"sessionCookie": []} in detail["security"]
     fields = contract["components"]["schemas"]["PostInteractions"]["properties"]
-    assert set(fields) == {"post_id", "reaction_counts", "comments_count", "viewer_reaction", "bookmarked"}
+    assert set(fields) == {"post_id", "reaction_counts", "comments_count", "viewer_reaction", "bookmarked", "meme_reactions", "viewer_meme_asset_id"}
     saved = contract["paths"]["/api/v1/users/me/bookmarks"]["get"]
     assert saved["operationId"] == "listSavedPosts"
     assert saved["security"] == [{"sessionCookie": []}]

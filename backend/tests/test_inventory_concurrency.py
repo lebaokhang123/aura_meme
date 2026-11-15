@@ -1,3 +1,5 @@
+import json
+from vault_test_rights import synthetic_rights
 """Real committed races and deferred COMMIT failures for equipment ownership."""
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
@@ -17,7 +19,7 @@ def equipment_race(race_comments):
     with engine.begin() as c:
         for index,asset in enumerate(ids):
             c.execute(text("INSERT INTO asset_items VALUES (:id,:slug,'icon','synthetic','D',:key,CAST(:rights AS jsonb),true,now(),now())"),
-                      {'id':asset,'slug':'fixture-'+asset.hex,'key':'catalog/'+'0'*64+'.png','rights':'{"review_status":"approved","source":"synthetic fixture"}'})
+                      {'id':asset,'slug':'fixture-'+asset.hex,'key':'catalog/'+'0'*64+'.png','rights':json.dumps(synthetic_rights('0'*64))})
             c.execute(text('INSERT INTO user_inventory VALUES (:owner,:asset,1,now(),now())'),{'owner':owner,'asset':asset})
     try:yield client,owner,ids,engine,tag
     finally:

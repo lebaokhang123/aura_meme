@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from PIL import Image, UnidentifiedImageError
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 from sqlalchemy import or_, select, text
 
 from app.aura import simulation_only
@@ -23,26 +23,41 @@ class Rights(BaseModel):
     author: Nonempty
     license: Nonempty
     attribution: Nonempty
-    review_status: Literal['pending', 'rejected']
+    review_status: Literal['pending', 'rejected', 'approved']
+    proof: dict | None = None
 
 
 class CatalogItem(BaseModel):
     model_config = ConfigDict(extra='forbid')
     id: UUID
     slug: str = Field(pattern=r'^[a-z0-9]+(?:-[a-z0-9]+)*$', max_length=100)
-    kind: Literal['avatar', 'frame', 'icon', 'effect']
+    kind: Literal['avatar', 'frame', 'icon', 'effect', 'background']
     collection: Nonempty
     rarity: Literal['D', 'C', 'B', 'A', 'S']
     file: str = Field(min_length=1, max_length=240)
     mime: Literal['image/png', 'image/jpeg', 'image/webp']
     sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     source_rights: Rights
+    name_vi: Nonempty | None = None
+    name_review_status: Literal['pending','approved','rejected'] | None = None
+    byte_size: int | None = Field(default=None, strict=True, gt=0, le=5*1024*1024)
+    width: int | None = Field(default=None, strict=True, gt=0)
+    height: int | None = Field(default=None, strict=True, gt=0)
+    source_files: list[Nonempty] = Field(default_factory=list, max_length=1000)
+    effect_key: Literal['violet-base','lucian-363','lucian-352-deep-sea','lucian-226','lucian-330'] | None = None
+
+    @model_validator(mode='after')
+    def valid_effect(self):
+        if self.effect_key is not None and self.kind != 'background':
+            raise ValueError('Only backgrounds can reference a renderer.')
+        return self
 
 
 class CatalogManifest(BaseModel):
     model_config = ConfigDict(extra='forbid')
     version: int = Field(strict=True, ge=1)
     items: list[CatalogItem] = Field(min_length=1, max_length=1000)
+    inventory: list[dict] = Field(default_factory=list, max_length=10000)
 
 
 def unique_keys(pairs):
@@ -73,12 +88,17 @@ def read_manifest(path):
         if not file.is_file() or file.stat().st_nlink != 1 or not file.resolve().is_relative_to(root) or not 0 < file.stat().st_size <= 5 * 1024 * 1024:
             raise ValueError('Catalog image is missing, outside package or oversized.')
         data = file.read_bytes()
+        if item.byte_size is not None and len(data) != item.byte_size:
+            raise ValueError('Catalog byte size differs from reviewed metadata.')
         if len(data) > 5 * 1024 * 1024 or sha256(data).hexdigest() != item.sha256:
             raise ValueError('Catalog content checksum mismatch.')
         try:
             with Image.open(BytesIO(data)) as image:
                 if Image.MIME.get(image.format) != item.mime or image.width * image.height > 12_000_000 or getattr(image, 'n_frames', 1) != 1:
                     raise ValueError('Catalog image MIME, dimensions or animation is unsupported.')
+                if ((item.width is not None and item.width != image.width)
+                        or (item.height is not None and item.height != image.height)):
+                    raise ValueError('Catalog dimensions differ from reviewed metadata.')
                 image.verify()
             with Image.open(BytesIO(data)) as image:
                 image.load()
@@ -90,6 +110,8 @@ def read_manifest(path):
 def import_draft(db, manifest, now):
     now = simulation_only(db, now)
     manifest = CatalogManifest.model_validate(manifest.model_dump())
+    if any(item.source_rights.review_status == 'approved' for item in manifest.items):
+        raise ValueError('Approved catalog requires separately authorized activation, never draft import.')
     digest = sha256(manifest.model_dump_json().encode()).hexdigest()
     added = 0
     with db.begin_nested():
@@ -123,7 +145,7 @@ def main():
         manifest = read_manifest(args.manifest)
     except (ValueError, OSError):
         parser.exit(1, 'Catalog validation failed; inspect local package metadata and bytes.\n')
-    print(f'Catalog v{manifest.version}: {len(manifest.items)} draft assets validated; no database/files changed.')
+    print(f'Catalog v{manifest.version}: {len(manifest.items)} catalog assets validated; no database/files changed.')
 
 
 if __name__ == '__main__':

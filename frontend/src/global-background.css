@@ -1,0 +1,36 @@
+/* Lucian UX/UI Prompt #226 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#226 */
+.global-background {
+  position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  --mx: -200px; --my: -200px;
+  --background-surface: var(--am-surface-container-low, #13141c);
+  --background-dot: var(--am-outline, #948f9a);
+  background: #100b1e;
+}
+.global-background, .global-background * { box-sizing: border-box; pointer-events: none; }
+.global-background canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.global-background[data-effect="lucian-363"] { background: var(--background-surface); }
+.global-background[data-effect="lucian-352-deep-sea"] { background: #04121c; }
+.global-background[data-effect="lucian-226"] { background: #07080f; }
+.global-background[data-effect="lucian-330"] { background: radial-gradient(circle at 50% 50%, #0b1230, #02030a 70%); }
+.global-background-grid, .global-background-spot {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.07) 1px, transparent 1px);
+  background-size: 34px 34px; background-position: -1px -1px;
+}
+.global-background-grid { mask-image: radial-gradient(75% 70% at 50% 45%, #000, transparent); }
+.global-background-spot {
+  background-image: linear-gradient(rgba(129,140,248,.55) 1px, transparent 1px), linear-gradient(90deg, rgba(129,140,248,.55) 1px, transparent 1px);
+  mask-image: radial-gradient(90px 90px at var(--mx) var(--my), #000, transparent); transition: opacity .4s;
+}
+.global-background-glow {
+  position: absolute; left: 50%; top: 44%; width: 260px; height: 180px; margin: -90px 0 0 -130px;
+  border-radius: 50%; background: radial-gradient(closest-side, rgba(99,102,241,.35), transparent); filter: blur(10px);
+}
+.global-background[data-theme="light"] { --background-surface: var(--am-surface-container-low, #fff); --background-dot: var(--am-outline, #8e8a97); background: #f1edf8; }
+.global-background[data-theme="light"] canvas { opacity: .2; }
+.global-background[data-theme="light"][data-effect="lucian-363"] { background: var(--background-surface); }
+.global-background[data-theme="light"][data-effect="lucian-363"] canvas { opacity: .7; }
+.global-background[data-theme="light"] .global-background-grid { background-image: linear-gradient(#655a851c 1px, transparent 1px), linear-gradient(90deg, #655a851c 1px, transparent 1px); }
+@media (prefers-reduced-motion: reduce) { .global-background-spot { transition: none; } }
+
+#root[data-vault-background]{isolation:isolate}#root[data-vault-background]>main{position:relative;z-index:1;background:transparent!important}#root[data-vault-background]>.site-footer{position:relative;z-index:1}

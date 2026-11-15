@@ -1,16 +1,9 @@
 import React,{useState,useSyncExternalStore} from 'react';
 import {auth} from '../auth.js';
-import {loginUrl} from '../return-url.js';
-import {icon} from './social-ui.jsx';
 import {useCopy,useData,ErrorMessage,LoadState,Pagination} from './account-ui.jsx';
 export {ContactPage} from './ContactPage.jsx';
 export {ProfilePage} from './ProfilePage.jsx';
-function catalogUrl(value){try{const url=new URL(value,location.origin);if(/^\/api\/v1\/catalog\/assets\/[0-9a-f-]{36}$/.test(url.pathname))return url.pathname;}catch{}return '/assets/brand/favicon-64.png';}
-export function VaultPage(){
- const t=useCopy(),[page,setPage]=useState(1),state=useData('/inventory/me?page='+page),[busy,setBusy]=useState(false),[error,setError]=useState(null),[saved,setSaved]=useState(false),data=state.data;
- async function equip(id){if(busy)return;setBusy(true);setError(null);setSaved(false);try{await auth.write('PUT','/inventory/equipment/avatar',{asset_id:id});await auth.refresh();state.retry();setSaved(true)}catch(e){if(e.status===401)location.replace(loginUrl());else setError(e)}finally{setBusy(false)}}
- return <main className="account-page vault-page"><header className="account-intro"><h1>{t('Bảo Khố của tôi','My Vault')}</h1><p>{t('Chỉ Meme đã sở hữu mới được dùng làm Avatar.','Only owned memes can be equipped as your avatar.')}</p></header><div className="account-panel"><h2>{t('Meme đã sở hữu','Owned memes')}</h2><ErrorMessage error={error}/>{saved&&<p role="status">{t('Đã cập nhật Avatar.','Avatar updated.')}</p>}<LoadState state={state}><div className="inventory-grid">{data?.items.filter(i=>i.asset.kind==='avatar').map(i=><article key={i.asset.id}><img src={catalogUrl(i.asset.media_url)} alt={i.asset.slug}/><p translate="no">{i.asset.slug}</p><p>×{i.quantity}</p><button className="account-button" disabled={busy||i.equipped} onClick={()=>equip(i.asset.id)}>{i.equipped?t('Đang trang bị','Equipped'):t('Dùng làm Avatar','Use as avatar')}</button></article>)}</div>{!data?.items.some(i=>i.asset.kind==='avatar')&&<p className="account-muted">{t('Chưa có Meme trong trang này. Avatar mặc định được giữ khi chưa trang bị.','No memes on this page. The default avatar is used when none is equipped.')}</p>}<Pagination data={data} page={page} onChange={setPage}/></LoadState><button className="account-button" disabled={busy} onClick={()=>equip(null)}>{t('Dùng Avatar mặc định','Use default avatar')}</button></div><section className="account-panel"><h2>{t('Background đã sở hữu','Owned backgrounds')}</h2><p className="account-muted">{t('Chưa có dữ liệu Background được hỗ trợ từ catalog. Không có chức năng trang bị ảnh bìa Profile.','The catalog does not yet support background data. Profile cover customization is unavailable.')}</p></section><a href="/profile">← {t('Về hồ sơ','Back to profile')}</a></main>;
-}
+export {default as VaultPage} from './VaultPage.jsx';
 export function ContactInbox(){
  const t=useCopy(),user=useSyncExternalStore(auth.subscribe,auth.snapshot).user,[page,setPage]=useState(1),admin=user?.roles.includes('ADMIN'),state=useData(admin?'/admin/contacts?page='+page:null),[error,setError]=useState(null),[busy,setBusy]=useState(false);
  if(!admin)return <main className="account-page"><h1>{t('Không có quyền truy cập','Access denied')}</h1></main>;

@@ -1,10 +1,11 @@
-"""Atomic draft open simulator; HTTP runtime remains NOT_READY regardless of stored fixtures."""
+"""Legacy isolated simulator plus an explicit default-off free V1 HTTP path."""
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID, uuid4
 import secrets
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
@@ -29,16 +30,17 @@ class CaseOpenResult(BaseModel):
     cost_khi_van: int = Field(ge=0)
     khi_van_balance: int = Field(ge=0)
     already_processed: bool
+    next_open_at: datetime | None = None
 
 
 @router.post('/cases/{case_id}/open', response_model=CaseOpenResult, operation_id='openCase',
-             responses=ERRORS | {503: {'model': ErrorResponse}}, openapi_extra=CSRF_HEADER)
-def open_case(case_id: UUID, idempotency_key: Annotated[str, Header(alias='Idempotency-Key', min_length=12, max_length=128)],
+             responses=ERRORS | {404: {'model': ErrorResponse},503: {'model': ErrorResponse}}, openapi_extra=CSRF_HEADER)
+def open_case(case_id: UUID, request: Request, idempotency_key: Annotated[str, Header(alias='Idempotency-Key', min_length=12, max_length=128)],
               account=Depends(require_account_csrf)):
     if not idempotency_key.strip():
         raise AuthError(422, 'VALIDATION_ERROR', 'Idempotency key must not be blank.')
-    # Owner approved readiness response, not economic activation or assets.
-    raise AuthError(503, 'NOT_READY', 'Case opening is not ready.')
+    from app.vault_runtime import open_runtime
+    return open_runtime(request, account, case_id, idempotency_key)
 
 
 @dataclass(frozen=True)

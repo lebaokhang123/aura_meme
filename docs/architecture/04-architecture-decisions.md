@@ -69,7 +69,7 @@ PostgreSQL               Object storage (target)
 | Tạo bài đăng kèm ảnh (P0) | React → API → validate ảnh/ownership → media storage → DB metadata/bài | Giới hạn loại/kích thước; xác minh nội dung file; phục hồi khi ghi file thành công nhưng transaction DB lỗi |
 | Bình luận / reaction (P0/P1) | Browser → Blog module → DB → (P1) Aura ledger | Authorization, giới hạn spam; điểm thưởng được tính tại backend, idempotency key nghiệp vụ và transaction |
 | Điểm danh (P1) | Browser → Aura V1 → receipt + XP ledger trong DB (không ví) | Mốc ngày mới **07:00 Asia/Ho_Chi_Minh**, thời điểm lưu UTC; UNIQUE theo user/ngày; +15 XP gốc, retry delta0, không cấp Khí Vận; receipt ví legacy được giữ nguyên |
-| Mở hòm (P1) | Browser → Vault module → odds server → debit ví → cấp item | Odds dùng Aura gốc; backend chọn kết quả/CSPRNG; debit và grant trong **cùng transaction**, kiểm soát concurrent requests |
+| Mở hòm (P1) | Browser → Vault V1 → odds cố định server → receipt/grant → quantity | V1 miễn phí, không ví/XP; CSPRNG, owner/idempotency/cooldown server; receipt+grant trong **cùng transaction**, metadata chỉ đọc khi schema0012 và runtime được bật |
 | VIP (P2) | Payment provider → verified webhook → entitlement | Không tin callback frontend để cấp VIP; **Plus x2 / Prime x3 chỉ tăng Aura bonus/level/khung**; Rank và odds không nhân |
 
 ## 5. Bề mặt tấn công và biện pháp thiết kế

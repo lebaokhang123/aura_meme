@@ -152,4 +152,6 @@ def test_interaction_openapi_matches_existing_contract():
             item = paths[method]
             assert item["operationId"] == operation and item["security"] == [{"sessionCookie": []}]
             assert {"401", "403", "404", "409", "422", "429", "500"} <= set(item["responses"])
-    assert contract["components"]["schemas"]["ReactionInput"]["properties"]["reaction_type"]["enum"] == ["like", "love", "laugh", "fire", "sad", "angry"]
+    variants=contract["components"]["schemas"]["ReactionInput"]["properties"]["reaction_type"]["anyOf"]
+    assert len(variants)==2 and variants[0]["enum"] == ["like", "love", "laugh", "fire", "sad", "angry"]
+    assert variants[1]["const"] == "meme"
