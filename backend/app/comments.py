@@ -116,6 +116,8 @@ def add_comment(post_id: UUID, payload: CommentInput, request: Request, account=
     except IntegrityError as error:
         if getattr(error.orig,"sqlstate",None)=="23505":raise AuthError(409,"CONFLICT","Request ID already used.") from None
         raise
+    from app.aura_runtime import award_comment
+    award_comment(account.db, comment, now)
     return comment_dto(comment, account.user, account.db.get(Profile, account.user.id))
 
 
@@ -128,6 +130,8 @@ def delete_comment(comment_id: UUID, request: Request, account=Depends(require_a
         raise AuthError(404, "NOT_FOUND", "Comment not found.")
     comment.status = "deleted"
     comment.deleted_at = comment.updated_at = request.app.state.auth.now()
+    from app.aura_runtime import reverse_comment
+    reverse_comment(account.db, comment.id, comment.updated_at)
     account.db.flush()
 
 
@@ -140,6 +144,9 @@ def moderate_comment_record(comment_id,request,account,status):
     before={"status":comment.status}
     comment.status=status;comment.updated_at=request.app.state.auth.now()
     if status=="deleted":comment.deleted_at=comment.updated_at
+    if status in {"hidden", "deleted"}:
+        from app.aura_runtime import reverse_comment
+        reverse_comment(account.db, comment.id, comment.updated_at)
     account.db.add(AdminAuditLog(id=uuid4(),actor_id=account.user.id,action="comment."+status,target_type="comment",
         target_id=str(comment.id),before_json=before,after_json={"status":status},created_at=comment.updated_at))
     account.db.flush()

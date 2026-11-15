@@ -8,6 +8,7 @@ from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
+from app.aura_lock import lock_aura_mutation
 from app.auth import CSRF_HEADER, ERRORS, delete_cookie, session_cookie, user_private
 from app.auth_schemas import LoginInput, RegisterInput, UserPrivate
 from app.auth_schemas import ErrorResponse
@@ -55,6 +56,7 @@ def require_admin_mutation(request: Request, response: Response, raw=Depends(ses
     if not raw or not TOKEN.fullmatch(raw):
         raise AuthError(401, "UNAUTHORIZED", "Authentication required.")
     with request.app.state.auth_session_factory() as db, db.begin():
+        lock_aura_mutation(db)
         # Lock before current_session locks the actor: mutual A->B changes must never hold opposing users first.
         db.scalar(select(Role.id).where(Role.code == "ADMIN").with_for_update())
         account = authenticated_account(request, response, raw, db)
@@ -150,6 +152,8 @@ def create_user(payload: AdminCreateUser, request: Request, account=Depends(requ
         role_id = account.db.scalar(select(Role.id).where(Role.code == code))
         account.db.add(UserRole(user_id=user.id, role_id=role_id, granted_at=now))
     account.db.flush()
+    from app.aura_runtime import initialize_progress
+    initialize_progress(account.db,user.id,now)
     audit_user(account, user, "user.create", None, now)
     return user_private(account.db, user)
 
@@ -176,6 +180,9 @@ def patch_user(user_id: UUID, payload: AdminUserPatch, request: Request, respons
     if changed:
         revoke_sessions(account.db, user.id, now)
         if user.id == account.user.id: delete_cookie(response, request.app.state.auth, "am_session")
+    if values.get("status") == "locked" and before["status"] != "locked":
+        from app.aura_runtime import reverse_user
+        reverse_user(account.db, user.id, now)
     audit_user(account, user, "user.update", before, now, email_changed=email_changed,
                profile_updated="display_name" in values)
     return user_private(account.db, user)
@@ -191,6 +198,8 @@ def delete_user(user_id: UUID, request: Request, response: Response,
     now = request.app.state.auth.now()
     user.status, user.deleted_at, user.updated_at = "deleted", now, now
     revoke_sessions(account.db, user.id, now)
+    from app.aura_runtime import reverse_user
+    reverse_user(account.db, user.id, now)
     audit_user(account, user, "user.delete", before, now)
     if user.id == account.user.id: delete_cookie(response, request.app.state.auth, "am_session")
 

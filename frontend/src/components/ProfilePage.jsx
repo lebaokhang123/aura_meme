@@ -1,3 +1,4 @@
+import {AuraProgress} from './AuraProgress.jsx';
 import React,{useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {auth} from '../auth.js';
 import {apiMedia} from '../social-api.js';
@@ -25,7 +26,7 @@ export function ProfilePage(){
  {mine&&(editing?<EditProfile profile={p} onSaved={values=>{profile.update({...p,...values});closeEdit();loadFeed().catch(()=>{})}} onCancel={closeEdit}/>:<button ref={editButton} className="am-profile-edit" onClick={()=>setEditing(true)}>{icon('edit',16)}{t('Chỉnh sửa hồ sơ','Edit profile')}</button>)}
  <p className="am-profile-bio" translate="no">{p.bio||t('Chưa có tiểu sử.','No bio yet.')}</p>
  <dl className="am-profile-stats"><div><dd>{pagination?.total??'—'}</dd><dt>{t('Bài viết','Posts')}</dt></div><div><dd>{comments.data?.pagination.total??'—'}</dd><dt>{t('Bình luận','Comments')}</dt></div><div><dd>—</dd><dt>Reaction</dt></div></dl>
- <div className="am-profile-progress"><div className="am-profile-badges"><span>LVL —</span><span>{t('Chưa có dữ liệu','No data yet')}</span></div><div className="am-profile-progress-track" aria-hidden="true"/><div className="am-profile-progress-caption"><span>— XP</span><span>{t('Chuỗi: —','Streak: —')}</span></div></div>
+ <AuraProgress profileId={p.id}/>
  {mine&&<div className="am-profile-account-links"><a href="/vault">{t('Đổi Avatar trong Bảo Khố','Change avatar in Vault')} →</a>{user.roles.includes('ADMIN')&&<a href="/admin/contacts" aria-label={t('Hộp thư quản trị','Admin inbox')}>{t('Hộp thư quản trị','Admin inbox')} →</a>}</div>}</section>
  {mine&&<><section className={'am-profile-collection'+(inventory.data&&!items.length?' am-profile-collection-empty':'')}><h2><a href="/vault">{t('Meme đã sở hữu','Owned memes')}</a></h2><LoadState state={inventory}>{items.length?<div className="am-profile-inventory">{items.map(item=><a href="/vault" key={item.asset.id}><img src={inventoryImage(item.asset.media_url)} alt={item.asset.slug} width="78" height="78"/></a>)}</div>:<p>{t('Chưa có Meme trong bộ sưu tập.','No memes in your collection yet.')}</p>}</LoadState></section>
  <section className="am-profile-collection am-profile-backgrounds"><h2>{t('Background toàn website','Site-wide backgrounds')}</h2><p>{t('Trang bị tại Bảo Khố khi khả dụng.','Equip in Vault when available.')}</p><a className="am-profile-vault-link" href="/vault">{t('Mở Bảo Khố','Open Vault')} →</a></section></>}

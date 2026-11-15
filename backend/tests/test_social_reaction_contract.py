@@ -32,16 +32,18 @@ def test_six_reaction_contracts_and_session_security():
     read=contract["paths"]["/api/v1/comments/{comment_id}/interactions"]["get"]
     assert {} in read["security"] and {"sessionCookie":[]} in read["security"]
 
-def test_comment_model_has_owner_key_foreign_keys_indexes_and_six_types():
+def test_comment_model_has_owner_key_foreign_keys_indexes_and_owned_meme_constraint():
     from app.models import Base
     table=Base.metadata.tables["comment_reactions"]
     assert [c.name for c in table.primary_key]==["comment_id","user_id"]
     assert {(f.parent.name,f.target_fullname,f.ondelete) for f in table.foreign_keys}=={
-        ("comment_id","comments.id","RESTRICT"),("user_id","users.id","RESTRICT")}
+        ("comment_id","comments.id","RESTRICT"),("user_id","users.id","RESTRICT"),
+        ("user_id","user_inventory.user_id","RESTRICT"),("meme_asset_id","user_inventory.asset_id","RESTRICT")}
     assert {tuple(c.name for c in index.columns) for index in table.indexes}=={
         ("comment_id","reaction_type"),("user_id",)}
     ddl=str(CreateTable(table).compile(dialect=postgresql.dialect()))
-    assert all("'"+kind+"'" in ddl for kind in KINDS)
+    assert all("'"+kind+"'" in ddl for kind in KINDS+["meme"])
+    assert "ck_comment_reactions_meme_reference" in ddl
 
 def test_upgrade_draft_sql_expands_only_reaction_constraint_and_adds_comment_table():
     from app.models import Base

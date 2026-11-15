@@ -69,6 +69,13 @@ def audit_category(account, category, action, before, now):
     account.db.flush()
 
 
+def reverse_hidden_category(db, category, previous_status, now):
+    if previous_status == "active" and category.status == "hidden":
+        from app.aura_runtime import reverse_post
+        for post_id in db.scalars(select(Post.id).where(Post.category_id == category.id).order_by(Post.id)):
+            reverse_post(db, post_id, now)
+
+
 def locked_category(db, category_id, active=False):
     query = select(Category).where(Category.id == category_id)
     if active:
@@ -138,6 +145,7 @@ def admin_update_category(category_id: UUID, payload: CategoryPatch, request: Re
     for name, value in payload.model_dump(exclude_unset=True).items():
         setattr(category, name, value)
     category.updated_at = request.app.state.auth.now()
+    reverse_hidden_category(account.db, category, before["status"], category.updated_at)
     audit_category(account, category, "category.update", before, category.updated_at)
     return category_dto(category)
 
@@ -148,6 +156,7 @@ def admin_delete_category(category_id: UUID, request: Request, account=Depends(r
     category = locked_category(account.db, category_id)
     before = category_snapshot(category)
     category.status, category.updated_at = "hidden", request.app.state.auth.now()
+    reverse_hidden_category(account.db, category, before["status"], category.updated_at)
     audit_category(account, category, "category.hide", before, category.updated_at)
 
 
@@ -235,6 +244,9 @@ def create_post(payload: PostInput, request: Request, account=Depends(require_ac
     except IntegrityError as error:
         if getattr(error.orig,"sqlstate",None)=="23505":raise AuthError(409,"CONFLICT","Request ID already used.") from None
         raise
+    if post.status == "published":
+        from app.aura_runtime import award_post
+        award_post(account.db, post, now)
     return post_dto(post, account.user, account.db.get(Profile, account.user.id), category)
 
 
@@ -262,6 +274,7 @@ def owned_post(db, user_id, post_id, editing=False):
               responses=ERRORS | {404: {"model": ErrorResponse}}, openapi_extra=CSRF_HEADER)
 def update_post(post_id: UUID, payload: PostPatch, request: Request, account=Depends(require_account_csrf)):
     post = owned_post(account.db, account.user.id, post_id, editing=True)
+    previous_status = post.status
     values = payload.model_dump(exclude_unset=True)
     if "content" in values and "title" not in values and post.title==technical_title(post.content):values["title"]=technical_title(values["content"])
     category = validate_post(account.db, account.user.id, values.get("category_id", post.category_id),
@@ -270,6 +283,12 @@ def update_post(post_id: UUID, payload: PostPatch, request: Request, account=Dep
         setattr(post, name, value)
     post.updated_at = request.app.state.auth.now()
     account.db.flush()
+    if previous_status == "draft" and post.status == "published":
+        from app.aura_runtime import award_post
+        award_post(account.db, post, post.updated_at)
+    elif previous_status == "published" and post.status != "published":
+        from app.aura_runtime import reverse_post
+        reverse_post(account.db, post.id, post.updated_at)
     return post_dto(post, account.user, account.db.get(Profile, account.user.id), category)
 
 
@@ -279,3 +298,5 @@ def delete_post(post_id: UUID, request: Request, account=Depends(require_account
     post = owned_post(account.db, account.user.id, post_id)
     post.status, post.deleted_at = "deleted", request.app.state.auth.now()
     post.updated_at = post.deleted_at
+    from app.aura_runtime import reverse_post
+    reverse_post(account.db, post.id, post.updated_at)

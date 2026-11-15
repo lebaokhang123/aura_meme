@@ -16,7 +16,7 @@ from app.db import create_db_engine
 from app.models import AdminAuditLog, Role, User, UserRole
 
 DEMO_ROOT = Path(__file__).resolve().parents[1] / 'demo.local'
-DEMO_REVISION = '0010_social_reactions'
+DEMO_REVISION = '0012_aura_v1'
 FIELDS = {'DATABASE_URL', 'DB_CONNECT_TIMEOUT', 'AUTH_SIGNING_KEY', 'AUTH_ENVIRONMENT',
           'AUTH_ALLOWED_ORIGINS', 'MEDIA_STORAGE_ROOT', 'CATALOG_STORAGE_ROOT'}
 
@@ -81,29 +81,42 @@ def demo_connection(connection):
 
 
 def reviewed_demo_schema(connection, *, allow_previous=False):
-    from sqlalchemy import MetaData, inspect
+    from sqlalchemy import inspect
     from alembic.autogenerate import compare_metadata
     from alembic.migration import MigrationContext
-    from app.models import Base
+    from app.models import reviewed_metadata
     revision = connection.scalar(text('SELECT version_num FROM alembic_version'))
-    previous = revision == '0009_vault_open' and allow_previous
+    previous = allow_previous and revision in {'0009_vault_open','0010_social_reactions','0011_vault_v1'}
     if revision != DEMO_REVISION and not previous:
         raise ConfigurationError('Demo schema is not at the reviewed revision.')
-    metadata = Base.metadata
-    if previous:
-        # Validate the exact pre-0010 shape without mutating the current ORM metadata.
-        metadata = MetaData(naming_convention=Base.metadata.naming_convention)
-        for table in Base.metadata.sorted_tables:
-            if table.name != 'comment_reactions':
-                table.to_metadata(metadata)
+    metadata = reviewed_metadata(revision)
     inspector = inspect(connection)
     if set(inspector.get_table_names()) != set(metadata.tables) | {'alembic_version'}:
         raise ConfigurationError('Unexpected demo schema tables.')
-    kinds = ('like', 'laugh', 'fire') if previous else ('like', 'love', 'laugh', 'fire', 'sad', 'angry')
-    expected = "reaction_type = ANY (ARRAY[" + ', '.join("'"+kind+"'::text" for kind in kinds) + '])'
-    checks = {c['name']: ''.join(c['sqltext'].split()) for c in inspector.get_check_constraints('post_reactions')}
-    if checks != {'ck_post_reactions_reaction_type': ''.join(expected.split())}:
-        raise ConfigurationError('Demo reaction constraint drift; stop for review.')
+    kinds = ('like','laugh','fire') if revision == '0009_vault_open' else ('like','love','laugh','fire','sad','angry')
+    vault = revision in {'0011_vault_v1','0012_aura_v1'}
+    if vault:
+        kinds += ('meme',)
+    expression = "reaction_type = ANY (ARRAY[" + ', '.join("'"+kind+"'::text" for kind in kinds) + '])'
+    expected = {}
+    for table in ('post_reactions','comment_reactions'):
+        if table not in metadata.tables:
+            continue
+        expected[table] = {'ck_'+table+'_reaction_type':expression}
+        if vault:
+            expected[table]['ck_'+table+'_meme_reference'] = "(reaction_type = 'meme'::text) = (meme_asset_id IS NOT NULL)"
+    expected['daily_checkins'] = {'ck_daily_checkins_effective_day':"effective_day = ((claimed_at AT TIME ZONE 'Asia/Ho_Chi_Minh'::text) - '07:00:00'::interval)::date"}
+    if revision == '0012_aura_v1':
+        expected['daily_checkins']['ck_daily_checkins_reward_mode'] = "reward_mode = 'legacy'::text AND wallet_transaction_id IS NOT NULL OR reward_mode = 'aura_v1'::text AND wallet_transaction_id IS NULL"
+        expected['aura_reward_events'] = {
+            'ck_aura_reward_events_kind':"kind = ANY (ARRAY['post'::text, 'reaction'::text, 'comment'::text])",
+            'ck_aura_reward_events_comment_binding':"(kind = 'comment'::text) = (comment_id IS NOT NULL)",
+            'ck_aura_reward_events_effective_day':"effective_day = ((occurred_at AT TIME ZONE 'Asia/Ho_Chi_Minh'::text) - '07:00:00'::interval)::date",
+        }
+    for table, constraints in expected.items():
+        checks = {c['name']:''.join(c['sqltext'].split()) for c in inspector.get_check_constraints(table)}
+        if checks != {name:''.join(value.split()) for name,value in constraints.items()}:
+            raise ConfigurationError('Demo '+table+' constraint drift; stop for review.')
     if compare_metadata(MigrationContext.configure(connection, opts={'compare_server_default': True}), metadata):
         raise ConfigurationError('Demo schema drift; stop for review.')
 
@@ -141,14 +154,31 @@ def bootstrap_admin(db, user_id, ask=input):
 
 
 def main(argv=None, ask=input):
-    parser = argparse.ArgumentParser(description='Owner-controlled first Admin on isolated local demo only.')
-    parser.add_argument('command', choices=['bootstrap-admin'])
-    parser.parse_args(argv)
+    parser = argparse.ArgumentParser(description='Explicit owner operations on the isolated local demo only.')
+    parser.add_argument('command', choices=['bootstrap-admin','publish-aura-v1'])
+    parser.add_argument('--user', type=UUID, help='Existing active ADMIN UUID for Aura publication.')
+    args = parser.parse_args(argv)
+    publish = args.command == 'publish-aura-v1'
+    if publish and args.user is None:
+        parser.error('--user is required for publish-aura-v1')
+    if not publish and args.user is not None:
+        parser.error('--user is only supported for publish-aura-v1')
     engine = None
     try:
-        user_id = UUID(ask('Registered demo account UUID (see /api/v1/users/me): ').strip())
+        user_id = args.user if publish else UUID(ask('Registered demo account UUID (see /api/v1/users/me): ').strip())
         values = demo_environment()
+        if publish:
+            activate_demo()
         engine = create_db_engine(validate_demo_url(values['DATABASE_URL']))
+        if publish:
+            from app.aura_runtime import publish_v1
+            with Session(engine) as db, db.begin():
+                db.execute(text("SET LOCAL lock_timeout='5s'"))
+                demo_connection(db.connection())
+                reviewed_demo_schema(db.connection())
+                publish_v1(db, user_id, datetime.now(timezone.utc))
+            print('Aura V1 policy is ready.')
+            return 0
         # Do not hold table locks while the Owner reads and types a confirmation.
         with engine.connect() as connection:
             connection.exec_driver_sql('SET TRANSACTION READ ONLY')
@@ -165,13 +195,13 @@ def main(argv=None, ask=input):
         print(message)
         return 0
     except (ValueError, EOFError, KeyboardInterrupt):
-        print('Cancelled or invalid account UUID; no change.')
+        print('Aura V1 publication refused; transaction rolled back.' if publish else 'Cancelled or invalid account UUID; no change.')
         return 1
     except ConfigurationError as error:
         print(str(error))
         return 1
     except Exception:
-        print('Demo bootstrap failed; transaction rolled back. Check local database/configuration.')
+        print('Demo command failed; transaction rolled back. Check local database/configuration.')
         return 1
     finally:
         if engine is not None:

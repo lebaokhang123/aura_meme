@@ -116,6 +116,9 @@ def register(payload: RegisterInput, request: Request, pre=Depends(guest_guard))
     now, user_id = runtime.now(), uuid4()
     try:
         with request.app.state.auth_session_factory() as db, db.begin():
+            from app.aura_lock import lock_aura_mutation
+            lock_aura_mutation(db)
+            now = runtime.now()
             # Unique code + ON CONFLICT handles simultaneous first registrations without ADMIN seed.
             db.execute(insert(Role).values(id=uuid4(), code="USER", description="User role")
                        .on_conflict_do_nothing(index_elements=[Role.code]))
@@ -127,6 +130,8 @@ def register(payload: RegisterInput, request: Request, pre=Depends(guest_guard))
             db.add_all([Profile(user_id=user_id, display_name=payload.display_name, updated_at=now),
                         UserRole(user_id=user_id, role_id=role_id, granted_at=now)])
             db.flush()
+            from app.aura_runtime import initialize_progress
+            initialize_progress(db,user_id,now)
             result = user_private(db, user)
         return result
     except IntegrityError as error:

@@ -2,7 +2,7 @@
 from datetime import date, datetime, timedelta
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import Date, Integer, cast, func, literal, select
 
@@ -29,9 +29,10 @@ class CheckInResult(BaseModel):
 
 @router.post("/check-in", response_model=CheckInResult, operation_id="dailyCheckin",
              responses=ERRORS | {503: {"model": ErrorResponse}}, openapi_extra=CSRF_HEADER)
-def claim(account=Depends(require_account_csrf)):
-    # No approved economic policy/weekly catalog: never wire the simulator into runtime.
-    raise AuthError(503, "NOT_READY", "Check-in rewards are not ready.")
+def claim(request: Request,account=Depends(require_account_csrf)):
+    from app.aura_runtime import claim_checkin
+    request.app.state.auth.limiter.check(("aura-checkin",str(account.user.id)),10,60)
+    return CheckInResult(**claim_checkin(account.db,account.user.id,request.app.state.auth.now()))
 
 
 def completed_week(db, owner, day):

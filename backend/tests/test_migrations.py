@@ -25,8 +25,8 @@ P0_TABLES = {
     "media_uploads", "posts", "comments", "contact_messages", "admin_audit_logs",
 }
 AURA_TABLES = P0_TABLES | {"post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger"}
-TABLES = AURA_TABLES | {"comment_reactions", "wallets", "wallet_transactions", "daily_checkins", "asset_items", "user_inventory", "user_equipment", "case_definitions", "case_loot_tables", "case_loot_rarities", "case_pool_items", "case_opens", "inventory_grants"}
-REVISION = "0010_social_reactions"
+TABLES = AURA_TABLES | {"aura_reward_events", "comment_reactions", "wallets", "wallet_transactions", "daily_checkins", "asset_items", "user_inventory", "user_equipment", "case_definitions", "case_loot_tables", "case_loot_rarities", "case_pool_items", "case_opens", "inventory_grants"}
+REVISION = "0012_aura_v1"
 
 
 def config():
@@ -384,3 +384,72 @@ def test_migrations_refuse_other_search_path(migrated):
         cfg.attributes["connection"] = connection
         with pytest.raises(RuntimeError, match="public schema"):
             command.upgrade(cfg, "head")
+
+
+def test_aura_v1_receipts_keep_legacy_wallet_shape_explicit():
+    from sqlalchemy import UniqueConstraint
+    events = Base.metadata.tables['aura_reward_events']
+    assert set(events.c.keys()) == {'id','event_key','kind','actor_id','post_id','comment_id','policy_id','effective_day','occurred_at'}
+    assert events.c.comment_id.nullable and not events.c.actor_id.nullable
+    assert events.c.occurred_at.type.timezone
+    assert any(isinstance(c, UniqueConstraint) and list(c.columns.keys()) == ['event_key'] for c in events.constraints)
+    assert {tuple(i.columns.keys()) for i in events.indexes} == {('post_id',),('actor_id',),('comment_id',)}
+    checks = {c.name: str(c.sqltext) for c in events.constraints if isinstance(c, CheckConstraint)}
+    assert set(checks) == {'ck_aura_reward_events_kind','ck_aura_reward_events_comment_binding','ck_aura_reward_events_effective_day'}
+    assert "Asia/Ho_Chi_Minh" in checks['ck_aura_reward_events_effective_day']
+    checkin = Base.metadata.tables['daily_checkins']
+    assert checkin.c.wallet_transaction_id.nullable
+    assert not checkin.c.reward_mode.nullable and checkin.c.reward_mode.default.arg == 'legacy'
+    assert str(checkin.c.reward_mode.server_default.arg) == "'legacy'"
+    reward_check = next(c for c in checkin.constraints if c.name == 'ck_daily_checkins_reward_mode')
+    assert str(reward_check.sqltext) == "(reward_mode='legacy' AND wallet_transaction_id IS NOT NULL) OR (reward_mode='aura_v1' AND wallet_transaction_id IS NULL)"
+    progress = Base.metadata.tables['user_progress']
+    assert str(next(c for c in progress.constraints if c.name == 'ck_user_progress_progress_bounds').sqltext) == 'level_cached >= 1 AND fair_level_cached >= 1 AND streak_days >= 0'
+
+
+def test_applied_vault_ancestry_is_byte_identical():
+    import hashlib
+    migration = ROOT/'alembic/versions/0011_vault_v1.py'
+    assert hashlib.sha256(migration.read_bytes()).hexdigest() == '87ebe71c79fc2ad4235903191112e7460491c43fb59b8fa9b7bdf828d0df8e9a'
+
+
+@pytest.mark.parametrize('revision,has_aura,has_vault,has_comment', [
+    ('0009_vault_open',False,False,False),
+    ('0010_social_reactions',False,False,True),
+    ('0011_vault_v1',False,True,True),
+    ('0012_aura_v1',True,True,True),
+])
+def test_reviewed_metadata_projects_only_known_predecessors(revision,has_aura,has_vault,has_comment):
+    from app.models import reviewed_metadata
+    before = str(Base.metadata.tables['daily_checkins'].c.wallet_transaction_id.nullable)
+    metadata = reviewed_metadata(revision)
+    assert ('aura_reward_events' in metadata.tables) == has_aura
+    assert ('comment_reactions' in metadata.tables) == has_comment
+    assert ('reward_mode' in metadata.tables['daily_checkins'].c) == has_aura
+    assert metadata.tables['daily_checkins'].c.wallet_transaction_id.nullable == has_aura
+    assert ('runtime_kind' in metadata.tables['case_definitions'].c) == has_vault
+    assert ('meme_asset_id' in metadata.tables['post_reactions'].c) == has_vault
+    assert str(Base.metadata.tables['daily_checkins'].c.wallet_transaction_id.nullable) == before
+    assert 'reward_mode' in Base.metadata.tables['daily_checkins'].c
+    with pytest.raises(ValueError, match='Unknown reviewed schema revision'):
+        reviewed_metadata('unknown')
+
+
+
+def test_dbml_schema_contract_matches_current_models_without_database():
+    from sqlalchemy.dialects.postgresql import dialect
+    dbml = (ROOT.parent/'docs/design/03-database.dbml').read_text(encoding='utf-8')
+    blocks = dict(re.findall(r'^Table (\w+) \{(.*?)^\}',dbml,re.M|re.S))
+    types = {'uuid':'UUID','text':'TEXT','timestamptz':'TIMESTAMP WITH TIME ZONE','integer':'INTEGER','date':'DATE','smallint':'SMALLINT','boolean':'BOOLEAN','bigint':'BIGINT','jsonb':'JSONB'}
+    for name,table in Base.metadata.tables.items():
+        expected = {column:(types[kind],not ('not null' in attributes or 'pk' in attributes)) for column,kind,attributes in re.findall(r'^  (\w+) (\w+)(?: \[([^\n]*)\])?\s*$',blocks[name],re.M)}
+        actual = {column.name:(str(column.type.compile(dialect=dialect())),column.nullable) for column in table.c}
+        assert actual == expected, name
+        expected_fk = set()
+        for source,target in re.findall(r'^Ref: (\w+\.(?:\([^)]*\)|\w+)) > (\w+\.(?:\([^)]*\)|\w+)) \[delete: restrict\]',dbml,re.M):
+            source_table,source_columns = source.split('.',1)
+            target_table,target_columns = target.split('.',1)
+            if source_table == name:
+                expected_fk.add((tuple(source_columns.strip('()').replace(' ','').split(',')),target_table,tuple(target_columns.strip('()').replace(' ','').split(','))))
+        actual_fk = {(tuple(c.name for c in fk.columns),fk.referred_table.name,tuple(e.column.name for e in fk.elements)) for fk in table.foreign_key_constraints}
+        assert actual_fk == expected_fk, name

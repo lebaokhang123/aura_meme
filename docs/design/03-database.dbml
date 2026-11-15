@@ -6,7 +6,7 @@
 
 Project AuraMeme {
   database_type: 'PostgreSQL'
-  Note: 'M0.3 | 35 tables / 66 foreign keys. Core business rules and transaction invariants are specified in 03-database-design.md.'
+  Note: 'M0.3 | 37 tables / 74 foreign keys. Core business rules and transaction invariants are specified in 03-database-design.md.'
 }
 
 // ======================================================================
@@ -135,7 +135,8 @@ Table comments {
 Table post_reactions {
   post_id uuid [not null]
   user_id uuid [not null]
-  reaction_type text [not null, note: 'like / love / laugh / fire / sad / angry']
+  meme_asset_id uuid [note: 'Nullable; owned avatar inventory only for meme reactions']
+  reaction_type text [not null, note: 'like / love / laugh / fire / sad / angry / meme']
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 
@@ -146,11 +147,12 @@ Table post_reactions {
   Note: 'P1 | Bài viết, danh mục, bình luận, media, liên hệ'
 }
 
-// DRAFT0010: Owner review required before database application.
+// Social reactions 0010; owned meme reference compatibility added in 0011.
 Table comment_reactions {
   comment_id uuid [not null]
   user_id uuid [not null]
-  reaction_type text [not null, note: 'like / love / laugh / fire / sad / angry']
+  meme_asset_id uuid [note: 'Nullable; owned avatar inventory only for meme reactions']
+  reaction_type text [not null, note: 'like / love / laugh / fire / sad / angry / meme']
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
   indexes {
@@ -240,11 +242,32 @@ Table aura_ledger {
   Note: 'P1 | Điểm Aura, streak, Khí Vận và sổ giao dịch'
 }
 
+Table aura_reward_events {
+  id uuid [not null, pk]
+  event_key text [not null, unique, note: 'Immutable server event identity; retries and recreate cannot earn twice']
+  kind text [not null, note: 'post / reaction / comment']
+  actor_id uuid [not null]
+  post_id uuid [not null]
+  comment_id uuid [note: 'Required exactly for comment events']
+  policy_id uuid [not null]
+  effective_day date [not null, note: 'Server day at 07:00 Asia/Ho_Chi_Minh']
+  occurred_at timestamptz [not null]
+
+  indexes {
+    post_id
+    actor_id
+    comment_id
+  }
+
+  Note: 'Aura V1 | Immutable activity receipts, including eligible events without an XP grant'
+}
+
 Table daily_checkins {
   user_id uuid [not null]
   effective_day date [not null, note: 'PK; Ngày server theo mốc 07:00 VN']
   aura_ledger_id uuid [not null, unique, note: 'FK; Một reward event']
-  wallet_transaction_id uuid [not null, unique, note: 'FK; Một credit Khí Vận']
+  wallet_transaction_id uuid [unique, note: 'FK; Required for legacy receipts, NULL for aura_v1']
+  reward_mode text [not null, default: 'legacy', note: 'legacy / aura_v1; V1 grants XP only']
   claimed_at timestamptz [not null, note: 'UTC']
 
   indexes {
@@ -287,10 +310,12 @@ Table wallet_transactions {
 Table asset_items {
   id uuid [not null, pk]
   slug text [not null, unique, note: 'UQ; import một catalog JSON chuẩn']
-  kind text [not null, note: 'avatar / frame / icon / effect / generator']
+  kind text [not null, note: 'avatar / frame / icon / effect / generator / background']
   collection text [not null]
   rarity text [not null, note: 'D / C / B / A / S']
   media_key text [not null, note: 'Asset do catalog quản lý, không phải upload user']
+  display_name text [note: 'Optional catalog label']
+  effect_key text [note: 'Optional approved background effect']
   source_rights jsonb [not null, note: 'source/author/license/attribution/review_status']
   active boolean [not null]
   created_at timestamptz [not null]
@@ -309,6 +334,7 @@ Table case_definitions {
   slug text [not null, unique, note: 'UQ; common / d / c / b / a / s']
   label text [not null]
   cost_khi_van bigint [not null, note: '>= 0, giá hiện hành đề xuất']
+  runtime_kind text [note: 'NULL for legacy; avatar / background requires zero cost']
   status text [not null, note: 'draft / active / retired']
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
@@ -418,7 +444,7 @@ Table inventory_grants {
 
 Table user_equipment {
   user_id uuid [not null]
-  slot_kind text [not null, note: 'PK; FK; avatar / frame / icon / effect']
+  slot_kind text [not null, note: 'PK; FK; avatar / frame / icon / effect / background']
   asset_id uuid [not null]
   equipped_at timestamptz [not null]
 
@@ -587,6 +613,7 @@ TableGroup aura_streak_wallet [note: 'Điểm Aura, streak, Khí Vận và sổ 
   reward_policy_versions
   user_progress
   aura_ledger
+  aura_reward_events
   daily_checkins
   wallets
   wallet_transactions
@@ -733,6 +760,7 @@ DiagramView view_aura_streak_wallet {
     reward_policy_versions
     user_progress
     aura_ledger
+    aura_reward_events
     daily_checkins
     wallets
     wallet_transactions
@@ -778,3 +806,10 @@ DiagramView view_admin_audit {
 
 Ref: comment_reactions.comment_id > comments.id [delete: restrict]
 Ref: comment_reactions.user_id > users.id [delete: restrict]
+
+Ref: aura_reward_events.actor_id > users.id [delete: restrict]
+Ref: aura_reward_events.post_id > posts.id [delete: restrict]
+Ref: aura_reward_events.comment_id > comments.id [delete: restrict]
+Ref: aura_reward_events.policy_id > reward_policy_versions.id [delete: restrict]
+Ref: post_reactions.(user_id, meme_asset_id) > user_inventory.(user_id, asset_id) [delete: restrict]
+Ref: comment_reactions.(user_id, meme_asset_id) > user_inventory.(user_id, asset_id) [delete: restrict]

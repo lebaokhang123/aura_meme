@@ -1,5 +1,5 @@
 """Read-only P1 views; missing policy/state is NOT_READY, never invented balances."""
-from bisect import bisect_right
+from datetime import date, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -7,12 +7,10 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select
 
 from app.account_schemas import UserPublic
-from app.aura import DraftPolicy
 from app.aura_clock import week_start
 from app.auth_schemas import ErrorResponse
 from app.blog import page_rows
 from app.blog_schemas import Pagination
-from app.checkin import streak_length
 from app.models import AuraLedger, DailyCheckin, Profile, RewardPolicyVersion, User, UserProgress, Wallet, WalletTransaction
 from app.permissions import require_authenticated_user
 from app.security import AuthError
@@ -22,13 +20,20 @@ ERRORS = {code: {"model": ErrorResponse} for code in (422, 429, 500, 503)}
 
 
 class AuraProgress(BaseModel):
-    earned_xp: int = Field(ge=0)
-    bonus_xp: int = Field(ge=0)
-    total_xp: int = Field(ge=0)
-    level: int = Field(ge=1)
-    fair_level: int = Field(ge=1)
-    streak_days: int = Field(ge=0)
-    khi_van_balance: int = Field(ge=0)
+    earned_xp:int=Field(ge=0)
+    bonus_xp:int=Field(ge=0)
+    total_xp:int=Field(ge=0)
+    level:int=Field(ge=1,le=100)
+    fair_level:int=Field(ge=1,le=100)
+    realm:str
+    level_xp:int=Field(ge=0)
+    next_level_xp:int|None=Field(default=None,ge=0)
+    xp_to_next:int=Field(ge=0)
+    streak_days:int=Field(ge=0)
+    checked_in:bool
+    effective_day:date
+    next_reset_at:datetime
+    server_time:datetime
 
 
 class LeaderboardEntry(BaseModel):
@@ -46,39 +51,16 @@ def not_ready():
     raise AuthError(503, "NOT_READY", "Aura policy or account state is not ready.")
 
 
-def read_policy(db, now):
-    policy = db.scalar(select(RewardPolicyVersion).where(RewardPolicyVersion.status == "published",
-        RewardPolicyVersion.effective_at <= now).order_by(RewardPolicyVersion.effective_at.desc(), RewardPolicyVersion.version.desc()).limit(1))
-    if policy is None:
-        not_ready()
-    try:
-        return DraftPolicy.model_validate(policy.config_json)
-    except ValidationError:
-        not_ready()
+def read_policy(db,now):
+    from app.aura_runtime import active_policy
+    return active_policy(db,now)
 
 
 @router.get("/aura/progress", response_model=AuraProgress, operation_id="getAuraProgress",
             responses=ERRORS | {code: {"model": ErrorResponse} for code in (401, 403)})
 def progress(request: Request, account=Depends(require_authenticated_user, scope="function")):
-    db, owner = account.db, account.user.id
-    now = request.app.state.auth.now()
-    config = read_policy(db, now)
-    state, wallet = db.get(UserProgress, owner), db.get(Wallet, owner)
-    if state is None or wallet is None:
-        not_ready()
-    earned, bonus, latest = db.execute(select(func.coalesce(func.sum(AuraLedger.base_xp), 0),
-        func.coalesce(func.sum(AuraLedger.bonus_xp), 0), func.max(AuraLedger.occurred_at)).where(AuraLedger.user_id == owner)).one()
-    if (latest is not None and latest > now) or (earned, bonus) != (state.aura_xp_earned, state.aura_xp_bonus):
-        not_ready()
-    balance, last_money = db.execute(select(func.coalesce(func.sum(WalletTransaction.delta_khi_van), 0),
-        func.max(WalletTransaction.created_at)).where(WalletTransaction.user_id == owner)).one()
-    last_day = db.scalar(select(func.max(DailyCheckin.effective_day)).where(DailyCheckin.user_id == owner))
-    if (balance != wallet.khi_van_balance or (last_money is not None and last_money > now)
-        or last_day != state.last_checkin_day or streak_length(db, owner, last_day) != state.streak_days):
-        not_ready()
-    return AuraProgress(earned_xp=earned, bonus_xp=bonus, total_xp=earned + bonus,
-        level=bisect_right(config.levels, earned + bonus), fair_level=bisect_right(config.levels, earned),
-        streak_days=state.streak_days, khi_van_balance=wallet.khi_van_balance)
+    from app.aura_runtime import progress_payload
+    return AuraProgress(**progress_payload(account.db,account.user.id,request.app.state.auth.now()))
 
 
 @router.get("/leaderboard", response_model=LeaderboardPage, operation_id="getLeaderboard", responses=ERRORS)

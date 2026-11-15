@@ -22,14 +22,23 @@ def test_progress_auth_precedes_readiness_and_guest_leaderboard_is_public(auth):
 @pytest.fixture
 def ready(draft):
     from app.aura import simulate_reward
+    from app.aura_runtime import publish_v1
+    from app.aura_v1 import config
+    from app.models import Role, UserRole
     client, db, owner, post, policy = draft
     now = client.app.state.auth.now()
     db.execute(text('UPDATE users SET created_at=:time'), {'time': now - timedelta(days=60)})
     db.execute(text('UPDATE reward_policy_versions SET effective_at=:time,created_at=:time'), {'time': now - timedelta(days=30)})
     simulate_reward(db, policy, 'post', post, owner, now)
     db.execute(text('INSERT INTO wallets VALUES (:owner,0,:now)'), {'owner': owner, 'now': now})
-    db.execute(text("UPDATE reward_policy_versions SET status='published'"))
-    return client, db, owner, policy, now
+    role = uuid4()
+    db.execute(Role.__table__.insert().values(id=role, code='ADMIN', description='Synthetic read-test administrator'))
+    db.execute(UserRole.__table__.insert().values(user_id=owner, role_id=role, granted_at=now))
+    canonical = publish_v1(db, owner, now)
+    assert canonical.id != policy and canonical.config_json == config()
+    assert db.execute(text('SELECT policy_id,base_xp,bonus_xp FROM aura_ledger')).one() == (policy,7,0)
+    assert db.scalar(text('SELECT status FROM reward_policy_versions WHERE id=:id'), {'id':policy}) == 'draft'
+    return client, db, owner, canonical.id, now
 
 
 def entry(db, owner, policy, when, base, bonus=0, reverse=None):
@@ -63,26 +72,43 @@ def test_progress_uses_actual_private_state_and_total_vs_earned_levels(ready):
     db.execute(text('UPDATE user_progress SET aura_xp_earned=9,aura_xp_bonus=4'))
     response = client.get('/api/v1/aura/progress?user_id='+str(uuid4()))
     assert response.status_code == 200, response.text
-    assert response.json() == {'earned_xp':9,'bonus_xp':4,'total_xp':13,'level':2,'fair_level':1,'streak_days':0,'khi_van_balance':17}
+    assert response.json() == {
+        'earned_xp':9,'bonus_xp':4,'total_xp':13,'level':2,'fair_level':1,'realm':'Luyện Khí',
+        'level_xp':2,'next_level_xp':12,'xp_to_next':10,'streak_days':0,'checked_in':False,
+        'effective_day':'2026-11-04','next_reset_at':'2026-11-05T00:00:00Z','server_time':'2026-11-04T00:00:00Z',
+    }
+    assert 'khi_van_balance' not in response.json()
     assert db.scalar(text('SELECT count(*) FROM aura_ledger')) == 2
     assert 'password' not in response.text and 'email' not in response.text
     assert client.get('/api/v1/leaderboard').json()['items'][0]['earned_xp'] == 9
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize('missing', ['wallet','progress','cache','money','streak'])
+@pytest.mark.parametrize('missing', ['progress','cache','streak'])
 def test_missing_or_inconsistent_account_state_is_not_fabricated(ready, missing):
     client, db, *_ = ready
-    if missing == 'wallet': db.execute(text('DELETE FROM wallets'))
-    elif missing == 'progress': db.execute(text('DELETE FROM user_progress'))
+    if missing == 'progress': db.execute(text('DELETE FROM user_progress'))
     elif missing == 'cache': db.execute(text('UPDATE user_progress SET aura_xp_earned=8'))
-    elif missing == 'money': db.execute(text('UPDATE wallets SET khi_van_balance=1'))
     else: db.execute(text('UPDATE user_progress SET streak_days=2'))
     response = client.get('/api/v1/aura/progress')
     assert response.status_code == 503 and response.json()['error']['code'] == 'NOT_READY'
     assert 'earned_xp' not in response.json()
-    if missing == 'wallet': assert db.scalar(text('SELECT count(*) FROM wallets')) == 0
     if missing == 'cache': assert db.scalar(text('SELECT aura_xp_earned FROM user_progress')) == 8
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize('wallet', ['absent','mismatched'])
+def test_legacy_wallet_state_does_not_block_private_xp_progress(ready, wallet):
+    client, db, *_ = ready
+    if wallet == 'absent': db.execute(text('DELETE FROM wallets'))
+    else: db.execute(text('UPDATE wallets SET khi_van_balance=1'))
+    response = client.get('/api/v1/aura/progress')
+    assert response.status_code == 200, response.text
+    assert response.json()['earned_xp'] == response.json()['total_xp'] == 7
+    assert response.json()['level'] == 1 and response.json()['xp_to_next'] == 4
+    assert 'khi_van_balance' not in response.json()
+    assert db.scalar(text('SELECT count(*) FROM wallets')) == (0 if wallet == 'absent' else 1)
+    if wallet == 'mismatched': assert db.scalar(text('SELECT khi_van_balance FROM wallets')) == 1
 
 
 @pytest.mark.integration
@@ -105,13 +131,18 @@ def test_wallet_balance_and_owner_fk_are_database_constraints(ready):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize('variant',['draft','retired','future','malformed'])
+@pytest.mark.parametrize('variant',['draft','retired','future','malformed','malformed_v1'])
 def test_only_effective_valid_published_policy_can_be_read(draft, variant):
     client, db, *_ = draft
     now = client.app.state.auth.now()
     if variant == 'retired': db.execute(text("UPDATE reward_policy_versions SET status='retired'"))
     if variant == 'future': db.execute(text("UPDATE reward_policy_versions SET status='published',effective_at=:time"), {'time':now+timedelta(days=1)})
     if variant == 'malformed': db.execute(text("UPDATE reward_policy_versions SET status='published',config_json='{}'::jsonb"))
+    if variant == 'malformed_v1':
+        import json
+        from app.aura_v1 import config
+        snapshot = config() | {'daily_cap':134}
+        db.execute(text("UPDATE reward_policy_versions SET status='published',config_json=CAST(:snapshot AS jsonb)"), {'snapshot':json.dumps(snapshot)})
     for path in ['/api/v1/aura/progress','/api/v1/leaderboard']:
         response = client.get(path)
         assert response.status_code == 503 and response.json()['error']['code'] == 'NOT_READY'

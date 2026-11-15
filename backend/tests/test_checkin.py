@@ -143,7 +143,7 @@ def test_day_constraint_and_receipt_ownership_are_database_enforced(checkin):
     simulate_checkin(db,policy,owner,START)
     row=db.execute(text('SELECT * FROM daily_checkins')).mappings().one()
     with pytest.raises(IntegrityError) as fault,db.begin_nested():
-        db.execute(text('INSERT INTO daily_checkins VALUES (:owner,:day,:xp,:money,:now)'),
+        db.execute(text('INSERT INTO daily_checkins(user_id,effective_day,aura_ledger_id,wallet_transaction_id,claimed_at) VALUES (:owner,:day,:xp,:money,:now)'),
             {'owner':owner,'day':START.date()+timedelta(days=1),'xp':row['aura_ledger_id'],'money':row['wallet_transaction_id'],'now':START})
     assert fault.value.orig.diag.constraint_name == 'ck_daily_checkins_effective_day'
     with pytest.raises(IntegrityError),db.begin_nested():
@@ -174,7 +174,7 @@ def test_foreign_receipt_or_wallet_reversal_owner_is_rejected(checkin,target):
             db.execute(WalletTransaction.__table__.insert().values(id=uuid4(),user_id=other,event_key='foreign-reverse',
                 delta_khi_van=-1,reason='reversal',policy_id=policy,reverses_id=pairs[owner][1],created_at=START))
         else:
-            db.execute(text('INSERT INTO daily_checkins VALUES (:owner,:day,:xp,:money,:now)'),{
+            db.execute(text('INSERT INTO daily_checkins(user_id,effective_day,aura_ledger_id,wallet_transaction_id,claimed_at) VALUES (:owner,:day,:xp,:money,:now)'),{
                 'owner':owner,'day':START.date(),'xp':pairs[other if target=='xp' else owner][0],
                 'money':pairs[other if target=='money' else owner][1],'now':START})
     assert error.value.orig.diag.constraint_name == {'xp':'fk_daily_checkins_owner_aura',
