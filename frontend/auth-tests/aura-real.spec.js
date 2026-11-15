@@ -19,7 +19,7 @@ async function progress(page){
  const response=await page.request.get('/api/v1/aura/progress');expect(response.status()).toBe(200);return response.json();
 }
 async function checkedCard(page,language='vi'){
- const card=page.locator('[data-aura]');await expect(card).toBeVisible();await expect(card.locator('.am-profile-progress-caption>span').first()).toHaveText('15 XP');
+ const card=page.locator('[data-aura]');await expect(card).toBeVisible();await expect(card.locator('.am-profile-progress-caption>span').first()).toHaveText('15 Exp');
  await expect(card).toContainText('LVL 2');await expect(card).toContainText('Luyện Khí');await expect(card).toContainText(language==='en'?'Streak: 1':'Chuỗi: 1');
  await expect(card.getByRole('button',{name:language==='en'?'Checked in':'Đã điểm danh',exact:true})).toBeDisabled();return card;
 }
@@ -30,7 +30,7 @@ test('real Aura check-in, private progress, persistence and responsive preferenc
  await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:1440,height:960});
  await register(page,prefix);await login(page,prefix);
  const before=await progress(page);expect(before).toMatchObject({earned_xp:0,bonus_xp:0,total_xp:0,level:1,fair_level:1,level_xp:0,next_level_xp:11,xp_to_next:11,streak_days:0,checked_in:false});
- const home=page.locator('[data-aura]');await expect(home).toBeVisible();await expect(home.locator('.am-profile-progress-caption>span').first()).toHaveText('0 XP');await expect(home).toContainText('LVL 1');
+ const home=page.locator('[data-aura]');await expect(home).toBeVisible();await expect(home.locator('.am-profile-progress-caption>span').first()).toHaveText('0 Exp');await expect(home).toContainText('LVL 1');
  await expect(page.getByText('TOP AURA CREATORS')).toHaveCount(0);
  const claim=page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname==='/api/v1/aura/check-in');
  const button=home.getByRole('button',{name:'Điểm danh',exact:true});await button.focus();await expect(button).toBeFocused();await page.keyboard.press('Enter');
@@ -42,7 +42,7 @@ test('real Aura check-in, private progress, persistence and responsive preferenc
  try{await register(await otherContext.newPage(),other)}finally{await otherContext.close()}
  const privateReads=[];const readListener=request=>{if(new URL(request.url()).pathname==='/api/v1/aura/progress')privateReads.push(request.url())};page.on('request',readListener);
  await page.goto('/profile/'+other);await expect(page.locator('.am-profile-name h1')).toBeVisible();await expect(page.locator('[data-aura]')).toContainText('Chưa có dữ liệu');
- await expect(page.locator('[data-aura]')).not.toContainText('15 XP');await expect(page.locator('[data-aura] button')).toHaveCount(0);expect(privateReads).toEqual([]);page.off('request',readListener);
+ await expect(page.locator('[data-aura]')).not.toContainText('15 Exp');await expect(page.locator('[data-aura] button')).toHaveCount(0);expect(privateReads).toEqual([]);page.off('request',readListener);
  await page.locator('[aria-controls="site-account-menu"]').click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();await expect(page.locator('.account-avatar')).toHaveCount(0);
  expect((await page.request.get('/api/v1/aura/progress')).status()).toBe(401);await login(page,prefix);await checkedCard(page);await page.goto('/profile');await checkedCard(page);
  const screenshot=async name=>page.screenshot({path:process.env.AURA_LEVEL_E2E_EVIDENCE?path.join(process.env.AURA_LEVEL_E2E_EVIDENCE,name):testInfo.outputPath(name),fullPage:true});

@@ -11,6 +11,7 @@ from sqlalchemy import and_, func, select, text
 from sqlalchemy.orm import undefer
 
 from app.aura_clock import effective_day
+from app.vault_exp_award import award_vault_open
 from app.auth import ERRORS
 from app.auth_schemas import ErrorResponse
 from app.blog import page_rows
@@ -181,6 +182,9 @@ def open_runtime(request, account, case_id, key, *, randbelow=secrets.randbelow)
         _grant_item(db, owner, asset_id, pool.policy_id, 'case:'+str(opening.id), 'case_open', now, opening.id)
     except ValueError:
         raise AuthError(503, 'NOT_READY', 'Inventory is inconsistent; preserve it for review.') from None
+    # Vault policy is validated by load_runtime_pool; the separate Aura
+    # social/check-in policy need not exist for an opening to succeed.
+    award_vault_open(db, owner, opening, now, pool.policy_id)
     return receipt_result(db, owner, opening, request, False)
 
 

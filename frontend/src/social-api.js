@@ -19,7 +19,7 @@ export function apiAuthor(value){
  apiId(value?.id);if(typeof value.username!=='string'||typeof value.display_name!=='string')bad();
  return {author:value.username,authorId:value.id,authorName:value.display_name,handle:'@'+value.username,
  avatar:apiMedia(value.avatar_url)||'/assets/identity/default-avatar.svg',
- level:'Lvl —',nickname:'Đang phát triển'};
+ level:Number.isSafeInteger(value.level)&&value.level>=1&&value.level<=100?'LVL '+value.level:'',nickname:value.username==='khang_dev'?'Bá Chủ Thiên Lôi':value.username==='kien_dev'?'Thiên Tướng Độ Ách':''};
 }
 export function apiCategory(value){
  apiId(value?.id);if(typeof value.slug!=='string'||!/^[-a-z0-9]{1,80}$/.test(value.slug)||typeof value.name!=='string'||(value.post_count!==undefined&&(!Number.isSafeInteger(value.post_count)||value.post_count<0)))bad();

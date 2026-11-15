@@ -6,7 +6,7 @@ const id='123e4567-e89b-42d3-a456-426614174000';
 const author={id,username:'new_author',display_name:'New Author',avatar_url:null};
 test('API DTO uses real author and media, never demo identity/level',()=>{
  const post=apiPost({id,author,category:{id,slug:'new-topic',name:'New topic'},title:'Hi',content:'Text',created_at:'2026-11-13T00:00:00Z',media_url:'/api/v1/media/'+id});
- assert.equal(post.authorId,id);assert.equal(post.authorName,'New Author');assert.equal(post.level,'Lvl —');assert.equal(post.category,'new-topic');assert.equal(post.categoryLabel,'New topic');
+ assert.equal(post.authorId,id);assert.equal(post.authorName,'New Author');assert.equal(post.level,'');assert.equal(post.nickname,'');assert.equal(post.category,'new-topic');assert.equal(post.categoryLabel,'New topic');
  assert.equal(apiAuthor(author).avatar,'/assets/identity/default-avatar.svg');
  assert.equal(apiAuthor({...author,avatar_url:'/api/v1/catalog/assets/'+id}).avatar,'/api/v1/catalog/assets/'+id);
  assert.throws(()=>apiPost({id,author,category:{id,slug:'new-topic',name:'New'},title:'Hi',content:'x',created_at:'bad'}));
@@ -32,4 +32,12 @@ test('WebP dimensions are checked before decode and API limits do not weaken moc
  assert.throws(()=>checkImageBytes(bytes,'image/webp',30),{message:'FILE_TYPE'});
  bytes[24]=255;bytes[25]=31;bytes[27]=255;bytes[28]=31;
  assert.throws(()=>checkImageBytes(bytes,'image/webp',30,true),{message:'FILE_DIMENSIONS'});
+});
+
+test('MVP honorifics use exact identities and level is never inferred from an Admin role',()=>{
+ assert.equal(apiAuthor({...author,username:'khang_dev'}).nickname,'Bá Chủ Thiên Lôi');
+ assert.equal(apiAuthor({...author,username:'kien_dev'}).nickname,'Thiên Tướng Độ Ách');
+ assert.equal(apiAuthor({...author,roles:['ADMIN']}).nickname,'');
+ assert.equal(apiAuthor({...author,level:11}).level,'LVL 11');
+ for(const level of [undefined,0,101,1.5,'99'])assert.equal(apiAuthor({...author,level}).level,'');
 });

@@ -108,8 +108,10 @@ export function SocialProvider({children}) {
         await readInteraction(action.target,action.id);
         if(action.target==='post'&&query.current.sort==='hot')await loadFeed();
       }catch(e){setError('Đã lưu thay đổi, nhưng chưa đồng bộ được dữ liệu hiển thị. Vui lòng tải lại.');}
+      window.dispatchEvent(new Event('aurameme:aura:invalidate'));
       return;
     }else throw Error('INVALID_ACTION');
+    window.dispatchEvent(new Event('aurameme:aura:invalidate'));
     if(['delete-post','moderate-post'].includes(action.type))setServerPosts(v=>v.filter(post=>post.id!==action.id));
     if(['delete-comment','moderate-comment'].includes(action.type))setSnapshot(v=>({...v,state:{...v.state,comments:v.state.comments.filter(c=>c.id!==action.id)}}));
     setSnapshot(v=>({...v,state:{...v.state,revision:v.state.revision+1}}));

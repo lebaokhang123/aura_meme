@@ -149,14 +149,14 @@ test('owned avatar can be equipped and restored to the default avatar',async({pa
 });
 
 test('incomplete avatar pool stays NOT_READY while a real background case remains selectable',async({page,context})=>{
- const api=await transport(context);api.backgroundOnly=true;await enter(page);await expect(open(page)).toBeDisabled();await expect(page.locator('.vault-chamber-note')).toContainText('NOT_READY');await page.getByRole('button',{name:'Rương Background',exact:true}).click();await expect(open(page)).toBeEnabled();expect(api.requests.filter(row=>row.method==='POST'&&row.path.endsWith('/open'))).toHaveLength(0);
+ const api=await transport(context);api.backgroundOnly=true;await enter(page);await expect(open(page)).toBeDisabled();await expect(page.locator('.vault-chamber-note')).toHaveCount(0);await page.getByRole('button',{name:'Rương Background',exact:true}).click();await expect(open(page)).toBeEnabled();expect(api.requests.filter(row=>row.method==='POST'&&row.path.endsWith('/open'))).toHaveLength(0);
 });
 test('explicit NOT_READY confirms no award and clears the pending attempt',async({page,context})=>{
- const api=await transport(context);api.nextPost='not-ready';await enter(page);await open(page).click();await expect(page.locator('.vault-error')).toContainText('NOT_READY');await expect(open(page)).toBeDisabled();await expect(page.locator('.vault-result')).toHaveCount(0);expect(api.receipts.size).toBe(0);expect(await page.evaluate(key=>sessionStorage.getItem(key),storageKey(users[0].id))).toBeNull();
+ const api=await transport(context);api.nextPost='not-ready';await enter(page);await open(page).click();await expect(page.locator('.vault-error')).toContainText('Rương hiện chưa có đủ vật phẩm để mở.');await expect(open(page)).toBeDisabled();await expect(page.locator('.vault-result')).toHaveCount(0);expect(api.receipts.size).toBe(0);expect(await page.evaluate(key=>sessionStorage.getItem(key),storageKey(users[0].id))).toBeNull();
 });
 
 test('background server equipment survives reload, clears at logout and stays owner-scoped',async({page,context})=>{
- const api=await transport(context);await enter(page);await page.getByRole('button',{name:'Rương Background',exact:true}).click();await page.locator('.vault-item-card').click();await page.getByRole('button',{name:'Trang bị Background',exact:true}).click();await expect(page.locator('.global-background')).toHaveAttribute('data-effect','violet-base');await page.reload();await expect(page.locator('.global-background')).toHaveAttribute('data-effect','violet-base');
+ const api=await transport(context);await enter(page);await page.getByRole('button',{name:'Rương Background',exact:true}).click();const backgroundCard=page.locator('.vault-item-card').filter({has:page.getByRole('heading',{name:background.display_name,exact:true})});await expect(backgroundCard).toHaveCount(1);await backgroundCard.click();await page.getByRole('button',{name:'Trang bị Background',exact:true}).click();await expect(page.locator('.global-background')).toHaveAttribute('data-effect','violet-base');await page.reload();await expect(page.locator('.global-background')).toHaveAttribute('data-effect','violet-base');
  await page.locator('[aria-controls="site-account-menu"]').click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();await expect(page.locator('.account-avatar')).toHaveCount(0);await expect(page.locator('.global-background')).toHaveCount(0);api.user=users[1];await page.goto('/vault');await expect(page.locator('.vault-item-card')).toHaveCount(2);await expect(page.locator('.global-background')).toHaveCount(0);api.user=users[0];await page.reload();await expect(page.locator('.global-background')).toHaveAttribute('data-effect','violet-base');
 });
 test('Vault screenshot matrix preserves approved controls, columns and muted sound in VI EN dark light',async({page,context},info)=>{
@@ -164,11 +164,18 @@ test('Vault screenshot matrix preserves approved controls, columns and muted sou
  for(const width of [375,768,1440])for(const theme of ['dark','light'])for(const language of ['vi','en']){
   await page.setViewportSize({width,height:960});if(await page.locator('html').getAttribute('data-theme')!==theme)await page.locator('.u219-tg').click();await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
   if((await page.locator('.u267-cd').textContent()).toLowerCase()!==language){await page.locator('.u267-gb').click();await page.getByRole('option',{name:language==='en'?'English':'Tiếng Việt',exact:true}).click();}
-  await expect(page.locator('.vault-item-card')).toHaveCount(2);await expect(page.getByRole('button',{name:language==='en'?'Open Case':'Mở Rương',exact:true})).toBeVisible();await expect(page.locator('.vault-sound-toggle')).toHaveAttribute('aria-pressed','false');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(await page.locator('.vault-card-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(width===375?2:width===768?3:5);
+  await expect(page.locator('.vault-item-card')).toHaveCount(2);await expect(page.getByRole('button',{name:language==='en'?'Open Case':'Mở Rương',exact:true})).toBeVisible();await expect(page.locator('.vault-sound-toggle')).toHaveAttribute('aria-pressed','true');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(await page.locator('.vault-card-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(width===375?2:width===768?3:5);
   await page.screenshot({path:info.outputPath('vault-'+width+'-'+theme+'-'+language+'.png'),fullPage:true});
  }
 });
 
 test('case network failure is not labelled NOT_READY and can be retried',async({page,context})=>{
  const api=await transport(context);api.casesError=true;await enter(page);await expect(page.locator('.vault-chamber-note')).toContainText('Không tải được rương');await expect(page.locator('.vault-chamber-note')).not.toContainText('NOT_READY');await expect(open(page)).toBeDisabled();api.casesError=false;await page.getByRole('button',{name:'Tải lại rương',exact:true}).click();await expect(open(page)).toBeEnabled();
+});
+
+test('MVP sound defaults on and persisted mute survives reload',async({page,context})=>{
+ await transport(context);await enter(page);const sound=page.locator('.vault-sound-toggle');await expect(sound).toHaveAttribute('aria-pressed','true');await sound.click();await expect(sound).toHaveAttribute('aria-pressed','false');await page.reload();await expect(sound).toHaveAttribute('aria-pressed','false');await sound.click();await page.reload();await expect(sound).toHaveAttribute('aria-pressed','true');
+});
+test('MVP 52-card reel stops on the server receipt after 6.2 seconds',async({page,context})=>{
+ await transport(context);await enter(page);await page.emulateMedia({reducedMotion:'no-preference'});await open(page).click();await expect(page.locator('.vault-reel.is-spinning')).toBeVisible();await expect(page.locator('.vault-reel-card')).toHaveCount(52);await expect(page.locator('.vault-reel-card').nth(47)).toContainText(rewardMeme.display_name);expect(await page.locator('.vault-reel').evaluate(e=>getComputedStyle(e).animationDuration)).toBe('6.2s');await expect(page.getByRole('dialog')).toContainText(rewardMeme.display_name,{timeout:9000});
 });
