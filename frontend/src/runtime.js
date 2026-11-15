@@ -3,6 +3,7 @@ import { USER_KEY, readDemoUser, identifyDemoUser } from './demo.js';
 import { readPreferences, translate } from './preferences.js';
 import {auth,MOCK_AUTH} from './auth.js';
 import {authMessage} from './auth-client.js';
+import {safeReturnUrl} from './return-url.js';
 const ROUTES = {'trang-chu':'/','kham-pha':'/explore','gioi-thieu':'/about','lien-he':'/contact','xep-hang':'/rank','bao-kho':'/vault','dang-nhap':'/login','dang-ky':'/register'};
 const PAGE = {'/':'home','/explore':'explore','/about':'about','/contact':'contact','/rank':'rank','/vault':'vault'};
 const PAGE_BODY_CLASS = {"guest-home": "bg-surface font-body-md text-on-surface antialiased selection:bg-secondary-container selection:text-on-secondary-container", "guest-explore": "bg-background font-body-md text-body-md text-on-surface antialiased", "guest-about": "bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-secondary-container selection:text-on-secondary-container", "guest-contact": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "guest-rank": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "guest-vault": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "user-home": "bg-surface font-body-md text-on-surface antialiased selection:bg-secondary-container selection:text-on-secondary-container", "user-explore": "bg-background font-body-md text-body-md text-on-surface antialiased", "user-about": "bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-secondary-container selection:text-on-secondary-container", "user-contact": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "user-rank": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "user-vault": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "login": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "register": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"};
@@ -91,7 +92,7 @@ async function submitApiForm(form){
    const display_name=form.querySelector('#username').value.trim();
    await auth.register({email,password,username:display_name.toLowerCase(),display_name});
    location.assign('/login?registered=1');
-  }else{await auth.login(email,password);location.assign('/');}
+  }else{await auth.login(email,password);location.assign(safeReturnUrl(new URLSearchParams(location.search).get('next')));}
  }catch(error){showDemoMessage(authMessage(error,readPreferences().language));}
  finally{pendingForms.delete(form);if(button)button.disabled=false;}
 }

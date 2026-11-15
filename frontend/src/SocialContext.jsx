@@ -9,6 +9,8 @@ import {apiId,apiCategory,apiPost,apiComment,apiPage,apiInteractions} from './so
 const SocialContext=createContext(null);
 export const useSocial=()=>useContext(SocialContext);
 export function SocialProvider({children}) {
+  const profileRoute=/^\/profile(?:\/([a-z0-9_]{3,32}))?\/?$/.exec(location.pathname);
+  const profileUsername=profileRoute?(profileRoute[1]||readDemoUser()?.username):null;
   const [snapshot,setSnapshot]=useState(()=>({state:emptyState(),media:{}}));
   const [ready,setReady]=useState(false),[error,setError]=useState('');
   const [serverPosts,setServerPosts]=useState([]),[categories,setCategories]=useState(MOCK_AUTH?CATEGORIES:[]);
@@ -30,14 +32,15 @@ export function SocialProvider({children}) {
   };
   const loadFeed=async(filters=query.current,append=false)=>{
     if(MOCK_AUTH)return;
-    if(!['/','/explore'].includes(location.pathname)){setReady(true);return;}
+    if(!profileUsername&&!['/','/explore'].includes(location.pathname)){setReady(true);return;}
     query.current=filters;const token=++generation.current,next=append?page.current+1:1;
     setLoading(true);setError('');
     try{
       const search=new URLSearchParams({page:String(next),page_size:location.pathname==='/explore'?'3':'20',include_interactions:'true',sort:filters.sort==='hot'?'reaction_desc':'created_desc'});
-      if(filters.q)search.set('search',filters.q);if(filters.category)search.set('category',filters.category);
+      if(profileUsername){search.set('author',profileUsername);search.set('sort','created_desc');}
+      else{if(filters.q)search.set('search',filters.q);if(filters.category)search.set('category',filters.category);}
       const result=apiPage(await auth.read('/posts?'+search)),mapped=result.items.map(apiPost);
-      const target=location.hash.match(/^#post-([0-9a-f-]{36})$/i)?.[1];
+      const target=!profileUsername&&location.hash.match(/^#post-([0-9a-f-]{36})$/i)?.[1];
       if(!append&&target&&!mapped.some(v=>v.id===target)){
         try{mapped.unshift(apiPost(await auth.read('/posts/'+apiId(target))))}catch(e){if(e.status!==404)throw e;}
       }
@@ -101,6 +104,7 @@ export function SocialProvider({children}) {
     }else throw Error('INVALID_ACTION');
     if(['delete-post','moderate-post'].includes(action.type))setServerPosts(v=>v.filter(post=>post.id!==action.id));
     if(['delete-comment','moderate-comment'].includes(action.type))setSnapshot(v=>({...v,state:{...v.state,comments:v.state.comments.filter(c=>c.id!==action.id)}}));
+    setSnapshot(v=>({...v,state:{...v.state,revision:v.state.revision+1}}));
     // A failed read after a successful write must not report that the mutation failed.
     try{
       if(['comment','delete-comment','moderate-comment'].includes(action.type)){
@@ -112,7 +116,7 @@ export function SocialProvider({children}) {
   };
   const urls=useRef(new Map()),channel=useRef(null),active=useRef(true),loaded=useRef(false);
   const refresh=async()=>{
-    if(!MOCK_AUTH){if(!['/','/explore'].includes(location.pathname)){setReady(true);return;}await loadCategories();return;}
+    if(!MOCK_AUTH){if(!profileUsername&&!['/','/explore'].includes(location.pathname)){setReady(true);return;}await loadCategories();return;}
     const result=await loadSocial();if(!active.current)return;
     const media={};
     for(const [id,blob] of Object.entries(result.files)){

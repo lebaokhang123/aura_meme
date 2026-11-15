@@ -293,6 +293,70 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
       x-phase: P0
+  /api/v1/users/{username}/activity:
+    get:
+      tags:
+      - Account
+      summary: Hoạt động public theo ngày lịch Việt Nam trong 53 tuần
+      operationId: getPublicUserActivity
+      description: Đếm post public do tài khoản viết và comment visible/chưa xóa trên post public. Không tính timestamp sau server now; tuần bắt đầu thứ Hai, gồm 371 ngày tới Chủ nhật tuần hiện tại, ngày tương lai bằng 0. Không bao gồm Aura/XP/Vault hoặc thông tin riêng tư.
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Username'
+      responses:
+        '200':
+          description: Thành công; end_date là hôm nay theo Asia/Ho_Chi_Minh
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicActivity'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
+  /api/v1/users/{username}/comments:
+    get:
+      tags:
+      - Blog
+      summary: Bình luận công khai của tài khoản, mới nhất trước
+      operationId: listUserComments
+      description: Chỉ trả comment visible/chưa xóa của user active trên bài public; tài khoản thiếu hoặc không active trả 404.
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Username'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                - items
+                - pagination
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-phase: P0
   /api/v1/categories:
     get:
       tags:
@@ -427,6 +491,11 @@ paths:
       - $ref: '#/components/parameters/PageSize'
       - $ref: '#/components/parameters/PostSearch'
       - $ref: '#/components/parameters/PostCategory'
+      - in: query
+        name: author
+        description: Username tác giả, so khớp chính xác; chỉ lọc bài public.
+        required: false
+        schema: {type: string, maxLength: 32}
       - in: query
         name: sort
         schema: {type: string, enum: [created_desc, created_asc, title_asc, reaction_desc], default: created_desc}
@@ -798,9 +867,10 @@ paths:
     post:
       tags:
       - Contact
-      summary: Gửi liên hệ từ Guest hoặc User
+      summary: Gửi liên hệ bằng tài khoản đã đăng nhập
       operationId: sendContact
-      security: []
+      security: *id001
+      description: Yêu cầu session active và CSRF ràng buộc session; giữ limiter và inbox Admin. Liên hệ Guest cũ được bảo toàn.
       parameters:
       - $ref: '#/components/parameters/CsrfHeader'
       requestBody:
@@ -828,6 +898,8 @@ paths:
                 required:
                 - id
                 - status
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
         '429':
@@ -2188,6 +2260,7 @@ components:
         display_name:
           type: string
         avatar_url:
+          description: Đường dẫn /api/v1/catalog/assets/{asset_id} của avatar đang equip, owned, quantity > 0, active và approved; null dùng avatar mặc định.
           type: string
           format: uri-reference
           nullable: true
@@ -2203,14 +2276,53 @@ components:
       - display_name
       - created_at
     PublicProfile:
+      description: Hồ sơ public chỉ gồm UserPublic; không cover, PII hoặc roles.
       allOf:
       - $ref: '#/components/schemas/UserPublic'
-      - type: object
-        properties:
-          cover_url:
-            type: string
-            format: uri-reference
-            nullable: true
+    ActivityDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        posts:
+          type: integer
+          minimum: 0
+        comments:
+          type: integer
+          minimum: 0
+        count:
+          type: integer
+          minimum: 0
+          description: posts + comments
+      required: [date, posts, comments, count]
+    PublicActivity:
+      type: object
+      properties:
+        timezone:
+          type: string
+          enum: [Asia/Ho_Chi_Minh]
+          default: Asia/Ho_Chi_Minh
+        start_date:
+          type: string
+          format: date
+          description: Thứ Hai 52 tuần trước thứ Hai của tuần hiện tại
+        end_date:
+          type: string
+          format: date
+          description: Hôm nay theo lịch Việt Nam, không phải Chủ nhật cuối danh sách
+        days:
+          type: array
+          minItems: 371
+          maxItems: 371
+          description: Ngày liên tục tăng dần tới Chủ nhật tuần hiện tại; ngày tương lai count bằng 0
+          items:
+            $ref: '#/components/schemas/ActivityDay'
+        total:
+          type: integer
+          minimum: 0
+          description: Tổng count của 371 ngày
+      required: [start_date, end_date, days, total]
     UserPrivate:
       type: object
       properties:
@@ -2245,6 +2357,7 @@ components:
           format: uuid
           nullable: true
         avatar_url:
+          description: Đường dẫn /api/v1/catalog/assets/{asset_id} của avatar đang equip, owned, quantity > 0, active và approved; null dùng avatar mặc định.
           type: string
           format: uri-reference
           nullable: true
@@ -2556,6 +2669,7 @@ components:
       - email
       - password
     ProfilePatch:
+      description: Chỉ cập nhật field hồ sơ; avatar qua PUT /inventory/equipment/avatar. Không cho sửa cover.
       type: object
       additionalProperties: false
       properties:
@@ -2580,10 +2694,15 @@ components:
           maxLength: 30
           nullable: true
         avatar_media_id:
+          description: Chỉ chấp nhận null để bỏ liên kết legacy; UUID khác null trả 422. Không thay avatar đang equip.
+          enum: [null]
           type: string
           format: uuid
           nullable: true
         cover_media_id:
+          description: Field legacy chỉ đọc; gửi bất kỳ giá trị nào, kể cả null, trả 422. Bỏ qua field để giữ dữ liệu cũ.
+          deprecated: true
+          not: {}
           type: string
           format: uuid
           nullable: true

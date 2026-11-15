@@ -6,8 +6,9 @@ const id='123e4567-e89b-42d3-a456-426614174000';
 const author={id,username:'new_author',display_name:'New Author',avatar_url:null};
 test('API DTO uses real author and media, never demo identity/level',()=>{
  const post=apiPost({id,author,category:{id,slug:'new-topic',name:'New topic'},title:'Hi',content:'Text',created_at:'2026-11-13T00:00:00Z',media_url:'/api/v1/media/'+id});
- assert.equal(post.authorId,id);assert.equal(post.authorName,'New Author');assert.equal(post.level,'Lvl —');assert.equal(post.category,'new-topic');
- assert.equal(apiAuthor(author).avatar,'/assets/brand/favicon-64.png');
+ assert.equal(post.authorId,id);assert.equal(post.authorName,'New Author');assert.equal(post.level,'Lvl —');assert.equal(post.category,'new-topic');assert.equal(post.categoryLabel,'New topic');
+ assert.equal(apiAuthor(author).avatar,'/assets/identity/default-avatar.svg');
+ assert.equal(apiAuthor({...author,avatar_url:'/api/v1/catalog/assets/'+id}).avatar,'/api/v1/catalog/assets/'+id);
  assert.throws(()=>apiPost({id,author,category:{id,slug:'new-topic',name:'New'},title:'Hi',content:'x',created_at:'bad'}));
  assert.throws(()=>apiAuthor({...author,avatar_url:'https://evil.example/x.png'}));
 });

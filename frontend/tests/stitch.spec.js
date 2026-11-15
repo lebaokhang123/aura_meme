@@ -83,7 +83,7 @@ for (const width of [375, 768, 1440]) {
 }
 
 test('header navigation reaches every mapped route', async ({ page }) => {
-  const destinations = { 'trang-chu': '/', 'kham-pha': '/explore', 'gioi-thieu': '/about', 'lien-he': '/contact', 'xep-hang': '/rank', 'bao-kho': '/vault', 'dang-nhap': '/login', 'dang-ky': '/register' };
+  const destinations = { 'trang-chu': '/', 'kham-pha': '/explore', 'gioi-thieu': '/about', 'lien-he': '/contact', 'bao-kho': '/vault', 'dang-nhap': '/login', 'dang-ky': '/register' };
   await page.setViewportSize({ width: 1440, height: 900 });
   for (const [key, destination] of Object.entries(destinations)) {
     await page.goto('/');

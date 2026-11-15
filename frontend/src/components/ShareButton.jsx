@@ -1,7 +1,7 @@
 import React,{useRef,useState} from 'react';
 import {useLocalized} from '../localize.jsx';
 import {icon} from './social-ui.jsx';
-export function ShareButton({postId}) {
+export function ShareButton({postId,profile=false}) {
   const render=useLocalized();
   const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[manual,setManual]=useState('');
   const pending=useRef(false);
@@ -17,7 +17,7 @@ export function ShareButton({postId}) {
       await navigator.clipboard.writeText(url.href);setMessage('Đã sao chép liên kết.');
     }catch{setMessage('Không sao chép được. Bạn có thể chọn liên kết để sao chép thủ công.');setManual(url.href)}finally{pending.current=false;setBusy(false)}
   };
-  return render(<div className="relative"><button type="button" disabled={busy} aria-label="Chia sẻ" className="p-1.5 text-outline hover:text-secondary transition-colors" onClick={share}>{icon('share')}</button>
+  return render(<div className="relative"><button type="button" disabled={busy} aria-label="Chia sẻ" className={'p-1.5 text-outline hover:text-secondary transition-colors'+(profile?' profile-share':'')} onClick={share}>{icon(profile?'north_east':'share')}{profile&&<span>Chia sẻ</span>}</button>
     {message&&<div role="status" className="absolute right-0 top-full z-30 w-[240px] max-w-[70vw] p-3 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface font-body-sm text-body-sm shadow-lg">{message}{manual&&<input aria-label="Liên kết bài viết" className="w-full min-w-0 mt-2 bg-surface-container text-on-surface p-2 rounded" readOnly value={manual} onFocus={event=>event.target.select()}/>}<button type="button" aria-label="Đóng thông báo chia sẻ" onClick={()=>{setMessage('');setManual('')}} className="ml-2 text-secondary">×</button></div>}
   </div>);
 }

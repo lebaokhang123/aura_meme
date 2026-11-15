@@ -17,7 +17,7 @@ test('one header keeps logo, navigation, search and controls aligned on every ro
     if (!baseline) baseline = geometry;
     expect(geometry).toEqual(baseline);
     const active = header.locator('.site-nav [aria-current="page"]');
-    if (['/login', '/register'].includes(route)) await expect(active).toHaveCount(0);
+    if (['/login', '/register', '/rank'].includes(route)) await expect(active).toHaveCount(0);
     else await expect(active).toHaveAttribute('href', route);
   }
 });

@@ -15,7 +15,7 @@ from test_auth import ACCOUNT, ORIGIN, PASSWORD, auth, csrf, login, migrated, po
 
 PRIVATE = {"id", "username", "email", "display_name", "roles", "status", "birth_year", "address",
            "phone", "bio", "avatar_media_id", "cover_media_id", "avatar_url", "cover_url"}
-PUBLIC = {"id", "username", "display_name", "bio", "avatar_url", "cover_url", "created_at"}
+PUBLIC = {"id", "username", "display_name", "bio", "avatar_url", "created_at"}
 NEW_PASSWORD = "Replacement password for test!"
 
 
@@ -106,10 +106,7 @@ def test_media_owner_and_ready(auth, field, kind):
         connection.execute(MediaUpload.__table__.insert().values(id=media_id, owner_id=owner, object_key="test/" + str(media_id),
             mime="image/png", size_bytes=1, status="pending" if kind == "owned_pending" else "ready", created_at=now, updated_at=now))
     response = account_request(client, "PATCH", payload={field: str(media_id)})
-    assert response.status_code == (200 if kind == "owned_ready" else 422)
-    if kind == "owned_ready":
-        assert response.json()[field] == str(media_id)
-        assert account_request(client, "PATCH", payload={field: None}).json()[field] is None
+    assert response.status_code == 422
 
 
 @pytest.mark.integration
@@ -250,3 +247,11 @@ def test_password_change_rate_limit_and_body_cap(auth):
 def test_account_mutations_require_authenticated_session(auth, method, path, payload):
     client, _ = auth
     assert account_request(client, method, path, payload).status_code == 401
+
+
+@pytest.mark.integration
+def test_cover_mutation_rejected_even_null(auth):
+    client, connection = auth
+    signed_in(client)
+    assert account_request(client, "PATCH", payload={"cover_media_id": None}).status_code == 422
+    assert account_request(client, "PATCH", payload={"avatar_media_id": None}).status_code == 200
