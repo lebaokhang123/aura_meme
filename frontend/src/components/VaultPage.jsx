@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { auth } from '../auth.js';
 import { usePreferences } from '../PreferencesContext.jsx';
 import { apiId, apiPage } from '../social-api.js';
 import { vaultAsset, vaultCatalog, vaultCases, vaultReceipt, readPendingOpen, vaultOdds } from '../vault-api.js';
 import { createVaultSound } from '../vault-sound.js';
+import { buildReelV2, reelOffsets, reelTickTimes, REEL_DURATION_MS } from '../vault-reel-v2.js';
 import '../vault-page.css';
 
 async function readVault(path){try{return await auth.read(path)}catch(error){if(error.status===401)auth.refresh().catch(()=>{});throw error;}}
@@ -34,7 +35,7 @@ export default function VaultPage() {
   const [collection, setCollection] = useState(null), [loading, setLoading] = useState(false), [loadError, setLoadError] = useState('');
   const [revision, setRevision] = useState(0), [error, setError] = useState(''), [pending, setPending] = useState(null), [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState(null), [spinning, setSpinning] = useState(false), [nextAt, setNextAt] = useState(0), [now, setNow] = useState(Date.now());
-  const [detail, setDetail] = useState(null), [equipping, setEquipping] = useState(false), [muted, setMuted] = useState(true);
+  const [detail, setDetail] = useState(null), [equipping, setEquipping] = useState(false), [muted, setMuted] = useState(()=>{try{return localStorage.getItem('aurameme-vault-muted')==='1';}catch{return false;}});
   const sound = useRef(null), opening = useRef(false), mounted = useRef(false), pendingRef = useRef(null), timers = useRef([]), dialog = useRef(null);
   const countVersions = useRef({ avatar: 0, background: 0 });
   const equipmentGeneration = useRef(0), ownEquipmentEvent = useRef(null);
@@ -124,7 +125,7 @@ export default function VaultPage() {
     }).catch(() => { /* Keep this counter unknown if its authoritative read fails. */ });
   }
   function failMessage(cause) {
-    if (cause?.code === 'NOT_READY') return t('NOT_READY · Rương hoặc vật phẩm chưa sẵn sàng. Chưa có vật phẩm được cấp.', 'NOT_READY · This case or its items are not ready. No item was granted.');
+    if (cause?.code === 'NOT_READY') return t('Rương hiện chưa có đủ vật phẩm để mở.', 'This case does not have enough items yet.');
     if (cause?.status === 429) return t('Vui lòng chờ trước khi thử lại lượt mở này.', 'Please wait before retrying this opening.');
     if (cause?.status === 401) return t('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'Your session expired. Please sign in again.');
     return t('Chưa xác nhận được kết quả. Thử lại để kiểm tra cùng lượt mở; hệ thống không tạo lượt mới.', 'The result is not confirmed. Retry to check the same opening; this will not create a new draw.');
@@ -157,13 +158,13 @@ export default function VaultPage() {
         if (!mounted.current || currentOwner.current !== requestOwner) return;
         clearTimers();
         setSpinning(false); setBusy(false); opening.current = false;
-        setDetail({ asset: confirmed.reward, owned: true, received: true }); sound.current?.reveal(confirmed.reward.rarity);
+        setDetail({ asset: confirmed.reward, owned: true, received: true }); sound.current?.reveal(confirmed.reward.rarity); window.dispatchEvent(new Event('aurameme:aura:invalidate'));
       };
       if (reducedMotion) finish();
       else {
         setSpinning(true);
-        for (let i = 1; i <= 10; i++) timers.current.push(setTimeout(() => sound.current?.tick(), i * 160));
-        timers.current.push(setTimeout(finish, 1800));
+        for (const ms of reelTickTimes(47, REEL_DURATION_MS)) timers.current.push(setTimeout(() => sound.current?.tick(), ms));
+        timers.current.push(setTimeout(finish, REEL_DURATION_MS));
       }
     } catch (cause) {
       if (!mounted.current || currentOwner.current !== requestOwner) return;
@@ -191,9 +192,9 @@ export default function VaultPage() {
     finally { if (mounted.current && currentOwner.current === requestOwner) setEquipping(false); }
   }
   const assets = (collection?.items || []).map(item => item.asset).filter(asset => asset.available);
-  const reelAssets = receipt ? [...assets.filter(asset => asset.id !== receipt.reward.id).slice(0, 4), receipt.reward, ...assets.filter(asset => asset.id !== receipt.reward.id).slice(4, 8)] : assets.slice(0, 9);
-  const middle = receipt ? reelAssets.findIndex(asset => asset.id === receipt.reward.id) : Math.floor(reelAssets.length / 2);
-  const reelOffset = reelAssets.length ? (reelAssets.length - 1) / 2 * 146 - middle * 146 : 0;
+  const reelData = useMemo(()=>receipt ? buildReelV2(assets, receipt.reward) : {items: assets.slice(0,9), winnerIndex: Math.floor(Math.min(9,assets.length)/2)}, [collection,receipt?.open_id,kind]);
+  const reelAssets = reelData.items;
+  const offsets = reelAssets.length ? reelOffsets(reelAssets.length,reelData.winnerIndex) : {startPx:0,endPx:0};
   return <main className="vault-page"><div className="vault-content">
     <header className="vault-hero"><svg className="vault-hero-atmosphere" aria-hidden="true" width="100%" height="100%"><defs><pattern id="vault-page-circuits" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M 10 10 L 40 10 L 40 40 M 70 20 L 70 70 L 30 70 M 0 50 L 20 50 L 35 65" fill="none" stroke="currentColor" strokeOpacity=".3" strokeWidth="1" /><circle cx="10" cy="10" r="2" fill="currentColor" opacity=".6" /><circle cx="40" cy="40" r="2" fill="currentColor" opacity=".6" /><circle cx="70" cy="70" r="2" fill="currentColor" opacity=".6" /></pattern><radialGradient id="vault-page-header-glow" cx="80%" cy="30%" r="60%"><stop offset="0%" stopColor="#4cd7f6" stopOpacity=".3" /><stop offset="60%" stopColor="#d0bcff" stopOpacity=".1" /><stop offset="100%" stopColor="#12131b" stopOpacity="0" /></radialGradient></defs><rect width="100%" height="100%" fill="url(#vault-page-circuits)" /><rect width="100%" height="100%" fill="url(#vault-page-header-glow)" /></svg><div><h1>{t('Bảo Khố', 'Aura Vault')}</h1><p>{t('Khám phá, sưu tập và trang bị dấu ấn Aura của riêng bạn.', 'Discover, collect and equip your own Aura signature.')}</p></div>
       <div className="vault-stats">{[[t('Tổng sở hữu', 'Total owned'), Number.isSafeInteger(stats?.avatar) && Number.isSafeInteger(stats?.background) ? stats.avatar + stats.background : '—'], [t('Bộ Meme', 'Memes'), stats?.avatar ?? '—'], [t('Background', 'Backgrounds'), stats?.background ?? '—']].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
@@ -201,14 +202,15 @@ export default function VaultPage() {
     {!owner ? <p className="vault-empty" role="status">{session.status === 'loading' ? t('Đang kiểm tra phiên đăng nhập…', 'Checking your session…') : <a href="/login">{t('Đăng nhập để khám phá Bảo Khố.', 'Sign in to explore the Vault.')}</a>}</p> : <>
       <section className="vault-chamber" aria-label={t('Mở rương', 'Open a case')}>
         <div className="vault-chamber-tools"><div className="vault-case-tabs" role="group" aria-label={t('Loại rương', 'Case type')}>{['avatar', 'background'].map(value => <button type="button" key={value} aria-pressed={kind === value} disabled={busy} onClick={() => chooseKind(value)}><span aria-hidden="true" className="material-symbols-outlined">{value === 'avatar' ? 'view_carousel' : 'wallpaper'}</span>{value === 'avatar' ? t('Rương Meme', 'Meme case') : t('Rương Background', 'Background case')}</button>)}</div>
-          <button type="button" className="vault-sound-toggle" aria-pressed={!muted} onClick={() => { const value = !muted; if (!value) sound.current?.unlock(); sound.current?.setMuted(value); setMuted(value); }}>{muted ? t('Âm thanh: Tắt', 'Sound: Off') : t('Âm thanh: Bật', 'Sound: On')}</button>
+          <button type="button" className="vault-sound-toggle" aria-pressed={!muted} onClick={() => { const value = !muted; if (!value) sound.current?.unlock(); sound.current?.setMuted(value); setMuted(value);try{localStorage.setItem('aurameme-vault-muted',value?'1':'0')}catch{}}}>{muted ? t('Âm thanh: Tắt', 'Sound: Off') : t('Âm thanh: Bật', 'Sound: On')}</button>
         </div>
         <div className="vault-roulette"><div className="vault-reel-frame"><div className="vault-needle" aria-hidden="true" />
-          {reelAssets.length ? <div className={`vault-reel${spinning ? ' is-spinning' : ''}`} style={{ '--reel-offset': `${reelOffset}px` }} aria-hidden="true">{reelAssets.map((asset, index) => <div className="vault-reel-card" data-rarity={asset.rarity} key={`${asset.id}-${index}`}><AssetImage asset={asset} /><strong>{asset.display_name}</strong></div>)}</div> : <p className="vault-empty">{t('Chưa có vật phẩm được duyệt để xem trước.', 'No approved items are available to preview.')}</p>}
+          {reelAssets.length ? <div className={`vault-reel${spinning ? ' is-spinning' : ''}`} style={{ '--reel-start': `${offsets.startPx}px`, '--reel-end': `${offsets.endPx}px`, '--reel-offset': `${offsets.endPx}px` }} aria-hidden="true">{reelAssets.map((asset, index) => <div className="vault-reel-card" data-rarity={asset.rarity} key={`${asset.id}-${index}`}><AssetImage asset={asset} /><strong>{asset.display_name}</strong></div>)}</div> : <p className="vault-empty">{t('Chưa có vật phẩm được duyệt để xem trước.', 'No approved items are available to preview.')}</p>}
         </div>
           <button className="vault-open-button" type="button" disabled={busy || waiting > 0 || (!readyCase && !pending)} onClick={openChest}><span className="material-symbols-outlined" aria-hidden="true">auto_awesome</span>{busy ? t('Đang mở…', 'Opening…') : waiting ? `${t('Chờ', 'Wait')} ${waiting}s` : pending ? t('Kiểm tra / thử lại lượt mở', 'Check / retry opening') : t('Mở Rương', 'Open Case')}</button>
         </div>
-          {(!casesLoaded || (!readyCase && !pending) || pending) && <p className="vault-chamber-note" role="status">{!casesLoaded ? t('Đang tải rương…', 'Loading cases…') : casesError && casesError.code !== 'NOT_READY' ? <>{t('Không tải được rương. Vui lòng thử lại.', 'Could not load cases. Please retry.')} <button type="button" onClick={() => location.reload()}>{t('Tải lại rương', 'Reload cases')}</button></> : pending ? t('Một lượt mở đang chờ xác nhận. Thử lại dùng cùng mã yêu cầu.', 'An opening awaits confirmation. Retry uses the same request key.') : t('NOT_READY · Rương chưa sẵn sàng. Tỷ lệ chưa được công bố.', 'NOT_READY · This case is not ready. Drop rates are not published.')}</p>}
+          {casesError && casesError.code !== 'NOT_READY' && <p className="vault-chamber-note" role="alert">{t('Không tải được rương. Vui lòng thử lại.', 'Could not load cases. Please retry.')} <button type="button" onClick={() => location.reload()}>{t('Tải lại rương', 'Reload cases')}</button></p>}
+        {(!casesLoaded || pending) && <p className="vault-visually-hidden" role="status">{!casesLoaded ? t('Đang tải rương…','Loading cases…') : t('Đang kiểm tra kết quả lượt mở trước.','Checking the previous opening.')}</p>}
           {receipt && !spinning && <p className="vault-result" role="status">{t('Đã nhận', 'Received')}: <strong>{receipt.reward.display_name}</strong> · {receipt.reward.rarity}</p>}
       </section>
       {error && <p className="vault-error" role="alert">{error}</p>}

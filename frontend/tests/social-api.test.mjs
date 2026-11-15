@@ -33,3 +33,11 @@ test('WebP dimensions are checked before decode and API limits do not weaken moc
  bytes[24]=255;bytes[25]=31;bytes[27]=255;bytes[28]=31;
  assert.throws(()=>checkImageBytes(bytes,'image/webp',30,true),{message:'FILE_DIMENSIONS'});
 });
+
+test('MVP honorifics use exact identities and level is never inferred from an Admin role',()=>{
+ assert.equal(apiAuthor({...author,username:'khang_dev'}).nickname,'Bá Chủ Thiên Lôi');
+ assert.equal(apiAuthor({...author,username:'kien_dev'}).nickname,'Thiên Tướng Độ Ách');
+ assert.equal(apiAuthor({...author,roles:['ADMIN']}).nickname,'');
+ assert.equal(apiAuthor({...author,level:11}).level,'LVL 11');
+ for(const level of [undefined,0,101,1.5,'99'])assert.equal(apiAuthor({...author,level}).level,'');
+});

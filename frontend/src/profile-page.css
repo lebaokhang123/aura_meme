@@ -24,3 +24,16 @@
 
 .am-profile-collection-empty,.am-profile-backgrounds{padding:12px;min-height:0}.am-profile-collection-empty h2,.am-profile-backgrounds h2{margin-bottom:6px;text-align:left;font-size:12px;line-height:18px}.am-profile-collection-empty p,.am-profile-backgrounds p{margin:0;text-align:left}.am-profile-backgrounds .am-profile-vault-link{text-align:left;margin-top:8px}
 .social-profile-post .social-post-identity>div>div:first-child>span:first-child>a.text-xs{margin-left:4px}.social-profile-post>.flex.flex-wrap>div:last-child>button:not(.profile-share){height:32px;gap:6px;padding:0 8px;font:400 11px/14px 'JetBrains Mono',monospace}.social-profile-post>.flex.flex-wrap>div:last-child>button:not(.profile-share)>.material-symbols-outlined{font-size:18px}.social-profile-post>.flex.flex-wrap>div:last-child>button:not(.profile-share)>span:last-child{font-size:11px;line-height:14px}
+
+/* Compact owned-collectibles preview (max 3 columns x 3 rows). */
+.am-profile .am-profile-inventory{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.am-profile .am-profile-item{position:relative;min-width:0;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--am-outline-variant);background:var(--am-surface-container-lowest)}
+.am-profile .am-profile-item>img{width:100%;height:100%;object-fit:cover}
+.am-profile .am-profile-item[data-rarity="S"]{border-color:#fbbf24}.am-profile .am-profile-item[data-rarity="A"]{border-color:#f87171}.am-profile .am-profile-item[data-rarity="B"]{border-color:#c084fc}
+.am-profile .am-profile-quantity{position:absolute;right:3px;bottom:3px;padding:0 3px;border-radius:3px;background:#0d0e15cc;color:white;font-size:10px}
+.am-profile-background-mini{width:100%;height:100%;overflow:hidden;position:relative;background:#19132d}
+.am-profile-background-mini>img{width:100%;height:100%;object-fit:cover}
+.am-profile-background-mini[data-effect="lucian-363"]{background-color:#081425;background-image:radial-gradient(#35c3e9 1px,transparent 1px);background-size:10px 10px}
+.am-profile-background-mini[data-effect="lucian-352-deep-sea"]{background:repeating-radial-gradient(ellipse at 30% 85%,#0b263b,#103452 8px,#071726 18px)}
+.am-profile-background-mini[data-effect="lucian-226"]{background-image:linear-gradient(120deg,transparent 40%,#9f66ff88,transparent 60%),linear-gradient(#ffffff10 1px,transparent 1px),linear-gradient(90deg,#ffffff10 1px,transparent 1px);background-size:100% 100%,12px 12px,12px 12px}
+.am-profile-background-mini[data-effect="lucian-330"]{background-color:#050718;background-image:radial-gradient(1px 1px at 19% 33%,#fff 99%,transparent),radial-gradient(1px 1px at 73% 51%,#88e5ff 99%,transparent),radial-gradient(1px 1px at 55% 82%,#ffdcff 99%,transparent)}

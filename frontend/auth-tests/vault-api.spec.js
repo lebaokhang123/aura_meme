@@ -172,3 +172,10 @@ test('Vault screenshot matrix preserves approved controls, columns and muted sou
 test('case network failure is not labelled NOT_READY and can be retried',async({page,context})=>{
  const api=await transport(context);api.casesError=true;await enter(page);await expect(page.locator('.vault-chamber-note')).toContainText('Không tải được rương');await expect(page.locator('.vault-chamber-note')).not.toContainText('NOT_READY');await expect(open(page)).toBeDisabled();api.casesError=false;await page.getByRole('button',{name:'Tải lại rương',exact:true}).click();await expect(open(page)).toBeEnabled();
 });
+
+test('MVP sound defaults on and persisted mute survives reload',async({page,context})=>{
+ await transport(context);await enter(page);const sound=page.locator('.vault-sound-toggle');await expect(sound).toHaveAttribute('aria-pressed','true');await sound.click();await expect(sound).toHaveAttribute('aria-pressed','false');await page.reload();await expect(sound).toHaveAttribute('aria-pressed','false');await sound.click();await page.reload();await expect(sound).toHaveAttribute('aria-pressed','true');
+});
+test('MVP 52-card reel stops on the server receipt after 6.2 seconds',async({page,context})=>{
+ await transport(context);await enter(page);await page.emulateMedia({reducedMotion:'no-preference'});await open(page).click();await expect(page.locator('.vault-reel.is-spinning')).toBeVisible();await expect(page.locator('.vault-reel-card')).toHaveCount(52);await expect(page.locator('.vault-reel-card').nth(47)).toContainText(rewardMeme.display_name);expect(await page.locator('.vault-reel').evaluate(e=>getComputedStyle(e).animationDuration)).toBe('6.2s');await expect(page.getByRole('dialog')).toContainText(rewardMeme.display_name,{timeout:9000});
+});

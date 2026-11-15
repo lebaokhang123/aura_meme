@@ -33,8 +33,8 @@
 .vault-needle::before { top: 0; border-top: 8px solid #ef4444; }
 .vault-needle::after { bottom: 0; border-bottom: 8px solid #ef4444; }
 .vault-reel { position: absolute; top: 9px; left: 50%; display: flex; gap: 10px; width: max-content; transform: translateX(calc(-50% + var(--reel-offset, 0px))); }
-.vault-reel.is-spinning { animation: vault-reel-reveal 1.8s cubic-bezier(.12,.8,.32,1) both; }
-@keyframes vault-reel-reveal { from { transform: translateX(calc(-50% + var(--reel-offset, 0px) + 584px)); } to { transform: translateX(calc(-50% + var(--reel-offset, 0px))); } }
+.vault-reel.is-spinning { animation: vault-reel-reveal 6.2s cubic-bezier(.1,.65,.12,1) both; will-change:transform; }
+@keyframes vault-reel-reveal { from { transform: translateX(calc(-50% + var(--reel-start, 0px))); } to { transform: translateX(calc(-50% + var(--reel-end, 0px))); } }
 .vault-reel-card { width: 136px; height: 160px; flex: none; display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 12px; background: var(--am-surface-container); border: 1px solid var(--am-outline-variant); border-bottom: 4px solid var(--rarity-color, var(--am-outline)); overflow: hidden; }
 .vault-reel-card img { width: 100%; min-height: 0; flex: 1; object-fit: cover; border-radius: 8px; }
 .vault-reel-card strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; font-size: 12px; line-height: 16px; }
@@ -137,3 +137,6 @@
 .u219[data-theme="light"] .vault-odds-card[data-rarity="A"] { --odds-color: #bc2929; }
 .u219[data-theme="light"] .vault-odds-card[data-rarity="S"] { --odds-color: #895b00; }
 @media (max-width: 599px) { .vault-odds-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .vault-odds-card:last-child { grid-column: 1 / -1; } }
+
+.vault-visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(prefers-reduced-motion:reduce){.vault-reel.is-spinning{animation:none!important}}
