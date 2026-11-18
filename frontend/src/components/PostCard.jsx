@@ -11,6 +11,7 @@ import {useSocial} from '../SocialContext.jsx';
 import {commentsFor} from '../social-model.js';
 import {usePreferences} from '../PreferencesContext.jsx';
 import {POSTS} from '../feed-data.js';
+import {readDemoUser} from '../demo.js';
 
 const authors={khang:'Khang_dev',kien:'Kien_dev',gigachad:'Gigachad'};
 export function HallIdentity({id}) {
@@ -33,7 +34,8 @@ export function PostCard({post,variant,hidden,onExplore}) {
   const [editing,setEditing]=useState(false),[text,setText]=useState(post.content),[category,setCategory]=useState(post.category),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [commentsOpen,setCommentsOpen]=useState(post.id==='khang');
   const commentCount=state.api?state.apiInteractions?.post?.[post.id]?.comments_count||0:commentsFor(state,post.id).length;
-  const displayed={...post,timeLabel:post.timeLabel||relativeTime(post.createdAt,language)};
+  const current=readDemoUser(),own=Boolean(post.api&&current?.id&&post.authorId===current.id);
+  const displayed={...post,...(own?{avatar:current.avatar,authorName:current.displayName}:{}),timeLabel:post.timeLabel||relativeTime(post.createdAt,language)};
   return render(<article id={`post-${post.id}`} data-post-id={post.id} className={variant==='explore'?'flex flex-col rounded-xl bg-surface-container-low border border-[#292932] p-5 shadow-md hover:shadow-2xl hover:border-secondary/40 transition-all group social-card social-explore':'bg-surface-container-low rounded-xl p-4 shadow-sm flex flex-col gap-3 relative social-card'+(variant==='profile'?' social-profile-post':'')} hidden={hidden} style={{...(hidden?{display:'none'}:{}),scrollMarginTop:'calc(var(--site-header-height) + 16px)'}} onClick={onExplore}>
     <PostHeader post={displayed} variant={variant} menu={<PostMenu postId={post.id} onEdit={()=>{setText(post.content);setCategory(post.category);setEditing(true)}}/>}/>
     {editing?<form aria-label="Sửa bài viết" onSubmit={async event=>{event.preventDefault();if(busy)return;setBusy(true);try{await commit({type:'update-post',id:post.id,content:text,category});setEditing(false)}catch(e){setError(e.message)}finally{setBusy(false)}}} className="flex flex-col gap-3"><textarea aria-label="Nội dung sửa bài" className="bg-surface-container text-on-surface rounded-lg p-3 w-full" maxLength={5000} value={text} onChange={e=>setText(e.target.value)}/><CategorySelect label="Danh mục sửa bài" categories={categories} value={category} onChange={setCategory} disabled={busy} className="social-category-select--wide"/><div className="social-action-row"><button type="submit" disabled={busy} className="social-action-button social-action-button--primary">{icon('check',16)}{busy?'Đang lưu...':'Lưu thay đổi'}</button><button type="button" disabled={busy} className="social-action-button" onClick={()=>setEditing(false)}>{icon('close',16)}Hủy</button></div><SocialMessage error={error}/></form>:post.createdAt?<><p translate="no" className="font-body-md text-body-md text-on-surface social-user-text">{post.content}</p>{post.media&&<div className="w-full bg-surface-container-lowest rounded-lg overflow-hidden relative flex items-center justify-center min-h-[340px] social-post-media"><img src={post.media} alt="Ảnh bài viết" className="w-full object-contain max-h-[460px]"/>{post.mediaType==='image/gif'&&<span className="absolute bottom-3 right-3 font-mono-tag text-mono-tag text-outline">GIF</span>}</div>}</>:<OriginalBody post={post} variant={variant}/>}

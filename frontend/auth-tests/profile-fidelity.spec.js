@@ -30,3 +30,49 @@ test('heatmap tooltip follows focused day without page overflow',async({page,con
  // Finish the hover interaction before resizing and testing keyboard focus.
  await page.mouse.move(0,0);await expect(page.getByRole('tooltip')).toHaveCount(0);await page.setViewportSize({width:375,height:945});const cell=page.locator('[data-activity-day][tabindex="0"]');await cell.focus();const tooltip=page.getByRole('tooltip');await expect(tooltip).toContainText('hoạt động');const box=await tooltip.boundingBox(),day=await cell.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(375);expect(box.y+box.height).toBeLessThanOrEqual(day.y);await page.keyboard.press('Escape');await expect(tooltip).toHaveCount(0);
 });
+
+test('equipped avatar and display name sync across PostCard, CommentRow and Composer without reload or overwriting other authors',async({page,context})=>{
+ const state=await profileServer(context);
+ const otherAuthor={id:'00000000-0000-4000-8000-000000000999',username:'other_author',display_name:'Other Author',created_at:'2026-01-01T00:00:00Z',avatar_url:null};
+ const otherPostId='00000000-0000-4000-8000-000000000199',otherCommentId='00000000-0000-4000-8000-000000000198';
+ const newAvatarUrl='/api/v1/catalog/assets/00000000-0000-4000-8000-000000000202';
+ state.posts.push({id:otherPostId,title:'Other post',content:'Other post content',author:otherAuthor,category:{id:'00000000-0000-4000-8000-000000000103',slug:'gaming',name:'Gaming',status:'active',post_count:2},created_at:'2026-11-14T03:00:00Z',updated_at:'2026-11-14T03:00:00Z',status:'published',media_url:null});
+ state.comments.push({id:otherCommentId,post_id:'00000000-0000-4000-8000-000000000102',author:otherAuthor,body:'Other author comment',created_at:'2026-11-14T04:45:00Z'});
+ await context.route('**/api/v1/posts*',route=>{
+  const req=route.request(),url=new URL(req.url()),p=url.pathname.replace('/api/v1','');
+  if(p==='/posts'&&req.method()==='GET'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items:state.posts.map(post=>({...post,author:post.id===otherPostId?otherAuthor:state.profile,interactions:{post_id:post.id,reaction_counts:{like:0,love:0,laugh:0,fire:0,sad:0,angry:0},viewer_reaction:null,comments_count:state.comments.filter(c=>c.post_id===post.id).length,bookmarked:false}})),pagination:{page:1,page_size:20,total:state.posts.length,total_pages:1}})});
+  }
+  return route.fallback();
+ });
+ await page.goto('/');
+ const ownPost=page.locator('[data-post-id="00000000-0000-4000-8000-000000000102"]'),otherPost=page.locator(`[data-post-id="${otherPostId}"]`);
+ await expect(ownPost).toBeVisible();await expect(otherPost).toBeVisible();
+ await ownPost.getByRole('button',{name:'Bình luận',exact:true}).click();
+ const ownComment=ownPost.locator('[data-comment-id="00000000-0000-4000-8000-000000000103"]'),otherComment=ownPost.locator(`[data-comment-id="${otherCommentId}"]`);
+ await expect(ownComment).toBeVisible();await expect(otherComment).toBeVisible();
+ const profileTab=await context.newPage();
+ await profileTab.goto('/profile');
+ await context.route('**/api/v1/posts*',route=>{
+  const req=route.request(),url=new URL(req.url()),p=url.pathname.replace('/api/v1','');
+  if(p==='/posts'&&req.method()==='GET')return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'SERVICE_UNAVAILABLE'}})});
+  return route.fallback();
+ });
+ state.viewer.avatar_url=newAvatarUrl;state.profile.avatar_url=newAvatarUrl;
+ await profileTab.getByRole('button',{name:'Chỉnh sửa hồ sơ',exact:true}).click();
+ await profileTab.getByRole('textbox',{name:'Tên hiển thị',exact:true}).fill('Live Synced Owner');
+ await profileTab.getByRole('button',{name:'Lưu thay đổi',exact:true}).click();
+ await expect(profileTab.getByRole('heading',{name:'Live Synced Owner',exact:true})).toBeVisible();
+ await expect(profileTab.locator('.am-profile-avatar img')).toHaveAttribute('src',newAvatarUrl);
+ await expect(page.locator('[data-current-user-avatar]')).toHaveAttribute('src',newAvatarUrl);
+ await expect(page.locator('[data-current-user-avatar]')).toHaveAttribute('alt','Live Synced Owner');
+ await expect(ownPost.locator('.social-post-header img')).toHaveAttribute('src',newAvatarUrl);
+ await expect(ownPost.locator('.social-post-header')).toContainText('Live Synced Owner');
+ await expect(ownComment.locator('img').first()).toHaveAttribute('src',newAvatarUrl);
+ await expect(ownComment).toContainText('Live Synced Owner');
+ await expect(otherPost.locator('.social-post-header img')).toHaveAttribute('src','/assets/identity/default-avatar.svg');
+ await expect(otherPost.locator('.social-post-header')).toContainText('Other Author');
+ await expect(otherComment.locator('img').first()).toHaveAttribute('src','/assets/identity/default-avatar.svg');
+ await expect(otherComment).toContainText('Other Author');
+ await profileTab.close();
+});

@@ -37,9 +37,10 @@ function EquippedBackground(){
   let active=true,generation=0;const channel=typeof BroadcastChannel==='undefined'?null:new BroadcastChannel('aurameme-equipment');
   const refresh=async()=>{const token=++generation;try{const value=await auth.read('/inventory/equipment');if(!Array.isArray(value?.items))throw Error('PROTOCOL_ERROR');const entry=value.items.find(item=>item.slot_kind==='background');const asset=entry?vaultAsset(entry.asset):null;if(active&&token===generation)setEquipment({owner,effect:asset?.kind==='background'&&asset.available?asset.effect_key:null});}catch{if(active&&token===generation)setEquipment({owner,effect:null});}};
   const changed=()=>{refresh();channel?.postMessage('changed')};
-  refresh();if(channel)channel.onmessage=refresh;
-  window.addEventListener('aurameme-equipment-changed',changed);window.addEventListener('focus',refresh);
-  return()=>{active=false;channel?.close();window.removeEventListener('aurameme-equipment-changed',changed);window.removeEventListener('focus',refresh)};
+  const sync=()=>{refresh();auth.refresh().catch(()=>{})};
+  refresh();if(channel)channel.onmessage=sync;
+  window.addEventListener('aurameme-equipment-changed',changed);window.addEventListener('focus',sync);
+  return()=>{active=false;channel?.close();window.removeEventListener('aurameme-equipment-changed',changed);window.removeEventListener('focus',sync)};
  },[owner]);
  const effect=!MOCK_AUTH&&session.status==='authenticated'&&equipment.owner===owner?equipment.effect:null;
  useEffect(()=>{const root=document.getElementById('root');if(effect)root.dataset.vaultBackground=effect;else delete root.dataset.vaultBackground;return()=>{delete root.dataset.vaultBackground}},[effect]);

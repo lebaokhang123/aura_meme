@@ -21,7 +21,7 @@ export function ProfilePage(){
  useLayoutEffect(()=>{if(!editing&&restoreEditFocus.current){editButton.current?.focus();restoreEditFocus.current=false}},[editing]);
  const {state,posts,pagination,loading,error,retry,loadMore,loadFeed}=useSocial();
  const profile=useData(valid?'/users/'+username:null),comments=useData(valid?'/users/'+username+'/comments?page=1&page_size=1':null,state.revision),activity=useData(valid?'/users/'+username+'/activity':null,state.revision),memeInventory=useData(mine?'/inventory/me?kind=avatar&page_size=9':null),backgroundInventory=useData(mine?'/inventory/me?kind=background&page_size=9':null);
- const p=profile.data,memeItems=topOwned(memeInventory.data?.items||[]),backgroundItems=topOwned(backgroundInventory.data?.items||[]);
+ const raw=profile.data,p=raw&&(mine&&user?.id===raw.id?{...raw,display_name:user.display_name,avatar_url:user.avatar_url??null}:raw),memeItems=topOwned(memeInventory.data?.items||[]),backgroundItems=topOwned(backgroundInventory.data?.items||[]);
  return <main className="am-profile"><div className="am-profile-layout">{!valid?<p role="alert">{t('Không tìm thấy hồ sơ.','Profile not found.')}</p>:<LoadState state={profile}>{p&&<>
  <aside className="profile-rail am-profile-rail">
  <section className="am-profile-identity"><div className="am-profile-avatar"><div className="am-profile-avatar-glow"/><div className="am-profile-avatar-frame"><img src={apiMedia(p.avatar_url)||'/assets/identity/default-avatar.svg'} alt={t('Ảnh đại diện ','Avatar of ')+p.display_name} width="112" height="112"/></div></div>
