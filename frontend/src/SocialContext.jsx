@@ -15,7 +15,7 @@ export function SocialProvider({children}) {
   const [ready,setReady]=useState(false),[error,setError]=useState('');
   const [serverPosts,setServerPosts]=useState([]),[categories,setCategories]=useState(MOCK_AUTH?CATEGORIES:[]);
   const [pagination,setPagination]=useState(null),[loading,setLoading]=useState(!MOCK_AUTH),[commentPages,setCommentPages]=useState({});
-  const query=useRef(readFilters(location.search,!MOCK_AUTH)),generation=useRef(0),page=useRef(1),uploads=useRef(new WeakMap());
+  const query=useRef(readFilters(location.search,!MOCK_AUTH)),generation=useRef(0),page=useRef(1),appendFailed=useRef(false),uploads=useRef(new WeakMap());
   const setInteraction=(target,id,value)=>{
     const parsed=apiInteractions(value,id,target);
     setSnapshot(v=>({...v,state:{...v.state,api:true,apiInteractions:{...v.state.apiInteractions,[target]:{...v.state.apiInteractions?.[target],[id]:parsed}}}}));
@@ -42,9 +42,9 @@ export function SocialProvider({children}) {
     if(MOCK_AUTH)return;
     if(!profileUsername&&!['/','/explore'].includes(location.pathname)){setReady(true);return;}
     query.current=filters;const token=++generation.current,next=append?page.current+1:1;
-    setLoading(true);setError('');
+    appendFailed.current=false;setLoading(true);setError('');if(!append){page.current=1;setServerPosts([]);setPagination(null);}
     try{
-      const search=new URLSearchParams({page:String(next),page_size:location.pathname==='/explore'?'3':'20',include_interactions:'true',sort:filters.sort==='hot'?'reaction_desc':'created_desc'});
+      const search=new URLSearchParams({page:String(next),page_size:'20',include_interactions:'true',sort:filters.sort==='hot'?'reaction_desc':'created_desc'});
       if(profileUsername){search.set('author',profileUsername);search.set('sort','created_desc');}
       else{if(filters.q)search.set('search',filters.q);if(filters.category)search.set('category',filters.category);}
       const result=apiPage(await auth.read('/posts?'+search)),mapped=result.items.map(apiPost);
@@ -60,7 +60,7 @@ export function SocialProvider({children}) {
       setServerPosts(previous=>[...new Map([...(append?previous:[]),...mapped.filter(v=>valid[v.id])].map(v=>[v.id,v])).values()]);
       setSnapshot(v=>({...v,state:{...v.state,api:true,apiInteractions:{...v.state.apiInteractions,post:{...(append?v.state.apiInteractions?.post:{}),...valid}}}}));
       page.current=next;setPagination(result.pagination);setReady(true);
-    }catch(e){if(active.current&&token===generation.current){setError(e.message);setReady(true);if(e.status===401)auth.refresh().catch(()=>{});}throw e;}
+    }catch(e){if(active.current&&token===generation.current){appendFailed.current=append;setError(e.message);setReady(true);if(e.status===401)auth.refresh().catch(()=>{});}throw e;}
     finally{if(active.current&&token===generation.current)setLoading(false)}
   };
   const loadComments=async(postId,append=false)=>{
@@ -158,5 +158,5 @@ export function SocialProvider({children}) {
     try{channel.current?.postMessage('updated')}catch{}
     refresh().catch(()=>{if(active.current)setError('Đã lưu thay đổi, nhưng chưa đồng bộ được dữ liệu hiển thị. Vui lòng tải lại.');});
   };
-  return <SocialContext.Provider value={{...snapshot,posts:MOCK_AUTH?allPosts(snapshot.state,snapshot.media):serverPosts,categories,pagination,loading,commentPages,loadComments,loadFeed,loadOwnedMemes,loadMore:()=>loadFeed(query.current,true),retry:async()=>{await refresh();if(!MOCK_AUTH)await loadFeed();},ready,error,commit}}>{children}</SocialContext.Provider>;
+  return <SocialContext.Provider value={{...snapshot,posts:MOCK_AUTH?allPosts(snapshot.state,snapshot.media):serverPosts,categories,pagination,loading,commentPages,loadComments,loadFeed,loadOwnedMemes,loadMore:()=>loadFeed(query.current,true),retry:async()=>{if(!MOCK_AUTH&&appendFailed.current)return loadFeed(query.current,true);await refresh();if(!MOCK_AUTH)await loadFeed(query.current,false);},ready,error,commit}}>{children}</SocialContext.Provider>;
 }

@@ -12,7 +12,7 @@ export function DemoFeed({ variant }) {
   const { filters, update, url,targetId,missingPost } = useFeed();
   const {posts,error,ready,loading,retry}=useSocial();
   const matches = MOCK_AUTH?selectPosts(filters,posts):posts;
-  const selected = variant==='explore'?matches.slice(0,3):matches;
+  const selected = MOCK_AUTH&&variant==='explore'?matches.slice(0,3):matches;
   const visible = new Set(selected.map(post => post.id));
   // Preserve comment drafts while switching filters.
   const ordered = [...selected, ...posts.filter(post => !visible.has(post.id))];
@@ -25,9 +25,10 @@ export function DemoFeed({ variant }) {
     {error&&<div role="alert" className="text-error font-body-sm text-body-sm">{({NETWORK_ERROR:'Không kết nối được máy chủ. Vui lòng thử lại.',PROTOCOL_ERROR:'Phản hồi máy chủ không hợp lệ.',NOT_READY:'Tính năng hoặc dữ liệu tạm thời chưa sẵn sàng. Vui lòng thử lại sau.',SERVICE_UNAVAILABLE:'Dịch vụ tạm thời gián đoạn. Vui lòng thử lại.',RATE_LIMITED:'Quá nhiều lần thử. Vui lòng thử lại sau.',INTERNAL_ERROR:'Không tải được dữ liệu máy chủ. Vui lòng thử lại.',API_ERROR:'Không tải được dữ liệu máy chủ. Vui lòng thử lại.'}[error]||error)}<button type="button" onClick={()=>retry().catch(()=>{})}>Thử lại</button></div>}{!MOCK_AUTH&&loading&&<p role="status">Đang tải bài viết...</p>}
     {missingPost&&<div role="status" className="text-on-surface-variant font-body-sm text-body-sm">Không tìm thấy bài trong dữ liệu demo của trình duyệt này.</div>}
     {ordered.map(post=><PostCard key={post.id} post={post} variant={variant} hidden={!visible.has(post.id)} onExplore={variant==='explore'?event=>{if(!event.target.closest('button,a,input,select,textarea')&&!getSelection()?.toString())location.assign(url('/',`post-${post.id}`))}:undefined}/>)}
-    {ready&&!loading&&!selected.length && <div role="status" className="bg-surface-container-low rounded-xl p-4 text-on-surface-variant font-body-md text-body-md">
+    {ready&&!loading&&!error&&!selected.length && <div role="status" className="bg-surface-container-low rounded-xl p-4 text-on-surface-variant font-body-md text-body-md">
       <p>Không tìm thấy bài viết phù hợp.</p><button type="button" className="text-secondary font-label-md text-label-md mt-3" onClick={() => update({ category: '', q: '' })}>Xóa bộ lọc</button>
     </div>}
+    {!MOCK_AUTH&&variant==='explore'&&<div className="col-span-full"><FeedEnd/></div>}
   </>);
 }
 const homeActive = 'flex items-center justify-between px-3 py-2 rounded-lg bg-surface-container-high text-secondary transition-all';

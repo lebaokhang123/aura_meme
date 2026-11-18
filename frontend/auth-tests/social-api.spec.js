@@ -24,7 +24,18 @@ async function server(context,{roles=['USER']}={}){
   if(p==='/categories')return send(200,page(categories.map(c=>({...c,post_count:state.posts.filter(p=>(p.category_id||cid)===c.id).length}))));
   if(method==='GET'&&p==='/posts'){
    if(state.failFeedOnce){state.failFeedOnce=false;return fail(503,'SERVICE_UNAVAILABLE')}
-   return send(200,page(state.posts.map(dto)));
+   const q=(url.searchParams.get('search')||'').toLowerCase(),cat=url.searchParams.get('category')||'',sort=url.searchParams.get('sort')||'created_desc';
+   const num=Math.max(1,Number(url.searchParams.get('page')||1)),size=Math.max(1,Number(url.searchParams.get('page_size')||20));
+   let filtered=state.posts.filter(post=>{
+    const category=categories.find(c=>c.id===(post.category_id||cid));
+    return (!cat||category?.slug===cat)&&(!q||`${post.title} ${post.content}`.toLowerCase().includes(q));
+   });
+   if(sort==='reaction_desc'){
+    const score=post=>Object.values(post.counts||{}).reduce((a,b)=>a+b,0);
+    filtered=[...filtered].sort((a,b)=>score(b)-score(a));
+   }
+   const total=filtered.length,total_pages=Math.ceil(total/size),items=filtered.slice((num-1)*size,num*size).map(dto);
+   return send(200,{items,pagination:{page:num,page_size:size,total,total_pages}});
   }
   const post=state.posts.find(v=>p==='/posts/'+v.id||p.startsWith('/posts/'+v.id+'/'));
   if(method==='GET'&&p.endsWith('/interactions')&&post)return send(200,interactions(post));
@@ -260,4 +271,48 @@ test('read errors report service or readiness messages and never claim changes w
  await card.getByRole('button',{name:'Bình luận',exact:true}).click();
  await expect(card.getByRole('alert')).toContainText('Tính năng hoặc dữ liệu tạm thời chưa sẵn sàng.');
  await expect(card.getByRole('alert')).not.toContainText('Không lưu được thay đổi');
+});
+
+test('Explore in API mode renders beyond 3 posts, paginates with filters, handles load-more retry and end state',async({page,context})=>{
+ const api=await server(context);
+ const gamingId=api.categories[0].id,animeId=api.categories[1].id;
+ for(let i=1;i<=25;i++){
+  const id='00000000-0000-4000-8000-'+String(100+i).padStart(12,'0');
+  api.posts.push({id,title:`Explore Post ${i}`,content:`Explore meme keyword ${i}`,category_id:i<=23?gamingId:animeId,counts:{...counts(),like:i},reaction:null});
+ }
+ await page.goto('/explore?category=gaming&q=keyword&sort=hot');
+ const cards=page.locator('article[data-post-id]:visible');
+ await expect(cards).toHaveCount(20);
+ await expect(cards.first()).toContainText('Explore meme keyword 23');
+ const loadMoreBtn=page.getByRole('button',{name:'Xem thêm bài viết',exact:true});
+ await expect(loadMoreBtn).toBeVisible();
+ api.failFeedOnce=true;
+ await loadMoreBtn.click();
+ await expect(page.getByRole('alert')).toContainText('Dịch vụ tạm thời gián đoạn.');
+ await expect(cards).toHaveCount(20);
+ await page.getByRole('button',{name:'Thử lại',exact:true}).click();
+ await expect(cards).toHaveCount(23);
+ await expect(page.getByRole('alert')).toHaveCount(0);
+ await expect(loadMoreBtn).toHaveCount(0);
+ await expect(page.locator('.demo-feed-end')).toContainText('Bạn đã xem hết 23 bài viết.');
+ const renderedIds=await cards.evaluateAll(nodes=>nodes.map(n=>n.dataset.postId));
+ expect(new Set(renderedIds).size).toBe(23);
+ const feedReads=api.requests.filter(r=>r.method==='GET'&&r.p==='/posts');
+ expect(feedReads.map(r=>[r.query.page,r.query.page_size,r.query.category,r.query.search,r.query.sort])).toEqual([
+  ['1','20','gaming','keyword','reaction_desc'],
+  ['2','20','gaming','keyword','reaction_desc'],
+  ['2','20','gaming','keyword','reaction_desc'],
+ ]);
+ api.failFeedOnce=true;
+ await page.locator('[data-category="anime"]').click();
+ await expect(page.getByRole('alert')).toContainText('Dịch vụ tạm thời gián đoạn.');
+ await expect(cards).toHaveCount(0);
+ await page.getByRole('button',{name:'Thử lại',exact:true}).click();
+ await expect(cards).toHaveCount(2);
+ await expect(cards.first()).toContainText('Explore meme keyword 25');
+ const afterFilterReads=api.requests.filter(r=>r.method==='GET'&&r.p==='/posts').slice(3);
+ expect(afterFilterReads.map(r=>[r.query.page,r.query.category])).toEqual([['1','anime'],['1','anime']]);
+ await page.locator('[data-category="truong-hoc"]').click();
+ await expect(cards).toHaveCount(0);
+ await expect(page.getByRole('status').filter({hasText:'Không tìm thấy bài viết phù hợp.'})).toBeVisible();
 });
