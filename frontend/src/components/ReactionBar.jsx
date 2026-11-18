@@ -89,7 +89,7 @@ export function ReactionBar({target='post',id,compact=false,onPick}) {
         {ownedLoading&&<p role="status" className="font-body-sm text-body-sm mt-2">{t("Đang tải kho Meme…","Loading owned memes…")}</p>}
         {!ownedLoading&&!ownedError&&ownedPage&&!owned.length&&<p className="font-body-sm text-body-sm mt-2">{ownedPage.total_pages<=1?t("Bạn chưa sở hữu Meme nào.","You do not own any memes yet."):t("Trang này chưa có Meme phù hợp. Xem tiếp kho của bạn.","No matching memes on this page. Continue browsing your inventory.")}</p>}
         {ownedPage&&ownedPage.page<ownedPage.total_pages&&<button type="button" className="text-secondary underline font-body-sm text-body-sm mt-3" disabled={ownedLoading||busy} onClick={()=>loadOwned(ownedPage.page+1)}>{t("Xem thêm Meme","Load more memes")}</button>}
-        {ownedError&&<><SocialMessage error={ownedError}/><button type="button" className="text-secondary underline mt-2" disabled={ownedLoading} onClick={()=>loadOwned(ownedPage?ownedPage.page+1:1)}>{t("Thử tải kho lại","Retry inventory")}</button></>}
+        {ownedError&&<><SocialMessage error={ownedError} read/><button type="button" className="text-secondary underline mt-2" disabled={ownedLoading} onClick={()=>loadOwned(ownedPage?ownedPage.page+1:1)}>{t("Thử tải kho lại","Retry inventory")}</button></>}
       </>}
     </div>}
   </div>;

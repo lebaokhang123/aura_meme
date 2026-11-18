@@ -22,3 +22,4 @@ backend/build/
 backend/**/*.db
 backend/**/*.db-shm
 backend/**/*.db-wal
+/backend/.venv_p2/

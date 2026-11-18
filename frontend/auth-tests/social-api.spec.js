@@ -6,7 +6,7 @@ const kinds=['like','love','laugh','fire','sad','angry'],counts=()=>Object.fromE
 const user={id:uid,username:'constructor',display_name:'New Author',email:'new@example.com',roles:['USER'],status:'active',avatar_url:null};
 async function server(context,{roles=['USER']}={}){
  const categories=[['gaming','Gaming'],['anime','Anime'],['cong-nghe','Công nghệ'],['truong-hoc','Trường học'],['random','Random']].map(([slug,name],i)=>({slug,name,id:'00000000-0000-4000-8000-'+String(i+2).padStart(12,'0'),status:'active'}));
- const state={user:null,posts:[],comments:[],requests:[],dropReplyOnce:false,failFeedOnce:false,categories};
+ const state={user:null,posts:[],comments:[],requests:[],dropReplyOnce:false,failFeedOnce:false,failCommentsCode:null,categories};
  await context.route('**/api/v1/**',async route=>{
   const req=route.request(),url=new URL(req.url()),p=url.pathname.replace('/api/v1',''),method=req.method();
   let body;try{body=req.postDataJSON()}catch{}
@@ -28,7 +28,10 @@ async function server(context,{roles=['USER']}={}){
   }
   const post=state.posts.find(v=>p==='/posts/'+v.id||p.startsWith('/posts/'+v.id+'/'));
   if(method==='GET'&&p.endsWith('/interactions')&&post)return send(200,interactions(post));
-  if(method==='GET'&&p.endsWith('/comments'))return send(200,page(state.comments.filter(c=>c.post_id===post?.id)));
+  if(method==='GET'&&p.endsWith('/comments')){
+   if(state.failCommentsCode){const code=state.failCommentsCode;state.failCommentsCode=null;return fail(code==='NOT_READY'?503:500,code)}
+   return send(200,page(state.comments.filter(c=>c.post_id===post?.id)));
+  }
   if(method==='GET'&&post)return send(200,dto(post));
   const comment=state.comments.find(c=>p==='/comments/'+c.id+'/interactions');
   if(comment)return send(200,{comment_id:comment.id,reaction_counts:counts(),viewer_reaction:null});
@@ -38,6 +41,15 @@ async function server(context,{roles=['USER']}={}){
   if(p.startsWith('/admin/posts/')&&method==='PATCH'){
    if(!state.user.roles.includes('ADMIN'))return fail(403,'FORBIDDEN');
    state.posts=state.posts.filter(row=>row.id!==p.split('/').at(-1));return send(204);
+  }
+  if(p.startsWith('/admin/comments/')&&method==='PATCH'){
+   if(!state.user.roles.includes('ADMIN'))return fail(403,'FORBIDDEN');
+   state.comments=state.comments.filter(row=>row.id!==p.split('/').at(-1));return send(204);
+  }
+  if(p.startsWith('/comments/')&&method==='DELETE'){
+   const id=p.split('/').at(-1),target=state.comments.find(row=>row.id===id);
+   if(!target||target.author.id!==state.user.id)return fail(404,'NOT_FOUND');
+   state.comments=state.comments.filter(row=>row.id!==id);return send(204);
   }
   if(p==='/posts'&&method==='POST'){
    let row=state.posts.find(v=>v.id===body.request_id);
@@ -183,4 +195,69 @@ for(const [width,theme] of [[375,'dark'],[1440,'light']])test(`post confirmation
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await hiding.getByRole('button',{name:t('Xác nhận ẩn'),exact:true}).click();await expect(card).toHaveCount(0);
  expect(api.requests.filter(r=>r.method==='PATCH'&&r.p==='/admin/posts/'+id)).toHaveLength(1);
+});
+
+for(const [role,theme] of [['USER','dark'],['ADMIN','dark'],['ADMIN','light']])test(`comment moderation enforces owner/ADMIN rules and confirmation cancel at ${role} ${theme}`,async({page,context})=>{
+ const t=s=>theme==='light'?(english[s]||s):s;
+ const roles=role==='ADMIN'?['USER','ADMIN']:['USER'];
+ const api=await server(context,{roles});
+ const otherAuthor={id:'00000000-0000-4000-8000-000000000099',username:'other_user',display_name:'Other User',avatar_url:null};
+ const postId='00000000-0000-4000-8000-000000000010',otherCommentId='00000000-0000-4000-8000-000000000011',ownCommentId='00000000-0000-4000-8000-000000000012';
+ api.posts.push({id:postId,title:'Post for comments',content:'Post for comments',category_id:cid,counts:counts(),reaction:null});
+ api.comments.push(
+  {id:otherCommentId,post_id:postId,body:'Foreign comment',author:otherAuthor,created_at:'2026-11-13T00:00:00Z'},
+  {id:ownCommentId,post_id:postId,body:'Own comment',author:user,created_at:'2026-11-13T00:01:00Z'},
+ );
+ await page.addInitScript(p=>localStorage.setItem('aurameme-ui-preferences',JSON.stringify(p)),{theme,language:theme==='light'?'en':'vi'});
+ await login(page);
+ const card=page.locator(`[data-post-id="${postId}"]`);
+ await card.getByRole('button',{name:t('Bình luận'),exact:true}).click();
+ const foreignRow=card.locator(`[data-comment-id="${otherCommentId}"]`),ownRow=card.locator(`[data-comment-id="${ownCommentId}"]`);
+ await expect(foreignRow).toBeVisible();await expect(ownRow).toBeVisible();
+ if(role==='USER'){
+  await expect(foreignRow.getByRole('button',{name:t('Tùy chọn bình luận')})).toHaveCount(0);
+  await ownRow.getByRole('button',{name:t('Tùy chọn bình luận')}).click();
+  await expect(ownRow.getByRole('menuitem',{name:t('Xóa bình luận'),exact:true})).toBeVisible();
+  await expect(ownRow.getByRole('menuitem',{name:t('Ẩn bình luận (Admin)'),exact:true})).toHaveCount(0);
+  return;
+ }
+ const foreignMenu=()=>foreignRow.getByRole('button',{name:t('Tùy chọn bình luận')});
+ await foreignMenu().click();
+ await expect(foreignRow.getByRole('menuitem',{name:t('Xóa bình luận'),exact:true})).toHaveCount(0);
+ await foreignRow.getByRole('menuitem',{name:t('Ẩn bình luận (Admin)'),exact:true}).click();
+ const dialog=page.getByRole('alertdialog',{name:t('Xác nhận ẩn bình luận')});
+ await expect(dialog).toBeVisible();
+ await dialog.getByRole('button',{name:t('Hủy'),exact:true}).click();
+ await expect(dialog).toHaveCount(0);
+ await expect(foreignMenu()).toBeFocused();
+ expect(api.requests.some(r=>r.p==='/admin/comments/'+otherCommentId)).toBe(false);
+ await foreignMenu().click();
+ await foreignRow.getByRole('menuitem',{name:t('Ẩn bình luận (Admin)'),exact:true}).click();
+ await expect(dialog).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(dialog).toHaveCount(0);
+ await expect(foreignMenu()).toBeFocused();
+ expect(api.requests.some(r=>r.p==='/admin/comments/'+otherCommentId)).toBe(false);
+ await foreignMenu().click();
+ await foreignRow.getByRole('menuitem',{name:t('Ẩn bình luận (Admin)'),exact:true}).click();
+ await dialog.getByRole('button',{name:t('Xác nhận ẩn'),exact:true}).click();
+ await expect(foreignRow).toHaveCount(0);
+ expect(api.requests.filter(r=>r.method==='PATCH'&&r.p==='/admin/comments/'+otherCommentId&&r.body?.status==='hidden')).toHaveLength(1);
+});
+
+test('read errors report service or readiness messages and never claim changes were not saved',async({page,context})=>{
+ const api=await server(context);
+ const postId='00000000-0000-4000-8000-000000000020';
+ api.posts.push({id:postId,title:'Read error check',content:'Read error check',category_id:cid,counts:counts(),reaction:null});
+ api.failFeedOnce=true;
+ await page.goto('/');
+ await expect(page.getByRole('alert')).toContainText('Dịch vụ tạm thời gián đoạn.');
+ await expect(page.getByRole('alert')).not.toContainText('Không lưu được thay đổi');
+ await page.getByRole('button',{name:'Thử lại',exact:true}).click();
+ const card=page.locator(`[data-post-id="${postId}"]`);
+ await expect(card).toBeVisible();
+ api.failCommentsCode='NOT_READY';
+ await card.getByRole('button',{name:'Bình luận',exact:true}).click();
+ await expect(card.getByRole('alert')).toContainText('Tính năng hoặc dữ liệu tạm thời chưa sẵn sàng.');
+ await expect(card.getByRole('alert')).not.toContainText('Không lưu được thay đổi');
 });

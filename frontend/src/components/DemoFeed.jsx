@@ -22,7 +22,7 @@ export function DemoFeed({ variant }) {
     if (ready&&target && !target.hidden) target.scrollIntoView({ block: 'start' });
   }, [ready,targetId,filters.q,filters.category]);
   return render(<>
-    {error&&<div role="alert" className="text-error font-body-sm text-body-sm">{error}<button type="button" onClick={()=>retry().catch(()=>{})}>Thử lại</button></div>}{!MOCK_AUTH&&loading&&<p role="status">Đang tải bài viết...</p>}
+    {error&&<div role="alert" className="text-error font-body-sm text-body-sm">{({NETWORK_ERROR:'Không kết nối được máy chủ. Vui lòng thử lại.',PROTOCOL_ERROR:'Phản hồi máy chủ không hợp lệ.',NOT_READY:'Tính năng hoặc dữ liệu tạm thời chưa sẵn sàng. Vui lòng thử lại sau.',SERVICE_UNAVAILABLE:'Dịch vụ tạm thời gián đoạn. Vui lòng thử lại.',RATE_LIMITED:'Quá nhiều lần thử. Vui lòng thử lại sau.',INTERNAL_ERROR:'Không tải được dữ liệu máy chủ. Vui lòng thử lại.',API_ERROR:'Không tải được dữ liệu máy chủ. Vui lòng thử lại.'}[error]||error)}<button type="button" onClick={()=>retry().catch(()=>{})}>Thử lại</button></div>}{!MOCK_AUTH&&loading&&<p role="status">Đang tải bài viết...</p>}
     {missingPost&&<div role="status" className="text-on-surface-variant font-body-sm text-body-sm">Không tìm thấy bài trong dữ liệu demo của trình duyệt này.</div>}
     {ordered.map(post=><PostCard key={post.id} post={post} variant={variant} hidden={!visible.has(post.id)} onExplore={variant==='explore'?event=>{if(!event.target.closest('button,a,input,select,textarea')&&!getSelection()?.toString())location.assign(url('/',`post-${post.id}`))}:undefined}/>)}
     {ready&&!loading&&!selected.length && <div role="status" className="bg-surface-container-low rounded-xl p-4 text-on-surface-variant font-body-md text-body-md">

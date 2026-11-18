@@ -92,7 +92,7 @@ test('inventory failure keeps standard reaction available and reports no owned r
  const server=await api(context,{failInventory:true});await page.goto('/');
  const card=page.locator(`[data-post-id="${pid}"]`);await card.getByRole('button',{name:'Thả biểu cảm',exact:true}).click();
  const picker=page.getByRole('dialog',{name:'Bộ chọn reaction'});await picker.getByRole('button',{name:'Meme của tôi'}).click();
- await expect(picker.getByRole('alert')).toBeVisible();await expect(picker.locator('[data-owned-meme]')).toHaveCount(0);
+ await expect(picker.getByRole('alert')).toBeVisible();await expect(picker.getByRole('alert')).toContainText('Tính năng hoặc dữ liệu tạm thời chưa sẵn sàng.');await expect(picker.getByRole('alert')).not.toContainText('Không lưu được thay đổi');await expect(picker.locator('[data-owned-meme]')).toHaveCount(0);
  await picker.getByRole('button',{name:'Biểu cảm',exact:true}).click();await picker.getByRole('button',{name:'Yêu',exact:true}).click();
  await expect(card.locator('[data-reaction-pill="love"]')).toHaveAttribute('aria-pressed','true');
  expect(server.requests.filter(row=>row.method==='PUT')[0].body).toEqual({reaction_type:'love'});
