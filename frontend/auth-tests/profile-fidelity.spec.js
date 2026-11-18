@@ -65,7 +65,7 @@ test('equipped avatar and display name sync across PostCard, CommentRow and Comp
  await expect(profileTab.getByRole('heading',{name:'Live Synced Owner',exact:true})).toBeVisible();
  await expect(profileTab.locator('.am-profile-avatar img')).toHaveAttribute('src',newAvatarUrl);
  await expect(page.locator('[data-current-user-avatar]')).toHaveAttribute('src',newAvatarUrl);
- await expect(page.locator('[data-current-user-avatar]')).toHaveAttribute('alt','Live Synced Owner');
+ await expect(page.locator('[data-current-user-avatar]')).toHaveAttribute('alt','Ảnh đại diện Live Synced Owner');
  await expect(ownPost.locator('.social-post-header img')).toHaveAttribute('src',newAvatarUrl);
  await expect(ownPost.locator('.social-post-header')).toContainText('Live Synced Owner');
  await expect(ownComment.locator('img').first()).toHaveAttribute('src',newAvatarUrl);
@@ -75,4 +75,23 @@ test('equipped avatar and display name sync across PostCard, CommentRow and Comp
  await expect(otherComment.locator('img').first()).toHaveAttribute('src','/assets/identity/default-avatar.svg');
  await expect(otherComment).toContainText('Other Author');
  await profileTab.close();
+ const meReadsBeforeIdle=state.requests.filter(r=>r.p==='/users/me'&&r.method==='GET').length;
+ await page.waitForTimeout(300);
+ expect(state.requests.filter(r=>r.p==='/users/me'&&r.method==='GET').length).toBe(meReadsBeforeIdle);
+ await page.locator('[aria-controls="site-account-menu"]').click();
+ await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();
+ await expect(page.locator('[data-current-user-avatar]')).toHaveCount(0);
+ await context.route('**/api/v1/posts*',route=>{
+  const req=route.request(),url=new URL(req.url()),p=url.pathname.replace('/api/v1','');
+  if(p==='/posts'&&req.method()==='GET'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items:state.posts.map(post=>({...post,author:post.id===otherPostId?otherAuthor:state.profile,interactions:{post_id:post.id,reaction_counts:{like:0,love:0,laugh:0,fire:0,sad:0,angry:0},viewer_reaction:null,comments_count:state.comments.filter(c=>c.post_id===post.id).length,bookmarked:false}})),pagination:{page:1,page_size:20,total:state.posts.length,total_pages:1}})});
+  }
+  return route.fallback();
+ });
+ state.viewer={...otherAuthor,email:'other@example.com',roles:['USER'],status:'active'};
+ await page.reload();
+ await expect(page.locator('[data-current-user-avatar]')).toHaveAttribute('alt','Ảnh đại diện Other Author');
+ await expect(ownPost.locator('.social-post-header')).toContainText('Live Synced Owner');
+ await expect(ownPost.locator('.social-post-header img')).toHaveAttribute('src',newAvatarUrl);
+ await expect(otherPost.locator('.social-post-header')).toContainText('Other Author');
 });
