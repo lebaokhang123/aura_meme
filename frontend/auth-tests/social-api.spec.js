@@ -41,7 +41,9 @@ async function server(context,{roles=['USER']}={}){
   if(method==='GET'&&p.endsWith('/interactions')&&post)return send(200,interactions(post));
   if(method==='GET'&&p.endsWith('/comments')){
    if(state.failCommentsCode){const code=state.failCommentsCode;state.failCommentsCode=null;return fail(code==='NOT_READY'?503:500,code)}
-   return send(200,page(state.comments.filter(c=>c.post_id===post?.id)));
+   const num=Math.max(1,Number(url.searchParams.get('page')||1)),size=Math.max(1,Number(url.searchParams.get('page_size')||10));
+   const all=state.comments.filter(c=>c.post_id===post?.id),total=all.length,total_pages=Math.ceil(total/size);
+   return send(200,{items:all.slice((num-1)*size,num*size),pagination:{page:num,page_size:size,total,total_pages}});
   }
   if(method==='GET'&&post)return send(200,dto(post));
   const comment=state.comments.find(c=>p==='/comments/'+c.id+'/interactions');
@@ -315,4 +317,53 @@ test('Explore in API mode renders beyond 3 posts, paginates with filters, handle
  await page.locator('[data-category="truong-hoc"]').click();
  await expect(cards).toHaveCount(0);
  await expect(page.getByRole('status').filter({hasText:'Không tìm thấy bài viết phù hợp.'})).toBeVisible();
+});
+
+test('comment pagination preserves loaded pages across toggle, isolates posts, handles errors and updates consistently',async({page,context})=>{
+ const api=await server(context);
+ const postA='00000000-0000-4000-8000-000000000201',postB='00000000-0000-4000-8000-000000000202';
+ api.posts.push(
+  {id:postA,title:'Post A',content:'Post A',category_id:cid,counts:counts(),reaction:null},
+  {id:postB,title:'Post B',content:'Post B',category_id:cid,counts:counts(),reaction:null},
+ );
+ for(let i=1;i<=12;i++){
+  api.comments.push({id:'00000000-0000-4000-8000-'+String(300+i).padStart(12,'0'),post_id:postA,body:`Comment A-${i}`,author:user,created_at:`2026-11-13T00:${String(i).padStart(2,'0')}:00Z`});
+ }
+ api.comments.push({id:'00000000-0000-4000-8000-000000000401',post_id:postB,body:'Comment B-1',author:user,created_at:'2026-11-13T00:01:00Z'});
+ await login(page);
+ const cardA=page.locator(`[data-post-id="${postA}"]`),cardB=page.locator(`[data-post-id="${postB}"]`);
+ await cardA.getByRole('button',{name:'Bình luận',exact:true}).click();
+ const rowsA=cardA.locator('[data-comment-id]');
+ await expect(rowsA).toHaveCount(10);
+ const moreBtn=cardA.getByRole('button',{name:'Xem thêm bình luận',exact:true});
+ await expect(moreBtn).toBeVisible();
+ api.failCommentsCode='SERVICE_UNAVAILABLE';
+ await moreBtn.click();
+ await expect(cardA.getByRole('alert')).toContainText('Dịch vụ tạm thời gián đoạn.');
+ await expect(rowsA).toHaveCount(10);
+ await moreBtn.click();
+ await expect(rowsA).toHaveCount(12);
+ await expect(moreBtn).toHaveCount(0);
+ await cardB.getByRole('button',{name:'Bình luận',exact:true}).click();
+ await expect(cardB.locator('[data-comment-id]')).toHaveCount(1);
+ await expect(cardB.locator('[data-comment-id]')).toContainText('Comment B-1');
+ const readsBeforeToggle=api.requests.filter(r=>r.method==='GET'&&r.p===`/posts/${postA}/comments`).length;
+ await cardA.getByRole('button',{name:'Bình luận',exact:true}).click();
+ await cardA.getByRole('button',{name:'Bình luận',exact:true}).click();
+ await expect(rowsA).toHaveCount(12);
+ expect(api.requests.filter(r=>r.method==='GET'&&r.p===`/posts/${postA}/comments`)).toHaveLength(readsBeforeToggle);
+ const texts=await rowsA.locator('.social-user-text').allInnerTexts();
+ expect(texts).toEqual(Array.from({length:12},(_,i)=>`Comment A-${i+1}`));
+ await cardA.getByLabel('Nội dung bình luận').fill('Comment A-13');
+ await cardA.getByRole('button',{name:/^Gửi/}).click();
+ await expect(rowsA).toHaveCount(13);
+ await expect(rowsA.last()).toContainText('Comment A-13');
+ const targetRow=rowsA.filter({hasText:'Comment A-12'});
+ await targetRow.getByRole('button',{name:'Tùy chọn bình luận'}).click();
+ await targetRow.getByRole('menuitem',{name:'Xóa bình luận',exact:true}).click();
+ await targetRow.getByRole('button',{name:'Xác nhận xóa',exact:true}).click();
+ await expect(rowsA).toHaveCount(12);
+ await expect(rowsA.filter({hasText:'Comment A-12'})).toHaveCount(0);
+ await expect(rowsA.last()).toContainText('Comment A-13');
+ await expect(cardB.locator('[data-comment-id]')).toHaveCount(1);
 });

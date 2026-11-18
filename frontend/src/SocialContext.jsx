@@ -63,10 +63,29 @@ export function SocialProvider({children}) {
     }catch(e){if(active.current&&token===generation.current){appendFailed.current=append;setError(e.message);setReady(true);if(e.status===401)auth.refresh().catch(()=>{});}throw e;}
     finally{if(active.current&&token===generation.current)setLoading(false)}
   };
-  const loadComments=async(postId,append=false)=>{
+  const loadComments=async(postId,append=false,uptoPage)=>{
     if(MOCK_AUTH)return;
     apiId(postId);const next=append?(commentPages[postId]?.page||1)+1:1;
     try{
+      if(!append&&Number.isSafeInteger(uptoPage)&&uptoPage>1){
+        let current=1,lastPage=null,items=[],interactions={};
+        while(current<=uptoPage){
+          const result=apiPage(await auth.read('/posts/'+postId+'/comments?page_size=10&page='+current));
+          const mapped=result.items.map(apiComment);
+          const values=await Promise.all(mapped.map(async row=>{
+            try{return [row.id,apiInteractions(await auth.read('/comments/'+row.id+'/interactions'),row.id,'comment')]}catch(e){if(e.status===404)return null;throw e;}
+          }));
+          if(!active.current)return;
+          const valid=Object.fromEntries(values.filter(Boolean));
+          items.push(...mapped.filter(c=>valid[c.id]));Object.assign(interactions,valid);lastPage=result.pagination;
+          if(current>=result.pagination.total_pages||!result.pagination.total_pages)break;
+          current++;
+        }
+        setSnapshot(v=>({...v,state:{...v.state,api:true,comments:[...new Map([...v.state.comments.filter(c=>c.postId!==postId),...items].map(c=>[c.id,c])).values()],
+          apiInteractions:{...v.state.apiInteractions,comment:{...v.state.apiInteractions?.comment,...interactions}}}}));
+        if(lastPage)setCommentPages(v=>({...v,[postId]:lastPage}));
+        return;
+      }
       const result=apiPage(await auth.read('/posts/'+postId+'/comments?page_size=10&page='+next));
       const mapped=result.items.map(apiComment);
       const values=await Promise.all(mapped.map(async row=>{
@@ -119,7 +138,11 @@ export function SocialProvider({children}) {
     try{
       if(['comment','delete-comment','moderate-comment'].includes(action.type)){
         const postId=action.postId||snapshot.state.comments.find(c=>c.id===action.id)?.postId;
-        if(postId){await loadComments(postId);await readInteraction('post',postId);}
+        if(postId){
+          const loadedPages=commentPages[postId]?.page||1,totalAfter=(commentPages[postId]?.total||0)+1;
+          const targetPage=action.type==='comment'?Math.max(loadedPages,Math.ceil(totalAfter/10)):loadedPages;
+          await loadComments(postId,false,targetPage);await readInteraction('post',postId);
+        }
       }else{await loadCategories();await loadFeed();}
     }catch{setError('Đã lưu thay đổi, nhưng chưa đồng bộ được dữ liệu hiển thị. Vui lòng tải lại.');}
     return result;

@@ -52,7 +52,7 @@ export function CommentSection({postId,active=true}) {
   const pending=useRef(false),draft=useRef(null);
   const input=useRef(null);
   useEffect(()=>{draft.current=null},[text]);
-  useEffect(()=>{if(active&&!MOCK_AUTH){setReadFailed(false);loadComments(postId).catch(e=>{setReadFailed(true);setError(e.message)});}},[postId,active]);
+  useEffect(()=>{if(active&&!MOCK_AUTH&&!commentPages[postId]){setReadFailed(false);loadComments(postId).catch(e=>{setReadFailed(true);setError(e.message)});}},[postId,active]);
   const insert=emoji=>{
     const el=input.current,start=el.selectionStart,end=el.selectionEnd,next=text.slice(0,start)+emoji+text.slice(end);
     if(next.length>2000)return;
