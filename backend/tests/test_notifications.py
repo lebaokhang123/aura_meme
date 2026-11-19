@@ -262,3 +262,110 @@ def test_social_notification_helpers_reaction_and_comment():
         now=now
     )
     assert notif_self_comment is None
+
+
+def test_admin_moderation_notification_post_and_comment():
+    from app.notifications import create_notification
+    db = MagicMock()
+    author_id = uuid4()
+    admin_id = uuid4()
+    post_id = uuid4()
+    comment_id = uuid4()
+    now = datetime.now(timezone.utc)
+
+    # 1. Admin hides post with custom reason
+    db.scalar.return_value = None
+    notif_post_hidden = create_notification(
+        db,
+        recipient_user_id=author_id,
+        type="moderation",
+        target_type="post",
+        target_id=post_id,
+        actor_user_id=admin_id,
+        payload={
+            "action": "hidden",
+            "reason": "Vi phạm bản quyền hình ảnh.",
+            "post_title": "Meme title",
+        },
+        dedupe_key=f"mod:post:{post_id}:hidden",
+        now=now
+    )
+    assert notif_post_hidden is not None
+    assert notif_post_hidden.recipient_user_id == author_id
+    assert notif_post_hidden.type == "moderation"
+    assert notif_post_hidden.payload["action"] == "hidden"
+    assert notif_post_hidden.payload["reason"] == "Vi phạm bản quyền hình ảnh."
+
+    # 2. Admin deletes post
+    db.scalar.return_value = None
+    notif_post_deleted = create_notification(
+        db,
+        recipient_user_id=author_id,
+        type="moderation",
+        target_type="post",
+        target_id=post_id,
+        actor_user_id=admin_id,
+        payload={
+            "action": "deleted",
+            "reason": "Nội dung phản cảm.",
+            "post_title": "Meme title",
+        },
+        dedupe_key=f"mod:post:{post_id}:deleted",
+        now=now
+    )
+    assert notif_post_deleted is not None
+    assert notif_post_deleted.payload["action"] == "deleted"
+
+    # 3. Admin hides comment
+    db.scalar.return_value = None
+    notif_comment_hidden = create_notification(
+        db,
+        recipient_user_id=author_id,
+        type="moderation",
+        target_type="comment",
+        target_id=comment_id,
+        actor_user_id=admin_id,
+        payload={
+            "action": "hidden",
+            "reason": "Bình luận spam.",
+            "comment_body": "Spam comment body",
+        },
+        dedupe_key=f"mod:comment:{comment_id}:hidden",
+        now=now
+    )
+    assert notif_comment_hidden is not None
+    assert notif_comment_hidden.target_type == "comment"
+    assert notif_comment_hidden.payload["action"] == "hidden"
+
+    # 4. Admin deletes comment
+    db.scalar.return_value = None
+    notif_comment_deleted = create_notification(
+        db,
+        recipient_user_id=author_id,
+        type="moderation",
+        target_type="comment",
+        target_id=comment_id,
+        actor_user_id=admin_id,
+        payload={
+            "action": "deleted",
+            "reason": "Bình luận vi phạm tiêu chuẩn.",
+            "comment_body": "Toxic comment body",
+        },
+        dedupe_key=f"mod:comment:{comment_id}:deleted",
+        now=now
+    )
+    assert notif_comment_deleted is not None
+    assert notif_comment_deleted.payload["action"] == "deleted"
+
+    # 5. Admin self-moderation (e.g. admin hides their own post)
+    notif_self_mod = create_notification(
+        db,
+        recipient_user_id=admin_id,
+        type="moderation",
+        target_type="post",
+        target_id=post_id,
+        actor_user_id=admin_id,
+        payload={"action": "hidden"},
+        now=now
+    )
+    assert notif_self_mod is None

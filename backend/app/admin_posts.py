@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import String, cast, or_, select
 
 from app.admin_users import require_admin_mutation
@@ -21,6 +21,7 @@ NOT_FOUND = {404: {"model": ErrorResponse}}
 
 class AdminPostPatch(PostPatch):
     status: Literal["draft", "published", "hidden"] = None
+    reason: str | None = Field(default=None, max_length=500)
 
 
 class AdminAuditEvent(BaseModel):
@@ -86,6 +87,7 @@ def moderate_post(post_id: UUID, payload: AdminPostPatch, request: Request,
     post = locked_post(account.db, post_id)
     before = post_state(post)
     values = payload.model_dump(exclude_unset=True)
+    reason = values.pop("reason", None)
     text_flags = {name + "_changed": name in values and values[name] != getattr(post, name) for name in ("title", "content")}
     if {"category_id", "media_id", "content"}.intersection(values):
         category = validate_post(account.db, post.author_id, values.get("category_id", post.category_id),
@@ -100,12 +102,32 @@ def moderate_post(post_id: UUID, payload: AdminPostPatch, request: Request,
         from app.aura_runtime import reverse_post
         reverse_post(account.db, post.id, post.updated_at)
     audit_post(account, post, "post.update", before, post.updated_at, **text_flags)
+    if post.status == "hidden" and before["status"] != "hidden":
+        author_id = getattr(post, "author_id", None)
+        if author_id is not None and author_id != account.user.id:
+            from app.notifications import create_notification
+            create_notification(
+                account.db,
+                recipient_user_id=author_id,
+                type="moderation",
+                target_type="post",
+                target_id=post.id,
+                actor_user_id=account.user.id,
+                payload={
+                    "action": "hidden",
+                    "reason": reason or "Bài viết của bạn đã bị ẩn do vi phạm Tiêu chuẩn Cộng đồng.",
+                    "post_title": (getattr(post, "title", None) or "")[:80],
+                },
+                dedupe_key=f"mod:post:{post.id}:hidden:{int(post.updated_at.timestamp())}",
+                now=post.updated_at,
+            )
     return post_dto(post, account.db.get(User, post.author_id), account.db.get(Profile, post.author_id), category)
 
 
 @router.delete("/posts/{post_id}", status_code=204, operation_id="adminDeletePost", responses=ERRORS | NOT_FOUND,
                openapi_extra=CSRF_HEADER)
-def delete_admin_post(post_id: UUID, request: Request, account=Depends(require_admin_mutation, scope="function")):
+def delete_admin_post(post_id: UUID, request: Request, reason: str | None = Query(None, max_length=500),
+                      account=Depends(require_admin_mutation, scope="function")):
     post = locked_post(account.db, post_id)
     before = post_state(post)
     post.status, post.deleted_at = "deleted", request.app.state.auth.now()
@@ -113,6 +135,24 @@ def delete_admin_post(post_id: UUID, request: Request, account=Depends(require_a
     from app.aura_runtime import reverse_post
     reverse_post(account.db, post.id, post.updated_at)
     audit_post(account, post, "post.delete", before, post.updated_at)
+    author_id = getattr(post, "author_id", None)
+    if author_id is not None and author_id != account.user.id:
+        from app.notifications import create_notification
+        create_notification(
+            account.db,
+            recipient_user_id=author_id,
+            type="moderation",
+            target_type="post",
+            target_id=post.id,
+            actor_user_id=account.user.id,
+            payload={
+                "action": "deleted",
+                "reason": reason or "Bài viết của bạn đã bị xóa bởi Quản trị viên.",
+                "post_title": (getattr(post, "title", None) or "")[:80],
+            },
+            dedupe_key=f"mod:post:{post.id}:deleted",
+            now=post.updated_at,
+        )
 
 
 @router.get("/audit-logs", response_model=AuditPage, operation_id="adminListAudit",

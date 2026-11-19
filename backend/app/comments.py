@@ -156,30 +156,54 @@ def delete_comment(comment_id: UUID, request: Request, account=Depends(require_a
 
 
 class CommentModeration(StrictInput):
-    status: Literal["visible","hidden"]
+    status: Literal["visible", "hidden"]
+    reason: str | None = Field(default=None, max_length=500)
 
-def moderate_comment_record(comment_id,request,account,status):
-    comment=account.db.scalar(select(Comment).where(Comment.id==comment_id,Comment.deleted_at.is_(None)).with_for_update())
-    if comment is None:raise AuthError(404,"NOT_FOUND","Comment not found.")
-    before={"status":comment.status}
-    comment.status=status;comment.updated_at=request.app.state.auth.now()
-    if status=="deleted":comment.deleted_at=comment.updated_at
+def moderate_comment_record(comment_id, request, account, status, reason=None):
+    comment = account.db.scalar(select(Comment).where(Comment.id == comment_id, Comment.deleted_at.is_(None)).with_for_update())
+    if comment is None:
+        raise AuthError(404, "NOT_FOUND", "Comment not found.")
+    before = {"status": comment.status}
+    comment.status = status
+    comment.updated_at = request.app.state.auth.now()
+    if status == "deleted":
+        comment.deleted_at = comment.updated_at
     if status in {"hidden", "deleted"}:
         from app.aura_runtime import reverse_comment
         reverse_comment(account.db, comment.id, comment.updated_at)
-    account.db.add(AdminAuditLog(id=uuid4(),actor_id=account.user.id,action="comment."+status,target_type="comment",
-        target_id=str(comment.id),before_json=before,after_json={"status":status},created_at=comment.updated_at))
+    account.db.add(AdminAuditLog(id=uuid4(), actor_id=account.user.id, action="comment." + status, target_type="comment",
+        target_id=str(comment.id), before_json=before, after_json={"status": status}, created_at=comment.updated_at))
     account.db.flush()
+    if status in {"hidden", "deleted"}:
+        author_id = getattr(comment, "author_id", None)
+        if author_id is not None and author_id != account.user.id:
+            from app.notifications import create_notification
+            create_notification(
+                account.db,
+                recipient_user_id=author_id,
+                type="moderation",
+                target_type="comment",
+                target_id=comment.id,
+                actor_user_id=account.user.id,
+                payload={
+                    "action": status,
+                    "reason": reason or ("Bình luận của bạn đã bị ẩn do vi phạm Tiêu chuẩn Cộng đồng." if status == "hidden" else "Bình luận của bạn đã bị xóa bởi Quản trị viên."),
+                    "comment_body": (getattr(comment, "body", None) or "")[:120],
+                },
+                dedupe_key=f"mod:comment:{comment.id}:{status}",
+                now=comment.updated_at,
+            )
 
-@router.patch("/admin/comments/{comment_id}",status_code=204,operation_id="adminModerateComment",tags=["Admin"],
-              responses=ERRORS|NOT_FOUND,openapi_extra=CSRF_HEADER)
-def moderate_comment(comment_id:UUID,payload:CommentModeration,request:Request,account=Depends(require_admin_mutation,scope="function")):
-    moderate_comment_record(comment_id,request,account,payload.status)
+@router.patch("/admin/comments/{comment_id}", status_code=204, operation_id="adminModerateComment", tags=["Admin"],
+              responses=ERRORS | NOT_FOUND, openapi_extra=CSRF_HEADER)
+def moderate_comment(comment_id: UUID, payload: CommentModeration, request: Request, account=Depends(require_admin_mutation, scope="function")):
+    moderate_comment_record(comment_id, request, account, payload.status, payload.reason)
 
-@router.delete("/admin/comments/{comment_id}",status_code=204,operation_id="adminDeleteComment",tags=["Admin"],
-               responses=ERRORS|NOT_FOUND,openapi_extra=CSRF_HEADER)
-def admin_delete_comment(comment_id:UUID,request:Request,account=Depends(require_admin_mutation,scope="function")):
-    moderate_comment_record(comment_id,request,account,"deleted")
+@router.delete("/admin/comments/{comment_id}", status_code=204, operation_id="adminDeleteComment", tags=["Admin"],
+               responses=ERRORS | NOT_FOUND, openapi_extra=CSRF_HEADER)
+def admin_delete_comment(comment_id: UUID, request: Request, reason: str | None = Query(None, max_length=500),
+                         account=Depends(require_admin_mutation, scope="function")):
+    moderate_comment_record(comment_id, request, account, "deleted", reason)
 
 
 @router.get("/users/{username}/comments", response_model=CommentPage, operation_id="listUserComments",
