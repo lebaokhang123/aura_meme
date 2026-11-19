@@ -31,6 +31,7 @@ from app.inventory import router as inventory_router
 from app.vault import router as vault_router
 from app.vault_open import router as vault_open_router
 from app.vault_runtime import router as vault_runtime_router
+from app.notifications import router as notifications_router
 from app.security import AuthBoundaryMiddleware, AuthError, AuthRuntime
 
 
@@ -70,6 +71,7 @@ app.include_router(inventory_router)
 app.include_router(vault_router)
 app.include_router(vault_open_router)
 app.include_router(vault_runtime_router)
+app.include_router(notifications_router)
 app.add_middleware(AuthBoundaryMiddleware)
 
 

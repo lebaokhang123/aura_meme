@@ -589,6 +589,21 @@ Table admin_audit_logs {
   Note: 'P0 | Báo cáo vi phạm và nhật ký quản trị'
 }
 
+Table notifications {
+  id uuid [not null, pk]
+  recipient_user_id uuid [not null]
+  actor_user_id uuid
+  type text [not null]
+  target_type text [not null]
+  target_id uuid
+  payload jsonb [not null]
+  created_at timestamptz [not null]
+  read_at timestamptz
+  dedupe_key text
+
+  Note: 'P2 | Hệ thống thông báo cá nhân'
+}
+
 // LOGICAL GROUPS - one PostgreSQL database, not independent databases
 
 TableGroup account_auth [note: 'Tài khoản, phân quyền, phiên đăng nhập'] {
@@ -813,3 +828,5 @@ Ref: aura_reward_events.comment_id > comments.id [delete: restrict]
 Ref: aura_reward_events.policy_id > reward_policy_versions.id [delete: restrict]
 Ref: post_reactions.(user_id, meme_asset_id) > user_inventory.(user_id, asset_id) [delete: restrict]
 Ref: comment_reactions.(user_id, meme_asset_id) > user_inventory.(user_id, asset_id) [delete: restrict]
+Ref: notifications.recipient_user_id > users.id [delete: restrict]
+Ref: notifications.actor_user_id > users.id [delete: restrict]

@@ -549,12 +549,36 @@ class AdminAuditLog(Base):
     )
 
 
+class Notification(Base):
+    __tablename__ = "notifications"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    recipient_user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    actor_user_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
+    target_type: Mapped[str] = mapped_column(Text, nullable=False)
+    target_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    dedupe_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        Index("ix_notifications_recipient_created", "recipient_user_id", created_at.desc()),
+        Index("ix_notifications_recipient_read", "recipient_user_id", "read_at"),
+        UniqueConstraint("dedupe_key", name="uq_notifications_dedupe_key"),
+        CheckConstraint("type IN ('reaction','comment','moderation','announcement')", name="notification_type"),
+        CheckConstraint("target_type IN ('post','comment','system')", name="notification_target_type"),
+    )
+
+
 def reviewed_metadata(revision):
     """Exact reviewed predecessor shapes; never mutate mapped runtime metadata."""
     if revision not in {'0009_vault_open','0010_social_reactions','0011_vault_v1','0012_aura_v1'}:
         raise ValueError('Unknown reviewed schema revision')
     metadata = MetaData(naming_convention=Base.metadata.naming_convention)
     for table in Base.metadata.sorted_tables:
+        if table.name == 'notifications':
+            continue
         if revision != '0012_aura_v1' and table.name == 'aura_reward_events':
             continue
         if revision == '0009_vault_open' and table.name == 'comment_reactions':

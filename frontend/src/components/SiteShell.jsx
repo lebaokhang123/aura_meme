@@ -6,6 +6,8 @@ import {logoutAccount} from '../runtime.js';
 import { useFeed } from '../FeedContext.jsx';
 import { LanguageSwitch } from './LanguageSwitch.jsx';
 import { ThemeSwitch } from './ThemeSwitch.jsx';
+import { NotificationsDropdown } from './NotificationsDropdown.jsx';
+import { getUnreadCount } from '../notifications-api.js';
 
 const navigation = [
   ['trang-chu', '/', 'Trang chủ'], ['kham-pha', '/explore', 'Khám phá'],
@@ -25,11 +27,33 @@ export function SiteHeader() {
   useEffect(() => setQuery(filters.q), [filters.q]);
   const user = readDemoUser();
   const [open, setOpen] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const header = useRef(null);
   const accountButton = useRef(null);
+  const notificationButton = useRef(null);
   const profile = useRef(null);
   const path = location.pathname.replace(/\/$/, '') || '/';
   const toggle = name => setOpen(current => current === name ? null : name);
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    const fetchCount = () => {
+      getUnreadCount()
+        .then(data => {
+          if (active && typeof data?.unread_count === 'number') {
+            setUnreadCount(data.unread_count);
+          }
+        })
+        .catch(() => {});
+    };
+    fetchCount();
+    window.addEventListener('focus', fetchCount);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', fetchCount);
+    };
+  }, [user]);
   useEffect(() => {
     const outside = event => { if (!event.target.closest('[data-header-popup]')) setOpen(null); };
     const keys = event => {
@@ -58,7 +82,32 @@ export function SiteHeader() {
           <ThemeSwitch />
           <LanguageSwitch open={open === 'language'} onToggle={() => toggle('language')} onClose={() => setOpen(null)} />
           {user ? <>
-            <button type="button" className="site-icon-button" aria-label="Thông báo" title="Thông báo">{symbol('notifications')}</button>
+            <div className="site-notifications" data-header-popup="notifications">
+              <button
+                ref={notificationButton}
+                type="button"
+                className={`site-icon-button notification-trigger${unreadCount > 0 ? ' has-unread' : ''}`}
+                aria-label="Thông báo"
+                title="Thông báo"
+                aria-haspopup="true"
+                aria-expanded={open === 'notifications'}
+                aria-controls="site-notifications-menu"
+                onClick={() => toggle('notifications')}
+              >
+                {symbol('notifications')}
+                {unreadCount > 0 && (
+                  <span className="notification-badge" aria-label={`${unreadCount} chưa đọc`}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              {open === 'notifications' && (
+                <NotificationsDropdown
+                  onClose={() => setOpen(null)}
+                  onUnreadChange={setUnreadCount}
+                />
+              )}
+            </div>
             <div className="site-account" data-header-popup="account"><button ref={accountButton} type="button" className="account-trigger" aria-label="Mở menu tài khoản" aria-haspopup="true" aria-expanded={open === 'account'} aria-controls="site-account-menu" onClick={() => toggle('account')}><img className="account-avatar" src={user.avatar} alt={`Ảnh đại diện ${user.displayName}`} width="32" height="32" /></button>
               {open === 'account' && <div className="site-dropdown" id="site-account-menu"><button type="button" onClick={() => { setOpen(null); if(MOCK_AUTH)profile.current.showModal();else location.assign('/profile'); }}>{symbol('person')}Thông tin</button><button type="button" className="logout-action" onClick={event => logoutAccount(event.currentTarget)}>{symbol('logout')}Đăng xuất</button></div>}
             </div>
