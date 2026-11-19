@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getNotifications, getUnreadCount, markRead, markAllRead } from '../src/notifications-api.js';
+import { getNotifications, getUnreadCount, markRead, markAllRead, createAnnouncement } from '../src/notifications-api.js';
 
 function mockClient() {
   const calls = [];
@@ -88,4 +88,18 @@ test('notifications API: mark all notifications read', async () => {
   assert.equal(client.calls[0].method, 'POST');
   assert.equal(client.calls[0].path, '/notifications/read-all');
   assert.equal(res.marked_read, 3);
+});
+
+test('notifications API: create admin announcement', async () => {
+  const client = mockClient();
+  client.write = async (method, path, body) => {
+    client.calls.push({ method, path, body });
+    return { success: true, recipients_count: 5, created_at: '2026-11-20T00:00:00Z' };
+  };
+  const res = await createAnnouncement({ title: 'Server Upgrade', body: 'Downtime at 00:00' }, { client });
+  assert.equal(client.calls[0].method, 'POST');
+  assert.equal(client.calls[0].path, '/admin/announcements');
+  assert.equal(client.calls[0].body.title, 'Server Upgrade');
+  assert.equal(res.success, true);
+  assert.equal(res.recipients_count, 5);
 });

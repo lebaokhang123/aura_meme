@@ -122,3 +122,28 @@ export async function markAllRead({ client = auth } = {}) {
   }
   return client.write('POST', '/notifications/read-all');
 }
+
+export async function createAnnouncement({ title, body }, { client = auth } = {}) {
+  if (MOCK_AUTH) {
+    const all = readMockNotifications();
+    const item = {
+      id: `notif-mock-${Date.now()}`,
+      type: 'announcement',
+      target_type: 'system',
+      target_id: null,
+      actor: {
+        id: 'admin',
+        username: 'admin',
+        display_name: 'Quản trị viên',
+        avatar_url: '/assets/brand/favicon-64.png'
+      },
+      payload: { title, body },
+      created_at: new Date().toISOString(),
+      read_at: null,
+      is_read: false
+    };
+    writeMockNotifications([item, ...all]);
+    return { success: true, recipients_count: 1, created_at: item.created_at };
+  }
+  return client.write('POST', '/admin/announcements', { title, body });
+}

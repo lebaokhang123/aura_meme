@@ -369,3 +369,44 @@ def test_admin_moderation_notification_post_and_comment():
         now=now
     )
     assert notif_self_mod is None
+
+
+def test_admin_announcements_openapi():
+    from app.main import app
+    schema = app.openapi()
+    post_op = schema["paths"]["/api/v1/admin/announcements"]["post"]
+    assert post_op["operationId"] == "adminCreateAnnouncement"
+    assert post_op["security"] == [{"sessionCookie": []}]
+    assert {"200", "401", "403"} <= set(post_op["responses"])
+
+
+def test_admin_announcements_fanout():
+    from app.admin_posts import create_admin_announcement, AnnouncementInput
+    from types import SimpleNamespace
+    db = MagicMock()
+    admin_id = uuid4()
+    u1, u2, u3 = uuid4(), uuid4(), uuid4()
+
+    scalars_mock = MagicMock()
+    scalars_mock.all.return_value = [u1, u2, u3]
+    db.scalars.return_value = scalars_mock
+
+    now_val = datetime.now(timezone.utc)
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(auth=SimpleNamespace(now=lambda: now_val))))
+    account = SimpleNamespace(db=db, user=SimpleNamespace(id=admin_id))
+
+    payload = AnnouncementInput(title="Bảo trì hệ thống", body="Máy chủ sẽ bảo trì lúc 00:00")
+    res = create_admin_announcement(payload, request, account)
+
+    assert res.success is True
+    assert res.recipients_count == 3
+    assert res.created_at == now_val
+
+    # Verify notifications added
+    db.add_all.assert_called_once()
+    created_items = db.add_all.call_args[0][0]
+    assert len(created_items) == 3
+    assert {item.recipient_user_id for item in created_items} == {u1, u2, u3}
+    assert all(item.type == "announcement" for item in created_items)
+    assert all(item.payload["title"] == "Bảo trì hệ thống" for item in created_items)
+    assert db.flush.assert_called_once is not None

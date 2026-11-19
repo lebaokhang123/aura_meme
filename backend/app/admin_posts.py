@@ -11,7 +11,7 @@ from app.auth import CSRF_HEADER, ERRORS
 from app.auth_schemas import ErrorResponse
 from app.blog import page_rows, post_dto, validate_post
 from app.blog_schemas import Pagination, PostPage, PostPatch, PostResponse
-from app.models import AdminAuditLog, Category, Post, Profile, User
+from app.models import AdminAuditLog, Category, Notification, Post, Profile, User
 from app.permissions import require_role
 from app.security import AuthError
 
@@ -22,6 +22,17 @@ NOT_FOUND = {404: {"model": ErrorResponse}}
 class AdminPostPatch(PostPatch):
     status: Literal["draft", "published", "hidden"] = None
     reason: str | None = Field(default=None, max_length=500)
+
+
+class AnnouncementInput(BaseModel):
+    title: str = Field(min_length=1, max_length=150)
+    body: str = Field(min_length=1, max_length=2000)
+
+
+class AnnouncementResponse(BaseModel):
+    success: bool
+    recipients_count: int
+    created_at: datetime
 
 
 class AdminAuditEvent(BaseModel):
@@ -178,3 +189,48 @@ def list_audit(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1
                 "created_asc": (AdminAuditLog.created_at, AdminAuditLog.id), "action_asc": (AdminAuditLog.action, AdminAuditLog.id)}
     rows, pagination = page_rows(account.db, statement.order_by(*ordering[sort]), page, page_size)
     return AuditPage(items=[AdminAuditEvent.model_validate(row[0], from_attributes=True) for row in rows], pagination=pagination)
+
+
+@router.post("/announcements", response_model=AnnouncementResponse, operation_id="adminCreateAnnouncement",
+             responses=ERRORS, openapi_extra=CSRF_HEADER)
+def create_admin_announcement(payload: AnnouncementInput, request: Request,
+                              account=Depends(require_admin_mutation, scope="function")):
+    now = request.app.state.auth.now()
+    active_user_ids = account.db.scalars(
+        select(User.id).where(User.status == "active")
+    ).all()
+
+    if active_user_ids:
+        notifications = [
+            Notification(
+                id=uuid4(),
+                recipient_user_id=uid,
+                actor_user_id=account.user.id,
+                type="announcement",
+                target_type="system",
+                target_id=None,
+                payload={"title": payload.title, "body": payload.body},
+                created_at=now,
+                read_at=None,
+                dedupe_key=None,
+            )
+            for uid in active_user_ids
+        ]
+        account.db.add_all(notifications)
+
+    account.db.add(AdminAuditLog(
+        id=uuid4(),
+        actor_id=account.user.id,
+        action="announcement.create",
+        target_type="system",
+        target_id="all",
+        before_json={},
+        after_json={"title": payload.title, "recipients_count": len(active_user_ids)},
+        created_at=now
+    ))
+    account.db.flush()
+    return AnnouncementResponse(
+        success=True,
+        recipients_count=len(active_user_ids),
+        created_at=now
+    )
