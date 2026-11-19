@@ -151,3 +151,114 @@ def test_notifications_guest_rejected(monkeypatch):
 
         res = client.post("/api/v1/notifications/read-all")
         assert res.status_code == 401
+
+
+def test_reaction_deduplication_updates_payload():
+    from app.notifications import create_notification
+    from app.models import Notification
+    db = MagicMock()
+    recipient_id = uuid4()
+    actor_id = uuid4()
+    now = datetime.now(timezone.utc)
+    dedupe_key = "reaction:post1:user1"
+
+    existing_notif = Notification(
+        id=uuid4(),
+        recipient_user_id=recipient_id,
+        actor_user_id=actor_id,
+        type="reaction",
+        target_type="post",
+        payload={"reaction_type": "like"},
+        created_at=now,
+        dedupe_key=dedupe_key
+    )
+    db.scalar.return_value = existing_notif
+
+    new_payload = {"reaction_type": "fire"}
+    res = create_notification(
+        db,
+        recipient_user_id=recipient_id,
+        actor_user_id=actor_id,
+        type="reaction",
+        target_type="post",
+        payload=new_payload,
+        dedupe_key=dedupe_key,
+        now=now
+    )
+    assert res is existing_notif
+    assert existing_notif.payload == new_payload
+    db.flush.assert_called_once()
+    db.add.assert_not_called()
+
+
+def test_social_notification_helpers_reaction_and_comment():
+    from app.notifications import create_notification
+    db = MagicMock()
+    author_id = uuid4()
+    interactor_id = uuid4()
+    post_id = uuid4()
+    comment_id = uuid4()
+    now = datetime.now(timezone.utc)
+
+    # 1. Reaction from another user
+    db.scalar.return_value = None  # No existing dedupe
+    notif_react = create_notification(
+        db,
+        recipient_user_id=author_id,
+        type="reaction",
+        target_type="post",
+        target_id=post_id,
+        actor_user_id=interactor_id,
+        payload={"reaction_type": "fire", "post_title": "Test Title"},
+        dedupe_key=f"reaction:{post_id}:{interactor_id}",
+        now=now
+    )
+    assert notif_react is not None
+    assert notif_react.recipient_user_id == author_id
+    assert notif_react.actor_user_id == interactor_id
+    assert notif_react.type == "reaction"
+    assert notif_react.payload["reaction_type"] == "fire"
+
+    # 2. Reaction on own post (self-interaction guard)
+    notif_self_react = create_notification(
+        db,
+        recipient_user_id=author_id,
+        type="reaction",
+        target_type="post",
+        target_id=post_id,
+        actor_user_id=author_id,
+        payload={"reaction_type": "fire"},
+        now=now
+    )
+    assert notif_self_react is None
+
+    # 3. Comment from another user
+    db.scalar.return_value = None
+    notif_comment = create_notification(
+        db,
+        recipient_user_id=author_id,
+        type="comment",
+        target_type="comment",
+        target_id=comment_id,
+        actor_user_id=interactor_id,
+        payload={"post_id": str(post_id), "comment_body": "Nice meme!", "post_title": "Test Title"},
+        dedupe_key=f"comment:{comment_id}",
+        now=now
+    )
+    assert notif_comment is not None
+    assert notif_comment.recipient_user_id == author_id
+    assert notif_comment.type == "comment"
+    assert notif_comment.payload["comment_body"] == "Nice meme!"
+
+    # 4. Comment on own post
+    notif_self_comment = create_notification(
+        db,
+        recipient_user_id=author_id,
+        type="comment",
+        target_type="comment",
+        target_id=comment_id,
+        actor_user_id=author_id,
+        payload={"post_id": str(post_id), "comment_body": "My own comment"},
+        now=now
+    )
+    assert notif_self_comment is None

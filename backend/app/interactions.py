@@ -98,6 +98,24 @@ def set_reaction(post_id: UUID, payload: ReactionInput, request: Request, accoun
     if first:
         from app.aura_runtime import award_reaction
         award_reaction(account.db, post_id, account.user.id, now)
+    post = account.db.get(Post, post_id)
+    author_id = getattr(post, "author_id", None)
+    if author_id is not None and author_id != account.user.id:
+        from app.notifications import create_notification
+        create_notification(
+            account.db,
+            recipient_user_id=author_id,
+            type="reaction",
+            target_type="post",
+            target_id=post_id,
+            actor_user_id=account.user.id,
+            payload={
+                "reaction_type": payload.reaction_type,
+                "post_title": (getattr(post, "title", None) or "")[:80],
+            },
+            dedupe_key=f"reaction:{post_id}:{account.user.id}",
+            now=now,
+        )
     return ReactionResult(post_id=post_id, **payload.model_dump())
 
 

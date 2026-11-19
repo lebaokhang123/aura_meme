@@ -73,6 +73,9 @@ def create_notification(
     if dedupe_key:
         existing = db.scalar(select(Notification).where(Notification.dedupe_key == dedupe_key))
         if existing is not None:
+            if payload is not None and existing.payload != payload:
+                existing.payload = payload
+                db.flush()
             return existing
 
     item = Notification(

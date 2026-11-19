@@ -118,6 +118,26 @@ def add_comment(post_id: UUID, payload: CommentInput, request: Request, account=
         raise
     from app.aura_runtime import award_comment
     award_comment(account.db, comment, now)
+    post = account.db.get(Post, post_id)
+    author_id = getattr(post, "author_id", None)
+    if author_id is not None and author_id != account.user.id:
+        from app.notifications import create_notification
+        create_notification(
+            account.db,
+            recipient_user_id=author_id,
+            type="comment",
+            target_type="comment",
+            target_id=comment.id,
+            actor_user_id=account.user.id,
+            payload={
+                "post_id": str(post_id),
+                "post_title": (getattr(post, "title", None) or "")[:80],
+                "comment_id": str(comment.id),
+                "comment_body": (comment.body or "")[:120],
+            },
+            dedupe_key=f"comment:{comment.id}",
+            now=now,
+        )
     return comment_dto(comment, account.user, account.db.get(Profile, account.user.id))
 
 
