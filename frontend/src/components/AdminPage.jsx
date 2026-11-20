@@ -179,7 +179,7 @@ export default function AdminPage(){
    {data&&<nav className="workspace-pagination" aria-label={t('Phân trang quản trị','Admin pagination')}><button type="button" disabled={loading||page<=1} onClick={()=>setPage(n=>n-1)}>{t('Trước','Previous')}</button><span>{page} / {Math.max(1,data.pagination.total_pages)} · {data.pagination.total} {t('mục','records')}</span><button type="button" disabled={loading||page>=data.pagination.total_pages} onClick={()=>setPage(n=>n+1)}>{t('Sau','Next')}</button></nav>}
   </section>
   </div>
-  <dialog ref={dialog} className="workspace-dialog" aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='announcement'?t('Soạn thông báo hệ thống','Compose announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Chi tiết & Xử lý liên hệ','Contact details & processing'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>
+  <dialog ref={dialog} className="workspace-dialog" aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='announcement'?t('Soạn Thông báo','Compose Announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Chi tiết & Xử lý liên hệ','Contact details & processing'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>
    {edit.type==='content-preview'&&<div className="admin-content-preview">
       <div className="admin-content-preview-header">
         <div className="admin-content-preview-meta">
@@ -213,11 +213,11 @@ export default function AdminPage(){
          onBlur={()=>setHoldingPreview(false)}
        >
          <Icon name="visibility" />
-         <span>{t('Giữ để xem trước', 'Hold to preview')}</span>
+         
        </button>
      </div>
      <textarea id="admin-announcement-body" value={edit.body} maxLength={2000} required disabled={busy} rows={6} placeholder={t('Nội dung thông báo toàn hệ thống…','Broadcast announcement body…')} onChange={e=>setEdit({...edit,body:e.target.value})}/>
-     <p className="workspace-meta">{t('Thông báo sẽ được gửi tới tất cả thành viên đang hoạt động khi phát.','Announcement will be delivered to all active members when broadcasted.')}</p>
+     <p className="workspace-meta">{t('Thông báo sẽ được gửi tới tất cả thành viên đang hoạt động.','All active members will receive this announcement.')}</p>
      {holdingPreview&&(
        <div className="admin-hold-preview-overlay" role="region" aria-live="polite">
          <div className="admin-hold-preview-card">
@@ -227,7 +227,7 @@ export default function AdminPage(){
            </div>
            <h4 className="admin-hold-preview-title">{edit.title?.trim()||t('(Chưa có tiêu đề)','(No title)')}</h4>
            <p className="admin-hold-preview-body">{edit.body?.trim()||t('(Chưa có nội dung)','(No content)')}</p>
-           <span className="admin-hold-preview-meta">{t('Thả chuột hoặc phím để tiếp tục soạn thảo', 'Release to resume composing')}</span>
+           
          </div>
        </div>
      )}
