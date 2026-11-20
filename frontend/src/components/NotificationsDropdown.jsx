@@ -319,24 +319,40 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
                 const postTitle = notif.payload?.post_title;
                 const reason = notif.payload?.reason;
 
-                let message = '';
                 let iconName = 'notifications';
+                let actorName = '';
+                let notifTitle = '';
+                let notifSnippet = '';
 
                 if (notif.type === 'reaction') {
                   iconName = reactionType === 'fire' ? 'local_fire_department' : 'favorite';
-                  message = t(
-                    `đã thả biểu cảm ${reactionType ? `(${reactionType})` : ''} vào bài viết của bạn`,
-                    `reacted to your post`
+                  actorName = actor?.display_name || actor?.username || t('Thành viên AuraMeme', 'AuraMeme Member');
+                  notifTitle = t(
+                    `Đã thả biểu cảm ${reactionType ? `(${reactionType})` : ''} vào bài viết của bạn`,
+                    `Reacted to your post`
                   );
+                  notifSnippet = postTitle ? `"${postTitle}"` : '';
                 } else if (notif.type === 'comment') {
                   iconName = 'chat_bubble';
-                  message = t('đã bình luận vào bài viết của bạn', 'commented on your post');
+                  actorName = actor?.display_name || actor?.username || t('Thành viên AuraMeme', 'AuraMeme Member');
+                  notifTitle = t('Đã bình luận vào bài viết của bạn', 'Commented on your post');
+                  notifSnippet = notif.payload?.comment_text || notif.payload?.content || body || (postTitle ? `"${postTitle}"` : '');
                 } else if (notif.type === 'moderation') {
                   iconName = 'shield';
-                  message = t('Nội dung của bạn đã được kiểm duyệt bởi Quản trị viên', 'Your content was moderated by an Administrator');
+                  actorName = actor?.display_name || t('Ban Quản Trị AuraMeme', 'AuraMeme Moderation Team');
+                  notifTitle = notif.payload?.action === 'deleted'
+                    ? t('Nội dung đã bị xóa bởi Quản trị viên', 'Content deleted by Moderator')
+                    : t('Nội dung đã được kiểm duyệt bởi Quản trị viên', 'Content moderated by Moderator');
+                  notifSnippet = reason ? `${t('Lý do:', 'Reason:')} ${reason}` : (notif.payload?.target_title ? `"${notif.payload.target_title}"` : (postTitle ? `"${postTitle}"` : ''));
                 } else if (notif.type === 'announcement') {
                   iconName = 'campaign';
-                  message = title || t('Thông báo từ Hệ Thống AuraMeme', 'Announcement from AuraMeme System');
+                  actorName = actor?.display_name || t('Hệ thống AuraMeme', 'AuraMeme System');
+                  notifTitle = title || t('Thông báo từ Hệ Thống AuraMeme', 'Announcement from AuraMeme System');
+                  notifSnippet = body || '';
+                } else {
+                  actorName = actor?.display_name || t('Hệ thống AuraMeme', 'AuraMeme System');
+                  notifTitle = title || t('Thông báo', 'Notification');
+                  notifSnippet = body || '';
                 }
 
                 return (
@@ -370,36 +386,20 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
                     </div>
 
                     <div className="notification-content">
-                      <div className="notification-text">
-                        {actor && (
-                          <strong className="notification-actor">
-                            {actor.display_name}{' '}
-                          </strong>
-                        )}
-                        <span>{message}</span>
-                      </div>
-
-                      {postTitle && (
-                        <p className="notification-preview-title">
-                          "{postTitle}"
-                        </p>
-                      )}
-
-                      {body && (
-                        <p className="notification-preview-body">
-                          {body}
-                        </p>
-                      )}
-
-                      {reason && (
-                        <p className="notification-reason">
-                          <em>{t('Lý do:', 'Reason:')} {reason}</em>
-                        </p>
-                      )}
-
-                      <span className="notification-time">
-                        {formatRelativeTime(notif.created_at, t)}
+                      <span className="notification-card-actor notification-actor" translate="no">
+                        {actorName}
                       </span>
+                      <strong className="notification-card-title">
+                        {notifTitle}
+                      </strong>
+                      {notifSnippet ? (
+                        <span className="notification-card-snippet" translate="no">
+                          {notifSnippet}
+                        </span>
+                      ) : null}
+                      <time className="notification-card-time notification-time" dateTime={notif.created_at}>
+                        {formatRelativeTime(notif.created_at, t)}
+                      </time>
                     </div>
 
                     <div className="notification-item-actions">
