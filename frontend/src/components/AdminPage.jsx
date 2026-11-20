@@ -63,7 +63,7 @@ export default function AdminPage(){
  function choose(value){setResource(value);setPage(1);setQuery('');setSearch('');setFilter('');setRole('');setError('');setSuccess('');}
  function confirm(row,body,label,path='/admin/'+resource+'/'+row.id,method='PATCH'){setError('');setEdit({type:'confirm',row,body,label,path,method})}
  async function save(event){
-  event.preventDefault();if(edit?.type==='content-preview'){setEdit(null);return;}if(inflight.current||!edit)return;inflight.current=true;setBusy(true);setError('');setSuccess('');const requestOwner=owner;
+  event.preventDefault();if(edit?.type==='content-preview'||edit?.type==='announcement-preview'){setEdit(null);return;}if(inflight.current||!edit)return;inflight.current=true;setBusy(true);setError('');setSuccess('');const requestOwner=owner;
   let method=edit.method||'PATCH',path=edit.path||'/admin/'+resource+'/'+(edit.row?.id||''),body=edit.body;
   if(edit.type==='roles'){method='PUT';path='/admin/users/'+edit.row.id+'/roles';body={roles:edit.roles}}
   if(edit.type==='category'){method=edit.row?'PATCH':'POST';path='/admin/categories'+(edit.row?'/'+edit.row.id:'');body=edit.row?{name:edit.name,status:edit.status}:{name:edit.name,slug:edit.slug};}
@@ -136,7 +136,7 @@ export default function AdminPage(){
         </div>
       </details>
     </div>}
-    {resource==='announcements'&&<><h3>{row.title}</h3><p className="workspace-meta">@{row.actor_username||'admin'} · {stamp(row.created_at)}</p><details><summary>{t('Xem nội dung','View content')}</summary><p className="workspace-text" translate="no">{row.body}</p>{row.published_at&&<p className="workspace-meta">{t('Phát lúc:','Broadcasted at:')} {stamp(row.published_at)} · {row.recipients_count} {t('người nhận','recipients')}</p>}</details></>}
+    {resource==='announcements'&&<><h3>{row.title}</h3><p className="workspace-meta">@{row.actor_username||'admin'} · {stamp(row.created_at)}{row.published_at&&` · ${t('Phát lúc:','Broadcasted at:')} ${stamp(row.published_at)}`}{typeof row.recipients_count==='number'&&` · ${row.recipients_count} ${t('người nhận','recipients')}`}</p><p className="admin-content-snippet" translate="no">{row.body?.length>120?(row.body.slice(0,120)+'…'):row.body}</p></>}
    </div><div className="admin-row-status">
     {resource==='audit-logs'&&<time className="workspace-meta" dateTime={row.created_at}>{stamp(row.created_at)}</time>}
     {row.status&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='assets'&&<span className="workspace-badge">{row.active?t('Đang bật','Active'):t('Đang tắt','Inactive')}</span>}
@@ -163,23 +163,23 @@ export default function AdminPage(){
     </div>}
     {resource==='categories'&&<button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'category',row,name:row.name,status:row.status})}}>{t('Chỉnh sửa','Edit')}</button>}
     {resource==='contacts'&&<button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'contact',row,status:row.status})}}>{t('Xem và xử lý','View and update')}</button>}
-    {resource==='announcements'&&<>
+    {resource==='announcements'&&<div className="admin-action-icons">
+      <button type="button" className="admin-icon-btn" disabled={busy} aria-label={t('Xem chi tiết thông báo','View announcement details')} title={t('Xem chi tiết thông báo','View announcement details')} onClick={()=>{setError('');setEdit({type:'announcement-preview',row})}}><Icon name="visibility"/></button>
       {row.status==='draft'&&<>
-        <button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'announcement',row,title:row.title,body:row.body,mode:'compose'})}}>{t('Sửa','Edit')}</button>
-        <button type="button" disabled={busy} className="workspace-primary" onClick={()=>confirm(row,{},t('Phát thông báo này tới tất cả thành viên đang hoạt động?','Broadcast this announcement to all active members?'),'/admin/announcements/'+row.id+'/publish','POST')}>{t('Phát ngay','Publish')}</button>
-        <button type="button" disabled={busy} className="text-error" onClick={()=>confirm(row,{},t('Xóa bản nháp này?','Delete this draft?'),'/admin/announcements/'+row.id,'DELETE')}>{t('Xóa','Delete')}</button>
+        <button type="button" className="admin-icon-btn" disabled={busy} aria-label={t('Sửa bản nháp','Edit draft')} title={t('Sửa bản nháp','Edit draft')} onClick={()=>{setError('');setEdit({type:'announcement',row,title:row.title,body:row.body,mode:'compose'})}}><Icon name="edit"/></button>
+        <button type="button" className="admin-icon-btn" disabled={busy} aria-label={t('Phát thông báo ngay','Broadcast announcement now')} title={t('Phát thông báo ngay','Broadcast announcement now')} onClick={()=>confirm(row,{},t('Phát thông báo này tới tất cả thành viên đang hoạt động?','Broadcast this announcement to all active members?'),'/admin/announcements/'+row.id+'/publish','POST')}><Icon name="send"/></button>
+        <button type="button" className="admin-icon-btn text-error" disabled={busy} aria-label={t('Xóa bản nháp','Delete draft')} title={t('Xóa bản nháp','Delete draft')} onClick={()=>confirm(row,{},t('Xóa bản nháp này?','Delete this draft?'),'/admin/announcements/'+row.id,'DELETE')}><Icon name="delete"/></button>
       </>}
       {row.status==='published'&&<>
-        <button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'announcement',row:null,title:`[${t('Đính chính','Correction')}] ${row.title}`,body:row.body,mode:'compose'})}}>{t('Đính chính','Rectify')}</button>
-        <button type="button" disabled={busy} className="text-error" onClick={()=>confirm(row,{},t('Thu hồi thông báo này? Người dùng sẽ không thấy thông báo này nữa.','Withdraw this announcement? Users will no longer see it as active.'),'/admin/announcements/'+row.id+'/withdraw','POST')}>{t('Thu hồi','Withdraw')}</button>
+        <button type="button" className="admin-icon-btn" disabled={busy} aria-label={t('Đính chính thông báo','Rectify announcement')} title={t('Đính chính thông báo','Rectify announcement')} onClick={()=>{setError('');setEdit({type:'announcement',row:null,title:`[${t('Đính chính','Correction')}] ${row.title}`,body:row.body,mode:'compose'})}}><Icon name="edit"/></button>
+        <button type="button" className="admin-icon-btn text-error" disabled={busy} aria-label={t('Thu hồi thông báo','Withdraw announcement')} title={t('Thu hồi thông báo','Withdraw announcement')} onClick={()=>confirm(row,{},t('Thu hồi thông báo này? Người dùng sẽ không thấy thông báo này nữa.','Withdraw this announcement? Users will no longer see it as active.'),'/admin/announcements/'+row.id+'/withdraw','POST')}><Icon name="undo"/></button>
       </>}
-      {row.status==='withdrawn'&&<span className="workspace-meta">{t('Đã thu hồi','Withdrawn')}</span>}
-    </>}
+    </div>}
    </div></article>)}</div>}
    {data&&<nav className="workspace-pagination" aria-label={t('Phân trang quản trị','Admin pagination')}><button type="button" disabled={loading||page<=1} onClick={()=>setPage(n=>n-1)}>{t('Trước','Previous')}</button><span>{page} / {Math.max(1,data.pagination.total_pages)} · {data.pagination.total} {t('mục','records')}</span><button type="button" disabled={loading||page>=data.pagination.total_pages} onClick={()=>setPage(n=>n+1)}>{t('Sau','Next')}</button></nav>}
   </section>
   </div>
-  <dialog ref={dialog} className="workspace-dialog" aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='announcement'?t('Soạn Thông báo','Compose Announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Chi tiết & Xử lý liên hệ','Contact details & processing'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>
+  <dialog ref={dialog} className="workspace-dialog" aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='announcement-preview'?t('Chi tiết thông báo hệ thống','Announcement details'):edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='announcement'?t('Soạn thông báo hệ thống','Compose system announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Chi tiết & Xử lý liên hệ','Contact details & processing'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>
    {edit.type==='content-preview'&&<div className="admin-content-preview">
       <div className="admin-content-preview-header">
         <div className="admin-content-preview-meta">
@@ -192,6 +192,21 @@ export default function AdminPage(){
       {edit.targetResource==='comments'&&edit.row?.post_id&&<div className="admin-content-ref-quote"><Icon name="format_quote"/><span>{t('Bình luận trên bài viết #','Comment on post #')}{edit.row.post_id}</span></div>}
       <div className="admin-content-preview-body" translate="no">{edit.row?.content??edit.row?.body}</div>
       {edit.targetResource==='posts'&&edit.row?.media_url&&edit.row?.status!=='deleted'&&<div className="admin-content-preview-media"><img src={edit.row.media_url.startsWith('http')||edit.row.media_url.startsWith('/')?edit.row.media_url:('/api/v1/admin/posts/'+edit.row.id+'/media')} alt={edit.row.title||'Post media'} loading="lazy"/></div>}
+    </div>}
+    {edit.type==='announcement-preview'&&<div className="admin-content-preview admin-announcement-preview">
+      <div className="admin-content-preview-header">
+        <div className="admin-content-preview-meta">
+          <span className="admin-content-preview-author">@{edit.row?.actor_username||'admin'}</span>
+          <span className="admin-content-preview-time">
+            {stamp(edit.row?.created_at)}
+            {edit.row?.published_at&&` · ${t('Phát lúc:','Broadcasted at:')} ${stamp(edit.row.published_at)}`}
+            {typeof edit.row?.recipients_count==='number'&&` · ${edit.row.recipients_count} ${t('người nhận','recipients')}`}
+          </span>
+        </div>
+        {edit.row?.status&&<span className="workspace-badge" data-status={edit.row.status}>{status(edit.row.status)}</span>}
+      </div>
+      <h3 className="admin-content-preview-title">{edit.row?.title}</h3>
+      <div className="admin-content-preview-body" translate="no">{edit.row?.body}</div>
     </div>}
     {edit.type==='confirm'&&<><p className="admin-confirm-target">{edit.row?.display_name||edit.row?.title||edit.row?.body}</p><p>{edit.label||t('Xác nhận thao tác này?','Confirm this action?')}</p></>}
    {edit.type==='announcement'&&<>
@@ -263,7 +278,7 @@ export default function AdminPage(){
     {edit.type==='moderate'&&<><p className="admin-confirm-target" translate="no">{edit.row?.title||edit.row?.body||edit.row?.id}</p><p>{edit.action==='hidden'?t('Ẩn nội dung này khỏi cộng đồng?','Hide this content from the community?'):t('Xóa hoàn toàn nội dung này?','Permanently delete this content?')}</p><label>{t('Lý do kiểm duyệt (5-500 ký tự) *','Moderation reason (5-500 chars) *')}<textarea value={edit.reason||''} maxLength={500} required disabled={busy} rows={3} placeholder={t('Nhập lý do gửi thông báo tới tác giả…','Enter reason to notify author…')} onChange={e=>setEdit({...edit,reason:e.target.value})}/></label><p className="workspace-meta">{t('Lý do sẽ được ghi vào nhật ký và gửi thông báo tới tác giả.','Reason will be logged and dispatched to the author.')}</p></>}
    {error&&<p className="workspace-error" role="alert">{error}</p>}
    <div className="workspace-dialog-actions">
-      {edit.type==='content-preview'?(
+      {edit.type==='content-preview'||edit.type==='announcement-preview'?(
         <button type="button" className="workspace-primary" onClick={()=>{setEdit(null);setHoldingPreview(false);}}>{t('Đóng','Close')}</button>
       ):(
         <>
