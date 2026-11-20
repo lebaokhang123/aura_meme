@@ -55,8 +55,8 @@ export default function AdminPage(){
  useEffect(()=>{setDenied(false);setData(null);setEdit(null);setHoldingPreview(false);setError('');setSuccess('');},[owner]);
  useEffect(()=>{
   setData(null);setError('');if(!allowed)return;let active=true;setLoading(true);
-  const params=new URLSearchParams({page:String(page),page_size:'20'});if(search)params.set('search',search);if(filter)params.set(resource==='assets'?'review_status':'status',filter);if(resource==='users'&&role)params.set('role',role);
-  auth.read('/admin/'+resource+'?'+params).then(value=>adminPage(value,resource)).then(value=>{if(active)setData({...value,resource,owner})}).catch(e=>{if(active){setError(explain(e));if(e.status===403){setDenied(true);auth.refresh().catch(()=>{})}if(e.status===401)auth.refresh().catch(()=>{});}}).finally(()=>{if(active)setLoading(false)});
+  const params=new URLSearchParams({page:String(page),page_size:'10'});if(search)params.set('search',search);if(filter)params.set(resource==='assets'?'review_status':'status',filter);if(resource==='users'&&role)params.set('role',role);
+  auth.read('/admin/'+resource+'?'+params).then(value=>adminPage(value,resource)).then(value=>{if(active){if(value.items.length===0&&page>1&&value.pagination.total>0){setPage(p=>Math.max(1,p-1));return;}setData({...value,resource,owner});}}).catch(e=>{if(active){setError(explain(e));if(e.status===403){setDenied(true);auth.refresh().catch(()=>{})}if(e.status===401)auth.refresh().catch(()=>{});}}).finally(()=>{if(active)setLoading(false)});
   return()=>{active=false};
  },[allowed,owner,resource,search,filter,role,page,revision]);
  useEffect(()=>{if(edit&&!dialog.current?.open)dialog.current.showModal();else if(!edit){dialog.current?.close();setHoldingPreview(false);}},[edit]);
@@ -86,7 +86,7 @@ export default function AdminPage(){
     path='/admin/'+edit.targetResource+'/'+edit.row.id;
     body={status:edit.action,reason:edit.reason.trim()};
   }
-  try{await auth.write(method,path,body);if(currentOwner.current!==requestOwner)return;setEdit(null);setRevision(n=>n+1);setSuccess(t('Đã lưu thay đổi.','Changes saved.'));if(resource==='users'&&edit.row?.id===requestOwner)await auth.refresh().catch(()=>{});}
+  try{await auth.write(method,path,body);if(currentOwner.current!==requestOwner)return;setEdit(null);if((edit.action==='deleted'||method==='DELETE')&&data?.items?.length===1&&page>1){setPage(p=>Math.max(1,p-1));}setRevision(n=>n+1);setSuccess(t('Đã lưu thay đổi.','Changes saved.'));if(resource==='users'&&edit.row?.id===requestOwner)await auth.refresh().catch(()=>{});}
   catch(e){if(currentOwner.current===requestOwner){setError(explain(e));if(e.status===403){setData(null);setDenied(true);setEdit(null);auth.refresh().catch(()=>{})}}}
   finally{inflight.current=false;setBusy(false)}
  }
