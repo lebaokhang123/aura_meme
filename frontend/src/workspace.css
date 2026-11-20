@@ -181,3 +181,19 @@
 .admin-content-preview-media { max-height:280px; border-radius:8px; overflow:hidden; border:1px solid var(--am-outline-variant); display:flex; align-items:center; justify-content:center; background:var(--am-surface-container-lowest); }
 .admin-content-preview-media img { max-width:100%; max-height:280px; object-fit:contain; }
 .admin-content-snippet { font-size:12px; color:var(--am-on-surface-variant); margin:4px 0 0; line-height:1.45; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:500px; }
+/* Subtask B: Contact Management Modal */
+.admin-contact-detail { display:flex; flex-direction:column; gap:16px; padding:4px 0 8px; }
+.admin-contact-info-card { display:flex; flex-direction:column; gap:12px; padding:14px 16px; border-radius:12px; background:var(--am-surface-container-low); border:1px solid var(--am-outline-variant); }
+.admin-contact-info-header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.admin-contact-sender { display:flex; align-items:center; gap:10px; }
+.admin-contact-avatar-icon { display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:var(--am-surface-container-high); color:var(--am-primary); }
+.admin-contact-avatar-icon .material-symbols-outlined { font-size:18px; }
+.admin-contact-sender-name { font-size:14px; font-weight:700; color:var(--am-on-surface); display:block; }
+.admin-contact-time { font-size:11px; color:var(--am-on-surface-variant); display:block; }
+.admin-contact-subject { margin:0; font-size:16px; font-weight:750; color:var(--am-on-surface); line-height:1.4; }
+.admin-contact-body-section { display:flex; flex-direction:column; gap:6px; }
+.admin-contact-section-label { font-size:12px; font-weight:600; color:var(--am-on-surface-variant); }
+.admin-contact-body-box { white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; line-height:1.65; color:var(--am-on-surface); max-height:220px; overflow-y:auto; padding:14px 16px; border-radius:10px; background:var(--am-surface-container-lowest); border:1px solid var(--am-outline-variant); }
+.admin-contact-status-section { display:flex; flex-direction:column; gap:6px; margin-top:4px; }
+.admin-contact-status-section label { font-size:12px; font-weight:600; color:var(--am-on-surface); }
+.admin-contact-status-section select { min-height:44px; padding:8px 12px; border-radius:10px; background:var(--am-surface-container-lowest); border:1px solid var(--am-outline-variant); color:var(--am-on-surface); font-size:13px; }

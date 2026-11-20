@@ -127,7 +127,7 @@ export default function AdminPage(){
    {data&&<nav className="workspace-pagination" aria-label={t('Phân trang quản trị','Admin pagination')}><button type="button" disabled={loading||page<=1} onClick={()=>setPage(n=>n-1)}>{t('Trước','Previous')}</button><span>{page} / {Math.max(1,data.pagination.total_pages)} · {data.pagination.total} {t('mục','records')}</span><button type="button" disabled={loading||page>=data.pagination.total_pages} onClick={()=>setPage(n=>n+1)}>{t('Sau','Next')}</button></nav>}
   </section>
   </div>
-  <dialog ref={dialog} className="workspace-dialog" aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='announcement'?t('Soạn thông báo hệ thống','Compose announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Xử lý liên hệ','Update contact'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>
+  <dialog ref={dialog} className="workspace-dialog" aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='announcement'?t('Soạn thông báo hệ thống','Compose announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Chi tiết & Xử lý liên hệ','Contact details & processing'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>
    {edit.type==='content-preview'&&<div className="admin-content-preview">
       <div className="admin-content-preview-header">
         <div className="admin-content-preview-meta">
@@ -182,7 +182,32 @@ export default function AdminPage(){
    </>}
    {edit.type==='roles'&&<><p>@{edit.row.username}</p><fieldset><legend>{t('Vai trò từ DB','Database roles')}</legend>{['USER','ADMIN'].map(value=><label className="workspace-checkbox" key={value}><input type="checkbox" checked={edit.roles.includes(value)} disabled={busy} onChange={e=>setEdit({...edit,roles:e.target.checked?[...edit.roles,value]:edit.roles.filter(r=>r!==value)})}/>{value}</label>)}</fieldset><p className="workspace-meta">{t('Thay đổi vai trò sẽ kết thúc các phiên của tài khoản đó.','Changing roles ends that account’s sessions.')}</p></>}
    {edit.type==='category'&&<><label>{t('Tên danh mục','Category name')}<input value={edit.name} maxLength={80} required disabled={busy} onChange={e=>setEdit({...edit,name:e.target.value})}/></label>{!edit.row?<label>Slug<input value={edit.slug} maxLength={80} pattern="[a-z0-9-]+" required disabled={busy} onChange={e=>setEdit({...edit,slug:e.target.value})}/></label>:<label>{t('Trạng thái','Status')}<select value={edit.status} disabled={busy} onChange={e=>setEdit({...edit,status:e.target.value})}>{states.categories.map(v=><option value={v} key={v}>{status(v)}</option>)}</select></label>}</>}
-   {edit.type==='contact'&&<><h3>{edit.row.subject}</h3><p>{edit.row.name}</p><p className="workspace-text" translate="no">{edit.row.body}</p><label>{t('Trạng thái','Status')}<select value={edit.status} disabled={busy} onChange={e=>setEdit({...edit,status:e.target.value})}>{states.contacts.map(v=><option value={v} key={v}>{status(v)}</option>)}</select></label></>}
+   {edit.type==='contact'&&<div className="admin-contact-detail">
+      <div className="admin-contact-info-card">
+        <div className="admin-contact-info-header">
+          <div className="admin-contact-sender">
+            <span className="admin-contact-avatar-icon"><Icon name="person" /></span>
+            <div>
+              <strong className="admin-contact-sender-name">{edit.row.name}</strong>
+              <span className="admin-contact-time">{stamp(edit.row.created_at)}</span>
+            </div>
+          </div>
+          <span className="workspace-badge" data-status={edit.row.status}>{status(edit.row.status)}</span>
+        </div>
+        <h3 className="admin-contact-subject">{edit.row.subject}</h3>
+      </div>
+      <div className="admin-contact-body-section">
+        <label className="admin-contact-section-label">{t('Nội dung tin nhắn', 'Message content')}</label>
+        <div className="admin-contact-body-box" translate="no">{edit.row.body}</div>
+      </div>
+      <div className="admin-contact-status-section">
+        <label htmlFor="admin-contact-status-select">{t('Cập nhật trạng thái xử lý', 'Update processing status')}</label>
+        <select id="admin-contact-status-select" value={edit.status} disabled={busy} onChange={e=>setEdit({...edit,status:e.target.value})}>
+          {states.contacts.map(v=><option value={v} key={v}>{status(v)}</option>)}
+        </select>
+        <p className="workspace-meta">{t('Chuyển sang "Đang xử lý" hoặc "Đã xử lý" để đồng bộ với đội ngũ hỗ trợ.', 'Set to "In review" or "Resolved" to coordinate with support.')}</p>
+      </div>
+    </div>}
     {edit.type==='moderate'&&<><p className="admin-confirm-target" translate="no">{edit.row?.title||edit.row?.body||edit.row?.id}</p><p>{edit.action==='hidden'?t('Ẩn nội dung này khỏi cộng đồng?','Hide this content from the community?'):t('Xóa hoàn toàn nội dung này?','Permanently delete this content?')}</p><label>{t('Lý do kiểm duyệt (5-500 ký tự) *','Moderation reason (5-500 chars) *')}<textarea value={edit.reason||''} maxLength={500} required disabled={busy} rows={3} placeholder={t('Nhập lý do gửi thông báo tới tác giả…','Enter reason to notify author…')} onChange={e=>setEdit({...edit,reason:e.target.value})}/></label><p className="workspace-meta">{t('Lý do sẽ được ghi vào nhật ký và gửi thông báo tới tác giả.','Reason will be logged and dispatched to the author.')}</p></>}
    {error&&<p className="workspace-error" role="alert">{error}</p>}
    <div className="workspace-dialog-actions">
@@ -197,7 +222,7 @@ export default function AdminPage(){
               <button type="submit" className="workspace-primary" disabled={busy||!edit.title.trim()||!edit.body.trim()}>{busy?t('Đang phát…','Broadcasting…'):t('Phát thông báo','Broadcast')}</button>
             </>
           ):(
-            <button type="submit" className="workspace-primary" disabled={busy}>{busy?t('Đang lưu…','Saving…'):t('Xác nhận','Confirm')}</button>
+            <button type="submit" className="workspace-primary" disabled={busy}>{busy?t('Đang lưu…','Saving…'):edit.type==='contact'?t('Lưu trạng thái','Save status'):t('Xác nhận','Confirm')}</button>
           )}
         </>
       )}
