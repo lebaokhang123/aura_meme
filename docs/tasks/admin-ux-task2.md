@@ -1,6 +1,6 @@
 # AuraMeme — Task 2: Admin Workspace UX Refinement Engineering Handoff
 
-Tài liệu bàn giao kỹ thuật hoàn thành **Task 2: Tối ưu trải nghiệm trang quản trị `/admin` (Admin Workspace UX Refinement)** theo đúng yêu cầu chỉ đạo của Owner, ChatGPT giám sát và Codex review cuối.
+Tài liệu bàn giao kỹ thuật hoàn thành **Task 2: Tối ưu trải nghiệm trang quản trị `/admin` (Admin Workspace UX Refinement)** và đợt nghiệm thu **Task 2 Final Polish** theo đúng yêu cầu chỉ đạo của Owner, ChatGPT giám sát và Codex review cuối.
 
 ---
 
@@ -9,7 +9,7 @@ Tài liệu bàn giao kỹ thuật hoàn thành **Task 2: Tối ưu trải nghi�
 - **Repository:** `D:\Big\du_an_lon\aura_meme_p2_clean`
 - **Nhánh phát triển:** `feat/admin-ux-task2`
 - **Base commit SHA:** `1b80b3e` (`fix(notifications): center detail modal and simplify inbox`)
-- **Trạng thái:** Toàn bộ 6 subtask nghiệp vụ A-F đã hoàn thành với commit riêng rẽ; verification tests 100% pass.
+- **Trạng thái:** Toàn bộ các subtask nghiệp vụ và đợt tinh chỉnh cuối (Task 2 Final Polish) đã hoàn thành với commit độc lập; verification tests 100% pass.
 - **Danh sách commit nghiệp vụ trên nhánh:**
   1. `cdc5c13` — `refactor(admin): streamline content review actions` (Subtask A)
   2. `70b19ae` — `refactor(admin): improve contact detail and status workflow` (Subtask B)
@@ -17,7 +17,11 @@ Tài liệu bàn giao kỹ thuật hoàn thành **Task 2: Tối ưu trải nghi�
   4. `6ec4013` — `style(admin): refine announcement composer copy and preview icon` (Subtask D)
   5. `1d70df0` — `style(admin): use approved guardian workspace icon` (Subtask E)
   6. `352a5fa` — `fix(admin): standardize pagination to ten records` (Subtask F)
-  7. *(HEAD)* — `docs(admin): document task2 review handoff` (Subtask G)
+  7. `f89c87f` — `docs(admin): document task2 review handoff`
+  8. `4c0678a` — `fix(notifications): improve inbox message hierarchy` (Final Polish A)
+  9. `4d63ad2` — `refactor(admin): unify announcement action icons` (Final Polish B)
+  10. `f233fe9` — `style(admin): normalize content action buttons` (Final Polish C)
+  11. `a42fa5b` — `test(admin): add visual and automated coverage for task 2 final polish`
 
 ---
 
@@ -59,7 +63,7 @@ Tài liệu bàn giao kỹ thuật hoàn thành **Task 2: Tối ưu trải nghi�
   - Bổ sung nút "Sao chép" (`admin-copy-btn`) kèm phản hồi trực quan "Đã sao chép" khi copy UUID vào clipboard.
 
 ### Subtask D: Notification Composer Microcopy Polish
-- **Tiêu đề Dialog:** Đổi thành `Soạn Thông báo` / `Compose Announcement`.
+- **Tiêu đề Dialog:** Đổi thành `Soạn thông báo hệ thống` / `Compose system announcement`.
 - **Mô tả cảnh báo:** Rút gọn súc tích thành `Thông báo sẽ được gửi tới tất cả thành viên đang hoạt động.` / `All active members will receive this announcement.`
 - **Nút mắt xem trước icon-only:** Nút `#admin-preview-eye-btn` chuyển thành icon con mắt đơn lẻ dạng nút vuông 32x32px bo góc chuẩn Cyberpunk, loại bỏ text phụ bên cạnh, giữ nguyên tooltip và `aria-label="Giữ để xem trước"`.
 - **Thẻ xem trước trực tiếp:** Loại bỏ dòng chú thích thừa `"Thả chuột hoặc phím để tiếp tục soạn thảo"`.
@@ -77,60 +81,121 @@ Tài liệu bàn giao kỹ thuật hoàn thành **Task 2: Tối ưu trải nghi�
 
 ---
 
-## 3. Bằng chứng kiểm thử & Visual QA (Evidence)
+## 3. Chi tiết Task 2 Final Polish
 
-### 3.1. Frontend Unit Tests (Node test runner)
-```powershell
-node --test frontend/tests/*.test.mjs
-# Kết quả: 62 passed, 0 failed (100% pass)
-```
+### A. Personal Notification Card — Phân cấp 4 dòng độc lập
+- **File:** `frontend/src/components/NotificationsDropdown.jsx`, `frontend/src/site.css`
+- **Commit:** `4c0678a` (`fix(notifications): improve inbox message hierarchy`)
+- **Giải pháp:**
+  - Tách bạch hoàn toàn nội dung thông báo thành 4 dòng hiển thị riêng biệt theo đúng cấu trúc:
+    1. **Dòng 1 — Tên người gửi (`.notification-card-actor`):** In đậm font 700, màu trắng sáng, phân tách độc lập với tiêu đề (không ghép trong một `<span>`). Tự động hiển thị tên người gửi hoặc tên định danh hệ thống ("Admin Tổng Chủ", "Hệ thống AuraMeme", "Ban Quản Trị AuraMeme").
+    2. **Dòng 2 — Tiêu đề (`.notification-card-title`):** Font 600, màu tím nhạt thương hiệu (`#d0bcff`). Với announcement lấy tiêu đề thật từ payload; với reaction/comment/moderation hiển thị tiêu đề hành động rõ ràng.
+    3. **Dòng 3 — Nội dung tóm tắt (`.notification-card-snippet`):** Font 400, màu xám nhạt (`#9c98a8`), áp dụng CSS ellipsis nghiêm ngặt: `min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`. Không cắt ngắn chuỗi trong JavaScript/state để modal xem chi tiết vẫn đọc trọn vẹn văn bản.
+    4. **Dòng 4 — Thời gian (`.notification-card-time`):** Font mono JetBrains 11px, màu `#8e8a9a`, hiển thị thời gian tương đối ("vừa xong", "2 giờ trước", v.v.).
+  - Giữ vững toàn bộ các tính năng đã qua nghiệm thu: chống bão request storm, cooldown 429 Retry-After, chấm xanh unread, nút xóa và modal xem chi tiết.
 
-### 3.2. Frontend Production Build (Vite 7)
-```powershell
-cd frontend
-npm.cmd run build
-# Kết quả: Built in 4.88s, 130 modules transformed, zero error.
-```
+### B. Admin Announcement Action Icons & Read-Only Preview Modal
+- **File:** `frontend/src/components/AdminPage.jsx`, `frontend/src/workspace.css`
+- **Commit:** `4d63ad2` (`refactor(admin): unify announcement action icons`)
+- **Giải pháp:**
+  - **Loại bỏ `<details><summary>Xem nội dung</summary></details>`:** Thay bằng dòng snippet tóm tắt `.admin-content-snippet`, tránh bung vỡ cấu trúc bảng.
+  - **Chuẩn hóa cụm Action Icons theo từng trạng thái:**
+    - **Published (Đã phát):**
+      - `visibility`: Mở modal xem trước chi tiết (read-only).
+      - `edit`: Mở composer đính chính với tiêu đề tiền tố `[Đính chính] <tiêu đề cũ>` và giữ nguyên nội dung để chỉnh sửa.
+      - `undo`: Thu hồi thông báo với dialog xác nhận cảnh báo an toàn.
+    - **Draft (Bản nháp):**
+      - `visibility`: Xem trước nội dung bản nháp trong modal.
+      - `edit`: Sửa bản nháp trực tiếp trong composer.
+      - `send`: Phát thông báo ngay với dialog xác nhận.
+      - `delete`: Xóa bản nháp vĩnh viễn với dialog xác nhận.
+    - **Withdrawn (Đã thu hồi):**
+      - `visibility`: Xem lại chi tiết thông báo đã thu hồi; các hành động khác bị ẩn.
+  - **Modal Read-Only Announcement Preview:**
+    - Căn giữa màn hình hoàn hảo, hiển thị chi tiết: Tiêu đề, Người phát (`@actor_username`), Thời gian tạo/phát, Badge trạng thái, Số người nhận (`recipients_count`), và toàn bộ nội dung thông báo đầy đủ (`white-space: pre-wrap`).
+    - Nút đóng duy nhất ở góc trên và chân dialog, hỗ trợ phím Esc để đóng nhanh.
 
-### 3.3. Backend Unit & Regression Pytest
-```powershell
-cd backend
-.\.venv_p2\Scripts\python.exe -m pytest -m "not integration" -q
-# Kết quả: 418 passed, 0 failed, 787 deselected in 44.96s (100% pass)
-```
-
-### 3.4. Playwright End-to-End Suite
-1. **`auth-tests/admin-premium.spec.js`:**
-   - 10 tests passed (100% pass).
-2. **`auth-tests/admin-ux.spec.js`:**
-   - 7/7 tests passed (100% pass).
-   - Kiểm thử toàn diện 6 subtasks A, B, C, D, E, F và capture screenshots.
-
-### 3.5. Danh mục ảnh chụp Visual QA (Artifacts)
-Toàn bộ ảnh chụp màn hình nghiệm thu được lưu tại thư mục Artifact:
-- `admin_qa_task2_desktop.png`: Toàn cảnh Desktop 1440px bảng Bài viết với 4 icon action, snippet tóm tắt, logo Guardian mới.
-- `admin_qa_task2_content_preview.png`: Modal xem trước bài viết read-only, không nút like/comment, căn giữa hoàn hảo.
-- `admin_qa_task2_contact_modal.png`: Modal xử lý liên hệ với khối thông tin người gửi, hộp scroll tin nhắn riêng, dropdown trạng thái.
-- `admin_qa_task2_audit_activity.png`: Tab Nhật ký quản trị với tên hành động humanized, khối ID kỹ thuật kèm nút sao chép.
-- `admin_qa_task2_tablet.png`: Giao diện trên Tablet 768px.
-- `admin_qa_task2_mobile.png`: Giao diện trên Mobile 375px responsive, không vỡ layout, cụm icon căn chỉnh chuẩn.
+### C. Chuẩn hóa kích thước Action Icon Buttons (40px x 40px)
+- **File:** `frontend/src/workspace.css`
+- **Commit:** `f233fe9` (`style(admin): normalize content action buttons`)
+- **Giải pháp:**
+  - Giải quyết dứt điểm xung đột CSS độ ưu tiên giữa `.admin-list-panel .workspace-row-actions button` (trước đó ghi đè `min-height: 44px; padding: 6px 10px; background: transparent;`) và `.admin-icon-btn`.
+  - Phân tách rõ ràng: Các nút văn bản thuần ("Khóa", "Sửa vai trò", "Chỉnh sửa") giữ rule `.admin-list-panel .workspace-row-actions button:not(.admin-icon-btn)`.
+  - Cụm icon buttons sử dụng selector scoped mạnh: `.admin-list-panel .workspace-row-actions .admin-icon-btn, .admin-icon-btn`:
+    - Click target chuẩn xác: `width: 40px; min-width: 40px; max-width: 40px; height: 40px; min-height: 40px; max-height: 40px; padding: 0; box-sizing: border-box;`.
+    - Icon Material Symbols: `font-size: 19px; width: 19px; height: 19px; display: inline-flex; align-items: center; justify-content: center;`.
+    - Border-radius `8px`, viền `1px solid var(--am-outline-variant)`, nền `var(--am-surface-container)`.
+    - Nút xóa (`.text-error`) chuyển sắc đỏ nhẹ thanh lịch khi hover: `background: color-mix(in srgb, var(--am-error) 12%, transparent);`.
+    - Thẻ liên kết `<a>` (như icon `open_in_new`) có kích thước và giao diện hoàn toàn đồng nhất 100% với thẻ `<button>`.
+    - Responsive: Layout flexbox với `gap: 6px; flex-wrap: wrap;` bảo đảm không bao giờ tràn hoặc co rúm trên thiết bị di động.
 
 ---
 
-## 4. Hướng dẫn Review cho Codex
+## 4. Bằng chứng kiểm thử & Visual QA (Evidence)
+
+### 4.1. Frontend Unit Tests (Node test runner)
+```powershell
+cd frontend
+node --test tests/*.test.mjs
+# Kết quả: 70 passed, 0 failed (100% pass)
+```
+*(Đã xác minh và ghi nhận làm rõ chênh lệch 62 vs 70 tests trước đây: do Windows PowerShell glob không mở rộng `notifications.test.mjs` khi chạy từ root; chạy trực tiếp trong thư mục `frontend` mở rộng trọn vẹn toàn bộ 7 file với 70 unit tests đạt 100%).*
+
+### 4.2. Frontend Production Build (Vite 7)
+```powershell
+cd frontend
+npm.cmd run build
+# Kết quả: Built in 3.02s, 130 modules transformed, zero syntax/chunk errors.
+```
+
+### 4.3. Backend Non-Integration Pytest
+```powershell
+cd backend
+Remove-Item Env:AUTH_ENVIRONMENT -ErrorAction SilentlyContinue
+Set-Item -Path Env:DATABASE_URL -Value "postgresql+psycopg://test:not-a-real-secret@127.0.0.1:1/test"
+.\.venv_p2\Scripts\python.exe -m pytest -m "not integration" -q
+# Kết quả: 418 passed, 0 failed, 787 deselected in 40.81s (100% pass)
+```
+
+### 4.4. Playwright End-to-End Suite
+Toàn bộ 3 file test E2E trọng yếu đều pass 100%:
+```powershell
+cd frontend
+npx.cmd playwright test --config=../.github/playwright.auth.config.mjs auth-tests/notifications-storm.spec.js auth-tests/admin-ux.spec.js auth-tests/admin-premium.spec.js --workers=1 --retries=0
+# Kết quả: 25 passed (100% pass)
+```
+- `notifications-storm.spec.js`: 8/8 tests passed.
+- `admin-ux.spec.js`: 9/9 tests passed (bổ sung test tự động kiểm tra cấu trúc 4 dòng thẻ thông báo, CSS ellipsis, cụm icon thông báo và kích thước 40px).
+- `admin-premium.spec.js`: 8/8 tests passed.
+
+### 4.5. Danh mục ảnh chụp Visual QA (Artifacts)
+Ảnh chụp nghiệm thu tại thư mục Artifact (`C:\Users\sammy\.gemini\antigravity\brain\cc803197-d415-4eaf-80c2-1173a22c12aa`):
+- `notification_dropdown_4lines.png`: Dropdown thông báo với 4 dòng rõ rệt: Tên người gửi, Tiêu đề, Nội dung tóm tắt (cắt bằng CSS ellipsis), Thời gian.
+- `admin_qa_task2_announcements.png`: Bảng Thông báo hệ thống trong trang Admin hiển thị snippet tóm tắt và cụm icon action chuẩn hóa.
+- `admin_qa_task2_announcement_preview.png`: Modal xem trước thông báo hệ thống dạng read-only, căn giữa trang, đầy đủ thông tin người phát và số người nhận.
+- `admin_qa_task2_desktop.png`: Toàn cảnh giao diện Desktop Admin 1440px với cụm 4 icon chuẩn 40x40px.
+- `admin_qa_task2_content_preview.png`: Modal xem trước nội dung bài viết read-only.
+- `admin_qa_task2_contact_modal.png`: Modal xử lý liên hệ với hộp cuộn độc lập.
+- `admin_qa_task2_audit_activity.png`: Tab Nhật ký quản trị với ngôn ngữ thân thiện và nút copy ID.
+- `admin_qa_task2_tablet.png`: Giao diện Admin trên Tablet 768px.
+- `admin_qa_task2_mobile.png`: Giao diện Admin trên Mobile 375px responsive hoàn hảo.
+
+---
+
+## 5. Hướng dẫn Review cho Codex
 
 Khi Codex thực hiện review kỹ thuật:
-1. Kiểm tra log commit: `git log -8 --oneline`.
+1. Kiểm tra log commit: `git log -6 --oneline`.
 2. Kiểm tra diff từng commit theo mã hash:
-   - `cdc5c13`: Cụm 4 icon và modal xem trước nội dung.
-   - `70b19ae`: Modal xử lý liên hệ có phân cấp rõ ràng.
-   - `6bbd419`: Nhân tính hóa nhật ký quản trị và nút sao chép ID.
-   - `6ec4013`: Tinh chỉnh microcopy composer và icon xem trước.
-   - `1d70df0`: Logo guardian tròn trong sidebar admin.
-   - `352a5fa`: Chuẩn hóa phân trang 10 mục và cơ chế chống kẹt trang rỗng.
-3. Chạy lệnh xác minh Playwright:
+   - `4c0678a`: Phân tách 4 dòng thông báo cá nhân, CSS ellipsis trên dòng snippet.
+   - `4d63ad2`: Chuẩn hóa icon thông báo Admin (`visibility`, `edit`, `undo` / `send` / `delete`) và modal read-only preview.
+   - `f233fe9`: Chuẩn hóa kích thước 40px x 40px và style nút icon Admin.
+   - `a42fa5b`: Bổ sung kiểm thử tự động và cập nhật ảnh chụp visual QA.
+3. Chạy lệnh xác minh toàn diện:
    ```powershell
    cd frontend
-   npx.cmd playwright test --config=../.github/playwright.auth.config.mjs auth-tests/admin-ux.spec.js --workers=1 --retries=0
+   node --test tests/*.test.mjs
+   npm.cmd run build
+   npx.cmd playwright test --config=../.github/playwright.auth.config.mjs auth-tests/notifications-storm.spec.js auth-tests/admin-ux.spec.js auth-tests/admin-premium.spec.js --workers=1 --retries=0
    ```
-4. Kiểm tra các ranh giới bảo mật: Không rò rỉ PII email ngoài luồng cho phép, không phá vỡ CSRF contracts, không ảnh hưởng các hệ thống Notifications, Vault, Rank đã nghiệm thu.
+4. Kiểm tra an toàn bảo mật: Không phá vỡ hotfix request storm, không rò rỉ dữ liệu ngoài luồng, không ảnh hưởng các hệ thống khác ngoài phạm vi được chỉ định.
