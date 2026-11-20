@@ -220,3 +220,23 @@ def mark_all_read(
         .values(read_at=now)
     )
     return MarkReadAllResponse(marked_read=res.rowcount or 0)
+
+
+@router.delete("/{notification_id}", status_code=204, operation_id="deleteNotification",
+               responses=ERRORS | NOT_FOUND, openapi_extra=CSRF_HEADER)
+def delete_notification(
+    notification_id: UUID,
+    request: Request,
+    account=Depends(require_account_csrf)
+):
+    notif = account.db.scalar(
+        select(Notification).where(
+            Notification.id == notification_id,
+            Notification.recipient_user_id == account.user.id
+        ).with_for_update()
+    )
+    if notif is None:
+        raise AuthError(404, "NOT_FOUND", "Notification not found.")
+
+    account.db.delete(notif)
+    account.db.flush()

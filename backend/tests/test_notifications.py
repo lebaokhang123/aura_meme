@@ -49,6 +49,12 @@ def test_notifications_openapi_contracts():
     assert read_all_op["security"] == [{"sessionCookie": []}]
     assert {"200", "401", "403"} <= set(read_all_op["responses"])
 
+    # 5. DELETE /api/v1/notifications/{notification_id}
+    del_op = paths["/api/v1/notifications/{notification_id}"]["delete"]
+    assert del_op["operationId"] == "deleteNotification"
+    assert del_op["security"] == [{"sessionCookie": []}]
+    assert {"204", "401", "403", "404"} <= set(del_op["responses"])
+
 
 def test_notifications_model_table_schema():
     from app.models import Base
@@ -150,6 +156,9 @@ def test_notifications_guest_rejected(monkeypatch):
         assert res.status_code == 401
 
         res = client.post("/api/v1/notifications/read-all")
+        assert res.status_code == 401
+
+        res = client.delete(f"/api/v1/notifications/{uuid4()}")
         assert res.status_code == 401
 
 

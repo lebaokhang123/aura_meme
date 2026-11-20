@@ -123,6 +123,16 @@ export async function markAllRead({ client = auth } = {}) {
   return client.write('POST', '/notifications/read-all');
 }
 
+export async function deleteNotification(notificationId, { client = auth } = {}) {
+  if (MOCK_AUTH) {
+    const all = readMockNotifications();
+    const next = all.filter(n => n.id !== notificationId);
+    writeMockNotifications(next);
+    return { success: true };
+  }
+  return client.write('DELETE', `/notifications/${notificationId}`);
+}
+
 export async function createAnnouncement({ title, body }, { client = auth } = {}) {
   if (MOCK_AUTH) {
     const all = readMockNotifications();
