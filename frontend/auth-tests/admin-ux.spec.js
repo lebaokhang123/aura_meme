@@ -35,7 +35,9 @@ async function setupAdminMockApi(context) {
       { id: id(60), slug: 'cyber-sword', kind: 'avatar', rarity: 'S', active: true, review_status: 'approved' }
     ],
     announcements: [
-      { id: id(70), title: 'Bảo trì hệ thống định kỳ', body: 'Hệ thống sẽ bảo trì vào 02:00 sáng mai.', status: 'published', actor_id: id(1), actor_username: 'admin_qa', created_at: now, published_at: now, recipients_count: 150 }
+      { id: id(70), title: 'Bảo trì hệ thống định kỳ', body: 'Hệ thống sẽ bảo trì vào 02:00 sáng mai.', status: 'published', actor_id: id(1), actor_username: 'admin_qa', created_at: now, published_at: now, recipients_count: 150 },
+      { id: id(71), title: 'Sự kiện Meme Cyberpunk Mùa Mới', body: 'Bản nháp thông báo sự kiện mùa đông...', status: 'draft', actor_id: id(1), actor_username: 'admin_qa', created_at: now },
+      { id: id(72), title: 'Thông báo nâng cấp máy chủ cũ', body: 'Thông báo này đã được thu hồi.', status: 'withdrawn', actor_id: id(1), actor_username: 'admin_qa', created_at: now }
     ]
   };
 
@@ -55,7 +57,31 @@ async function setupAdminMockApi(context) {
 
     if (path === '/users/me') return send(200, users[0]);
     if (path === '/auth/csrf') return send(200, { csrf_token: 'server-csrf-token' });
-    if (path === '/notifications/unread-count') return send(200, { unread_count: 0 });
+    if (path === '/notifications/unread-count') return send(200, { unread_count: 1 });
+    if (path === '/notifications') {
+      return send(200, {
+        items: [
+          {
+            id: id(80),
+            type: 'announcement',
+            actor: { id: id(1), username: 'admin_qa', display_name: 'Admin Tổng Chủ' },
+            payload: { title: 'Chào mừng thành viên mới', body: 'AuraMeme hân hạnh chào đón các tu tiên giả gia nhập đấu trường meme cyberpunk đỉnh cao.' },
+            is_read: false,
+            created_at: now
+          },
+          {
+            id: id(81),
+            type: 'comment',
+            actor: { id: id(2), username: 'member_01', display_name: 'Hắc Ám Đạo Nhân' },
+            payload: { post_title: 'Meme tu tiên hài hước', comment_text: 'Đạo hữu tu vi thâm hậu quá!' },
+            is_read: true,
+            created_at: now
+          }
+        ],
+        pagination: { page: 1, page_size: 20, total: 2, total_pages: 1 },
+        unread_count: 1
+      });
+    }
 
     const parts = path.split('/').filter(Boolean);
     if (parts[0] !== 'admin') return send(200, page([]));
@@ -206,10 +232,10 @@ test.describe('Task 2 — Admin Workspace UX Refinement', () => {
     await page.locator('.admin-sidebar').getByRole('button', { name: 'Thông báo' }).click();
     await expect(page.getByRole('heading', { name: 'Thông báo hệ thống', exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Phát thông báo' }).click();
+    await page.locator('.admin-broadcast-btn').click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole('heading', { name: 'Soạn Thông báo' })).toBeVisible();
+    await expect(dialog.locator('#admin-dialog-title')).toContainText('Soạn thông báo hệ thống');
     await expect(dialog.locator('.workspace-meta')).toHaveText('Thông báo sẽ được gửi tới tất cả thành viên đang hoạt động.');
 
     const eyeBtn = dialog.locator('#admin-preview-eye-btn');
@@ -273,5 +299,84 @@ test.describe('Task 2 — Admin Workspace UX Refinement', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await expect(page.locator(`[data-admin-id="${id(10)}"]`)).toBeVisible();
     await page.screenshot({ path: `${artifactDir}/admin_qa_task2_mobile.png`, fullPage: true });
+  });
+
+  test('Task 2 Final Polish: Personal notification card displays 4 distinct lines with ellipsis', async ({ page, context }) => {
+    await setupAdminMockApi(context);
+    const artifactDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
+    await page.goto('/admin');
+    await page.locator('.notification-trigger').click();
+    await expect(page.locator('.notifications-dropdown')).toBeVisible();
+
+    const firstItem = page.locator('.notification-item').first();
+    await expect(firstItem.locator('.notification-card-actor')).toHaveText('Admin Tổng Chủ');
+    await expect(firstItem.locator('.notification-card-title')).toHaveText('Chào mừng thành viên mới');
+    await expect(firstItem.locator('.notification-card-snippet')).toContainText('AuraMeme hân hạnh chào đón');
+    await expect(firstItem.locator('.notification-card-time')).toBeVisible();
+
+    // Verify CSS ellipsis on snippet
+    const snippetStyle = await firstItem.locator('.notification-card-snippet').evaluate(el => {
+      const s = window.getComputedStyle(el);
+      return { textOverflow: s.textOverflow, whiteSpace: s.whiteSpace, overflow: s.overflow };
+    });
+    expect(snippetStyle.textOverflow).toBe('ellipsis');
+    expect(snippetStyle.whiteSpace).toBe('nowrap');
+    expect(snippetStyle.overflow).toBe('hidden');
+
+    await page.screenshot({ path: `${artifactDir}/notification_dropdown_4lines.png` });
+  });
+
+  test('Task 2 Final Polish: Announcement table uses snippet and normalized 40px action icon buttons', async ({ page, context }) => {
+    await setupAdminMockApi(context);
+    const artifactDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
+    await page.goto('/admin');
+    await page.locator('.admin-sidebar').getByRole('button', { name: 'Thông báo' }).click();
+
+    // 1. Verify <details> removed and replaced by .admin-content-snippet
+    await expect(page.locator('[data-resource="announcements"] details')).toHaveCount(0);
+    const publishedRow = page.locator(`[data-admin-id="${id(70)}"]`);
+    await expect(publishedRow.locator('.admin-content-snippet')).toBeVisible();
+
+    // 2. Verify normalized 40px icon button dimensions
+    const iconBtn = publishedRow.locator('.admin-icon-btn').first();
+    const btnBox = await iconBtn.boundingBox();
+    expect(Math.round(btnBox.width)).toBe(40);
+    expect(Math.round(btnBox.height)).toBe(40);
+
+    // 3. Verify action icons for Published: visibility, edit, undo
+    await expect(publishedRow.locator('.admin-action-icons .admin-icon-btn')).toHaveCount(3);
+    await expect(publishedRow.locator('.admin-action-icons [aria-label="Xem chi tiết thông báo"]')).toBeVisible();
+    await expect(publishedRow.locator('.admin-action-icons [aria-label="Đính chính thông báo"]')).toBeVisible();
+    await expect(publishedRow.locator('.admin-action-icons [aria-label="Thu hồi thông báo"]')).toBeVisible();
+
+    // 4. Verify action icons for Draft: visibility, edit, send, delete
+    const draftRow = page.locator(`[data-admin-id="${id(71)}"]`);
+    await expect(draftRow.locator('.admin-action-icons .admin-icon-btn')).toHaveCount(4);
+    await expect(draftRow.locator('.admin-action-icons [aria-label="Xem chi tiết thông báo"]')).toBeVisible();
+    await expect(draftRow.locator('.admin-action-icons [aria-label="Sửa bản nháp"]')).toBeVisible();
+    await expect(draftRow.locator('.admin-action-icons [aria-label="Phát thông báo ngay"]')).toBeVisible();
+    await expect(draftRow.locator('.admin-action-icons [aria-label="Xóa bản nháp"]')).toBeVisible();
+
+    // 5. Verify action icons for Withdrawn: visibility only
+    const withdrawnRow = page.locator(`[data-admin-id="${id(72)}"]`);
+    await expect(withdrawnRow.locator('.admin-action-icons .admin-icon-btn')).toHaveCount(1);
+    await expect(withdrawnRow.locator('.admin-action-icons [aria-label="Xem chi tiết thông báo"]')).toBeVisible();
+
+    // 6. Screenshot announcements table
+    await page.screenshot({ path: `${artifactDir}/admin_qa_task2_announcements.png` });
+
+    // 7. Click visibility on published announcement -> opens preview modal
+    await publishedRow.locator('.admin-action-icons [aria-label="Xem chi tiết thông báo"]').click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('#admin-dialog-title')).toHaveText('Chi tiết thông báo hệ thống');
+    await expect(dialog.locator('.admin-content-preview-author')).toHaveText('@admin_qa');
+    await expect(dialog.locator('.admin-content-preview-title')).toHaveText('Bảo trì hệ thống định kỳ');
+    await expect(dialog.locator('.admin-content-preview-body')).toContainText('Hệ thống sẽ bảo trì vào 02:00 sáng mai.');
+
+    // Screenshot announcement preview modal
+    await page.screenshot({ path: `${artifactDir}/admin_qa_task2_announcement_preview.png` });
+    await dialog.locator('.workspace-dialog-actions').getByRole('button', { name: 'Đóng' }).click();
+    await expect(dialog).toHaveCount(0);
   });
 });
