@@ -20,7 +20,7 @@ NOT_FOUND = {404: {"model": ErrorResponse}}
 
 
 class AdminPostPatch(PostPatch):
-    status: Literal["draft", "published", "hidden"] = None
+    status: Literal["draft", "published", "hidden", "deleted"] = None
     reason: str | None = Field(default=None, max_length=500)
 
 
@@ -125,6 +125,8 @@ def moderate_post(post_id: UUID, payload: AdminPostPatch, request: Request,
     values = payload.model_dump(exclude_unset=True)
     reason = values.pop("reason", None)
     text_flags = {name + "_changed": name in values and values[name] != getattr(post, name) for name in ("title", "content")}
+    if reason:
+        text_flags["reason"] = reason
     if {"category_id", "media_id", "content"}.intersection(values):
         category = validate_post(account.db, post.author_id, values.get("category_id", post.category_id),
             values.get("media_id", post.media_id), values.get("content", post.content), allow_hidden_category=True)
@@ -157,6 +159,26 @@ def moderate_post(post_id: UUID, payload: AdminPostPatch, request: Request,
                 dedupe_key=f"mod:post:{post.id}:hidden:{int(post.updated_at.timestamp())}",
                 now=post.updated_at,
             )
+    elif post.status == "deleted" and before["status"] != "deleted":
+        post.deleted_at = post.updated_at
+        author_id = getattr(post, "author_id", None)
+        if author_id is not None and author_id != account.user.id:
+            from app.notifications import create_notification
+            create_notification(
+                account.db,
+                recipient_user_id=author_id,
+                type="moderation",
+                target_type="post",
+                target_id=post.id,
+                actor_user_id=account.user.id,
+                payload={
+                    "action": "deleted",
+                    "reason": reason or "Bài viết của bạn đã bị xóa bởi Quản trị viên.",
+                    "post_title": (getattr(post, "title", None) or "")[:80],
+                },
+                dedupe_key=f"mod:post:{post.id}:deleted",
+                now=post.updated_at,
+            )
     return post_dto(post, account.db.get(User, post.author_id), account.db.get(Profile, post.author_id), category)
 
 
@@ -170,7 +192,7 @@ def delete_admin_post(post_id: UUID, request: Request, reason: str | None = Quer
     post.updated_at = post.deleted_at
     from app.aura_runtime import reverse_post
     reverse_post(account.db, post.id, post.updated_at)
-    audit_post(account, post, "post.delete", before, post.updated_at)
+    audit_post(account, post, "post.delete", before, post.updated_at, **({"reason": reason} if reason else {}))
     author_id = getattr(post, "author_id", None)
     if author_id is not None and author_id != account.user.id:
         from app.notifications import create_notification

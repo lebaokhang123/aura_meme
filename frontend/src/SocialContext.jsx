@@ -95,12 +95,12 @@ export function SocialProvider({children}) {
       const category=categories.find(c=>c.id===action.category);if(!category)throw Error('INVALID_CATEGORY');
       result=await auth.write('PATCH','/posts/'+apiId(action.id),{content:action.content,category_id:category.apiId});
     }else if(action.type==='delete-post')await auth.write('DELETE','/posts/'+apiId(action.id));
-    else if(action.type==='moderate-post')await auth.write('PATCH','/admin/posts/'+apiId(action.id),{status:'hidden'});
+    else if(action.type==='moderate-post')await auth.write('PATCH','/admin/posts/'+apiId(action.id),{status:action.status||'hidden',reason:action.reason||undefined});
     else if(action.type==='comment'){
       if(!action.text.trim()||action.text.length>2000)throw Error('INVALID_COMMENT');
       result=await auth.write('POST','/posts/'+apiId(action.postId)+'/comments',{request_id:apiId(action.id),body:action.text});
     }else if(action.type==='delete-comment')await auth.write('DELETE','/comments/'+apiId(action.id));
-    else if(action.type==='moderate-comment')await auth.write('PATCH','/admin/comments/'+apiId(action.id),{status:'hidden'});
+    else if(action.type==='moderate-comment')await auth.write('PATCH','/admin/comments/'+apiId(action.id),{status:action.status||'hidden',reason:action.reason||undefined});
     else if(action.type==='react'){
       const mutation=reactionMutation(action,snapshot.state.apiInteractions?.[action.target]?.[action.id]);
       await auth.write(mutation.method,mutation.path,mutation.body);

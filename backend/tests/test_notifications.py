@@ -486,3 +486,75 @@ def test_admin_announcement_draft_lifecycle():
     # 3. Delete draft
     delete_admin_announcement(res.id, request, account)
     db.delete.assert_called_with(master_mock)
+
+
+def test_comment_moderation_reason_and_audit():
+    from app.comments import moderate_comment_record
+    from app.models import Comment, AdminAuditLog, Notification
+    from types import SimpleNamespace
+    db = MagicMock()
+    admin_id = uuid4()
+    author_id = uuid4()
+    comment_id = uuid4()
+    post_id = uuid4()
+    now_val = datetime.now(timezone.utc)
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(auth=SimpleNamespace(now=lambda: now_val))))
+    account = SimpleNamespace(db=db, user=SimpleNamespace(id=admin_id))
+
+    mock_comment = Comment(
+        id=comment_id,
+        author_id=author_id,
+        post_id=post_id,
+        body="Nội dung vi phạm",
+        status="visible",
+        created_at=now_val,
+        updated_at=now_val
+    )
+    db.scalar.side_effect = [mock_comment, None]
+
+    # Moderate hidden with reason
+    moderate_comment_record(comment_id, request, account, "hidden", reason="Vi phạm tiêu chuẩn cộng đồng")
+    assert mock_comment.status == "hidden"
+
+    # Check audit log added with reason
+    audit_calls = [c[0][0] for c in db.add.call_args_list if isinstance(c[0][0], AdminAuditLog)]
+    assert len(audit_calls) == 1
+    assert audit_calls[0].after_json["reason"] == "Vi phạm tiêu chuẩn cộng đồng"
+
+    # Check notification created with reason and post_id
+    notif_calls = [c[0][0] for c in db.add.call_args_list if isinstance(c[0][0], Notification)]
+    assert len(notif_calls) == 1
+    assert notif_calls[0].recipient_user_id == author_id
+    assert notif_calls[0].payload["action"] == "hidden"
+    assert notif_calls[0].payload["reason"] == "Vi phạm tiêu chuẩn cộng đồng"
+    assert notif_calls[0].payload["post_id"] == str(post_id)
+
+
+def test_comment_self_moderation_no_notification():
+    from app.comments import moderate_comment_record
+    from app.models import Comment, Notification
+    from types import SimpleNamespace
+    db = MagicMock()
+    admin_id = uuid4()
+    comment_id = uuid4()
+    now_val = datetime.now(timezone.utc)
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(auth=SimpleNamespace(now=lambda: now_val))))
+    account = SimpleNamespace(db=db, user=SimpleNamespace(id=admin_id))
+
+    # Author is the admin
+    mock_comment = Comment(
+        id=comment_id,
+        author_id=admin_id,
+        body="Admin tự xóa",
+        status="visible",
+        created_at=now_val,
+        updated_at=now_val
+    )
+    db.scalar.side_effect = [mock_comment, None]
+
+    moderate_comment_record(comment_id, request, account, "deleted", reason="Admin tự dọn dẹp")
+    assert mock_comment.status == "deleted"
+
+    # Notification should not be sent to self
+    notif_calls = [c[0][0] for c in db.add.call_args_list if isinstance(c[0][0], Notification)]
+    assert len(notif_calls) == 0

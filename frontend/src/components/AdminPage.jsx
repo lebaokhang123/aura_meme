@@ -48,6 +48,15 @@ export default function AdminPage(){
       else{method='POST';path='/admin/announcements';body={title:edit.title.trim(),body:edit.body.trim(),is_draft:false}}
     }
   }
+  if(edit.type==='moderate'){
+    if(!edit.reason||edit.reason.trim().length<5){
+      setError(t('Vui lòng nhập lý do kiểm duyệt tối thiểu 5 ký tự.','Please enter a moderation reason of at least 5 characters.'));
+      inflight.current=false;setBusy(false);return;
+    }
+    method='PATCH';
+    path='/admin/'+edit.targetResource+'/'+edit.row.id;
+    body={status:edit.action,reason:edit.reason.trim()};
+  }
   try{await auth.write(method,path,body);if(currentOwner.current!==requestOwner)return;setEdit(null);setRevision(n=>n+1);setSuccess(t('Đã lưu thay đổi.','Changes saved.'));if(resource==='users'&&edit.row?.id===requestOwner)await auth.refresh().catch(()=>{});}
   catch(e){if(currentOwner.current===requestOwner){setError(explain(e));if(e.status===403){setData(null);setDenied(true);setEdit(null);auth.refresh().catch(()=>{})}}}
   finally{inflight.current=false;setBusy(false)}
@@ -80,7 +89,14 @@ export default function AdminPage(){
     {resource==='audit-logs'&&<time className="workspace-meta" dateTime={row.created_at}>{stamp(row.created_at)}</time>}
     {row.status&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='assets'&&<span className="workspace-badge">{row.active?t('Đang bật','Active'):t('Đang tắt','Inactive')}</span>}
     </div><div className="workspace-row-actions">{resource==='users'&&row.status!=='deleted'&&<><button type="button" disabled={busy} onClick={()=>confirm(row,{status:row.status==='active'?'locked':'active'},row.status==='active'?t('Khóa tài khoản','Lock account'):t('Mở khóa tài khoản','Unlock account'))}>{row.status==='active'?t('Khóa','Lock'):t('Mở khóa','Unlock')}</button><button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'roles',row,roles:[...row.roles]})}}>{t('Sửa vai trò','Edit roles')}</button></>}
-    {(resource==='posts'||resource==='comments')&&row.status!=='deleted'&&<button type="button" disabled={busy} onClick={()=>confirm(row,{status:row.status==='hidden'?(resource==='posts'?'published':'visible'):'hidden'},row.status==='hidden'?t('Hiển thị nội dung','Show content'):t('Ẩn nội dung','Hide content'))}>{row.status==='hidden'?t('Hiển thị','Show'):t('Ẩn','Hide')}</button>}
+    {(resource==='posts'||resource==='comments')&&row.status!=='deleted'&&<>
+      {row.status==='hidden'?(
+        <button type="button" disabled={busy} onClick={()=>confirm(row,{status:resource==='posts'?'published':'visible'},t('Hiển thị lại nội dung này?','Show this content again?'))}>{t('Hiển thị','Show')}</button>
+      ):(
+        <button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'moderate',row,targetResource:resource,action:'hidden',reason:'',label:t('Ẩn nội dung','Hide content')})}}>{t('Ẩn','Hide')}</button>
+      )}
+      <button type="button" disabled={busy} className="text-error" onClick={()=>{setError('');setEdit({type:'moderate',row,targetResource:resource,action:'deleted',reason:'',label:t('Xóa nội dung','Delete content')})}}>{t('Xóa','Delete')}</button>
+    </>}
     {resource==='categories'&&<button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'category',row,name:row.name,status:row.status})}}>{t('Chỉnh sửa','Edit')}</button>}
     {resource==='contacts'&&<button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'contact',row,status:row.status})}}>{t('Xem và xử lý','View and update')}</button>}
     {resource==='announcements'&&<>
@@ -123,6 +139,7 @@ export default function AdminPage(){
    {edit.type==='roles'&&<><p>@{edit.row.username}</p><fieldset><legend>{t('Vai trò từ DB','Database roles')}</legend>{['USER','ADMIN'].map(value=><label className="workspace-checkbox" key={value}><input type="checkbox" checked={edit.roles.includes(value)} disabled={busy} onChange={e=>setEdit({...edit,roles:e.target.checked?[...edit.roles,value]:edit.roles.filter(r=>r!==value)})}/>{value}</label>)}</fieldset><p className="workspace-meta">{t('Thay đổi vai trò sẽ kết thúc các phiên của tài khoản đó.','Changing roles ends that account’s sessions.')}</p></>}
    {edit.type==='category'&&<><label>{t('Tên danh mục','Category name')}<input value={edit.name} maxLength={80} required disabled={busy} onChange={e=>setEdit({...edit,name:e.target.value})}/></label>{!edit.row?<label>Slug<input value={edit.slug} maxLength={80} pattern="[a-z0-9-]+" required disabled={busy} onChange={e=>setEdit({...edit,slug:e.target.value})}/></label>:<label>{t('Trạng thái','Status')}<select value={edit.status} disabled={busy} onChange={e=>setEdit({...edit,status:e.target.value})}>{states.categories.map(v=><option value={v} key={v}>{status(v)}</option>)}</select></label>}</>}
    {edit.type==='contact'&&<><h3>{edit.row.subject}</h3><p>{edit.row.name}</p><p className="workspace-text" translate="no">{edit.row.body}</p><label>{t('Trạng thái','Status')}<select value={edit.status} disabled={busy} onChange={e=>setEdit({...edit,status:e.target.value})}>{states.contacts.map(v=><option value={v} key={v}>{status(v)}</option>)}</select></label></>}
+    {edit.type==='moderate'&&<><p className="admin-confirm-target" translate="no">{edit.row?.title||edit.row?.body||edit.row?.id}</p><p>{edit.action==='hidden'?t('Ẩn nội dung này khỏi cộng đồng?','Hide this content from the community?'):t('Xóa hoàn toàn nội dung này?','Permanently delete this content?')}</p><label>{t('Lý do kiểm duyệt (5-500 ký tự) *','Moderation reason (5-500 chars) *')}<textarea value={edit.reason||''} maxLength={500} required disabled={busy} rows={3} placeholder={t('Nhập lý do gửi thông báo tới tác giả…','Enter reason to notify author…')} onChange={e=>setEdit({...edit,reason:e.target.value})}/></label><p className="workspace-meta">{t('Lý do sẽ được ghi vào nhật ký và gửi thông báo tới tác giả.','Reason will be logged and dispatched to the author.')}</p></>}
    {error&&<p className="workspace-error" role="alert">{error}</p>}
    <div className="workspace-dialog-actions">
      <button type="button" disabled={busy} onClick={()=>setEdit(null)}>{t('Hủy','Cancel')}</button>

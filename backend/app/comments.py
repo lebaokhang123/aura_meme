@@ -156,7 +156,7 @@ def delete_comment(comment_id: UUID, request: Request, account=Depends(require_a
 
 
 class CommentModeration(StrictInput):
-    status: Literal["visible", "hidden"]
+    status: Literal["visible", "hidden", "deleted"]
     reason: str | None = Field(default=None, max_length=500)
 
 def moderate_comment_record(comment_id, request, account, status, reason=None):
@@ -172,7 +172,7 @@ def moderate_comment_record(comment_id, request, account, status, reason=None):
         from app.aura_runtime import reverse_comment
         reverse_comment(account.db, comment.id, comment.updated_at)
     account.db.add(AdminAuditLog(id=uuid4(), actor_id=account.user.id, action="comment." + status, target_type="comment",
-        target_id=str(comment.id), before_json=before, after_json={"status": status}, created_at=comment.updated_at))
+        target_id=str(comment.id), before_json=before, after_json={"status": status, **({"reason": reason} if reason else {})}, created_at=comment.updated_at))
     account.db.flush()
     if status in {"hidden", "deleted"}:
         author_id = getattr(comment, "author_id", None)
@@ -189,6 +189,7 @@ def moderate_comment_record(comment_id, request, account, status, reason=None):
                     "action": status,
                     "reason": reason or ("Bình luận của bạn đã bị ẩn do vi phạm Tiêu chuẩn Cộng đồng." if status == "hidden" else "Bình luận của bạn đã bị xóa bởi Quản trị viên."),
                     "comment_body": (getattr(comment, "body", None) or "")[:120],
+                    "post_id": str(comment.post_id) if getattr(comment, "post_id", None) else None,
                 },
                 dedupe_key=f"mod:comment:{comment.id}:{status}",
                 now=comment.updated_at,
