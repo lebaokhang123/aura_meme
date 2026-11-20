@@ -213,7 +213,7 @@ test.describe('P0 Hotfix: Notifications Request Storm Prevention', () => {
     expect(api.counts.notifications).toBe(1);
   });
 
-  test('switching tabs (All <-> Unread) triggers exactly one request per switch and preserves filter', async ({ page, context }) => {
+  test('simplified personal inbox has no filtering tabs, shows unified feed, and maintains single request', async ({ page, context }) => {
     const api = await setupApiMock(context);
 
     await page.goto('/');
@@ -221,22 +221,24 @@ test.describe('P0 Hotfix: Notifications Request Storm Prevention', () => {
     await expect(page.locator('.notifications-dropdown')).toBeVisible();
     expect(api.counts.notifications).toBe(1);
 
-    // Switch to "Chưa đọc"
-    await page.getByRole('tab', { name: 'Chưa đọc' }).click();
-    await expect(page.locator('.notification-item')).toHaveCount(1);
-    expect(api.counts.notifications).toBe(2);
+    // Verify no tabs are rendered
+    await expect(page.locator('.notifications-tabs')).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'Chưa đọc' })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'Tất cả' })).toHaveCount(0);
 
-    // Switch back to "Tất cả"
-    await page.getByRole('tab', { name: 'Tất cả' }).click();
+    // Unified feed shows all items
     await expect(page.locator('.notification-item')).toHaveCount(2);
-    expect(api.counts.notifications).toBe(3);
 
-    // Wait 3 seconds: no extra requests
+    // Header has title and unread pill
+    await expect(page.locator('.notifications-title-area h3')).toContainText('Thông báo');
+    await expect(page.locator('.notifications-unread-pill')).toBeVisible();
+
+    // Wait 3 seconds: strictly no extra requests
     await page.waitForTimeout(3000);
-    expect(api.counts.notifications).toBe(3);
+    expect(api.counts.notifications).toBe(1);
   });
 
-  test('item click opens detail modal, mark read, delete item, mark all without storming', async ({ page, context }) => {
+  test('item click opens portal-centered detail modal, mark read, delete item, mark all without storming', async ({ page, context }) => {
     const api = await setupApiMock(context);
 
     await page.goto('/');
@@ -247,6 +249,13 @@ test.describe('P0 Hotfix: Notifications Request Storm Prevention', () => {
     await page.locator('.notification-item').first().click();
     await expect(page.locator('.notification-modal')).toBeVisible();
     await expect(page.locator('.notification-modal').getByText('Bài viết meme test')).toBeVisible();
+
+    // Verify modal is mounted via portal directly under document.body
+    const isDirectChildOfBody = await page.evaluate(() => {
+      const backdrop = document.querySelector('.notification-modal-backdrop');
+      return backdrop && backdrop.parentElement === document.body;
+    });
+    expect(isDirectChildOfBody).toBe(true);
 
     // Close modal via close button
     await page.locator('.notification-modal-dismiss-btn').click();
@@ -264,6 +273,53 @@ test.describe('P0 Hotfix: Notifications Request Storm Prevention', () => {
 
     // Total notifications fetch count must remain 1
     expect(api.counts.notifications).toBe(1);
+  });
+
+  test('admin announcement composer: simplified UI without tabs, dark textarea, and hold-to-preview', async ({ page, context }) => {
+    const api = await setupApiMock(context);
+
+    await page.goto('/admin');
+    await expect(page.locator('.admin-page')).toBeVisible();
+
+    // Switch to "Thông báo" section
+    await page.locator('.admin-sidebar').getByRole('button', { name: 'Thông báo' }).click();
+
+    // Click "Phát thông báo" button
+    await page.locator('.admin-broadcast-btn').click();
+    await expect(page.locator('.workspace-dialog')).toBeVisible();
+    await expect(page.locator('#admin-dialog-title')).toContainText('Soạn thông báo hệ thống');
+
+    // Verify tabs ("Soạn thảo", "Xem trước") do NOT exist
+    await expect(page.getByRole('button', { name: 'Soạn thảo', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Xem trước', exact: true })).toHaveCount(0);
+
+    // Fill title and content
+    const titleInput = page.locator('input[placeholder*="Tiêu đề thông báo"]');
+    const bodyTextarea = page.locator('#admin-announcement-body');
+    await titleInput.fill('Cyberpunk System Alert');
+    await bodyTextarea.fill('Critical maintenance completed successfully.');
+
+    // Eye button for hold-to-preview
+    const eyeBtn = page.locator('#admin-preview-eye-btn');
+    await expect(eyeBtn).toBeVisible();
+
+    // Hold eye button (pointerdown) -> preview overlay appears
+    await eyeBtn.dispatchEvent('pointerdown');
+    await expect(page.locator('.admin-hold-preview-overlay')).toBeVisible();
+    await expect(page.locator('.admin-hold-preview-title')).toContainText('Cyberpunk System Alert');
+    await expect(page.locator('.admin-hold-preview-body')).toContainText('Critical maintenance completed successfully.');
+
+    // Release eye button (pointerup) -> preview overlay disappears
+    await eyeBtn.dispatchEvent('pointerup');
+    await expect(page.locator('.admin-hold-preview-overlay')).toHaveCount(0);
+
+    // Form inputs must retain values
+    expect(await titleInput.inputValue()).toBe('Cyberpunk System Alert');
+    expect(await bodyTextarea.inputValue()).toBe('Critical maintenance completed successfully.');
+
+    // Cancel closes dialog cleanly
+    await page.getByRole('button', { name: 'Hủy' }).click();
+    await expect(page.locator('.workspace-dialog')).not.toBeVisible();
   });
 
   test('multiple open/close toggles of notification bell behave predictably without storms', async ({ page, context }) => {

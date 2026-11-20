@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { getNotifications, markRead, markAllRead, deleteNotification } from '../notifications-api.js';
 import { useLocalized } from '../localize.jsx';
 import { usePreferences } from '../PreferencesContext.jsx';
@@ -40,7 +41,6 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
 
   const [items, setItems] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [filter, setFilter] = useState('all'); // 'all' | 'unread'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [busyAction, setBusyAction] = useState(false);
@@ -61,7 +61,7 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
   const activeRequestIdRef = useRef(0);
   const cooldownUntilRef = useRef(0);
 
-  const load = useCallback(async (isUnreadOnly = false) => {
+  const load = useCallback(async () => {
     const requestId = ++activeRequestIdRef.current;
     const now = Date.now();
     if (now < cooldownUntilRef.current) {
@@ -77,7 +77,7 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
     setError(null);
     setPage(1);
     try {
-      const data = await getNotifications({ page: 1, pageSize: 20, unreadOnly: isUnreadOnly });
+      const data = await getNotifications({ page: 1, pageSize: 20 });
       if (requestId !== activeRequestIdRef.current) return;
       setItems(data.items || []);
       setTotalPages(data.pagination?.total_pages || 1);
@@ -103,11 +103,11 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
   }, []);
 
   useEffect(() => {
-    load(filter === 'unread');
+    load();
     return () => {
       activeRequestIdRef.current++;
     };
-  }, [filter, load]);
+  }, [load]);
 
   const handleLoadMore = async () => {
     if (loadingMore || page >= totalPages) return;
@@ -122,7 +122,7 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const data = await getNotifications({ page: nextPage, pageSize: 20, unreadOnly: filter === 'unread' });
+      const data = await getNotifications({ page: nextPage, pageSize: 20 });
       setItems(prev => [...prev, ...(data.items || [])]);
       setPage(nextPage);
       setTotalPages(data.pagination?.total_pages || 1);
@@ -279,27 +279,6 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
           </div>
         </div>
 
-        <div className="notifications-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={filter === 'all'}
-            className={`notifications-tab${filter === 'all' ? ' active' : ''}`}
-            onClick={() => setFilter('all')}
-          >
-            {t('Tất cả', 'All')}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={filter === 'unread'}
-            className={`notifications-tab${filter === 'unread' ? ' active' : ''}`}
-            onClick={() => setFilter('unread')}
-          >
-            {t('Chưa đọc', 'Unread')}
-          </button>
-        </div>
-
         <div className="notifications-list" role="feed">
           {loading ? (
             <div className="notifications-loading">
@@ -318,7 +297,7 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
                     : `Quá nhiều lần thử. Vui lòng đợi ${remaining} giây.`);
                   return;
                 }
-                load(filter === 'unread');
+                load();
               }}>
                 {t('Thử lại', 'Retry')}
               </button>
@@ -327,9 +306,7 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
             <div className="notifications-empty">
               {symbol('notifications_off')}
               <p>
-                {filter === 'unread'
-                  ? t('Không có thông báo chưa đọc.', 'No unread notifications.')
-                  : t('Chưa có thông báo nào.', 'No notifications yet.')}
+                {t('Chưa có thông báo nào.', 'No notifications yet.')}
               </p>
             </div>
           ) : (
@@ -467,10 +444,11 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
         </div>
       </div>
 
-      {/* Task A4: Detail Modal */}
-      {selectedNotif && (
+      {/* Task B: Detail Modal mounted via Portal into document.body */}
+      {selectedNotif && typeof document !== 'undefined' && createPortal(
         <div
           className="notification-modal-backdrop"
+          data-header-popup="notifications"
           onClick={handleCloseModal}
           role="presentation"
         >
@@ -628,8 +606,8 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </>
+        </div>,
+        document.body
+      )}</>
   );
 }

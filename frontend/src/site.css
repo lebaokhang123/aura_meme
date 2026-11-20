@@ -159,8 +159,8 @@ html { --site-header-height: 65px; }
 .notifications-empty span.material-symbols-outlined { font-size: 36px; color: #49454f; }
 
 /* Notification Detail Modal */
-.notification-modal-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.notification-modal { background: #1e1f27; border: 1px solid #49454f; border-radius: 16px; width: 100%; max-width: 520px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 1px 1px rgba(208, 188, 255, 0.2); overflow: hidden; }
+.notification-modal-backdrop { position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.notification-modal { background: #1e1f27; border: 1px solid #49454f; border-radius: 16px; width: min(520px, calc(100vw - 32px)); max-height: min(600px, 85vh); display: flex; flex-direction: column; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(208, 188, 255, 0.2); overflow: hidden; margin: auto; }
 .notification-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #33343d; background: #191a22; flex-shrink: 0; }
 .notification-modal-type-tag { display: inline-flex; align-items: center; gap: 6px; font: 700 12px/16px 'Plus Jakarta Sans', sans-serif; color: #d0bcff; background: rgba(208, 188, 255, 0.1); padding: 3px 10px; border-radius: 20px; }
 .notification-modal-type-tag span.material-symbols-outlined { font-size: 16px; }

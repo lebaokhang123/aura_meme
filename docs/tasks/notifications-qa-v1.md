@@ -221,3 +221,35 @@ npm.cmd run build
 - **Toàn bộ Frontend Unit Tests:** `68/68 passed` (100% PASS).
 - **Production Build:** `✓ built in 4.12s` (Bundle hoàn toàn sạch).
 - **Live Browser QA:** Chạy trực tiếp trên Chromium với tài khoản QA thật kết nối DB 5434, ghi nhận tổng cộng 3 requests `/notifications` (1 mở, 2 đổi tab) và 0 request 429. Ảnh chụp: `live_bell_normal.png`.
+
+---
+
+## 10. QA V1.1: UI Polish & Portal Modal Centering
+
+### 10.1. Bối cảnh & Yêu cầu từ Owner
+Sau vòng nghiệm thu sơ bộ, Owner yêu cầu hoàn thiện 3 điểm UI trọng tâm, tuyệt đối bảo toàn hotfix P0 chống request storm:
+1. **Task A — Admin Announcement Composer (`AdminPage.jsx`, `workspace.css`):**
+   - Đơn giản hóa giao diện: Gỡ bỏ 2 tab chuyển đổi ("Soạn thảo" và "Xem trước").
+   - Giữ lại đầy đủ: Tiêu đề input, textarea nội dung, icon mắt xem trước, Hủy, Lưu bản nháp, Phát thông báo.
+   - Sửa lỗi textarea bị trắng: Bổ sung selector `textarea` vào reset rules của `.workspace-page` và `.workspace-dialog` trong `workspace.css`, đồng bộ nền tối Cyberpunk (`#161722` / `var(--am-surface-container-lowest)`), text sáng (`var(--am-on-surface)`), viền outline và focus ring tím sang trọng.
+   - Tính năng "Giữ để xem trước" (Hold to Preview): Đặt nút mắt `visibility` ở góc phải header textarea (`aria-label="Giữ để xem trước"`). Nhấn giữ chuột/chạm/phím (Space/Enter) sẽ hiển thị overlay thẻ xem trước trực tiếp từ dữ liệu đang soạn; thả ra sẽ tự đóng lại. Không làm mất input, không gửi API, không submit form.
+2. **Task B — Fix Notification Detail Modal (`NotificationsDropdown.jsx`, `site.css`):**
+   - Sửa triệt để lỗi modal bị lệch lên đỉnh màn hình: Thay vì render bên trong dropdown (bị ảnh hưởng stacking context và overflow của parent), sử dụng `ReactDOM.createPortal(..., document.body)` để gắn backdrop và modal trực tiếp vào `document.body`.
+   - Căn giữa tuyệt đối trong viewport: `position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 9999;` kết hợp backdrop mờ tối và scroll container cho nội dung dài.
+   - Bổ sung `data-header-popup="notifications"` trên modal backdrop: Đảm bảo khi tương tác đóng/mở modal, cơ chế click-outside của `SiteShell.jsx` không bị kích hoạt nhầm làm unmount dropdown.
+3. **Task C — Simplify Personal Notification Inbox (`NotificationsDropdown.jsx`):**
+   - Bỏ 2 tab lọc "Tất cả" và "Chưa đọc".
+   - Header tinh gọn: Tiêu đề "Thông báo", badge pill số lượng chưa đọc, nút "Đọc tất cả".
+   - Thân hộp thư hiển thị một feed duy nhất sắp xếp theo recency, có chấm xanh báo chưa đọc, nút xóa riêng từng thông báo, phân trang "Xem thêm" và click xem chi tiết.
+   - Duy trì airtight tính năng chống request storm: `load = useCallback(..., [])` không phụ thuộc vào `filter`, effect mount chạy đúng 1 lần duy nhất, zero network loops.
+
+### 10.2. Bằng chứng Đo kiểm & Screenshots Thực tế
+- **Frontend Build:** `npm run build` hoàn thành trong 2.98s, zero warning/error.
+- **Frontend Unit Tests:** `node --test frontend/tests/*.test.mjs` đạt `70/70 passed` (100% PASS).
+- **Backend Non-Integration Pytest:** `pytest -m "not integration"` đạt `418 passed` (100% PASS).
+- **Playwright Test Suite:** `auth-tests/notifications-storm.spec.js` cập nhật kiểm thử cả 8 kịch bản (bao gồm unified inbox, portal modal centered, admin composer hold-to-preview, storm prevention): `8 passed (44.1s)`.
+- **Live Chromium Screenshots (DB 5434 & Preview Server 5173):**
+  - `live_qa_v1_1_inbox_simplified.png`: Hộp thư cá nhân tinh gọn, không còn tab, hiển thị rõ feed thông báo và chấm chưa đọc.
+  - `live_qa_v1_1_modal_centered.png`: Modal chi tiết căn chính giữa màn hình qua Portal, hiển thị chuẩn thông tin announcement/reaction.
+  - `live_qa_v1_1_composer_dark.png`: Trình soạn thông báo Admin nền tối cyberpunk, textarea chuẩn màu, nút mắt xem trước.
+  - `live_qa_v1_1_composer_preview.png`: Thẻ xem trước trực tiếp hiển thị mượt mà khi nhấn giữ nút mắt.
