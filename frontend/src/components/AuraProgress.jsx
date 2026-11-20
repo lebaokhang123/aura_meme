@@ -3,7 +3,7 @@ import {auth} from '../auth.js';
 import {apiAuraProgress,apiAuraCheckIn,resetSeconds} from '../aura-api.js';
 import {useCopy,ErrorMessage} from './account-ui.jsx';
 
-export function AuraProgress({profileId,home=false}){
+export function AuraProgress({profileId,home=false,publicLevel,publicRealm}){
  const t=useCopy(),session=useSyncExternalStore(auth.subscribe,auth.snapshot),identity=session.user?.id;
  const own=session.status==='authenticated'&&(home||profileId===identity);
  const [state,setState]=useState({}),[revision,setRevision]=useState(0),[now,setNow]=useState(Date.now());
@@ -30,8 +30,11 @@ export function AuraProgress({profileId,home=false}){
   }finally{locked.current=false;}
  }
  const percentage=data?(data.next_level_xp===null?100:Math.min(100,100*data.level_xp/Math.max(1,data.next_level_xp))):0;
- return <div data-aura className={home?'bg-surface-container-low rounded-xl p-4 shadow-sm flex flex-col gap-3.5 relative overflow-hidden':'am-profile-progress'} aria-busy={current.busy||current.saving||undefined}>
- <div className={home?'flex flex-col items-center justify-center text-center gap-2 pb-3 border-b border-surface-container-high':'am-profile-badges'}><span className={home?'font-mono-tag text-[11px] font-extrabold text-amber-300':''}>LVL {data?.level??'—'}</span><span className={home?'font-headline-sm text-headline-sm font-extrabold text-amber-400':''}>{data?.realm||t('Chưa có dữ liệu','No data yet')}</span></div>
+ const displayLevel=data?.level??(publicLevel!==undefined&&publicLevel!==null?publicLevel:'—');
+ const displayRealm=data?.realm||publicRealm||t('Chưa có dữ liệu','No data yet');
+ const titleBadge=home?(session.user?.username==='khang_dev'?'Bá Chủ Thiên Lôi':session.user?.username==='kien_dev'?'Thiên Tướng Độ Ách':displayRealm):displayRealm;
+ return <div data-aura className={home?'am-profile-progress am-home-aura-progress':'am-profile-progress'} aria-busy={current.busy||current.saving||undefined}>
+ <div className="am-profile-badges"><span translate="no">LVL {displayLevel}</span><span translate="no">{titleBadge}</span></div>
  <div className="am-profile-progress-track" role="progressbar" aria-label={t('Tiến độ Level','Level progress')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={data?Math.floor(percentage):undefined}><div style={{width:percentage+'%',height:'100%',background:'var(--am-secondary)'}}/></div>
  <div className="am-profile-progress-caption"><span>{data?data.total_xp+' Exp':'— Exp'}</span><span>{t('Chuỗi: ','Streak: ')}{data?.streak_days??'—'}</span></div>
  {data&&<><span className="block font-body-sm text-[12px] text-on-surface-variant leading-relaxed">{data.next_level_xp===null?t('Đã đạt cấp tối đa','Maximum level reached'):t('Exp cần để lên cấp: ','Exp to next level: ')+data.xp_to_next}</span><span className="block font-body-sm text-[12px] text-on-surface-variant leading-relaxed">{t('Exp gốc: ','Earned Exp: ')}{data.earned_xp} · {t('Exp thưởng: ','Bonus Exp: ')}{data.bonus_xp}</span></>}
