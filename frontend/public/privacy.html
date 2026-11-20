@@ -1,1159 +1,349 @@
 <!doctype html>
 <html lang="vi" data-theme="dark" class="dark">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="Chính sách bảo mật đơn giản, minh bạch của dự án AuraMeme.">
   <title>Chính sách bảo mật — AuraMeme</title>
-  <link rel="icon" type="image/png" sizes="64x64 32x32 16x16" href="/assets/brand/favicon-64.png" />
-  <link rel="apple-touch-icon" href="/assets/brand/favicon-64.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
-
+  <link rel="icon" type="image/png" href="/assets/brand/favicon-64.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    /* CSS Variables & Theming */
     :root {
-      --am-font-main: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      --am-font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      
-      /* Dark Palette (Default) */
-      --am-bg: #12131a;
-      --am-bg-subtle: #171822;
-      --am-surface: #1c1d27;
-      --am-surface-container: #222432;
-      --am-surface-high: #2a2c3d;
-      --am-text: #f3f2fa;
-      --am-text-secondary: #c2c0d1;
-      --am-text-muted: #9592a8;
-      --am-border: #2d3042;
-      --am-border-subtle: #232533;
-      --am-primary: #d0bcff;
-      --am-primary-rgb: 208, 188, 255;
-      --am-primary-container: rgba(208, 188, 255, 0.12);
-      --am-secondary: #c2c1ff;
-      --am-tertiary: #4cd7f6;
-      --am-tertiary-container: rgba(76, 215, 246, 0.12);
-      --am-warning: #ffb703;
-      --am-warning-container: rgba(255, 183, 3, 0.12);
-      --am-header-bg: rgba(18, 19, 26, 0.88);
-      --am-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-      --am-code-bg: #0d0e14;
+      color-scheme: dark;
+      --bg: #111119;
+      --panel: #191925;
+      --text: #f3f1fa;
+      --muted: #a9a5b9;
+      --soft: #d6d3e4;
+      --border: #2e2a3b;
+      --accent: #c1a7ff;
+      --accent-bg: rgba(172, 130, 255, .09);
+      --head: rgba(17, 17, 25, .94);
+      --focus: #8edff5;
     }
-
-    [data-theme="light"], html:not(.dark) {
-      /* Light Palette (High Contrast & Clean) */
-      --am-bg: #f8f8fc;
-      --am-bg-subtle: #f0f0f8;
-      --am-surface: #ffffff;
-      --am-surface-container: #eae9f5;
-      --am-surface-high: #dedde9;
-      --am-text: #1b1b22;
-      --am-text-secondary: #484654;
-      --am-text-muted: #6b687c;
-      --am-border: #d4d2e3;
-      --am-border-subtle: #e6e5f0;
-      --am-primary: #594294;
-      --am-primary-rgb: 89, 66, 148;
-      --am-primary-container: rgba(89, 66, 148, 0.08);
-      --am-secondary: #4c4a85;
-      --am-tertiary: #007086;
-      --am-tertiary-container: rgba(0, 112, 134, 0.08);
-      --am-warning: #b07200;
-      --am-warning-container: rgba(176, 114, 0, 0.1);
-      --am-header-bg: rgba(248, 248, 252, 0.92);
-      --am-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-      --am-code-bg: #f0eff8;
+    html[data-theme="light"], html:not(.dark) {
+      color-scheme: light;
+      --bg: #faf9fe;
+      --panel: #f1eff9;
+      --text: #211b2c;
+      --muted: #696476;
+      --soft: #484053;
+      --border: #e0dbe9;
+      --accent: #61489c;
+      --accent-bg: rgba(100, 67, 170, .06);
+      --head: rgba(250, 249, 254, .95);
+      --focus: #256f8c;
     }
-
-    /* Bilingual Toggle Rules */
-    html[lang="vi"] .lang-en { display: none !important; }
-    html[lang="en"] .lang-vi { display: none !important; }
-
-    /* Base Reset & Typography */
-    *, *::before, *::after { box-sizing: border-box; }
-    html {
-      font-size: 16px;
-      scroll-behavior: smooth;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
+    html[lang="vi"] .lang-en, html[lang="en"] .lang-vi { display: none !important; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 400 16px/1.75 Inter, system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+    a { color: inherit; text-decoration: none; }
+    a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    button { font: inherit; cursor: pointer; }
+    .container { width: calc(100% - 80px); max-width: 1480px; margin-inline: auto; }
+    .skip { position: absolute; top: -80px; left: 20px; padding: 10px 16px; z-index: 300; background: var(--accent); color: var(--bg); border-radius: 8px; font-weight: 700; }
+    .skip:focus { top: 10px; }
+    .header { width: 100%; height: 76px; position: sticky; top: 0; z-index: 40; border-bottom: 1px solid var(--border); background: var(--head); backdrop-filter: blur(16px); }
+    .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 30px; height: 100%; }
+    .brand { display: inline-flex; align-items: center; gap: 11px; flex-shrink: 0; font: 800 21px/1 'Plus Jakarta Sans', system-ui, sans-serif; letter-spacing: -.055em; }
+    .brand img { height: 35px; width: 35px; object-fit: contain; }
+    .brand strong { color: var(--accent); font-weight: 800; }
+    .header-nav, .header-actions { display: flex; align-items: center; gap: 26px; }
+    .header-nav a { font-size: 14px; color: var(--muted); font-weight: 600; transition: color .15s; }
+    .header-nav a:hover, .footer a:hover { color: var(--accent); }
+    .header-actions { gap: 10px; }
+    .header-actions button { border: 1px solid var(--border); border-radius: 11px; background: var(--panel); color: var(--text); height: 40px; min-width: 44px; padding: 0 12px; font-weight: 700; font-size: 13px; transition: border-color .15s, background .15s; }
+    .header-actions button:hover { border-color: var(--accent); }
+    .mobile-home { display: none; font-size: 13px; font-weight: 600; color: var(--soft); }
+    main { flex: 1; }
+    .hero { padding: 60px 0 52px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; }
+    .eyebrow { text-transform: uppercase; letter-spacing: .13em; font-weight: 800; font-size: 11px; color: var(--accent); }
+    h1, h2, h3, p { margin-top: 0; }
+    h1, h2 { font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif; letter-spacing: -.04em; }
+    h1 { font-size: clamp(34px, 3.4vw, 50px); line-height: 1.16; margin: 14px 0 18px; }
+    .hero-desc { max-width: 750px; color: var(--soft); font-size: 17px; line-height: 1.72; margin-bottom: 0; }
+    .hero-meta { text-align: right; color: var(--muted); font-size: 13px; white-space: nowrap; padding-bottom: 5px; }
+    .hero-meta strong { display: block; color: var(--text); font-size: 14px; font-weight: 650; margin-bottom: 3px; }
+    .content { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 52px; padding: 46px 0 92px; }
+    .toc { align-self: start; position: sticky; top: 112px; padding-top: 10px; }
+    .toc-title { font-weight: 800; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 17px; }
+    .toc a { display: block; font-size: 14px; line-height: 1.4; padding: 11px 13px; margin: 0 0 4px -13px; border-radius: 9px; color: var(--muted); transition: background .15s, color .15s; }
+    .toc a:hover, .toc a:focus-visible { background: var(--accent-bg); color: var(--accent); }
+    .toc a.is-active { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+    .article { min-width: 0; }
+    .intro-strip { padding: 20px 24px; margin-bottom: 32px; border-left: 3px solid var(--accent); background: var(--accent-bg); border-radius: 0 12px 12px 0; color: var(--soft); font-size: 14px; line-height: 1.7; }
+    .intro-strip strong { color: var(--text); }
+    .policy-section { display: grid; grid-template-columns: 55px minmax(0, 1fr); gap: 20px; border-top: 1px solid var(--border); padding: 33px 0 32px; scroll-margin-top: 100px; }
+    .section-num { color: var(--accent); font: 800 15px/1.6 'Plus Jakarta Sans', sans-serif; padding-top: 2px; }
+    .policy-section h2 { font-size: 23px; line-height: 1.35; margin: 0 0 14px; }
+    .policy-section p { margin-bottom: 12px; color: var(--soft); max-width: 93ch; }
+    .policy-section p:last-child { margin-bottom: 0; }
+    .policy-section ul { padding-left: 20px; margin: 4px 0 10px; color: var(--soft); max-width: 93ch; }
+    .policy-section li { margin: 6px 0; }
+    .policy-section strong { color: var(--text); font-weight: 700; }
+    .policy-section a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+    .mobile-toc { display: none; }
+    .footer { width: 100%; border-top: 1px solid var(--border); background: var(--panel); margin-top: auto; }
+    .footer-top { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(140px, 1fr)); gap: 50px; padding: 45px 0 36px; }
+    .footer .brand { font-size: 19px; }
+    .footer .brand img { width: 30px; height: 30px; }
+    .footer-desc { color: var(--muted); font-size: 13px; max-width: 350px; line-height: 1.7; margin: 16px 0 0; }
+    .footer h3 { font-size: 13px; margin: 5px 0 14px; font-weight: 800; color: var(--text); }
+    .footer-links { display: flex; flex-direction: column; gap: 11px; }
+    .footer-links a { color: var(--muted); font-size: 13px; line-height: 1.4; transition: color .15s; }
+    .footer-bottom { display: flex; justify-content: space-between; gap: 14px; border-top: 1px solid var(--border); padding: 18px 0 22px; color: var(--muted); font-size: 12px; }
+    @media (max-width: 1050px) {
+      .header-nav { gap: 16px; }
+      .header-nav a { font-size: 13px; }
+      .content { grid-template-columns: 195px minmax(0, 1fr); gap: 33px; }
+      .hero { padding-top: 45px; }
     }
-    body {
-      margin: 0;
-      padding: 0;
-      background: var(--am-bg);
-      color: var(--am-text);
-      font-family: var(--am-font-main);
-      line-height: 1.65;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+    @media (max-width: 760px) {
+      .container { width: calc(100% - 40px); }
+      .header { height: 68px; }
+      .brand { font-size: 19px; }
+      .brand img { width: 30px; height: 30px; }
+      .header-nav { display: none; }
+      .mobile-home { display: inline; }
+      .header-inner { gap: 12px; }
+      .hero { display: block; padding: 38px 0 34px; }
+      .hero-meta { text-align: left; white-space: normal; padding: 22px 0 0; }
+      .hero-desc { font-size: 15px; }
+      .content { display: block; padding: 24px 0 55px; }
+      .toc { display: none; }
+      .mobile-toc { display: block; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 22px; background: var(--panel); }
+      .mobile-toc summary { padding: 12px 15px; cursor: pointer; font-weight: 700; font-size: 14px; }
+      .mobile-toc nav { padding: 4px 15px 14px; display: grid; gap: 5px; }
+      .mobile-toc a { padding: 5px 0; color: var(--soft); font-size: 14px; }
+      .intro-strip { padding: 16px; margin-bottom: 18px; }
+      .policy-section { grid-template-columns: 35px 1fr; gap: 10px; padding: 25px 0; }
+      .policy-section h2 { font-size: 20px; }
+      .policy-section p, .policy-section li { font-size: 14px; line-height: 1.75; }
+      .footer-top { grid-template-columns: 1fr 1fr; gap: 28px; padding: 34px 0 28px; }
+      .footer-brand-col { grid-column: 1 / -1; }
+      .footer-bottom { flex-direction: column; gap: 6px; }
     }
-
-    /* Skip to content */
-    .skip-link {
-      position: absolute;
-      top: -60px;
-      left: 16px;
-      background: var(--am-primary);
-      color: #000;
-      font-weight: 700;
-      padding: 10px 16px;
-      border-radius: 8px;
-      z-index: 1000;
-      text-decoration: none;
-      transition: top 0.2s ease;
+    @media (max-width: 420px) {
+      .container { width: calc(100% - 32px); }
+      .header-actions { gap: 6px; }
+      .header-actions button { min-width: 36px; height: 38px; padding: 0 9px; font-size: 12px; }
+      .mobile-home { font-size: 12px; }
+      .hero { padding-top: 28px; }
+      .footer-top { gap: 20px; }
     }
-    .skip-link:focus { top: 16px; outline: 3px solid #fff; }
-
-    /* Header */
-    .policy-header {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: var(--am-header-bg);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--am-border);
-      height: 64px;
-      display: flex;
-      align-items: center;
-    }
-    .policy-header-inner {
-      width: 100%;
-      max-width: 1240px;
-      margin: 0 auto;
-      padding: 0 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-    }
-    .policy-brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      text-decoration: none;
-      color: var(--am-text);
-      font-weight: 800;
-      font-size: 1.25rem;
-      letter-spacing: -0.02em;
-    }
-    .policy-brand img {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      object-fit: cover;
-    }
-    .brand-accent {
-      color: var(--am-primary);
-    }
-    .policy-header-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .policy-back-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: 1px solid var(--am-border);
-      background: var(--am-surface);
-      color: var(--am-text);
-      font-size: 0.875rem;
-      font-weight: 600;
-      text-decoration: none;
-      transition: all 0.15s ease;
-    }
-    .policy-back-link:hover {
-      background: var(--am-surface-high);
-      border-color: var(--am-primary);
-      color: var(--am-primary);
-    }
-    .policy-tool-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 40px;
-      height: 40px;
-      padding: 0;
-      border: 1px solid var(--am-border);
-      border-radius: 8px;
-      background: var(--am-surface);
-      color: var(--am-text);
-      cursor: pointer;
-      font-family: var(--am-font-main);
-      font-weight: 700;
-      font-size: 0.8125rem;
-      transition: all 0.15s ease;
-    }
-    .policy-tool-btn:hover {
-      background: var(--am-surface-high);
-      border-color: var(--am-primary);
-      color: var(--am-primary);
-    }
-    .policy-tool-btn:focus-visible, .policy-back-link:focus-visible, a:focus-visible {
-      outline: 2px solid var(--am-primary);
-      outline-offset: 2px;
-    }
-
-    /* Container & Layout */
-    .policy-wrapper {
-      flex: 1;
-      width: 100%;
-      max-width: 1240px;
-      margin: 0 auto;
-      padding: 36px 24px 64px;
-    }
-
-    /* Hero Banner */
-    .policy-hero {
-      padding-bottom: 32px;
-      border-bottom: 1px solid var(--am-border);
-      margin-bottom: 40px;
-    }
-    .policy-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 12px;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      background: var(--am-warning-container);
-      color: var(--am-warning);
-      border: 1px solid rgba(255, 183, 3, 0.3);
-      margin-bottom: 14px;
-    }
-    .policy-badge .material-symbols-outlined { font-size: 15px; }
-    .policy-hero h1 {
-      margin: 0 0 12px;
-      font-size: 2.375rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.2;
-      color: var(--am-text);
-    }
-    .policy-meta {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 16px;
-      color: var(--am-text-muted);
-      font-size: 0.875rem;
-      font-family: var(--am-font-mono);
-    }
-    .policy-meta-item { display: inline-flex; align-items: center; gap: 6px; }
-    .policy-meta-item .material-symbols-outlined { font-size: 17px; }
-
-    /* Two-Column Grid */
-    .policy-grid {
-      display: grid;
-      grid-template-columns: 280px minmax(0, 1fr);
-      gap: 48px;
-      align-items: start;
-    }
-
-    /* Desktop Sticky Sidebar TOC */
-    .policy-sidebar {
-      position: sticky;
-      top: 96px;
-      max-height: calc(100vh - 120px);
-      overflow-y: auto;
-      padding-right: 12px;
-    }
-    .policy-sidebar::-webkit-scrollbar { width: 4px; }
-    .policy-sidebar::-webkit-scrollbar-thumb { background: var(--am-border); border-radius: 4px; }
-    .policy-toc-title {
-      font-size: 0.8125rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--am-text-muted);
-      margin: 0 0 12px 12px;
-    }
-    .policy-toc-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .policy-toc-link {
-      display: block;
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-size: 0.84375rem;
-      color: var(--am-text-secondary);
-      text-decoration: none;
-      line-height: 1.4;
-      transition: all 0.15s ease;
-      border-left: 2px solid transparent;
-    }
-    .policy-toc-link:hover {
-      color: var(--am-text);
-      background: var(--am-surface);
-    }
-    .policy-toc-link.is-active {
-      color: var(--am-primary);
-      font-weight: 700;
-      background: var(--am-primary-container);
-      border-left-color: var(--am-primary);
-    }
-
-    /* Mobile TOC Collapsible Dropdown */
-    .policy-mobile-toc {
-      display: none;
-      margin-bottom: 28px;
-      background: var(--am-surface);
-      border: 1px solid var(--am-border);
-      border-radius: 12px;
-      padding: 12px 16px;
-    }
-    .policy-mobile-toc summary {
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 0.9375rem;
-      color: var(--am-primary);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      user-select: none;
-    }
-    .policy-mobile-toc[open] summary { margin-bottom: 12px; }
-    .policy-mobile-toc ol {
-      margin: 0;
-      padding-left: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .policy-mobile-toc a {
-      color: var(--am-text-secondary);
-      text-decoration: none;
-      font-size: 0.875rem;
-    }
-    .policy-mobile-toc a:hover { color: var(--am-primary); }
-
-    /* Main Policy Articles */
-    .policy-main {
-      min-width: 0;
-      max-width: 820px;
-    }
-    .policy-section {
-      margin-bottom: 48px;
-      scroll-margin-top: 84px;
-    }
-    .policy-section:last-child { margin-bottom: 0; }
-    .policy-section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--am-border-subtle);
-      padding-bottom: 10px;
-      margin-bottom: 16px;
-    }
-    .policy-section h2 {
-      margin: 0;
-      font-size: 1.375rem;
-      font-weight: 750;
-      color: var(--am-text);
-      letter-spacing: -0.02em;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .sec-num {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
-      background: var(--am-surface-container);
-      color: var(--am-primary);
-      font-family: var(--am-font-mono);
-      font-size: 0.8125rem;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-    .policy-anchor-btn {
-      color: var(--am-text-muted);
-      text-decoration: none;
-      padding: 4px;
-      border-radius: 6px;
-      display: inline-flex;
-      align-items: center;
-      transition: color 0.15s;
-    }
-    .policy-anchor-btn:hover { color: var(--am-primary); }
-    .policy-anchor-btn .material-symbols-outlined { font-size: 18px; }
-
-    .policy-section p {
-      margin: 0 0 16px;
-      color: var(--am-text-secondary);
-      font-size: 0.96875rem;
-      line-height: 1.7;
-    }
-    .policy-section ul, .policy-section ol {
-      margin: 0 0 18px;
-      padding-left: 24px;
-      color: var(--am-text-secondary);
-      font-size: 0.96875rem;
-      line-height: 1.7;
-    }
-    .policy-section li { margin-bottom: 8px; }
-    .policy-section li strong { color: var(--am-text); }
-
-    /* Callout Card */
-    .policy-callout {
-      background: var(--am-surface);
-      border: 1px solid var(--am-border);
-      border-left: 4px solid var(--am-primary);
-      border-radius: 10px;
-      padding: 16px 20px;
-      margin: 20px 0;
-      font-size: 0.90625rem;
-      color: var(--am-text-secondary);
-    }
-    .policy-callout.warning {
-      border-left-color: var(--am-warning);
-      background: var(--am-warning-container);
-      border-color: rgba(255, 183, 3, 0.25);
-    }
-    .policy-callout strong { color: var(--am-text); }
-    .policy-callout p:last-child { margin-bottom: 0; }
-
-    /* Structured Table */
-    .policy-table-wrapper {
-      overflow-x: auto;
-      margin: 20px 0;
-      border: 1px solid var(--am-border);
-      border-radius: 10px;
-      background: var(--am-surface);
-    }
-    .policy-table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 0.875rem;
-    }
-    .policy-table th {
-      background: var(--am-surface-container);
-      color: var(--am-text);
-      font-weight: 700;
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--am-border);
-    }
-    .policy-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--am-border-subtle);
-      color: var(--am-text-secondary);
-      vertical-align: top;
-      line-height: 1.55;
-    }
-    .policy-table tr:last-child td { border-bottom: 0; }
-    .policy-table code {
-      background: var(--am-code-bg);
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: var(--am-font-mono);
-      font-size: 0.8125rem;
-      color: var(--am-primary);
-    }
-
-    /* Footer */
-    .policy-footer {
-      border-top: 1px solid var(--am-border);
-      background: var(--am-bg-subtle);
-      padding: 40px 24px;
-      margin-top: auto;
-    }
-    .policy-footer-inner {
-      max-width: 1240px;
-      margin: 0 auto;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-      font-size: 0.875rem;
-      color: var(--am-text-muted);
-    }
-    .policy-footer-links {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-    .policy-footer-links a {
-      color: var(--am-text-secondary);
-      text-decoration: none;
-      transition: color 0.15s ease;
-    }
-    .policy-footer-links a:hover { color: var(--am-primary); }
-
-    /* Responsive */
-    @media (max-width: 1024px) {
-      .policy-grid {
-        grid-template-columns: 240px minmax(0, 1fr);
-        gap: 32px;
-      }
-      .policy-hero h1 { font-size: 2rem; }
-    }
-    @media (max-width: 768px) {
-      .policy-grid {
-        grid-template-columns: 1fr;
-        gap: 0;
-      }
-      .policy-sidebar { display: none; }
-      .policy-mobile-toc { display: block; }
-      .policy-wrapper { padding: 24px 16px 48px; }
-      .policy-hero { margin-bottom: 24px; padding-bottom: 24px; }
-      .policy-hero h1 { font-size: 1.75rem; }
-      .policy-footer-inner {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 16px;
-      }
-      .policy-back-link .btn-text { display: none; }
-      .policy-back-link { padding: 8px 10px; }
-    }
-
-    /* Accessibility: Reduced Motion */
     @media (prefers-reduced-motion: reduce) {
-      html { scroll-behavior: auto !important; }
-      *, *::before, *::after {
-        animation-duration: 0.001ms !important;
-        transition-duration: 0.001ms !important;
-      }
+      html { scroll-behavior: auto; }
+      * { transition: none !important; }
     }
-
-    /* Print Styles */
     @media print {
-      body { background: #fff !important; color: #000 !important; }
-      .policy-header, .policy-sidebar, .policy-mobile-toc, .policy-footer-links, .policy-anchor-btn, .skip-link { display: none !important; }
-      .policy-wrapper { max-width: 100% !important; padding: 0 !important; }
-      .policy-grid { display: block !important; }
-      .policy-main { max-width: 100% !important; }
-      .policy-section { page-break-inside: avoid; }
-      .policy-callout, .policy-table-wrapper { border-color: #ccc !important; background: #fff !important; color: #000 !important; }
+      html { color-scheme: light; }
+      body { background: #fff; color: #111; }
+      .header, .footer, .toc, .mobile-toc, .header-actions, .skip { display: none !important; }
+      .container { width: 100%; max-width: none; }
+      .hero { padding: 0 0 25px; }
+      .hero-meta { display: none; }
+      .content { display: block; padding: 20px 0; }
+      .intro-strip { background: #fff; color: #222; border-left: 2px solid #777; }
+      .policy-section { break-inside: avoid; }
+      .policy-section p, .policy-section ul { color: #222; }
     }
   </style>
 </head>
 <body>
-  <!-- Accessibility Skip Link -->
-  <a href="#main-content" class="skip-link">
-    <span class="lang-vi">Chuyển đến nội dung chính</span>
-    <span class="lang-en">Skip to main content</span>
-  </a>
-
-  <!-- Top Navigation Header -->
-  <header class="policy-header" role="banner">
-    <div class="policy-header-inner">
-      <a href="/" class="policy-brand" aria-label="AuraMeme — Trang chủ">
-        <img src="/assets/brand/favicon-64.png" alt="AuraMeme" width="32" height="32" />
-        <span>Aura<span class="brand-accent">Meme</span></span>
+  <a class="skip" href="#main"><span class="lang-vi">Bỏ qua điều hướng</span><span class="lang-en">Skip to content</span></a>
+  <header class="header">
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="AuraMeme">
+        <img src="/assets/brand/favicon-64.png" alt="" onerror="this.style.display='none'">
+        <span>Aura<strong>Meme</strong></span>
       </a>
-
-      <div class="policy-header-actions">
-        <a href="/" class="policy-back-link" aria-label="Quay lại trang chủ AuraMeme">
-          <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
-          <span class="btn-text lang-vi">Về trang chủ</span>
-          <span class="btn-text lang-en">Back to Home</span>
-        </a>
-
-        <button type="button" id="theme-toggle" class="policy-tool-btn" aria-label="Chuyển chế độ sáng / tối" title="Chuyển chế độ sáng / tối">
-          <span class="material-symbols-outlined" id="theme-icon" aria-hidden="true">dark_mode</span>
-        </button>
-
-        <button type="button" id="lang-toggle" class="policy-tool-btn" aria-label="Chuyển sang tiếng Anh / Switch to English" title="Chuyển ngôn ngữ / Switch language">
-          <span id="lang-label" aria-hidden="true">EN</span>
-        </button>
+      <nav class="header-nav" aria-label="Main navigation">
+        <a href="/"><span class="lang-vi">Trang chủ</span><span class="lang-en">Home</span></a>
+        <a href="/explore"><span class="lang-vi">Khám phá</span><span class="lang-en">Explore</span></a>
+        <a href="/rank"><span class="lang-vi">Xếp hạng</span><span class="lang-en">Ranking</span></a>
+        <a href="/vault"><span class="lang-vi">Bảo Khố</span><span class="lang-en">Vault</span></a>
+        <a href="/contact"><span class="lang-vi">Liên hệ</span><span class="lang-en">Contact</span></a>
+      </nav>
+      <div class="header-actions">
+        <a href="/" class="mobile-home"><span class="lang-vi">Trang chủ</span><span class="lang-en">Home</span></a>
+        <button id="theme-toggle" type="button" aria-label="Đổi giao diện sáng/tối" title="Đổi giao diện sáng/tối">☾</button>
+        <button id="lang-toggle" type="button" aria-label="Chuyển sang tiếng Anh" title="Chuyển sang tiếng Anh">EN</button>
       </div>
     </div>
   </header>
 
-  <!-- Content Wrapper -->
-  <div class="policy-wrapper">
-    <!-- Hero Title -->
-    <header class="policy-hero">
-      <div class="policy-badge">
-        <span class="material-symbols-outlined" aria-hidden="true">verified_user</span>
-        <span class="lang-vi">Dự thảo kỹ thuật P2 · Minh bạch dữ liệu</span>
-        <span class="lang-en">P2 Technical Draft · Data Transparency</span>
+  <main id="main" class="container">
+    <div class="hero">
+      <div>
+        <div class="eyebrow"><span class="lang-vi">QUYỀN RIÊNG TƯ TẠI AURAMEME</span><span class="lang-en">PRIVACY AT AURAMEME</span></div>
+        <h1><span class="lang-vi">Chính sách bảo mật</span><span class="lang-en">Privacy Policy</span></h1>
+        <p class="hero-desc"><span class="lang-vi">Một vài thông tin quan trọng về cách AuraMeme sử dụng và bảo vệ dữ liệu khi bạn tham gia cộng đồng.</span><span class="lang-en">A short guide to how AuraMeme uses and protects information while you explore the community.</span></p>
       </div>
-      <h1>
-        <span class="lang-vi">Chính sách bảo mật AuraMeme</span>
-        <span class="lang-en">AuraMeme Privacy Policy</span>
-      </h1>
-      <div class="policy-meta">
-        <div class="policy-meta-item">
-          <span class="material-symbols-outlined" aria-hidden="true">history</span>
-          <span class="lang-vi">Phiên bản: 1.0 (Dự thảo phát triển)</span>
-          <span class="lang-en">Version: 1.0 (Development Draft)</span>
-        </div>
-        <div class="policy-meta-item">
-          <span class="material-symbols-outlined" aria-hidden="true">calendar_today</span>
-          <span class="lang-vi">Cập nhật: Tháng 11/2026</span>
-          <span class="lang-en">Updated: November 2026</span>
-        </div>
-        <div class="policy-meta-item">
-          <span class="material-symbols-outlined" aria-hidden="true">gavel</span>
-          <span class="lang-vi">Khung pháp lý: Luật 91/2025/QH15 & NĐ 147/2024</span>
-          <span class="lang-en">Framework: Law 91/2025/QH15 & Decree 147/2024</span>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Two-Column Content -->
-    <div class="policy-grid">
-      <!-- Desktop Table of Contents -->
-      <aside class="policy-sidebar" aria-label="Mục lục chính sách">
-        <div class="policy-toc-title">
-          <span class="lang-vi">Mục lục điều khoản</span>
-          <span class="lang-en">Table of Contents</span>
-        </div>
+      <div class="hero-meta"><strong><span class="lang-vi">Dự án học tập & portfolio</span><span class="lang-en">Student & portfolio project</span></strong><span class="lang-vi">Cập nhật: 20/11/2026</span><span class="lang-en">Updated: 20 Nov 2026</span></div>
+    </div>
+    <details class="mobile-toc">
+      <summary><span class="lang-vi">Nội dung chính sách (6 mục)</span><span class="lang-en">In this policy (6 sections)</span></summary>
+      <nav aria-label="Policy sections">
+        <a href="#about"><span class="lang-vi">01. Về AuraMeme</span><span class="lang-en">01. About AuraMeme</span></a>
+        <a href="#data"><span class="lang-vi">02. Thông tin được lưu</span><span class="lang-en">02. What we store</span></a>
+        <a href="#purpose"><span class="lang-vi">03. Mục đích sử dụng</span><span class="lang-en">03. How information is used</span></a>
+        <a href="#visibility"><span class="lang-vi">04. Công khai & riêng tư</span><span class="lang-en">04. Public & private data</span></a>
+        <a href="#cookies"><span class="lang-vi">05. Cookie & bảo mật</span><span class="lang-en">05. Cookies & security</span></a>
+        <a href="#rights"><span class="lang-vi">06. Quyền & liên hệ</span><span class="lang-en">06. Your choices & contact</span></a>
+      </nav>
+    </details>
+    <div class="content">
+      <aside class="toc" aria-label="Policy table of contents">
+        <div class="toc-title"><span class="lang-vi">TRONG TRANG NÀY</span><span class="lang-en">ON THIS PAGE</span></div>
         <nav>
-          <ul class="policy-toc-list">
-            <li><a href="#sec-1" class="policy-toc-link is-active"><span class="lang-vi">1. Giới thiệu & Phạm vi</span><span class="lang-en">1. Introduction & Scope</span></a></li>
-            <li><a href="#sec-2" class="policy-toc-link"><span class="lang-vi">2. Các loại dữ liệu thu thập</span><span class="lang-en">2. Data We Collect</span></a></li>
-            <li><a href="#sec-3" class="policy-toc-link"><span class="lang-vi">3. Mục đích & Căn cứ xử lý</span><span class="lang-en">3. Purposes & Legal Grounds</span></a></li>
-            <li><a href="#sec-4" class="policy-toc-link"><span class="lang-vi">4. Dữ liệu công khai & Riêng tư</span><span class="lang-en">4. Public vs Private Data</span></a></li>
-            <li><a href="#sec-5" class="policy-toc-link"><span class="lang-vi">5. Cookie & Lưu trữ trình duyệt</span><span class="lang-en">5. Cookies & Local Storage</span></a></li>
-            <li><a href="#sec-6" class="policy-toc-link"><span class="lang-vi">6. Bảo mật & Kiểm soát truy cập</span><span class="lang-en">6. Security & Access Control</span></a></li>
-            <li><a href="#sec-7" class="policy-toc-link"><span class="lang-vi">7. Chia sẻ & Dịch vụ bên thứ ba</span><span class="lang-en">7. Data Sharing & Third Parties</span></a></li>
-            <li><a href="#sec-8" class="policy-toc-link"><span class="lang-vi">8. Thời gian lưu trữ & Xóa dữ liệu</span><span class="lang-en">8. Retention & Deletion</span></a></li>
-            <li><a href="#sec-9" class="policy-toc-link"><span class="lang-vi">9. Quyền của chủ thể dữ liệu</span><span class="lang-en">9. Your Data Rights</span></a></li>
-            <li><a href="#sec-10" class="policy-toc-link"><span class="lang-vi">10. Người dùng chưa thành niên</span><span class="lang-en">10. Children & Minors</span></a></li>
-            <li><a href="#sec-11" class="policy-toc-link"><span class="lang-vi">11. Cập nhật & Kênh liên hệ</span><span class="lang-en">11. Updates & Contact</span></a></li>
-          </ul>
+          <a href="#about"><span class="lang-vi">01. Về AuraMeme</span><span class="lang-en">01. About AuraMeme</span></a>
+          <a href="#data"><span class="lang-vi">02. Thông tin được lưu</span><span class="lang-en">02. What we store</span></a>
+          <a href="#purpose"><span class="lang-vi">03. Mục đích sử dụng</span><span class="lang-en">03. How information is used</span></a>
+          <a href="#visibility"><span class="lang-vi">04. Công khai & riêng tư</span><span class="lang-en">04. Public & private data</span></a>
+          <a href="#cookies"><span class="lang-vi">05. Cookie & bảo mật</span><span class="lang-en">05. Cookies & security</span></a>
+          <a href="#rights"><span class="lang-vi">06. Quyền & liên hệ</span><span class="lang-en">06. Your choices & contact</span></a>
         </nav>
       </aside>
-
-      <!-- Main Reading Content -->
-      <main id="main-content" class="policy-main" role="main">
-        <!-- Mobile Table of Contents Accordion -->
-        <details class="policy-mobile-toc">
-          <summary>
-            <span class="lang-vi">Mục lục chính sách</span>
-            <span class="lang-en">Table of Contents</span>
-            <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
-          </summary>
-          <ol>
-            <li><a href="#sec-1"><span class="lang-vi">Giới thiệu & Phạm vi</span><span class="lang-en">Introduction & Scope</span></a></li>
-            <li><a href="#sec-2"><span class="lang-vi">Các loại dữ liệu thu thập</span><span class="lang-en">Data We Collect</span></a></li>
-            <li><a href="#sec-3"><span class="lang-vi">Mục đích & Căn cứ xử lý</span><span class="lang-en">Purposes & Legal Grounds</span></a></li>
-            <li><a href="#sec-4"><span class="lang-vi">Dữ liệu công khai & Riêng tư</span><span class="lang-en">Public vs Private Data</span></a></li>
-            <li><a href="#sec-5"><span class="lang-vi">Cookie & Lưu trữ trình duyệt</span><span class="lang-en">Cookies & Local Storage</span></a></li>
-            <li><a href="#sec-6"><span class="lang-vi">Bảo mật & Kiểm soát truy cập</span><span class="lang-en">Security & Access Control</span></a></li>
-            <li><a href="#sec-7"><span class="lang-vi">Chia sẻ & Dịch vụ bên thứ ba</span><span class="lang-en">Data Sharing & Third Parties</span></a></li>
-            <li><a href="#sec-8"><span class="lang-vi">Thời gian lưu trữ & Xóa dữ liệu</span><span class="lang-en">Retention & Deletion</span></a></li>
-            <li><a href="#sec-9"><span class="lang-vi">Quyền của chủ thể dữ liệu</span><span class="lang-en">Your Data Rights</span></a></li>
-            <li><a href="#sec-10"><span class="lang-vi">Người dùng chưa thành niên</span><span class="lang-en">Children & Minors</span></a></li>
-            <li><a href="#sec-11"><span class="lang-vi">Cập nhật & Kênh liên hệ</span><span class="lang-en">Updates & Contact</span></a></li>
-          </ol>
-        </details>
-
-        <!-- Section 1 -->
-        <section id="sec-1" class="policy-section">
-          <div class="policy-section-header">
-            <h2><span class="sec-num">1</span> <span class="lang-vi">Giới thiệu và Phạm vi áp dụng</span><span class="lang-en">Introduction and Scope</span></h2>
-            <a href="#sec-1" class="policy-anchor-btn" title="Liên kết đến điều khoản này"><span class="material-symbols-outlined">link</span></a>
-          </div>
-          <p class="lang-vi">
-            Chào mừng bạn đến với <strong>AuraMeme</strong> — Nền tảng mạng xã hội kết hợp văn hóa Meme hài hước và cơ chế Tu tiên Cyberpunk độc đáo. Chúng tôi tôn trọng quyền riêng tư và cam kết bảo vệ dữ liệu cá nhân của người dùng theo nguyên tắc minh bạch, tối thiểu hóa thu thập và bảo mật kỹ thuật đa tầng.
-          </p>
-          <p class="lang-en">
-            Welcome to <strong>AuraMeme</strong> — A social community platform blending internet meme culture with a distinctive Cyberpunk cultivation mechanic. We respect your privacy and are committed to safeguarding your personal data through transparency, data minimization, and multi-layered technical security.
-          </p>
-          <p class="lang-vi">
-            Chính sách bảo mật này mô tả cách AuraMeme thu thập, xử lý, lưu trữ và bảo vệ dữ liệu của bạn khi truy cập website, đăng ký tài khoản, đăng bài, bình luận, điểm danh hoặc tương tác với các tính năng trên nền tảng.
-          </p>
-          <p class="lang-en">
-            This Privacy Policy outlines how AuraMeme collects, processes, stores, and protects your information when you visit our website, register an account, publish posts, leave comments, check in, or interact with features across the platform.
-          </p>
-          <div class="policy-callout">
-            <strong class="lang-vi">Ghi chú trạng thái dự thảo:</strong>
-            <strong class="lang-en">Draft Status Notice:</strong>
-            <p class="lang-vi">
-              Phiên bản hiện tại là bản dự thảo kỹ thuật tương ứng với giai đoạn <em>P2 Social MVP</em>. Mọi nội dung phản ánh trung thực kiến trúc phần mềm thực tế đang vận hành, chưa thay thế cho văn bản tư vấn pháp lý chính thức và đang chờ phê duyệt sau cùng từ Chủ sở hữu nền tảng.
-            </p>
-            <p class="lang-en">
-              This document is a technical draft reflecting the current <em>P2 Social MVP</em> implementation. It accurately describes the operating software architecture, does not substitute formal legal advice, and remains subject to final approval by the platform owner.
-            </p>
-          </div>
+      <div class="article">
+        <div class="intro-strip"><span class="lang-vi"><strong>Ngắn gọn:</strong> AuraMeme là dự án học tập và portfolio, không phải dịch vụ thương mại. Trang này mô tả cách dữ liệu được xử lý theo các tính năng đang có; nội dung có thể được cập nhật khi dự án phát triển hoặc triển khai rộng rãi hơn.</span><span class="lang-en"><strong>In short:</strong> AuraMeme is a student and portfolio project, not a commercial service. This page describes how information is handled by current features and may be updated as the project evolves or becomes publicly deployed.</span></div>
+        <section id="about" class="policy-section" aria-labelledby="h-about">
+          <div class="section-num">01</div><div><h2 id="h-about"><span class="lang-vi">Về AuraMeme</span><span class="lang-en">About AuraMeme</span></h2>
+          <p class="lang-vi">AuraMeme là website chia sẻ meme và giao lưu cộng đồng, kết hợp các tính năng Aura, xếp hạng và bộ sưu tập vật phẩm. Dự án được xây dựng để học tập, thực hành phát triển web và DevOps, đồng thời giới thiệu năng lực kỹ thuật qua portfolio.</p>
+          <p class="lang-en">AuraMeme is a meme-sharing community with Aura points, rankings, and collectible items. It is built for learning, practicing web development and DevOps, and showcasing engineering work in a portfolio.</p></div>
         </section>
-
-        <!-- Section 2 -->
-        <section id="sec-2" class="policy-section">
-          <div class="policy-section-header">
-            <h2><span class="sec-num">2</span> <span class="lang-vi">Các loại dữ liệu AuraMeme thu thập</span><span class="lang-en">Data We Collect</span></h2>
-            <a href="#sec-2" class="policy-anchor-btn" title="Liên kết đến điều khoản này"><span class="material-symbols-outlined">link</span></a>
-          </div>
-          <p class="lang-vi">
-            Chúng tôi chỉ thu thập các trường dữ liệu cần thiết phục vụ vận hành cộng đồng và cung cấp trải nghiệm tu tiên tương tác:
-          </p>
-          <p class="lang-en">
-            We collect only the data points strictly required to operate community features and provide interactive cultivation mechanics:
-          </p>
-          <ul class="lang-vi">
-            <li><strong>Thông tin tài khoản:</strong> Tên đăng nhập (username), địa chỉ email (phục vụ liên lạc và đăng nhập), mật khẩu đã được băm mã hóa một chiều bằng hàm băm mật mã an toàn (Argon2 / Bcrypt). Chúng tôi không bao giờ lưu trữ mật khẩu ở dạng văn bản rõ.</li>
-            <li><strong>Hồ sơ người dùng:</strong> Tên hiển thị (display name), tiểu sử cá nhân (bio), ảnh đại diện (avatar), và hình nền hồ sơ (background) do bạn chủ động thiết lập.</li>
-            <li><strong>Dữ liệu cộng đồng & nội dung:</strong> Các bài viết meme (tiêu đề, nội dung, tệp hình ảnh/media), bình luận, phản hồi biểu cảm (reaction: đốt lửa, thả tim), và danh sách bài viết bạn đánh dấu lưu trữ (bookmarks).</li>
-            <li><strong>Dữ liệu tu tiên Aura & Vật phẩm ảo:</strong> Điểm tu vi Aura (Aura XP), cấp độ tu luyện (Level 1–100), cảnh giới (Realm), chuỗi ngày điểm danh liên tiếp (Streak), lịch sử nhận thưởng Aura hàng ngày, và danh mục vật phẩm ảo cá nhân (ảnh đại diện, khung viền, danh hiệu) mở khóa từ Bảo Khố (Vault).</li>
-            <li><strong>Thông tin liên hệ & Hỗ trợ:</strong> Họ tên, email, tiêu đề và nội dung tin nhắn bạn gửi qua biểu mẫu liên hệ hỗ trợ hoặc phản ánh kỹ thuật.</li>
-            <li><strong>Dữ liệu kỹ thuật & Phiên làm việc:</strong> Mã định danh phiên làm việc ngẫu nhiên, địa chỉ IP kết nối (phục vụ kiểm soát tần suất request rate-limiting và phòng chống tấn công từ chối dịch vụ), thông tin tác nhân trình duyệt (User-Agent).</li>
-          </ul>
-          <ul class="lang-en">
-            <li><strong>Account Credentials:</strong> Username, email address (for identification and account recovery), and a securely hashed password (Argon2 / Bcrypt). We never store plaintext passwords.</li>
-            <li><strong>Profile Information:</strong> Display name, personal bio, avatar URL, and profile background image chosen by you.</li>
-            <li><strong>Community Content:</strong> Meme submissions (title, body text, uploaded media), comments, expressive reactions (fire, heart), and bookmarked posts.</li>
-            <li><strong>Cultivation Game Mechanics & Virtual Assets:</strong> Aura cultivation XP, level (1–100), cultivation realm, daily check-in streak, daily earned Aura limits, and virtual cosmetic items (avatars, borders, titles) unlocked via the Vault.</li>
-            <li><strong>Support Messages:</strong> Sender name, email address, subject, and message body submitted through the contact support form.</li>
-            <li><strong>Technical Session Metadata:</strong> Server session identifier, connection IP address (used strictly for rate-limiting and DDoS mitigation), and browser User-Agent strings.</li>
-          </ul>
+        <section id="data" class="policy-section" aria-labelledby="h-data">
+          <div class="section-num">02</div><div><h2 id="h-data"><span class="lang-vi">Thông tin AuraMeme lưu trữ</span><span class="lang-en">Information AuraMeme stores</span></h2>
+          <p class="lang-vi">Khi sử dụng website, dữ liệu có thể bao gồm:</p><p class="lang-en">When you use the website, information may include:</p>
+          <ul class="lang-vi"><li><strong>Tài khoản:</strong> tên đăng nhập, email và thông tin hồ sơ.</li><li><strong>Hoạt động:</strong> bài viết, bình luận, biểu cảm, đánh dấu bài viết và tiến trình Aura/Vault.</li><li><strong>Hỗ trợ và kỹ thuật:</strong> nội dung liên hệ, thông tin phiên đăng nhập và dữ liệu cần thiết để duy trì hoạt động an toàn.</li></ul>
+          <ul class="lang-en"><li><strong>Account:</strong> username, email address, and profile details.</li><li><strong>Activity:</strong> posts, comments, reactions, bookmarks, and Aura/Vault progress.</li><li><strong>Support and technical data:</strong> contact messages, login-session details, and information needed to operate the service safely.</li></ul></div>
         </section>
-
-        <!-- Section 3 -->
-        <section id="sec-3" class="policy-section">
-          <div class="policy-section-header">
-            <h2><span class="sec-num">3</span> <span class="lang-vi">Mục đích và Căn cứ xử lý dữ liệu</span><span class="lang-en">Purposes and Legal Grounds</span></h2>
-            <a href="#sec-3" class="policy-anchor-btn" title="Liên kết đến điều khoản này"><span class="material-symbols-outlined">link</span></a>
-          </div>
-          <p class="lang-vi">
-            Theo quy định tại <strong>Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15</strong> và <strong>Nghị định 147/2024/NĐ-CP</strong>, AuraMeme xử lý dữ liệu dựa trên các mục đích và căn cứ hợp pháp sau:
-          </p>
-          <p class="lang-en">
-            Pursuant to Vietnam's <strong>Personal Data Protection Law No. 91/2025/QH15</strong> and <strong>Decree 147/2024/ND-CP</strong>, AuraMeme processes personal data on the following legitimate grounds and purposes:
-          </p>
-          <div class="policy-table-wrapper">
-            <table class="policy-table">
-              <thead>
-                <tr>
-                  <th style="width: 30%;"><span class="lang-vi">Mục đích xử lý</span><span class="lang-en">Processing Purpose</span></th>
-                  <th style="width: 35%;"><span class="lang-vi">Dữ liệu liên quan</span><span class="lang-en">Associated Data</span></th>
-                  <th style="width: 35%;"><span class="lang-vi">Căn cứ pháp lý</span><span class="lang-en">Legal Basis</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><strong class="lang-vi">Cung cấp dịch vụ mạng xã hội</strong><strong class="lang-en">Core Platform Operation</strong></td>
-                  <td><span class="lang-vi">Tài khoản, hồ sơ, bài đăng, bình luận, điểm tu vi Aura</span><span class="lang-en">Account, profile, posts, comments, Aura score</span></td>
-                  <td><span class="lang-vi">Thực hiện thỏa thuận cung cấp dịch vụ & sự đồng ý khi đăng ký</span><span class="lang-en">Contractual necessity & consent upon registration</span></td>
-                </tr>
-                <tr>
-                  <td><strong class="lang-vi">Bảo đảm an ninh, chống spam & request storm</strong><strong class="lang-en">Security, Anti-Spam & Rate Limiting</strong></td>
-                  <td><span class="lang-vi">IP kết nối, session token, nhật ký kiểm duyệt (audit logs)</span><span class="lang-en">Connection IP, session token, admin audit logs</span></td>
-                  <td><span class="lang-vi">Lợi ích hợp pháp về an toàn mạng & nghĩa vụ theo NĐ 147/2024</span><span class="lang-en">Legitimate security interest & statutory duty under Decree 147/2024</span></td>
-                </tr>
-                <tr>
-                  <td><strong class="lang-vi">Xử lý yêu cầu hỗ trợ người dùng</strong><strong class="lang-en">Customer Support & Triage</strong></td>
-                  <td><span class="lang-vi">Họ tên, email, nội dung tin nhắn trong hộp thư liên hệ</span><span class="lang-en">Name, email, message body from contact form</span></td>
-                  <td><span class="lang-vi">Sự đồng ý tự nguyện của người gửi khi liên hệ</span><span class="lang-en">User voluntary consent when submitting support inquiry</span></td>
-                </tr>
-                <tr>
-                  <td><strong class="lang-vi">Tuân thủ yêu cầu pháp luật</strong><strong class="lang-en">Regulatory Compliance</strong></td>
-                  <td><span class="lang-vi">Dữ liệu tài khoản và nhật ký vi phạm theo yêu cầu tư pháp</span><span class="lang-en">Account records and violation logs upon official subpoena</span></td>
-                  <td><span class="lang-vi">Nghĩa vụ pháp lý theo Luật An ninh mạng & Luật 91/2025/QH15</span><span class="lang-en">Statutory legal obligation under applicable law</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <section id="purpose" class="policy-section" aria-labelledby="h-purpose">
+          <div class="section-num">03</div><div><h2 id="h-purpose"><span class="lang-vi">Dữ liệu được sử dụng để làm gì?</span><span class="lang-en">How information is used</span></h2>
+          <p class="lang-vi">Thông tin được dùng để đăng nhập, hiển thị bài viết và hồ sơ, ghi nhận tương tác, vận hành Aura/Vault, gửi thông báo liên quan, phản hồi liên hệ và hạn chế hành vi lạm dụng. Phiên bản dự án hiện tại không có tính năng quảng cáo cá nhân hóa hoặc bán dữ liệu người dùng.</p>
+          <p class="lang-en">Information supports sign-in, posts and profiles, interactions, Aura/Vault features, relevant notifications, support requests, and abuse prevention. The current project does not include personalized advertising or user-data sales features.</p></div>
         </section>
-
-        <!-- Section 4 -->
-        <section id="sec-4" class="policy-section">
-          <div class="policy-section-header">
-            <h2><span class="sec-num">4</span> <span class="lang-vi">Nội dung công khai và Quyền riêng tư của thành viên</span><span class="lang-en">Public Content vs Private Data</span></h2>
-            <a href="#sec-4" class="policy-anchor-btn" title="Liên kết đến điều khoản này"><span class="material-symbols-outlined">link</span></a>
-          </div>
-          <p class="lang-vi">
-            AuraMeme phân định ranh giới rành mạch giữa thông tin công khai và thông tin được bảo mật riêng tư:
-          </p>
-          <p class="lang-en">
-            AuraMeme maintains an uncompromising boundary between public platform information and strictly private member data:
-          </p>
-          <div class="policy-table-wrapper">
-            <table class="policy-table">
-              <thead>
-                <tr>
-                  <th style="width: 50%;"><span class="lang-vi">Dữ liệu hiển thị công khai (Public)</span><span class="lang-en">Publicly Visible Data</span></th>
-                  <th style="width: 50%;"><span class="lang-vi">Dữ liệu bảo mật riêng tư (Private)</span><span class="lang-en">Confidential & Private Data</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>
-                    <ul style="margin: 0; padding-left: 18px;">
-                      <li><span class="lang-vi">Tên hiển thị và username (<code>@username</code>)</span><span class="lang-en">Display name and username (<code>@username</code>)</span></li>
-                      <li><span class="lang-vi">Ảnh đại diện, hình nền hồ sơ, tiểu sử</span><span class="lang-en">Avatar, background, and public bio</span></li>
-                      <li><span class="lang-vi">Cấp độ (Level), Cảnh giới (Realm), Chuỗi điểm danh</span><span class="lang-en">Cultivation Level, Realm, and check-in streak</span></li>
-                      <li><span class="lang-vi">Bài đăng meme, bình luận công khai</span><span class="lang-en">Published meme posts, public comments</span></li>
-                      <li><span class="lang-vi">Vị trí và điểm số trên Bảng xếp hạng (Leaderboard)</span><span class="lang-en">Rank & score on public Leaderboards</span></li>
-                    </ul>
-                  </td>
-                  <td>
-                    <ul style="margin: 0; padding-left: 18px;">
-                      <li><span class="lang-vi">Địa chỉ email đăng ký</span><span class="lang-en">Registered email address</span></li>
-                      <li><span class="lang-vi">Mật khẩu băm mã hóa một chiều</span><span class="lang-en">One-way cryptographic password hashes</span></li>
-                      <li><span class="lang-vi">Session Cookie và CSRF token</span><span class="lang-en">Session cookies and CSRF tokens</span></li>
-                      <li><span class="lang-vi">Danh sách bài viết đã lưu riêng (Bookmarks)</span><span class="lang-en">Personal saved bookmarks</span></li>
-                      <li><span class="lang-vi">Hộp thư thông báo cá nhân & tin nhắn hỗ trợ</span><span class="lang-en">Personal notification inbox & support messages</span></li>
-                    </ul>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="policy-callout warning">
-            <strong class="lang-vi">Khuyến cáo an toàn:</strong>
-            <strong class="lang-en">Safety Recommendation:</strong>
-            <p class="lang-vi">
-              Khi tham gia diễn đàn công cộng, tuyệt đối không đăng tải thông tin cá nhân nhạy cảm (như căn cước công dân, số điện thoại riêng, số tài khoản ngân hàng hoặc địa chỉ nhà ở) trong nội dung meme hay bình luận.
-            </p>
-            <p class="lang-en">
-              When participating in public feeds, never disclose sensitive personal credentials (such as national ID numbers, private phone numbers, bank accounts, or residential addresses) in meme descriptions or comments.
-            </p>
-          </div>
+        <section id="visibility" class="policy-section" aria-labelledby="h-visibility">
+          <div class="section-num">04</div><div><h2 id="h-visibility"><span class="lang-vi">Thông tin công khai và riêng tư</span><span class="lang-en">Public and private information</span></h2>
+          <p class="lang-vi">Tên hiển thị, hồ sơ công khai, bài viết, bình luận và một số thông tin Aura/xếp hạng có thể được thành viên khác nhìn thấy. Email, mật khẩu và thông tin phiên đăng nhập không được hiển thị như nội dung cộng đồng.</p>
+          <p class="lang-vi">Bạn nên tránh đăng số điện thoại, địa chỉ hoặc thông tin nhạy cảm trong bài viết và bình luận công khai.</p>
+          <p class="lang-en">Display names, public profiles, posts, comments, and some Aura/ranking information may be visible to other members. Email addresses, passwords, and login-session data are not displayed as community content.</p>
+          <p class="lang-en">Avoid posting phone numbers, addresses, or other sensitive details in public posts and comments.</p></div>
         </section>
-
-        <!-- Section 5 -->
-        <section id="sec-5" class="policy-section">
-          <div class="policy-section-header">
-            <h2><span class="sec-num">5</span> <span class="lang-vi">Cookie, Phiên đăng nhập và Lưu trữ trên trình duyệt</span><span class="lang-en">Cookies, Sessions, and Browser Storage</span></h2>
-            <a href="#sec-5" class="policy-anchor-btn" title="Liên kết đến điều khoản này"><span class="material-symbols-outlined">link</span></a>
-          </div>
-          <p class="lang-vi">
-            AuraMeme áp dụng cơ chế lưu trữ trình duyệt tối giản, phục vụ kỹ thuật xác thực và tùy chọn hiển thị:
-          </p>
-          <p class="lang-en">
-            AuraMeme employs minimal client-side browser storage exclusively for secure authentication and UI preferences:
-          </p>
-          <ul class="lang-vi">
-            <li><strong>Session Cookie (HttpOnly Cookie):</strong> Được gán khi đăng nhập thành công để duy trì phiên làm việc an toàn. Cookie mang cờ <code>HttpOnly</code> (ngăn chặn mã độc JavaScript đọc trộm cookie, chống tấn công XSS) và thuộc tính <code>SameSite</code> (ngăn chặn tấn công giả mạo CSRF).</li>
-            <li><strong>CSRF Token:</strong> Mã thông báo ngẫu nhiên được cấp phát bởi máy chủ, gửi kèm qua HTTP header đối với các thao tác thay đổi dữ liệu (đăng bài, bình luận, reaction, cập nhật hồ sơ).</li>
-            <li><strong>Bộ nhớ cục bộ (localStorage):</strong> Sử dụng duy nhất khóa <code>aurameme-ui-preferences</code> để ghi nhớ chế độ giao diện (<code>theme: dark/light</code>) và ngôn ngữ (<code>language: vi/en</code>). Chúng tôi <strong>không bao giờ</strong> lưu trữ thông tin nhận dạng cá nhân, mật khẩu hay token xác thực trong <code>localStorage</code>.</li>
-          </ul>
-          <ul class="lang-en">
-            <li><strong>Session Cookie (HttpOnly Cookie):</strong> Issued upon successful authentication to maintain your session. The cookie carries the <code>HttpOnly</code> flag (preventing client-side JavaScript access against XSS theft) and <code>SameSite</code> protection against CSRF.</li>
-            <li><strong>CSRF Token:</strong> Cryptographically generated security token sent via HTTP headers for all state-mutating requests (posting, commenting, reacting, profile edits).</li>
-            <li><strong>Browser Storage (localStorage):</strong> Used exclusively under the key <code>aurameme-ui-preferences</code> to retain your visual appearance (<code>theme: dark/light</code>) and language (<code>language: vi/en</code>). We <strong>never</strong> store credentials, auth tokens, or personal identifiers in <code>localStorage</code>.</li>
-          </ul>
+        <section id="cookies" class="policy-section" aria-labelledby="h-cookies">
+          <div class="section-num">05</div><div><h2 id="h-cookies"><span class="lang-vi">Cookie và bảo mật</span><span class="lang-en">Cookies and security</span></h2>
+          <p class="lang-vi">Website sử dụng cookie phiên để duy trì đăng nhập và hỗ trợ bảo vệ tài khoản. Trình duyệt có thể lưu lựa chọn giao diện sáng/tối và ngôn ngữ để bạn không cần thiết lập lại mỗi lần truy cập.</p>
+          <p class="lang-vi">AuraMeme áp dụng các biện pháp bảo vệ phù hợp với hệ thống hiện tại; tuy nhiên, không có dịch vụ trực tuyến nào có thể bảo đảm an toàn tuyệt đối.</p>
+          <p class="lang-en">The website uses session cookies to keep you signed in and help protect your account. The browser may remember your theme and language preferences for future visits.</p>
+          <p class="lang-en">AuraMeme uses security measures available in its current implementation, but no online service can guarantee absolute security.</p></div>
         </section>
-
-        <!-- Section 6 -->
-        <section id="sec-6" class="policy-section">
-          <div class="policy-section-header">
-            <h2><span class="sec-num">6</span> <span class="lang-vi">Bảo mật và Kiểm soát truy cập dữ liệu</span><span class="lang-en">Data Security and Access Control</span></h2>
-            <a href="#sec-6" class="policy-anchor-btn" title="Liên kết đến điều khoản này"><span class="material-symbols-outlined">link</span></a>
-          </div>
-          <p class="lang-vi">
-            Chúng tôi triển khai các giải pháp bảo mật kỹ thuật đa tầng nhằm bảo vệ dữ liệu thành viên khỏi truy cập trái phép:
-          </p>
-          <p class="lang-en">
-            We implement defense-in-depth technical security controls to protect member data against unauthorized access:
-          </p>
-          <ul class="lang-vi">
-            <li><strong>Phân quyền truy cập dựa trên vai trò (RBAC):</strong> Cơ chế phân quyền nghiêm ngặt tách biệt giữa Người dùng thông thường (USER) và Ban Quản Trị (ADMIN). Quản trị viên chỉ được cấp quyền truy cập các công cụ vận hành thông qua phiên xác thực chuyên biệt.</li>
-            <li><strong>Nhật ký kiểm toán quản trị (Admin Audit Logs):</strong> Mọi hành động quản trị quan trọng (ẩn/xóa nội dung, khóa tài khoản, phát thông báo hệ thống) đều được ghi nhận tự động vào bảng nhật ký kiểm toán không thể xóa sửa, ghi rõ thời gian và đối tượng tác động.</li>
-            <li><strong>Bảo vệ chống bão yêu cầu (Request Storm Hotfix):</strong> Hệ thống tích hợp thuật toán tự động ngăn chặn vòng lặp polling, tự động kích hoạt thời gian hồi phục khi gặp mã phản hồi <code>429 Rate Limited</code> nhằm giữ ổn định hạ tầng mạng.</li>
-            <li><strong>Giới hạn cam kết an toàn:</strong> Dù áp dụng các tiêu chuẩn an ninh tiên tiến, không có hệ thống truyền tải hay lưu trữ dữ liệu nào qua mạng Internet có thể bảo đảm an toàn tuyệt đối 100%. Nền tảng không tuyên bố bảo mật tuyệt đối vượt quá khả năng kỹ thuật thực tế.</li>
-          </ul>
-          <ul class="lang-en">
-            <li><strong>Role-Based Access Control (RBAC):</strong> Strict separation between standard members (USER) and moderators (ADMIN). Administrative consoles require verified authorization claims and active session checks.</li>
-            <li><strong>Admin Audit Trail:</strong> Administrative interventions (moderating posts, locking accounts, broadcasting announcements) are immutably logged with actor identities, timestamps, and target resources.</li>
-            <li><strong>Request Storm Mitigation:</strong> Anti-storm client guards and server-side rate limiters prevent runaway request loops, honoring <code>429 Retry-After</code> cooldowns.</li>
-            <li><strong>Honest Security Boundaries:</strong> While modern technical precautions are implemented, no transmission over the Internet can be guaranteed as 100% invulnerable. We avoid exaggerated security claims beyond verified operational realities.</li>
-          </ul>
+        <section id="rights" class="policy-section" aria-labelledby="h-rights">
+          <div class="section-num">06</div><div><h2 id="h-rights"><span class="lang-vi">Quyền của bạn và cách liên hệ</span><span class="lang-en">Your choices and how to contact us</span></h2>
+          <p class="lang-vi">Bạn có thể cập nhật hồ sơ và quản lý nội dung cá nhân trong phạm vi các tính năng hiện có. Với những thắc mắc hoặc yêu cầu khác liên quan đến dữ liệu tài khoản, hãy sử dụng <a href="/contact">trang Liên hệ</a> để đội ngũ dự án xem xét. Một số yêu cầu có thể cần xác minh quyền sở hữu tài khoản trước khi xử lý.</p>
+          <p class="lang-vi">Chính sách này sẽ được điều chỉnh khi AuraMeme bổ sung tính năng hoặc thay đổi cách vận hành.</p>
+          <p class="lang-en">You can update your profile and manage your own content where the current features allow it. For questions or other account-data requests, use the <a href="/contact">Contact page</a> to reach the project team. Some requests may require account ownership verification.</p>
+          <p class="lang-en">This policy may change as AuraMeme adds features or changes how the project operates.</p></div>
         </section>
-
-        <!-- Section 7 -->
-        <section id="sec-7" class="policy-section">
-          <div class="policy-section-header">
-            <h2><span class="sec-num">7</span> <span class="lang-vi">Chia sẻ dữ liệu và Dịch vụ bên thứ ba</span><span class="lang-en">Data Sharing and Third-Party Services</span></h2>
-            <a href="#sec-7" class="policy-anchor-btn" title="Liên kết đến điều khoản này"><span class="material-symbols-outlined">link</span></a>
-          </div>
-          <p class="lang-vi">
-            AuraMeme tuân thủ nguyên tắc không thương mại hóa dữ liệu riêng tư của người dùng:
-          </p>
-          <p class="lang-en">
-            AuraMeme adheres strictly to non-commercialization of member private records:
-          </p>
-          <ul class="lang-vi">
-            <li><strong>Không bán hoặc cho thuê dữ liệu:</strong> Chúng tôi không bao giờ bán, cho thuê hoặc chuyển nhượng danh sách email hay thông tin cá nhân của bạn cho bất kỳ đơn vị quảng cáo hay tiếp thị bên thứ ba nào.</li>
-            <li><strong>Không tích hợp mã theo dõi hành vi (No 3rd-party Trackers):</strong> Trang web không cài đặt Google Analytics, Facebook Pixel, hay các dịch vụ theo dõi hành vi xuyên nền tảng của bên thứ ba.</li>
-            <li><strong>Dịch vụ thanh toán:</strong> Các tính năng gói hội viên (Aura Plus / Prime) hiện đang được triển khai dưới dạng môi trường mô phỏng (Sandbox), <strong>chưa kết nối với bất kỳ cổng thanh toán tiền thật nào của bên thứ ba</strong>.</li>
-            <li><strong>Cung cấp theo yêu cầu cơ quan nhà nước:</strong> Dữ liệu chỉ được cung cấp cho cơ quan chức năng có thẩm quyền tại Việt Nam khi có văn bản yêu cầu chính thức theo đúng trình tự và thủ tục luật định.</li>
-          </ul>
-          <ul class="lang-en">
-            <li><strong>No Data Brokering:</strong> We never sell, rent, or trade your email address or private records to third-party ad networks or data aggregators.</li>
-            <li><strong>Zero Third-Party Behavior Tracking:</strong> We do not embed Google Analytics, Meta Pixels, or cross-site tracking beacons.</li>
-            <li><strong>Payment Gateways:</strong> Membership tiers (Aura Plus / Prime) currently operate in sandbox demonstration mode and <strong>do not process real financial transactions via external payment gateways</strong>.</li>
-            <li><strong>Law Enforcement Compliance:</strong> We disclose account information only when officially subpoenaed by authorized state authorities in compliance with Vietnamese statutory due process.</li>
-          </ul>
-        </section>
-
-        <!-- Section 8 -->
-        <section id="sec-8" class="policy-section">
-          <div class="policy-section-header">
-            <h2><span class="sec-num">8</span> <span class="lang-vi">Thời gian lưu trữ và Xử lý khi xóa tài khoản</span><span class="lang-en">Data Retention and Deletion</span></h2>
-            <a href="#sec-8" class="policy-anchor-btn" title="Liên kết đến điều khoản này"><span class="material-symbols-outlined">link</span></a>
-          </div>
-          <p class="lang-vi">
-            Quy trình xử lý vòng đời dữ liệu trên nền tảng được định nghĩa như sau:
-          </p>
-          <p class="lang-en">
-            Data lifecycle management across platform storage is structured as follows:
-          </p>
-          <ul class="lang-vi">
-            <li><strong>Thời hạn lưu trữ:</strong> Dữ liệu tài khoản và tương tác được duy trì chừng nào tài khoản của bạn còn ở trạng thái hoạt động trên nền tảng AuraMeme.</li>
-            <li><strong>Xóa bài viết & bình luận (Soft Delete):</strong> Khi bạn bấm xóa bài viết hoặc bình luận của chính mình, nội dung sẽ được cập nhật trạng thái <code>deleted</code>, lập tức bị gỡ bỏ khỏi luồng bảng tin công khai và không thể truy cập lại bởi người dùng khác.</li>
-            <li><strong>Khóa & Hủy tài khoản:</strong> Khi tài khoản bị khóa hoặc nhận được yêu cầu hủy từ chủ sở hữu, phiên làm việc sẽ bị thu hồi ngay lập tức, hồ sơ công khai ngừng xuất hiện trên các trang cộng đồng.</li>
-            <li><strong>Xóa triệt để (Hard Delete):</strong> Nền tảng hiện tiếp nhận và xử lý thủ công các yêu cầu xóa dữ liệu hoàn toàn thông qua Hộp thư Liên hệ với Ban Quản Trị trong khi quy trình xóa tự động thác đổ (cascade deletion) đang được hoàn thiện.</li>
-          </ul>
-          <ul class="lang-en">
-            <li><strong>Retention Term:</strong> Profile information and community posts remain retained for the active lifespan of your member account.</li>
-            <li><strong>Content Deletion (Soft Delete):</strong> When you remove a post or comment, its state is marked as <code>deleted</code> and immediately excluded from all public community feeds and rankings.</li>
-            <li><strong>Account Suspension & Termination:</strong> Upon account locking or verified deletion requests, authentication sessions are revoked and public profiles are withdrawn from member listings.</li>
-            <li><strong>Permanent Purging (Hard Delete):</strong> Full database purges are currently fulfilled administratively upon written request via the Contact form while automated cascade-deletion routines are being completed.</li>
-          </ul>
-        </section>
-
-        <!-- Section 9 -->
-        <section id="sec-9" class="policy-section">
-          <div class="policy-section-header">
-            <h2><span class="sec-num">9</span> <span class="lang-vi">Quyền của người dùng đối với dữ liệu cá nhân</span><span class="lang-en">Your Personal Data Rights</span></h2>
-            <a href="#sec-9" class="policy-anchor-btn" title="Liên kết đến điều khoản này"><span class="material-symbols-outlined">link</span></a>
-          </div>
-          <p class="lang-vi">
-            Căn cứ theo <strong>Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15</strong>, bạn với tư cách là chủ thể dữ liệu có đầy đủ các quyền hợp pháp sau đây:
-          </p>
-          <p class="lang-en">
-            In accordance with <strong>Vietnam's Personal Data Protection Law No. 91/2025/QH15</strong>, you hold the following statutory rights as a data subject:
-          </p>
-          <ol class="lang-vi">
-            <li><strong>Quyền được biết & được thông báo:</strong> Được cung cấp thông tin minh bạch về hoạt động xử lý dữ liệu thông qua văn bản chính sách này.</li>
-            <li><strong>Quyền truy cập & chỉnh sửa:</strong> Bạn có quyền xem và cập nhật trực tiếp tên hiển thị, tiểu sử, ảnh đại diện, hình nền trong giao diện Hồ sơ (Profile).</li>
-            <li><strong>Quyền xóa dữ liệu (Quyền được lãng quên):</strong> Quyền yêu cầu xóa bỏ các bài đăng, bình luận hoặc yêu cầu gỡ bỏ toàn bộ tài khoản cá nhân.</li>
-            <li><strong>Quyền rút lại sự đồng ý:</strong> Bạn có quyền ngừng sử dụng nền tảng và rút lại sự đồng ý đã cấp bất kỳ lúc nào.</li>
-            <li><strong>Quyền khiếu nại & phản ánh:</strong> Gửi khiếu nại tới Ban Quản Trị AuraMeme nếu phát hiện dữ liệu cá nhân bị xử lý sai mục đích hoặc vi phạm quy định an toàn thông tin.</li>
-          </ol>
-          <ol class="lang-en">
-            <li><strong>Right to be Informed:</strong> To receive transparent explanations regarding data processing activities via this policy document.</li>
-            <li><strong>Right of Access and Rectification:</strong> To review and update your display name, bio, avatar, and background directly in your Profile settings.</li>
-            <li><strong>Right to Erasure:</strong> To delete your published posts and comments, or request full account deregistration.</li>
-            <li><strong>Right to Withdraw Consent:</strong> To discontinue service usage and withdraw previously granted processing consent at any time.</li>
-            <li><strong>Right to Lodge Complaints:</strong> To submit inquiries or formal grievances to platform moderation if you suspect data misuse or unauthorized disclosure.</li>
-          </ol>
-        </section>
-
-        <!-- Section 10 -->
-        <section id="sec-10" class="policy-section">
-          <div class="policy-section-header">
-            <h2><span class="sec-num">10</span> <span class="lang-vi">Quy định về người dùng chưa thành niên</span><span class="lang-en">Children and Minors</span></h2>
-            <a href="#sec-10" class="policy-anchor-btn" title="Liên kết đến điều khoản này"><span class="material-symbols-outlined">link</span></a>
-          </div>
-          <p class="lang-vi">
-            AuraMeme là nền tảng mạng xã hội giải trí hướng tới đối tượng người dùng từ thanh thiếu niên đến người trưởng thành:
-          </p>
-          <p class="lang-en">
-            AuraMeme is an entertainment social network geared toward young adults and mature meme creators:
-          </p>
-          <ul class="lang-vi">
-            <li>Tuân thủ quy định bảo vệ trẻ em trên môi trường mạng theo <strong>Nghị định 147/2024/NĐ-CP</strong> và Luật Bảo vệ dữ liệu cá nhân: Người dùng dưới 15 tuổi hoặc chưa thành niên theo quy định pháp luật cần có sự đồng ý và giám sát từ cha mẹ hoặc người giám hộ hợp pháp khi tạo tài khoản và tham gia cộng đồng.</li>
-            <li>Nền tảng không chủ ý thu thập thông tin nhận dạng nhạy cảm từ trẻ em. Nếu phụ huynh hoặc người giám hộ phát hiện trẻ em cung cấp thông tin tài khoản mà không có sự cho phép, vui lòng liên hệ với chúng tôi để tiến hành xóa tài khoản kịp thời.</li>
-          </ul>
-          <ul class="lang-en">
-            <li>In compliance with minor protection mandates under <strong>Decree 147/2024/ND-CP</strong>: Individuals under 15 years of age or statutory minors require consent and oversight from parents or legal guardians when registering an account.</li>
-            <li>We do not knowingly collect personal credentials from children without guardian awareness. If a parent discovers unauthorized account registration, please notify platform administration for prompt account removal.</li>
-          </ul>
-        </section>
-
-        <!-- Section 11 -->
-        <section id="sec-11" class="policy-section">
-          <div class="policy-section-header">
-            <h2><span class="sec-num">11</span> <span class="lang-vi">Thay đổi chính sách và Phương thức liên hệ</span><span class="lang-en">Policy Updates and Contact Channels</span></h2>
-            <a href="#sec-11" class="policy-anchor-btn" title="Liên kết đến điều khoản này"><span class="material-symbols-outlined">link</span></a>
-          </div>
-          <p class="lang-vi">
-            AuraMeme có thể cập nhật nội dung Chính sách bảo mật này theo định kỳ nhằm phản ánh đúng tiến trình phát triển tính năng kỹ thuật hoặc điều chỉnh phù hợp với văn bản quy phạm pháp luật mới có hiệu lực.
-          </p>
-          <p class="lang-en">
-            AuraMeme may periodically revise this Privacy Policy to reflect evolving technical implementations or newly enacted statutory provisions.
-          </p>
-          <p class="lang-vi">
-            Khi có thay đổi trọng yếu, chúng tôi sẽ thông báo công khai qua tính năng <strong>Thông báo hệ thống</strong> trên trang web hoặc gửi cảnh báo tại trang chủ.
-          </p>
-          <p class="lang-en">
-            Material adjustments will be announced proactively through our in-app <strong>System Announcement</strong> banner or on the community home feed.
-          </p>
-          <div class="policy-callout">
-            <strong class="lang-vi">Đầu mối tiếp nhận yêu cầu dữ liệu:</strong>
-            <strong class="lang-en">Data Inquiry & Contact Triage:</strong>
-            <p class="lang-vi">
-              Mọi thắc mắc, đề xuất chỉnh sửa hoặc khiếu nại về quyền riêng tư, vui lòng gửi qua:
-            </p>
-            <p class="lang-en">
-              For privacy inquiries, rights enforcement requests, or feedback, please reach out via:
-            </p>
-            <ul style="margin: 8px 0 0; padding-left: 18px;">
-              <li><strong class="lang-vi">Biểu mẫu hỗ trợ trực tuyến:</strong><strong class="lang-en">Online Support Form:</strong> <a href="/contact" style="color: var(--am-primary);">AuraMeme Contact Portal (/contact)</a></li>
-              <li><strong class="lang-vi">Đại diện tiếp nhận:</strong><strong class="lang-en">Representative Body:</strong> <span class="lang-vi">Ban Quản Trị Nền Tảng AuraMeme</span><span class="lang-en">AuraMeme Platform Moderation Team</span></li>
-              <li><strong class="lang-vi">Địa chỉ pháp nhân & Email pháp lý:</strong><strong class="lang-en">Legal Identity & Corporate Address:</strong> <span class="lang-vi">Sẽ được công bố chính thức sau khi hoàn tất thủ tục đăng ký mạng xã hội theo quy định của cơ quan nhà nước có thẩm quyền.</span><span class="lang-en">To be formally designated upon regulatory licensing under applicable decree guidelines.</span></li>
-            </ul>
-          </div>
-        </section>
-      </main>
+      </div>
     </div>
-  </div>
+  </main>
 
-  <!-- Footer -->
-  <footer class="policy-footer" role="contentinfo">
-    <div class="policy-footer-inner">
+  <footer class="footer">
+    <div class="container footer-top">
+      <div class="footer-brand-col">
+        <a class="brand" href="/">
+          <img src="/assets/brand/favicon-64.png" alt="" onerror="this.style.display='none'">
+          <span>Aura<strong>Meme</strong></span>
+        </a>
+        <p class="footer-desc"><span class="lang-vi">Một không gian nhỏ dành cho meme, cộng đồng và những ý tưởng sáng tạo. Được xây dựng như một dự án học tập và portfolio.</span><span class="lang-en">A little space for memes, community, and creative ideas. Built as a student and portfolio project.</span></p>
+      </div>
       <div>
-        © 2026 AuraMeme Platform.
-        <span class="lang-vi">Bảo lưu mọi quyền.</span>
-        <span class="lang-en">All rights reserved.</span>
+        <h3><span class="lang-vi">Khám phá</span><span class="lang-en">Explore</span></h3>
+        <nav class="footer-links" aria-label="Explore links">
+          <a href="/"><span class="lang-vi">Trang chủ</span><span class="lang-en">Home</span></a>
+          <a href="/explore"><span class="lang-vi">Khám phá meme</span><span class="lang-en">Explore memes</span></a>
+          <a href="/vault"><span class="lang-vi">Bảo Khố</span><span class="lang-en">Vault</span></a>
+        </nav>
       </div>
-      <div class="policy-footer-links">
-        <a href="/"><span class="lang-vi">Trang chủ</span><span class="lang-en">Home</span></a>
-        <a href="/explore"><span class="lang-vi">Khám phá</span><span class="lang-en">Explore</span></a>
-        <a href="/vault"><span class="lang-vi">Bảo Khố</span><span class="lang-en">Vault</span></a>
-        <a href="/contact"><span class="lang-vi">Liên hệ hỗ trợ</span><span class="lang-en">Contact Support</span></a>
-        <a href="https://github.com/lebaokhang123/aura_meme" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <div>
+        <h3><span class="lang-vi">Thông tin</span><span class="lang-en">Information</span></h3>
+        <nav class="footer-links" aria-label="Information links">
+          <a href="/about"><span class="lang-vi">Giới thiệu</span><span class="lang-en">About</span></a>
+          <a href="/contact"><span class="lang-vi">Liên hệ</span><span class="lang-en">Contact</span></a>
+          <a href="/privacy.html"><span class="lang-vi">Chính sách bảo mật</span><span class="lang-en">Privacy policy</span></a>
+        </nav>
       </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>© 2026 AuraMeme.</span>
+      <span><span class="lang-vi">Học tập · Sáng tạo · Cộng đồng</span><span class="lang-en">Learn · Create · Connect</span></span>
     </div>
   </footer>
 
-  <!-- Theme & Language Synchronizer Script -->
   <script>
-    (function () {
-      const STORAGE_KEY = 'aurameme-ui-preferences';
-
-      function safeGetPreferences() {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            return {
-              theme: parsed.theme === 'light' ? 'light' : 'dark',
-              language: parsed.language === 'en' ? 'en' : 'vi'
-            };
-          }
-        } catch (e) {
-          /* Fallback when localStorage is blocked or throws */
-        }
-        return { theme: 'dark', language: 'vi' };
+  (()=>{
+    'use strict';
+    const KEY='aurameme-ui-preferences';
+    const root=document.documentElement;
+    const themeButton=document.querySelector('#theme-toggle');
+    const langButton=document.querySelector('#lang-toggle');
+    let values={theme:'dark',language:'vi'};
+    try {
+      const saved=JSON.parse(localStorage.getItem(KEY)||'null');
+      if(saved&&typeof saved==='object') {
+        values={...saved,theme:saved.theme==='light'?'light':'dark',language:saved.language==='en'?'en':'vi'};
       }
+    } catch {}
+    const apply=()=>{
+      root.dataset.theme=values.theme;
+      root.classList.toggle('dark',values.theme==='dark');
+      root.lang=values.language;
+      document.title=values.language==='en'?'Privacy Policy — AuraMeme':'Chính sách bảo mật — AuraMeme';
+      themeButton.textContent=values.theme==='dark'?'☾':'☀';
+      themeButton.setAttribute('aria-label',values.language==='en'?'Toggle color theme':'Đổi giao diện sáng/tối');
+      themeButton.title=themeButton.getAttribute('aria-label');
+      langButton.textContent=values.language==='vi'?'EN':'VI';
+      langButton.setAttribute('aria-label',values.language==='en'?'Switch to Vietnamese':'Chuyển sang tiếng Anh');
+      langButton.title=langButton.getAttribute('aria-label');
+    };
+    const persist=()=>{
+      try {
+        const current=JSON.parse(localStorage.getItem(KEY)||'{}');
+        localStorage.setItem(KEY,JSON.stringify({...current,...values}));
+      } catch {}
+    };
+    themeButton.addEventListener('click',()=>{
+      values.theme=values.theme==='dark'?'light':'dark';
+      apply();
+      persist();
+    });
+    langButton.addEventListener('click',()=>{
+      values.language=values.language==='vi'?'en':'vi';
+      apply();
+      persist();
+    });
+    apply();
 
-      function safeSetPreferences(patch) {
-        try {
-          const current = safeGetPreferences();
-          const next = Object.assign({}, current, patch);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        } catch (e) {
-          /* Gracefully ignore storage exceptions */
-        }
-      }
-
-      function applyTheme(theme) {
-        const isDark = theme === 'dark';
-        document.documentElement.dataset.theme = theme;
-        document.documentElement.classList.toggle('dark', isDark);
-
-        const icon = document.getElementById('theme-icon');
-        const btn = document.getElementById('theme-toggle');
-        if (icon) {
-          icon.textContent = isDark ? 'dark_mode' : 'light_mode';
-        }
-        if (btn) {
-          const label = isDark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối';
-          btn.setAttribute('aria-label', label);
-          btn.setAttribute('title', label);
-        }
-      }
-
-      function applyLanguage(lang) {
-        const isEn = lang === 'en';
-        document.documentElement.lang = lang;
-        document.title = isEn
-          ? 'Privacy Policy — AuraMeme'
-          : 'Chính sách bảo mật — AuraMeme';
-
-        const label = document.getElementById('lang-label');
-        const btn = document.getElementById('lang-toggle');
-        if (label) {
-          label.textContent = isEn ? 'VI' : 'EN';
-        }
-        if (btn) {
-          const btnLabel = isEn ? 'Switch to Vietnamese' : 'Chuyển sang tiếng Anh';
-          btn.setAttribute('aria-label', btnLabel);
-          btn.setAttribute('title', btnLabel);
-        }
-      }
-
-      // Initialize from saved preference immediately
-      const initialPrefs = safeGetPreferences();
-      applyTheme(initialPrefs.theme);
-      applyLanguage(initialPrefs.language);
-
-      // DOM interactive bindings
-      document.addEventListener('DOMContentLoaded', function () {
-        const themeBtn = document.getElementById('theme-toggle');
-        const langBtn = document.getElementById('lang-toggle');
-
-        if (themeBtn) {
-          themeBtn.addEventListener('click', function () {
-            const currentTheme = document.documentElement.dataset.theme || 'dark';
-            const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            applyTheme(nextTheme);
-            safeSetPreferences({ theme: nextTheme });
-          });
-        }
-
-        if (langBtn) {
-          langBtn.addEventListener('click', function () {
-            const currentLang = document.documentElement.lang || 'vi';
-            const nextLang = currentLang === 'vi' ? 'en' : 'vi';
-            applyLanguage(nextLang);
-            safeSetPreferences({ language: nextLang });
-          });
-        }
-
-        // ScrollSpy for Table of Contents
-        const sections = document.querySelectorAll('section[id^="sec-"]');
-        const tocLinks = document.querySelectorAll('.policy-toc-link');
-
-        if ('IntersectionObserver' in window && sections.length && tocLinks.length) {
-          const observer = new IntersectionObserver(function (entries) {
-            entries.forEach(function (entry) {
-              if (entry.isIntersecting) {
-                const id = entry.target.getAttribute('id');
-                tocLinks.forEach(function (link) {
-                  const href = link.getAttribute('href');
-                  if (href === '#' + id) {
-                    link.classList.add('is-active');
-                  } else {
-                    link.classList.remove('is-active');
-                  }
-                });
-              }
+    // ScrollSpy for Desktop Table of Contents
+    const sections = document.querySelectorAll('section[id]');
+    const tocLinks = document.querySelectorAll('.toc a');
+    if ('IntersectionObserver' in window && sections.length && tocLinks.length) {
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const id = entry.target.getAttribute('id');
+            tocLinks.forEach(link => {
+              link.classList.toggle('is-active', link.getAttribute('href') === '#' + id);
             });
-          }, {
-            rootMargin: '-20% 0px -70% 0px',
-            threshold: 0
-          });
-
-          sections.forEach(function (sec) {
-            observer.observe(sec);
-          });
-        }
-      });
-    })();
+          }
+        });
+      }, { rootMargin: '-15% 0px -75% 0px', threshold: 0 });
+      sections.forEach(s => observer.observe(s));
+    }
+  })();
   </script>
 </body>
 </html>
