@@ -47,6 +47,18 @@ class VaultSettings(BaseSettings):
     vault_runtime_enabled: bool = False
 
 
+class PremiumSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
+    premium_sandbox_enabled: bool = True
+    vnpay_tmn_code: str | None = None
+    vnpay_hash_secret: SecretStr | None = None
+    vnpay_payment_url: str = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+    vnpay_return_url: str = "http://127.0.0.1:5173/premium"
+    vnpay_price_plus_vnd: int = Field(default=125000, ge=1000)
+    vnpay_price_prime_vnd: int = Field(default=1250000, ge=1000)
+    vnpay_pricing_approved: bool = False
+
+
 class AuthSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
     auth_signing_key: SecretStr

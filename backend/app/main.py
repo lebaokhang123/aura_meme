@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from uuid import uuid4
 from pydantic import BaseModel, ValidationError
 
-from app.config import AuthSettings, ConfigurationError, VaultSettings, load_settings
+from app.config import AuthSettings, ConfigurationError, PremiumSettings, VaultSettings, load_settings
 from app.db import create_db_engine
 from app.auth_schemas import CooldownDetails
 from app.auth import router
@@ -32,6 +32,8 @@ from app.vault import router as vault_router
 from app.vault_open import router as vault_open_router
 from app.vault_runtime import router as vault_runtime_router
 from app.notifications import router as notifications_router
+from app.premium import router as premium_router
+from app.vnpay_adapter import VnpayAdapter
 from app.security import AuthBoundaryMiddleware, AuthError, AuthRuntime
 
 
@@ -46,6 +48,15 @@ async def lifespan(app: FastAPI):
             raise ConfigurationError("Invalid authentication configuration; check AUTH_SIGNING_KEY, AUTH_ENVIRONMENT and AUTH_ALLOWED_ORIGINS.") from None
         app.state.auth_session_factory = lambda: Session(engine)
         app.state.vault = VaultSettings()
+        app.state.premium = PremiumSettings()
+        secret = app.state.premium.vnpay_hash_secret.get_secret_value() if app.state.premium.vnpay_hash_secret else None
+        app.state.vnpay = VnpayAdapter(
+            tmn_code=app.state.premium.vnpay_tmn_code,
+            hash_secret=secret,
+            payment_url=app.state.premium.vnpay_payment_url,
+            return_url=app.state.premium.vnpay_return_url,
+            pricing_approved=app.state.premium.vnpay_pricing_approved,
+        )
         yield
     finally:
         engine.dispose()
@@ -72,6 +83,7 @@ app.include_router(vault_router)
 app.include_router(vault_open_router)
 app.include_router(vault_runtime_router)
 app.include_router(notifications_router)
+app.include_router(premium_router)
 app.add_middleware(AuthBoundaryMiddleware)
 
 
