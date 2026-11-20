@@ -6,18 +6,47 @@ import {adminPage,canAdmin} from '../admin-api.js';
 import '../workspace.css';
 
 const sections=[['users','Người dùng','Users',['users']],['content','Nội dung','Content',['posts','comments','categories']],['contacts','Liên hệ','Contacts',['contacts']],['moderation','Kiểm duyệt','Moderation',['audit-logs','assets']],['notifications','Thông báo','Notifications',['announcements']]];
-const labels={users:['Người dùng','Users'],posts:['Bài viết','Posts'],comments:['Bình luận','Comments'],categories:['Danh mục','Categories'],contacts:['Hộp thư liên hệ','Contact inbox'],'audit-logs':['Nhật ký kiểm duyệt','Audit log'],assets:['Trạng thái vật phẩm','Asset status'],announcements:['Thông báo hệ thống','System announcements']};
+const labels={users:['Người dùng','Users'],posts:['Bài viết','Posts'],comments:['Bình luận','Comments'],categories:['Danh mục','Categories'],contacts:['Hộp thư liên hệ','Contact inbox'],'audit-logs':['Nhật ký quản trị','Admin activity'],assets:['Trạng thái vật phẩm','Asset status'],announcements:['Thông báo hệ thống','System announcements']};
 const sectionIcons={users:'group',content:'article',contacts:'inbox',moderation:'shield',notifications:'campaign'};
-const resourceNotes={users:['Quản lý trạng thái và quyền truy cập của thành viên.','Manage member status and access.'],posts:['Xem nội dung và kiểm soát những bài xuất hiện trong cộng đồng.','Review posts and control their visibility in the community.'],comments:['Xem và xử lý bình luận, kể cả nội dung đã ẩn.','Review comments, including hidden content.'],categories:['Sắp xếp nội dung bằng các danh mục dùng chung.','Organize community content with shared categories.'],contacts:['Đọc và phân loại tin nhắn gửi đến AuraMeme.','Read and triage messages sent to AuraMeme.'],'audit-logs':['Theo dõi ai đã thực hiện thay đổi và thời điểm xử lý.','See who made a change and when it happened.'],assets:['Kiểm tra trạng thái hoạt động và duyệt của danh mục vật phẩm.','Inspect catalog availability and review status.'],announcements:['Soạn thảo, quản lý và phát thông báo tới các thành viên.','Draft, manage, and broadcast announcements to community members.']};
+const resourceNotes={users:['Quản lý trạng thái và quyền truy cập của thành viên.','Manage member status and access.'],posts:['Xem nội dung và kiểm soát những bài xuất hiện trong cộng đồng.','Review posts and control their visibility in the community.'],comments:['Xem và xử lý bình luận, kể cả nội dung đã ẩn.','Review comments, including hidden content.'],categories:['Sắp xếp nội dung bằng các danh mục dùng chung.','Organize community content with shared categories.'],contacts:['Đọc và phân loại tin nhắn gửi đến AuraMeme.','Read and triage messages sent to AuraMeme.'],'audit-logs':['Ghi lại các thay đổi do quản trị viên thực hiện: ai đã làm gì và khi nào.','Log of administrative actions: who did what and when.'],assets:['Kiểm tra trạng thái hoạt động và duyệt của danh mục vật phẩm.','Inspect catalog availability and review status.'],announcements:['Soạn thảo, quản lý và phát thông báo tới các thành viên.','Draft, manage, and broadcast announcements to community members.']};
 const Icon=({name,...props})=><span className="material-symbols-outlined" aria-hidden="true" {...props}>{name}</span>;
 const states={users:['active','locked','deleted'],posts:['draft','published','hidden','deleted'],comments:['visible','hidden','deleted'],categories:['active','hidden'],contacts:['new','in_review','resolved'],assets:['pending','approved','rejected','unknown'],announcements:['draft','published','withdrawn']};
+const auditActionLabels={
+  'contact.update':['Cập nhật trạng thái liên hệ','Updated contact status'],
+  'post.update':['Cập nhật bài viết','Updated post'],
+  'post.hidden':['Ẩn bài viết','Hidden post'],
+  'post.deleted':['Xóa bài viết','Deleted post'],
+  'post.delete':['Xóa bài viết','Deleted post'],
+  'comment.hidden':['Ẩn bình luận','Hidden comment'],
+  'comment.deleted':['Xóa bình luận','Deleted comment'],
+  'comment.update':['Cập nhật bình luận','Updated comment'],
+  'announcement.create':['Tạo thông báo hệ thống','Created system announcement'],
+  'announcement.publish':['Phát thông báo hệ thống','Broadcasted system announcement'],
+  'announcement.withdraw':['Thu hồi thông báo hệ thống','Withdrew system announcement'],
+  'announcement.delete':['Xóa thông báo hệ thống','Deleted announcement'],
+  'user.status':['Cập nhật trạng thái người dùng','Updated user status'],
+  'user.roles':['Cập nhật vai trò người dùng','Updated user roles'],
+  'category.create':['Tạo danh mục','Created category'],
+  'category.update':['Cập nhật danh mục','Updated category'],
+  'asset.review':['Kiểm duyệt vật phẩm','Reviewed asset'],
+  'asset.update':['Cập nhật vật phẩm','Updated asset']
+};
+const auditTargetLabels={
+  post:['Bài viết','Post'],
+  comment:['Bình luận','Comment'],
+  contact:['Liên hệ','Contact message'],
+  announcement:['Thông báo','Announcement'],
+  user:['Người dùng','User'],
+  category:['Danh mục','Category'],
+  asset:['Vật phẩm','Asset']
+};
 const statusLabels={active:['Hoạt động','Active'],locked:['Đã khóa','Locked'],deleted:['Đã xóa','Deleted'],draft:['Bản nháp','Draft'],published:['Công khai','Published'],visible:['Hiển thị','Visible'],hidden:['Đã ẩn','Hidden'],new:['Mới','New'],in_review:['Đang xử lý','In review'],resolved:['Đã xử lý','Resolved'],pending:['Chờ duyệt','Pending'],approved:['Đã duyệt','Approved'],rejected:['Từ chối','Rejected'],unknown:['Chưa rõ','Unknown'],withdrawn:['Đã thu hồi','Withdrawn']};
 export default function AdminPage(){
  const session=useSyncExternalStore(auth.subscribe,auth.snapshot),{language}=usePreferences(),t=(vi,en)=>language==='en'?en:vi;
- const title=resource=>t(...labels[resource]),status=value=>statusLabels[value]?t(...statusLabels[value]):value;
+ const title=resource=>t(...labels[resource]),status=value=>statusLabels[value]?t(...statusLabels[value]):value,formatAuditAction=a=>auditActionLabels[a]?t(...auditActionLabels[a]):a,formatAuditTarget=trg=>auditTargetLabels[trg]?t(...auditTargetLabels[trg]):trg;
  const allowed=!MOCK_AUTH&&session.status==='authenticated'&&canAdmin(session.user),owner=allowed?session.user.id:null;
  const [resource,setResource]=useState('users'),[query,setQuery]=useState(''),[search,setSearch]=useState(''),[filter,setFilter]=useState(''),[role,setRole]=useState(''),[page,setPage]=useState(1),[revision,setRevision]=useState(0);
- const [result,setData]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[denied,setDenied]=useState(false),[edit,setEdit]=useState(null),[busy,setBusy]=useState(false),[holdingPreview,setHoldingPreview]=useState(false);
+ const [result,setData]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[denied,setDenied]=useState(false),[edit,setEdit]=useState(null),[busy,setBusy]=useState(false),[holdingPreview,setHoldingPreview]=useState(false),[copiedId,setCopiedId]=useState(null);
  const dialog=useRef(null),inflight=useRef(false),currentOwner=useRef(owner);currentOwner.current=owner;
  // Never render a previous resource or account while the next read is pending.
  const data=result?.resource===resource&&result.owner===owner?result:null;
@@ -61,6 +90,7 @@ export default function AdminPage(){
   catch(e){if(currentOwner.current===requestOwner){setError(explain(e));if(e.status===403){setData(null);setDenied(true);setEdit(null);auth.refresh().catch(()=>{})}}}
   finally{inflight.current=false;setBusy(false)}
  }
+ const copyTargetId=id=>{if(navigator?.clipboard?.writeText){navigator.clipboard.writeText(id).then(()=>{setCopiedId(id);setTimeout(()=>setCopiedId(null),2000)}).catch(()=>{})}};
  const stamp=value=>new Date(value).toLocaleString(language==='en'?'en-GB':'vi-VN');
  if(!allowed||denied)return <main className="workspace-page"><div className="workspace-content"><section className="workspace-panel" role="alert"><h1>{t('Không có quyền truy cập','Access denied')}</h1><p>{t('Trang này chỉ dành cho Admin do máy chủ xác minh.','This workspace requires an Admin role verified by the server.')}</p><a href="/">{t('Quay lại Trang chủ','Back to Home')}</a></section></div></main>;
  return <main className="workspace-page admin-page"><div className="workspace-content admin-layout">
@@ -83,7 +113,29 @@ export default function AdminPage(){
     {resource==='categories'&&<><h3>{row.name}</h3><p className="workspace-meta">{row.slug}</p></>}
     {resource==='contacts'&&<><h3>{row.subject}</h3><p>{row.name}</p><p className="workspace-meta">{stamp(row.created_at)}</p></>}
     {resource==='assets'&&<><h3>{row.slug}</h3><p className="workspace-meta">{row.kind} · {row.rarity} · {status(row.review_status)}</p></>}
-    {resource==='audit-logs'&&<><h3>{row.action}</h3><p className="workspace-meta">{row.target_type} · {row.target_id}</p><p className="workspace-meta">{t('Người thực hiện','Actor')}: {row.actor_id}</p></>}
+    {resource==='audit-logs'&&<div className="admin-audit-entry">
+      <div className="admin-audit-entry-header">
+        <span className="admin-audit-action-badge"><Icon name="history_toggle_off"/></span>
+        <div>
+          <h3 className="admin-audit-title">{formatAuditAction(row.action)}</h3>
+          <p className="admin-audit-sub">
+            <span>{t('Thực hiện: ','By: ')}<strong>{row.actor_id===owner?t('Bạn (Admin hiện tại)','You (Current Admin)'):(t('Quản trị viên #','Admin #')+String(row.actor_id).slice(0,8))}</strong></span>
+            <span>·</span>
+            <span>{t('Đối tượng: ','Target: ')}<strong>{formatAuditTarget(row.target_type)}</strong></span>
+          </p>
+        </div>
+      </div>
+      <details className="admin-audit-tech-details">
+        <summary>{t('Chi tiết kỹ thuật','Technical details')}</summary>
+        <div className="admin-audit-id-copy">
+          <code>{row.target_type} ID: {row.target_id}</code>
+          <button type="button" className="admin-copy-btn" onClick={()=>copyTargetId(row.target_id)} aria-label={t('Sao chép mã định danh','Copy technical ID')} title={t('Sao chép mã định danh','Copy technical ID')}>
+            <Icon name={copiedId===row.target_id?"check":"content_copy"}/>
+            <span>{copiedId===row.target_id?t('Đã sao chép','Copied'):t('Sao chép','Copy')}</span>
+          </button>
+        </div>
+      </details>
+    </div>}
     {resource==='announcements'&&<><h3>{row.title}</h3><p className="workspace-meta">@{row.actor_username||'admin'} · {stamp(row.created_at)}</p><details><summary>{t('Xem nội dung','View content')}</summary><p className="workspace-text" translate="no">{row.body}</p>{row.published_at&&<p className="workspace-meta">{t('Phát lúc:','Broadcasted at:')} {stamp(row.published_at)} · {row.recipients_count} {t('người nhận','recipients')}</p>}</details></>}
    </div><div className="admin-row-status">
     {resource==='audit-logs'&&<time className="workspace-meta" dateTime={row.created_at}>{stamp(row.created_at)}</time>}

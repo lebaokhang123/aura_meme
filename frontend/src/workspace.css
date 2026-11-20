@@ -197,3 +197,19 @@
 .admin-contact-status-section { display:flex; flex-direction:column; gap:6px; margin-top:4px; }
 .admin-contact-status-section label { font-size:12px; font-weight:600; color:var(--am-on-surface); }
 .admin-contact-status-section select { min-height:44px; padding:8px 12px; border-radius:10px; background:var(--am-surface-container-lowest); border:1px solid var(--am-outline-variant); color:var(--am-on-surface); font-size:13px; }
+/* Subtask C: Admin Audit History */
+.admin-audit-entry { display:flex; flex-direction:column; gap:8px; width:100%; }
+.admin-audit-entry-header { display:flex; align-items:flex-start; gap:12px; }
+.admin-audit-action-badge { display:grid; place-items:center; width:34px; height:34px; border-radius:8px; background:var(--am-surface-container-high); color:var(--am-secondary); flex-shrink:0; }
+.admin-audit-action-badge .material-symbols-outlined { font-size:18px; }
+.admin-audit-title { margin:0; font-size:14px; font-weight:700; color:var(--am-on-surface); line-height:1.4; }
+.admin-audit-sub { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:12px; color:var(--am-on-surface-variant); margin:4px 0 0; }
+.admin-audit-sub strong { color:var(--am-on-surface); font-weight:600; }
+.admin-audit-tech-details { margin-top:4px; font-size:11px; }
+.admin-audit-tech-details summary { cursor:pointer; color:var(--am-on-surface-variant); font-size:11px; user-select:none; display:inline-flex; align-items:center; gap:4px; min-height:28px; }
+.admin-audit-tech-details summary:hover { color:var(--am-primary); }
+.admin-audit-id-copy { display:flex; align-items:center; gap:10px; margin-top:6px; padding:6px 10px; border-radius:6px; background:var(--am-surface-container-lowest); border:1px solid var(--am-outline-variant); max-width:fit-content; }
+.admin-audit-id-copy code { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--am-on-surface); }
+.admin-copy-btn { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; min-height:24px; border-radius:4px; background:var(--am-surface-container); border:1px solid var(--am-outline-variant); color:var(--am-on-surface); font-size:11px; cursor:pointer; transition:all .15s ease; }
+.admin-copy-btn:hover { background:var(--am-surface-container-high); border-color:var(--am-outline); color:var(--am-primary); }
+.admin-copy-btn .material-symbols-outlined { font-size:14px; }
