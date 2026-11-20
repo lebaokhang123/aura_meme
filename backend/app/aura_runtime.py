@@ -2,9 +2,10 @@
 from datetime import timedelta
 from uuid import uuid4
 
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import cast, exists, func, literal, or_, select, text
+from sqlalchemy.dialects.postgresql import JSONB
 
-from app.aura_v1 import SCHEMA, config, day_window, level_progress, validate_config
+from app.aura_v1 import SCHEMA, _SNAPSHOT, config, day_window, level_progress, validate_config
 from app.models import (AdminAuditLog, AuraLedger, AuraRewardEvent, Category, Comment, DailyCheckin,
     Post, PostReaction, RewardPolicyVersion, Role, User, UserProgress, UserRole)
 from app.security import AuthError
@@ -28,6 +29,20 @@ def active_policy(db,now,required=True):
     try:validate_config(policies[0].config_json)
     except (ValueError,TypeError):unavailable("Aura policy differs from the reviewed V1 snapshot.")
     return policies[0]
+
+
+def public_level_column(now):
+    day_window(now)
+    published_v1=(RewardPolicyVersion.status=="published",RewardPolicyVersion.effective_at<=now,RewardPolicyVersion.config_json["schema"].astext==SCHEMA)
+    active_v1=(func.to_regclass("public.aura_reward_events").is_not(None),
+        select(func.count()).select_from(RewardPolicyVersion).where(*published_v1).correlate(None).scalar_subquery()==1,
+        exists(select(RewardPolicyVersion.id).where(*published_v1,RewardPolicyVersion.config_json==cast(literal(_SNAPSHOT),JSONB)).correlate(None)))
+    return select(UserProgress.level_cached).where(UserProgress.user_id==User.id,UserProgress.level_cached.between(1,100),*active_v1).correlate(User).scalar_subquery().label("level")
+
+
+def read_public_level(db,owner,now):
+    # Same gate as list reads; never raises, so non-Aura mutations keep working when policy is not ready.
+    return db.scalar(select(public_level_column(now)).select_from(User).where(User.id==owner))
 
 
 def _streak(db,owner,last_day):

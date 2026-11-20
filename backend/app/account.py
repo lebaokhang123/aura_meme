@@ -62,10 +62,11 @@ def change_password(payload: PasswordChange, request: Request, account=Depends(r
             responses={status: {"model": ErrorResponse} for status in (404, 422, 429, 500)})
 def get_public_user(request: Request, username: str = Path(min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$")):
     with request.app.state.auth_session_factory() as db:
-        row = db.execute(select(User, Profile).join(Profile, Profile.user_id == User.id).where(
-            User.username == username, User.status == "active")).one_or_none()
+        from app.aura_runtime import public_level_column
+        row = db.execute(select(User, Profile, public_level_column(request.app.state.auth.now())).join(
+            Profile, Profile.user_id == User.id).where(User.username == username, User.status == "active")).one_or_none()
         if row is None:
             raise AuthError(404, "NOT_FOUND", "Profile not found.")
-        user, profile = row
+        user, profile, level = row
         return PublicProfile(id=user.id, username=user.username, display_name=profile.display_name,
-                          created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url)
+                          created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url, level=level)

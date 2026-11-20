@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {apiAuthor,apiPost,apiPage,apiInteractions,apiCategory} from '../src/social-api.js';
+import {apiAuthor,apiPost,apiComment,apiPage,apiInteractions,apiCategory} from '../src/social-api.js';
 import {readFilters} from '../src/feed-data.js';
 const id='123e4567-e89b-42d3-a456-426614174000';
 const author={id,username:'new_author',display_name:'New Author',avatar_url:null};
@@ -38,6 +38,18 @@ test('MVP honorifics use exact identities and level is never inferred from an Ad
  assert.equal(apiAuthor({...author,username:'khang_dev'}).nickname,'Bá Chủ Thiên Lôi');
  assert.equal(apiAuthor({...author,username:'kien_dev'}).nickname,'Thiên Tướng Độ Ách');
  assert.equal(apiAuthor({...author,roles:['ADMIN']}).nickname,'');
- assert.equal(apiAuthor({...author,level:11}).level,'LVL 11');
- for(const level of [undefined,0,101,1.5,'99'])assert.equal(apiAuthor({...author,level}).level,'');
+ assert.equal(apiAuthor({...author,level:11,realm:'Trúc Cơ'}).level,'LVL 11');
+ assert.equal(apiAuthor({...author,level:11,realm:'Trúc Cơ'}).realm,'Trúc Cơ');
+ assert.equal(apiAuthor({...author,level:11,realm:'Trúc Cơ'}).nickname,'Trúc Cơ');
+ assert.equal(apiAuthor({...author,level:11,realm:'Trúc Cơ',title:'Bá Chủ Thiên Lôi',username:'khang_dev'}).nickname,'Bá Chủ Thiên Lôi');
+ for(const level of [undefined,0,101,1.5,'99']){
+  assert.equal(apiAuthor({...author,level,realm:'Trúc Cơ'}).level,'');
+  assert.equal(apiAuthor({...author,level,realm:'Trúc Cơ'}).realm,'');
+ }
+ const postWithLevel=apiPost({id,author:{...author,username:'khang_dev',level:12,realm:'Trúc Cơ',title:'Bá Chủ Thiên Lôi'},category:{id,slug:'gaming',name:'Gaming'},title:'Hi',content:'Text',created_at:'2026-11-13T00:00:00Z',media_url:null});
+ assert.equal(postWithLevel.level,'LVL 12');assert.equal(postWithLevel.realm,'Trúc Cơ');assert.equal(postWithLevel.nickname,'Bá Chủ Thiên Lôi');
+ const commentWithLevel=apiComment({id,post_id:id,author:{...author,username:'kien_dev',level:7,realm:'Luyện Khí',title:'Thiên Tướng Độ Ách'},body:'Hi',created_at:'2026-11-13T00:00:00Z'});
+ assert.equal(commentWithLevel.level,'LVL 7');assert.equal(commentWithLevel.realm,'Luyện Khí');assert.equal(commentWithLevel.nickname,'Thiên Tướng Độ Ách');
+ const normalUserComment=apiComment({id,post_id:id,author:{...author,username:'alice',level:1,realm:'Luyện Khí',title:'Luyện Khí'},body:'Hi',created_at:'2026-11-13T00:00:00Z'});
+ assert.equal(normalUserComment.level,'LVL 1');assert.equal(normalUserComment.realm,'Luyện Khí');assert.equal(normalUserComment.nickname,'Luyện Khí');
 });

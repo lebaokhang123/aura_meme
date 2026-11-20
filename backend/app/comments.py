@@ -48,9 +48,9 @@ class CommentPage(BaseModel):
     pagination: Pagination
 
 
-def comment_dto(comment, user, profile):
+def comment_dto(comment, user, profile, level=None):
     author = UserPublic(id=user.id, username=user.username, display_name=profile.display_name,
-                        created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url)
+                        created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url, level=level)
     return CommentResponse(id=comment.id, post_id=comment.post_id, author=author,
                            body=comment.body, created_at=comment.created_at)
 
@@ -85,7 +85,8 @@ def list_comments(post_id: UUID, request: Request, page: int = Query(1, ge=1),
         raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
     with request.app.state.auth_session_factory() as db:
         require_public_post(db, post_id)
-        statement = select(Comment, User, Profile).join(User, User.id == Comment.author_id).join(
+        from app.aura_runtime import public_level_column
+        statement = select(Comment, User, Profile, public_level_column(request.app.state.auth.now())).join(User, User.id == Comment.author_id).join(
             Profile, Profile.user_id == User.id).where(Comment.post_id == post_id,
                 Comment.status == "visible", Comment.deleted_at.is_(None), User.status == "active",
                 Comment.post_id.in_(public_post_id(post_id)))
@@ -102,13 +103,14 @@ def list_comments(post_id: UUID, request: Request, page: int = Query(1, ge=1),
              operation_id="addComment", responses=ERRORS | NOT_FOUND, openapi_extra=CSRF_HEADER)
 def add_comment(post_id: UUID, payload: CommentInput, request: Request, account=Depends(require_account_csrf)):
     lock_public_post(account.db, post_id)
+    now = request.app.state.auth.now()
+    from app.aura_runtime import award_comment, read_public_level
     if payload.request_id is not None:
         existing=account.db.get(Comment,payload.request_id)
         if existing is not None:
             if existing.author_id!=account.user.id or existing.post_id!=post_id or existing.body!=payload.body or existing.status!="visible" or existing.deleted_at is not None:
                 raise AuthError(409,"CONFLICT","Request ID already used.")
-            return comment_dto(existing,account.user,account.db.get(Profile,account.user.id))
-    now = request.app.state.auth.now()
+            return comment_dto(existing,account.user,account.db.get(Profile,account.user.id),read_public_level(account.db,account.user.id,now))
     comment = Comment(id=payload.request_id or uuid4(), post_id=post_id, author_id=account.user.id, body=payload.body,
                       status="visible", created_at=now, updated_at=now, deleted_at=None)
     account.db.add(comment)
@@ -116,7 +118,6 @@ def add_comment(post_id: UUID, payload: CommentInput, request: Request, account=
     except IntegrityError as error:
         if getattr(error.orig,"sqlstate",None)=="23505":raise AuthError(409,"CONFLICT","Request ID already used.") from None
         raise
-    from app.aura_runtime import award_comment
     award_comment(account.db, comment, now)
     post = account.db.get(Post, post_id)
     author_id = getattr(post, "author_id", None)
@@ -138,7 +139,7 @@ def add_comment(post_id: UUID, payload: CommentInput, request: Request, account=
             dedupe_key=f"comment:{comment.id}",
             now=now,
         )
-    return comment_dto(comment, account.user, account.db.get(Profile, account.user.id))
+    return comment_dto(comment, account.user, account.db.get(Profile, account.user.id), read_public_level(account.db, account.user.id, now))
 
 
 @router.delete("/comments/{comment_id}", status_code=204, operation_id="deleteComment",
@@ -214,7 +215,8 @@ def list_user_comments(request: Request, username: str = Path(min_length=3, max_
     with request.app.state.auth_session_factory() as db:
         if db.scalar(select(User.id).where(User.username == username, User.status == "active")) is None:
             raise AuthError(404, "NOT_FOUND", "Profile not found.")
-        statement = select(Comment, User, Profile).join(User, User.id == Comment.author_id).join(
+        from app.aura_runtime import public_level_column
+        statement = select(Comment, User, Profile, public_level_column(request.app.state.auth.now())).join(User, User.id == Comment.author_id).join(
             Profile, Profile.user_id == User.id).where(User.username == username, User.status == "active",
                 Comment.status == "visible", Comment.deleted_at.is_(None),
                 Comment.post_id.in_(public_posts().with_only_columns(Post.id)))

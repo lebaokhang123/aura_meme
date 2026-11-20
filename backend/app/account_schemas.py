@@ -25,6 +25,27 @@ class UserPublic(BaseModel):
     created_at: datetime
     bio: str | None = None
     avatar_url: str | None = Field(default=None, json_schema_extra={"format": "uri-reference"})
+    level: StrictInt | None = Field(default=None, ge=1, le=100, exclude_if=lambda value: value is None)
+    # Derived only from the validated public level with the reviewed Aura V1 mapping; never client input.
+    realm: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    title: str | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @model_validator(mode="after")
+    def public_identity(self):
+        from app.aura_v1 import REALMS
+        if self.level is not None:
+            derived_realm = REALMS[(self.level - 1) // 10]
+            self.realm = derived_realm
+            if self.username == "khang_dev":
+                self.title = "Bá Chủ Thiên Lôi"
+            elif self.username == "kien_dev":
+                self.title = "Thiên Tướng Độ Ách"
+            else:
+                self.title = derived_realm
+        else:
+            self.realm = None
+            self.title = None
+        return self
 
 
 class PublicProfile(UserPublic):

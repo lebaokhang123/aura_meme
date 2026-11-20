@@ -215,3 +215,44 @@ def test_runtime_contract_only_adds_two_read_endpoints_with_503():
         assert '503' in contract['paths'][path]['get']['responses']
     assert contract['paths']['/api/v1/aura/progress']['get']['security'] == [{'sessionCookie':[]}]
     assert not contract['paths']['/api/v1/leaderboard']['get'].get('security')
+
+
+def test_user_public_level_contract_and_policy_gated_sql():
+    from app.account_schemas import PublicProfile, UserPublic
+    from app.aura_runtime import public_level_column
+    from app.models import User
+    from pydantic import ValidationError
+    from sqlalchemy import select
+    from sqlalchemy.dialects import postgresql
+    now = datetime(2026, 11, 14, 12, 0, tzinfo=timezone.utc)
+    base = dict(id=uuid4(), username='alice', display_name='Alice', created_at=now, bio=None, avatar_url=None)
+    legacy = UserPublic(**base).model_dump()
+    assert set(legacy) == {'id', 'username', 'display_name', 'created_at', 'bio', 'avatar_url'}
+    with_level = PublicProfile(**base, level=11).model_dump()
+    assert with_level['level'] == 11
+    assert with_level['realm'] == 'Trúc Cơ'
+    assert with_level['title'] == 'Trúc Cơ'
+    from app.aura_v1 import REALMS
+    for level, realm in ((1, REALMS[0]), (10, REALMS[0]), (91, REALMS[9]), (100, REALMS[9])):
+        dumped = UserPublic(**base, level=level).model_dump()
+        assert dumped['realm'] == realm
+        assert dumped['title'] == realm
+    assert 'realm' not in UserPublic(**base, realm='Phi Thăng').model_dump()
+    assert 'title' not in UserPublic(**base, title='Bá Chủ').model_dump()
+    khang = UserPublic(**{**base, 'username': 'khang_dev'}, level=79).model_dump()
+    assert khang['title'] == 'Bá Chủ Thiên Lôi'
+    kien = UserPublic(**{**base, 'username': 'kien_dev'}, level=9).model_dump()
+    assert kien['title'] == 'Thiên Tướng Độ Ách'
+    for invalid in (0, 101, -1, True, '11', 1.5):
+        with pytest.raises(ValidationError):
+            UserPublic(**base, level=invalid)
+    with pytest.raises(ValueError):
+        public_level_column(datetime(2026, 11, 14, 12, 0))
+    compiled = select(User.id, public_level_column(now)).compile(dialect=postgresql.dialect())
+    sql = str(compiled)
+    assert 'user_progress.level_cached' in sql
+    assert 'to_regclass(' in sql and ' IS NOT NULL' in sql
+    assert 'public.aura_reward_events' in compiled.params.values()
+    assert 'reward_policy_versions.effective_at <=' in sql
+    assert 'now()' not in sql.lower()
+    assert now in compiled.params.values()

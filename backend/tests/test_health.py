@@ -51,7 +51,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         assert patch["additionalProperties"] is False and patch["minProperties"] == 1
         assert patch["properties"]["display_name"]["type"] == "string"
         public = contract["components"]["schemas"]["UserPublic"]
-        assert set(public["properties"]) == {"id", "username", "display_name", "created_at", "bio", "avatar_url"}
+        assert set(public["properties"]) == {"id", "username", "display_name", "created_at", "bio", "avatar_url", "level", "realm", "title"}
         assert public["properties"]["avatar_url"]["format"] == "uri-reference"
         assert {"type": "string"} in public["properties"]["avatar_url"]["anyOf"]
         profile = contract["components"]["schemas"]["PublicProfile"]

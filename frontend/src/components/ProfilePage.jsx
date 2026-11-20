@@ -6,8 +6,9 @@ import {useSocial} from '../SocialContext.jsx';
 import {useCopy,useData,ErrorMessage,LoadState} from './account-ui.jsx';
 import {EditProfile} from './profile-edit.jsx';
 import {ActivityHeatmap} from './ActivityHeatmap.jsx';
-import {PostCard} from './PostCard.jsx';
+import {PostCard,apiStyleAuthor} from './PostCard.jsx';
 import {icon} from './social-ui.jsx';
+import {authorClasses} from '../generated/social-stitch.jsx';
 function inventoryImage(value){try{const url=new URL(value,location.origin);if(/^\/api\/v1\/catalog\/assets\/[0-9a-f-]{36}$/.test(url.pathname))return url.pathname;}catch{}return '/assets/brand/favicon-64.png';}
 const RARITY_PRIORITY={S:5,A:4,B:3,C:2,D:1};
 function topOwned(items){return [...items].sort((a,b)=>(RARITY_PRIORITY[b.asset.rarity]||0)-(RARITY_PRIORITY[a.asset.rarity]||0)||a.asset.slug.localeCompare(b.asset.slug)).slice(0,9);}
@@ -25,11 +26,11 @@ export function ProfilePage(){
  return <main className="am-profile"><div className="am-profile-layout">{!valid?<p role="alert">{t('Không tìm thấy hồ sơ.','Profile not found.')}</p>:<LoadState state={profile}>{p&&<>
  <aside className="profile-rail am-profile-rail">
  <section className="am-profile-identity"><div className="am-profile-avatar"><div className="am-profile-avatar-glow"/><div className="am-profile-avatar-frame"><img src={apiMedia(p.avatar_url)||'/assets/identity/default-avatar.svg'} alt={t('Ảnh đại diện ','Avatar of ')+p.display_name} width="112" height="112"/></div></div>
- <div className="am-profile-name"><h1 translate="no">{p.display_name}</h1><p translate="no">@{p.username}</p></div>
+ <div className="am-profile-name"><h1 translate="no">{p.display_name}</h1><p translate="no">@{p.username}</p>{(p.title||p.username==='khang_dev'||p.username==='kien_dev')&&<div className="mt-1 flex justify-center"><span className={`${authorClasses(apiStyleAuthor(p.username)).nickname} whitespace-nowrap`}>{p.title||(p.username==='khang_dev'?'Bá Chủ Thiên Lôi':'Thiên Tướng Độ Ách')}</span></div>}</div>
  {mine&&(editing?<EditProfile profile={p} onSaved={values=>{profile.update({...p,...values});closeEdit();loadFeed().catch(()=>{})}} onCancel={closeEdit}/>:<button ref={editButton} className="am-profile-edit" onClick={()=>setEditing(true)}>{icon('edit',16)}{t('Chỉnh sửa hồ sơ','Edit profile')}</button>)}
  <p className="am-profile-bio" translate="no">{p.bio||t('Chưa có tiểu sử.','No bio yet.')}</p>
  <dl className="am-profile-stats"><div><dd>{pagination?.total??'—'}</dd><dt>{t('Bài viết','Posts')}</dt></div><div><dd>{comments.data?.pagination.total??'—'}</dd><dt>{t('Bình luận','Comments')}</dt></div><div><dd>—</dd><dt>Reaction</dt></div></dl>
- <AuraProgress profileId={p.id}/>
+ <AuraProgress profileId={p.id} publicLevel={p.level} publicRealm={p.realm} publicTitle={p.title}/>
  </section>
  {mine&&<>
  <section className={'am-profile-collection'+(!memeItems.length?' am-profile-collection-empty':'')}><h2>{t('Meme đã sở hữu','Owned memes')}</h2><LoadState state={memeInventory}>{memeItems.length?<div className="am-profile-inventory">{memeItems.map(item=><div className="am-profile-item" data-rarity={item.asset.rarity} key={item.asset.id}><img src={inventoryImage(item.asset.media_url)} alt={item.asset.display_name||item.asset.slug} width="78" height="78" title={(item.asset.display_name||item.asset.slug)+' · '+item.asset.rarity}/>{item.quantity>1&&<span className="am-profile-quantity">×{item.quantity}</span>}</div>)}</div>:<p>{t('Chưa có Meme trong bộ sưu tập.','No memes in your collection yet.')}</p>}</LoadState></section>

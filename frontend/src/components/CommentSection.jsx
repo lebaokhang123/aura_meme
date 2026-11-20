@@ -9,6 +9,7 @@ import {ReactionBar} from './ReactionBar.jsx';
 import {icon,SocialMessage} from './social-ui.jsx';
 import {authorClasses} from '../generated/social-stitch.jsx';
 import {POSTS} from '../feed-data.js';
+import {apiStyleAuthor,LevelPill} from './PostCard.jsx';
 export function relativeTime(createdAt,language) {
   const minutes=Math.max(0,Math.floor((Date.now()-createdAt)/60000));
   if(minutes===0)return language==='en'?'Just now':'Vừa xong';
@@ -18,7 +19,7 @@ function CommentRow({comment}) {
   const render=useLocalized(),{commit}=useSocial(),current=readDemoUser(),{language}=usePreferences();
   const author=comment.api?{avatar:comment.authorId===current?.id?current.avatar:comment.avatar,displayName:comment.authorId===current?.id?current.displayName:comment.authorName}:DEMO_USERS.find(user=>user.username===comment.author);
   const profile=comment.api?{handle:comment.handle,level:comment.level,nickname:comment.nickname}:POSTS.find(post=>post.id===({Khang_dev:'khang',Kien_dev:'kien',Gigachad:'gigachad'}[comment.author]));
-  const classes=authorClasses(comment.api?'Khang_dev':comment.author,true);
+  const classes=authorClasses(comment.api?apiStyleAuthor(comment.author):comment.author,true);
   const isAuthor=comment.api?current?.id===comment.authorId:current?.username===comment.author;
   const isAdmin=!MOCK_AUTH&&Array.isArray(current?.roles)&&current.roles.includes('ADMIN');
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[menuOpen,setMenuOpen]=useState(false),[confirm,setConfirm]=useState(null),[reason,setReason]=useState('');
@@ -46,7 +47,7 @@ function CommentRow({comment}) {
   return render(<div className="flex items-start gap-3 p-2.5 rounded-xl bg-surface-container/40 hover:bg-surface-container/70 transition-colors" data-comment-id={comment.id}>
     <img className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-secondary/50" src={author.avatar} alt={author.displayName}/>
     <div className="flex-1 flex flex-col gap-1 min-w-0">
-      <div className="flex items-start justify-between gap-2"><div className="flex items-center gap-1.5 flex-wrap min-w-0"><span translate={comment.api?'no':undefined} className="font-label-md text-[13px] font-bold text-on-surface hover:underline cursor-pointer break-all">{author.displayName}</span><span translate={comment.api?'no':undefined} className="text-[11px] text-outline font-normal">{profile.handle}</span><span className={classes.level}>{profile.level}</span><span className={classes.nickname}>{profile.nickname}</span><time className="text-outline text-[11px] ml-auto font-mono-tag" dateTime={comment.createdAt?new Date(comment.createdAt).toISOString():undefined}>{comment.timeLabel||relativeTime(comment.createdAt,language)}</time></div>
+      <div className="flex items-start justify-between gap-2"><div className="flex items-center gap-1.5 flex-wrap min-w-0"><span translate={comment.api?'no':undefined} className="font-label-md text-[13px] font-bold text-on-surface hover:underline cursor-pointer break-all">{author.displayName}</span><span translate={comment.api?'no':undefined} className="text-[11px] text-outline font-normal">{profile.handle}</span><LevelPill level={profile.level} className={`${classes.level} whitespace-nowrap shrink-0`}/>{profile.nickname&&<span className={`${classes.nickname} whitespace-nowrap shrink-0`} translate="no">{profile.nickname}</span>}<time className="text-outline text-[11px] ml-auto font-mono-tag" dateTime={comment.createdAt?new Date(comment.createdAt).toISOString():undefined}>{comment.timeLabel||relativeTime(comment.createdAt,language)}</time></div>
       {(isAuthor||isAdmin)&&<div ref={menu} className="relative shrink-0"><button ref={menuButton} type="button" aria-label="Tùy chọn bình luận" aria-haspopup="menu" aria-expanded={menuOpen} className="p-1 text-outline hover:text-on-surface" onClick={()=>{setMenuOpen(v=>!v);setConfirm(null);setReason('');setError('')}}>{icon('more_horiz',18)}</button>{menuOpen&&<div role="menu" className="absolute right-0 top-full z-40 w-[240px] p-2.5 rounded-xl bg-surface-container-high border border-outline-variant shadow-lg text-left">
         {!confirm&&<>
           {isAuthor&&<button type="button" role="menuitem" className="text-error p-2 font-body-sm text-body-sm w-full text-left rounded-lg hover:bg-surface-container-highest flex items-center gap-2" onClick={()=>setConfirm('author-delete')}>{icon('delete',16)}Xóa bình luận</button>}

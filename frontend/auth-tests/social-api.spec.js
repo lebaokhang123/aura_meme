@@ -14,7 +14,7 @@ async function server(context,{roles=['USER']}={}){
   const send=(status,value)=>route.fulfill({status,contentType:'application/json',body:status===204?'':JSON.stringify(value)});
   const fail=(status,code)=>send(status,{error:{code,message:'safe'}});
   const interactions=post=>({post_id:post.id,reaction_counts:post.counts,viewer_reaction:state.user?post.reaction:null,comments_count:state.comments.filter(c=>c.post_id===post.id).length,bookmarked:false});
-  const dto=post=>({...post,author:user,category:categories.find(c=>c.id===(post.category_id||cid)),created_at:'2026-11-13T00:00:00Z',updated_at:'2026-11-13T00:00:00Z',status:'published',media_url:null,interactions:interactions(post)});
+  const dto=post=>({...post,author:post.author||user,category:categories.find(c=>c.id===(post.category_id||cid)),created_at:'2026-11-13T00:00:00Z',updated_at:'2026-11-13T00:00:00Z',status:'published',media_url:null,interactions:interactions(post)});
   const page=items=>({items,pagination:{page:1,page_size:20,total:items.length,total_pages:items.length?1:0}});
   if(p==='/aura/progress')return state.user?send(200,auraProgressFixture):fail(401,'UNAUTHORIZED');
   if(p==='/users/me')return state.user?send(200,state.user):fail(401,'UNAUTHORIZED');
@@ -28,7 +28,7 @@ async function server(context,{roles=['USER']}={}){
   }
   const post=state.posts.find(v=>p==='/posts/'+v.id||p.startsWith('/posts/'+v.id+'/'));
   if(method==='GET'&&p.endsWith('/interactions')&&post)return send(200,interactions(post));
-  if(method==='GET'&&p.endsWith('/comments'))return send(200,page(state.comments.filter(c=>c.post_id===post?.id)));
+  if(method==='GET'&&p.endsWith('/comments'))return send(200,page(state.comments.filter(c=>c.post_id===post?.id).map(c=>({...c,author:c.author||user,created_at:'2026-11-13T00:00:00Z'}))));
   if(method==='GET'&&post)return send(200,dto(post));
   const comment=state.comments.find(c=>p==='/comments/'+c.id+'/interactions');
   if(comment)return send(200,{comment_id:comment.id,reaction_counts:counts(),viewer_reaction:null});
@@ -181,6 +181,47 @@ for(const [width,theme] of [[375,'dark'],[1440,'light']])test(`post confirmation
  await expect.poll(()=>hiding.evaluate(el=>getComputedStyle(el).opacity)).toBe('1');
  if(process.env.CATEGORY_CAPTURE_DIR)await page.screenshot({path:process.env.CATEGORY_CAPTURE_DIR+`/confirmation-${width}-${theme}.png`});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await hiding.getByRole('button',{name:t('Xác nhận ẩn'),exact:true}).click();await expect(card).toHaveCount(0);
+ const reasonArea=hiding.locator('textarea');
+  if(await reasonArea.count()>0)await reasonArea.fill('Vi phạm tiêu chuẩn cộng đồng');
+  await hiding.getByRole('button',{name:t('Xác nhận ẩn'),exact:true}).click();await expect(card).toHaveCount(0);
  expect(api.requests.filter(r=>r.method==='PATCH'&&r.p==='/admin/posts/'+id)).toHaveLength(1);
+});
+
+test('PostCard and CommentRow display validated Level and Chức danh for Admin and regular users',async({page,context})=>{
+ const api=await server(context);
+ const khangPostId='00000000-0000-4000-8000-000000000701';
+ const alicePostId='00000000-0000-4000-8000-000000000702';
+ const plainPostId='00000000-0000-4000-8000-000000000703';
+ const khangAuthor={id:'00000000-0000-4000-8000-000000000711',username:'khang_dev',display_name:'Khang Dev',level:79,realm:'Hóa Thần',title:'Bá Chủ Thiên Lôi',avatar_url:null};
+ const aliceAuthor={id:'00000000-0000-4000-8000-000000000712',username:'alice',display_name:'Alice Wonder',level:1,realm:'Luyện Khí',title:'Luyện Khí',avatar_url:null};
+ const plainAuthor={id:'00000000-0000-4000-8000-000000000713',username:'new_user',display_name:'New User',avatar_url:null};
+ const kienAuthor={id:'00000000-0000-4000-8000-000000000714',username:'kien_dev',display_name:'Kien Dev',level:9,realm:'Luyện Khí',title:'Thiên Tướng Độ Ách',avatar_url:null};
+ api.posts.push(
+  {id:khangPostId,title:'Khang Post',content:'Khang content',category_id:cid,counts:counts(),reaction:null,author:khangAuthor},
+  {id:alicePostId,title:'Alice Post',content:'Alice content',category_id:cid,counts:counts(),reaction:null,author:aliceAuthor},
+  {id:plainPostId,title:'Plain Post',content:'Plain content',category_id:cid,counts:counts(),reaction:null,author:plainAuthor}
+ );
+ api.comments.push(
+  {id:'00000000-0000-4000-8000-000000000721',post_id:khangPostId,body:'Kien comment here',author:kienAuthor}
+ );
+ await page.goto('/');
+ const khangCard=page.locator(`[data-post-id="${khangPostId}"]`);
+ const aliceCard=page.locator(`[data-post-id="${alicePostId}"]`);
+ const plainCard=page.locator(`[data-post-id="${plainPostId}"]`);
+ await expect(khangCard.locator('.social-post-header')).toContainText('Khang Dev');
+ await expect(khangCard.locator('.social-post-header')).toContainText('@khang_dev');
+ await expect(khangCard.locator('.social-post-header')).toContainText('LVL 79');
+ await expect(khangCard.locator('.social-post-header')).toContainText('Bá Chủ Thiên Lôi');
+ await expect(aliceCard.locator('.social-post-header')).toContainText('Alice Wonder');
+ await expect(aliceCard.locator('.social-post-header')).toContainText('@alice');
+ await expect(aliceCard.locator('.social-post-header')).toContainText('LVL 1');
+ await expect(aliceCard.locator('.social-post-header')).toContainText('Luyện Khí');
+ await expect(plainCard.locator('.social-post-header')).toContainText('New User');
+ await expect(plainCard.locator('.social-post-header')).not.toContainText('LVL');
+ await khangCard.getByRole('button',{name:'Bình luận',exact:true}).click();
+ const kienComment=khangCard.locator('[data-comment-id="00000000-0000-4000-8000-000000000721"]');
+ await expect(kienComment).toContainText('Kien Dev');
+ await expect(kienComment).toContainText('@kien_dev');
+ await expect(kienComment).toContainText('LVL 9');
+ await expect(kienComment).toContainText('Thiên Tướng Độ Ách');
 });

@@ -17,9 +17,13 @@ export function vaultAsset(value){
 }
 export function apiAuthor(value){
  apiId(value?.id);if(typeof value.username!=='string'||typeof value.display_name!=='string')bad();
+ const level=Number.isSafeInteger(value.level)&&value.level>=1&&value.level<=100?value.level:null;
+ const realm=level&&typeof value.realm==='string'?value.realm:'';
+ const serverTitle=level&&typeof value.title==='string'?value.title:'';
+ const nickname=serverTitle||(value.username==='khang_dev'?'Bá Chủ Thiên Lôi':value.username==='kien_dev'?'Thiên Tướng Độ Ách':realm);
  return {author:value.username,authorId:value.id,authorName:value.display_name,handle:'@'+value.username,
  avatar:apiMedia(value.avatar_url)||'/assets/identity/default-avatar.svg',
- level:Number.isSafeInteger(value.level)&&value.level>=1&&value.level<=100?'LVL '+value.level:'',nickname:value.username==='khang_dev'?'Bá Chủ Thiên Lôi':value.username==='kien_dev'?'Thiên Tướng Độ Ách':''};
+ level:level?'LVL '+level:'',realm,nickname};
 }
 export function apiCategory(value){
  apiId(value?.id);if(typeof value.slug!=='string'||!/^[-a-z0-9]{1,80}$/.test(value.slug)||typeof value.name!=='string'||(value.post_count!==undefined&&(!Number.isSafeInteger(value.post_count)||value.post_count<0)))bad();

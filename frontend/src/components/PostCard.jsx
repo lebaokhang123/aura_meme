@@ -13,17 +13,19 @@ import {usePreferences} from '../PreferencesContext.jsx';
 import {POSTS} from '../feed-data.js';
 
 const authors={khang:'Khang_dev',kien:'Kien_dev',gigachad:'Gigachad'};
+export const apiStyleAuthor=username=>username==='kien_dev'?'Kien_dev':'Khang_dev';
+export function LevelPill({level,className}){return level?<span className={className} translate="no">{level}</span>:null;}
 export function HallIdentity({id}) {
   const post=POSTS.find(post=>post.id===id),classes=authorClasses(authors[id]);
   return <div className="flex items-center gap-1.5 flex-wrap min-w-0 hall-identity"><span className="font-label-md text-label-md font-bold text-on-surface whitespace-nowrap">{post.authorName}</span><span className="font-mono-tag text-mono-tag text-outline whitespace-nowrap">@{authors[id]}</span><span className={`${classes.level} whitespace-nowrap`}>{post.level}</span><span className={`${classes.nickname} whitespace-nowrap`}>{post.nickname}</span></div>;
 }
 export function PostHeader({post,variant,menu}) {
-  const render=useLocalized(),classes=authorClasses(post.api?'Khang_dev':post.author||authors[post.id]);
+  const render=useLocalized(),classes=authorClasses(post.api?apiStyleAuthor(post.author):post.author||authors[post.id]);
   return render(<div className="flex items-center justify-between social-post-header">
     <div className="flex items-center gap-3 min-w-0 social-post-identity"><img className="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-secondary/50" src={post.avatar} alt={post.authorName}/>
       <div className="flex flex-col min-w-0"><div className="flex items-center gap-1.5 flex-wrap">
         <span className={`font-label-lg text-label-lg text-on-surface font-bold hover:underline cursor-pointer ${post.api?'inline-block max-w-full break-words':variant==='explore'?'flex flex-col whitespace-nowrap':''}`}>{variant==='profile'?<a href={'/profile/'+encodeURIComponent(post.author)} translate="no">{post.authorName}</a>:variant==='explore'?<PostLink post={post}/>:post.authorName}{' '}{post.api?<a href={'/profile/'+encodeURIComponent(post.author)} className="text-xs text-outline font-normal">{post.handle}</a>:<span className="text-xs text-outline font-normal">{post.handle}</span>}</span>
-        {post.level&&<span className={`${classes.level} whitespace-nowrap shrink-0`}>{post.level}</span>}{post.nickname&&<span className={`${classes.nickname} whitespace-nowrap shrink-0`}>{post.nickname}</span>}
+        <LevelPill level={post.level} className={`${classes.level} whitespace-nowrap shrink-0`}/>{post.nickname&&<span className={`${classes.nickname} whitespace-nowrap shrink-0`} translate="no">{post.nickname}</span>}
       </div><div className="flex items-center gap-2 text-outline font-body-sm text-body-sm">{variant==='profile'?<a href={'/#post-'+post.id} className="font-mono-tag text-mono-tag">{post.timeLabel}</a>:<span className="font-mono-tag text-mono-tag">{post.timeLabel}</span>}<span>·</span><PostCategory post={post} label={variant==='profile'?post.categoryLabel:undefined} className="text-secondary font-medium"/></div></div>
     </div>{menu||<button type="button" className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors" aria-label="Tùy chọn bài viết">{icon('more_horiz')}</button>}
   </div>);
