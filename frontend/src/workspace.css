@@ -89,7 +89,8 @@
 .admin-layout { max-width:1344px; display:grid; grid-template-columns:208px minmax(0,1fr); align-items:start; gap:32px; padding:32px; }
 .admin-sidebar { position:sticky; top:24px; display:flex; flex-direction:column; padding:8px 20px 20px 0; border-right:1px solid var(--am-outline-variant); min-height:620px; }
 .admin-workspace-brand { display:flex; align-items:center; gap:12px; margin-bottom:36px; }
-.admin-brand-mark { display:grid; place-items:center; width:40px; height:44px; background:var(--am-secondary-container); color:var(--am-on-secondary-container); border-radius:12px; }
+.admin-brand-mark { display:grid; place-items:center; width:40px; height:40px; background:transparent; border-radius:50%; overflow:hidden; flex-shrink:0; }
+.admin-brand-logo-img { display:block; width:40px; height:40px; border-radius:50%; object-fit:cover; }
 .admin-workspace-brand strong { display:block; font:800 16px/24px 'Plus Jakarta Sans',sans-serif; }
 .admin-workspace-brand div>span { display:block; color:var(--am-on-surface-variant); font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
 .admin-nav-caption { font:600 9px/18px 'JetBrains Mono',monospace; letter-spacing:.08em; color:var(--am-on-surface-variant); margin:0 0 12px 10px; }
