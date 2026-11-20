@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, update
+from sqlalchemy import func, not_, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.auth import CSRF_HEADER, ERRORS
@@ -104,7 +104,10 @@ def get_notifications(
 ):
     db = account.db
     user_id = account.user.id
-    query = select(Notification).where(Notification.recipient_user_id == user_id)
+    query = select(Notification).where(
+        Notification.recipient_user_id == user_id,
+        or_(Notification.dedupe_key.is_(None), not_(Notification.dedupe_key.like("master:%")))
+    )
     if unread_only:
         query = query.where(Notification.read_at.is_(None))
 
@@ -124,7 +127,8 @@ def get_notifications(
     unread_count = db.scalar(
         select(func.count()).select_from(Notification).where(
             Notification.recipient_user_id == user_id,
-            Notification.read_at.is_(None)
+            Notification.read_at.is_(None),
+            or_(Notification.dedupe_key.is_(None), not_(Notification.dedupe_key.like("master:%")))
         )
     ) or 0
 
@@ -153,7 +157,8 @@ def get_unread_count(
     count = account.db.scalar(
         select(func.count()).select_from(Notification).where(
             Notification.recipient_user_id == account.user.id,
-            Notification.read_at.is_(None)
+            Notification.read_at.is_(None),
+            or_(Notification.dedupe_key.is_(None), not_(Notification.dedupe_key.like("master:%")))
         )
     ) or 0
     return UnreadCountResponse(unread_count=count)
@@ -215,7 +220,8 @@ def mark_all_read(
         update(Notification)
         .where(
             Notification.recipient_user_id == account.user.id,
-            Notification.read_at.is_(None)
+            Notification.read_at.is_(None),
+            or_(Notification.dedupe_key.is_(None), not_(Notification.dedupe_key.like("master:%")))
         )
         .values(read_at=now)
     )

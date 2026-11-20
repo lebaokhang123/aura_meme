@@ -4,7 +4,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import String, cast, or_, select
+from sqlalchemy import String, cast, not_, or_, select
 
 from app.admin_users import require_admin_mutation
 from app.auth import CSRF_HEADER, ERRORS
@@ -27,12 +27,37 @@ class AdminPostPatch(PostPatch):
 class AnnouncementInput(BaseModel):
     title: str = Field(min_length=1, max_length=150)
     body: str = Field(min_length=1, max_length=2000)
+    is_draft: bool = False
+
+
+class AnnouncementUpdateInput(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=150)
+    body: str | None = Field(default=None, min_length=1, max_length=2000)
+
+
+class AnnouncementItem(BaseModel):
+    id: UUID
+    title: str
+    body: str
+    status: Literal["draft", "published", "withdrawn"]
+    actor_id: UUID
+    actor_username: str | None = None
+    created_at: datetime
+    published_at: datetime | None = None
+    recipients_count: int = 0
+
+
+class AnnouncementPage(BaseModel):
+    items: list[AnnouncementItem]
+    pagination: Pagination
 
 
 class AnnouncementResponse(BaseModel):
     success: bool
     recipients_count: int
     created_at: datetime
+    id: UUID | None = None
+    status: str = "published"
 
 
 class AdminAuditEvent(BaseModel):
@@ -191,11 +216,227 @@ def list_audit(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1
     return AuditPage(items=[AdminAuditEvent.model_validate(row[0], from_attributes=True) for row in rows], pagination=pagination)
 
 
+@router.get("/announcements", response_model=AnnouncementPage, operation_id="adminListAnnouncements",
+            responses=ERRORS)
+def list_admin_announcements(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: str | None = Query(None),
+    search: str | None = Query(None, max_length=100),
+    account=Depends(require_role("ADMIN"))
+):
+    statement = (
+        select(Notification, User)
+        .join(User, User.id == Notification.actor_user_id)
+        .where(Notification.dedupe_key.like("master:%"))
+    )
+    rows, pagination = page_rows(account.db, statement.order_by(Notification.created_at.desc(), Notification.id.desc()), page, page_size)
+    items = []
+    for notif, user in rows:
+        p = notif.payload or {}
+        item_status = p.get("status", "published")
+        if status and item_status != status:
+            continue
+        item_title = p.get("title", "")
+        item_body = p.get("body", "")
+        if search:
+            s = search.lower()
+            if s not in item_title.lower() and s not in item_body.lower():
+                continue
+        items.append(AnnouncementItem(
+            id=notif.id,
+            title=item_title,
+            body=item_body,
+            status=item_status,
+            actor_id=user.id,
+            actor_username=user.username,
+            created_at=notif.created_at,
+            published_at=datetime.fromisoformat(p["published_at"]) if p.get("published_at") else (notif.created_at if item_status == "published" else None),
+            recipients_count=p.get("recipients_count", 0)
+        ))
+    return AnnouncementPage(items=items, pagination=pagination)
+
+
 @router.post("/announcements", response_model=AnnouncementResponse, operation_id="adminCreateAnnouncement",
              responses=ERRORS, openapi_extra=CSRF_HEADER)
 def create_admin_announcement(payload: AnnouncementInput, request: Request,
                               account=Depends(require_admin_mutation, scope="function")):
     now = request.app.state.auth.now()
+    announcement_id = uuid4()
+    is_draft = payload.is_draft
+
+    if not is_draft:
+        active_user_ids = account.db.scalars(
+            select(User.id).where(User.status == "active")
+        ).all()
+        recipients_count = len(active_user_ids)
+        if active_user_ids:
+            notifications = [
+                Notification(
+                    id=uuid4(),
+                    recipient_user_id=uid,
+                    actor_user_id=account.user.id,
+                    type="announcement",
+                    target_type="system",
+                    target_id=announcement_id,
+                    payload={"title": payload.title, "body": payload.body, "announcement_id": str(announcement_id), "status": "published"},
+                    created_at=now,
+                    read_at=None,
+                    dedupe_key=f"fanout:{announcement_id}:{uid}",
+                )
+                for uid in active_user_ids
+            ]
+            account.db.add_all(notifications)
+        status_val = "published"
+        published_at_val = now
+    else:
+        recipients_count = 0
+        status_val = "draft"
+        published_at_val = None
+
+    master_notif = Notification(
+        id=announcement_id,
+        recipient_user_id=account.user.id,
+        actor_user_id=account.user.id,
+        type="announcement",
+        target_type="system",
+        target_id=announcement_id,
+        payload={
+            "title": payload.title,
+            "body": payload.body,
+            "status": status_val,
+            "recipients_count": recipients_count,
+            "created_at": now.isoformat(),
+            "published_at": published_at_val.isoformat() if published_at_val else None
+        },
+        created_at=now,
+        read_at=None,
+        dedupe_key=f"master:{announcement_id}"
+    )
+    account.db.add(master_notif)
+
+    account.db.add(AdminAuditLog(
+        id=uuid4(),
+        actor_id=account.user.id,
+        action="announcement.draft" if is_draft else "announcement.create",
+        target_type="system",
+        target_id=str(announcement_id),
+        before_json={},
+        after_json={"title": payload.title, "status": status_val, "recipients_count": recipients_count},
+        created_at=now
+    ))
+    account.db.flush()
+
+    return AnnouncementResponse(
+        success=True,
+        recipients_count=recipients_count,
+        created_at=now,
+        id=announcement_id,
+        status=status_val
+    )
+
+
+@router.patch("/announcements/{announcement_id}", response_model=AnnouncementItem, operation_id="adminUpdateAnnouncement",
+              responses=ERRORS | NOT_FOUND, openapi_extra=CSRF_HEADER)
+def update_admin_announcement(announcement_id: UUID, payload: AnnouncementUpdateInput, request: Request,
+                              account=Depends(require_admin_mutation, scope="function")):
+    now = request.app.state.auth.now()
+    master = account.db.scalar(
+        select(Notification).where(
+            Notification.id == announcement_id,
+            Notification.dedupe_key == f"master:{announcement_id}"
+        ).with_for_update()
+    )
+    if master is None:
+        raise AuthError(404, "NOT_FOUND", "Announcement not found.")
+
+    p = dict(master.payload or {})
+    if p.get("status") != "draft":
+        raise AuthError(409, "CONFLICT", "Only draft announcements can be edited.")
+
+    before = dict(p)
+    if payload.title is not None:
+        p["title"] = payload.title
+    if payload.body is not None:
+        p["body"] = payload.body
+    p["updated_at"] = now.isoformat()
+    master.payload = p
+
+    account.db.add(AdminAuditLog(
+        id=uuid4(),
+        actor_id=account.user.id,
+        action="announcement.update",
+        target_type="system",
+        target_id=str(announcement_id),
+        before_json=before,
+        after_json=p,
+        created_at=now
+    ))
+    account.db.flush()
+
+    return AnnouncementItem(
+        id=master.id,
+        title=p.get("title", ""),
+        body=p.get("body", ""),
+        status="draft",
+        actor_id=master.actor_user_id or account.user.id,
+        actor_username=account.user.username,
+        created_at=master.created_at,
+        published_at=None,
+        recipients_count=0
+    )
+
+
+@router.delete("/announcements/{announcement_id}", status_code=204, operation_id="adminDeleteAnnouncement",
+               responses=ERRORS | NOT_FOUND, openapi_extra=CSRF_HEADER)
+def delete_admin_announcement(announcement_id: UUID, request: Request,
+                              account=Depends(require_admin_mutation, scope="function")):
+    now = request.app.state.auth.now()
+    master = account.db.scalar(
+        select(Notification).where(
+            Notification.id == announcement_id,
+            Notification.dedupe_key == f"master:{announcement_id}"
+        ).with_for_update()
+    )
+    if master is None:
+        raise AuthError(404, "NOT_FOUND", "Announcement not found.")
+
+    p = master.payload or {}
+    if p.get("status") != "draft":
+        raise AuthError(409, "CONFLICT", "Only draft announcements can be deleted.")
+
+    account.db.add(AdminAuditLog(
+        id=uuid4(),
+        actor_id=account.user.id,
+        action="announcement.delete",
+        target_type="system",
+        target_id=str(announcement_id),
+        before_json=p,
+        after_json={},
+        created_at=now
+    ))
+    account.db.delete(master)
+    account.db.flush()
+
+
+@router.post("/announcements/{announcement_id}/publish", response_model=AnnouncementItem, operation_id="adminPublishAnnouncement",
+             responses=ERRORS | NOT_FOUND, openapi_extra=CSRF_HEADER)
+def publish_admin_announcement(announcement_id: UUID, request: Request,
+                               account=Depends(require_admin_mutation, scope="function")):
+    now = request.app.state.auth.now()
+    master = account.db.scalar(
+        select(Notification).where(
+            Notification.id == announcement_id,
+            Notification.dedupe_key == f"master:{announcement_id}"
+        ).with_for_update()
+    )
+    if master is None:
+        raise AuthError(404, "NOT_FOUND", "Announcement not found.")
+
+    p = dict(master.payload or {})
+    if p.get("status") != "draft":
+        raise AuthError(409, "CONFLICT", "Only draft announcements can be published.")
+
     active_user_ids = account.db.scalars(
         select(User.id).where(User.status == "active")
     ).all()
@@ -208,29 +449,99 @@ def create_admin_announcement(payload: AnnouncementInput, request: Request,
                 actor_user_id=account.user.id,
                 type="announcement",
                 target_type="system",
-                target_id=None,
-                payload={"title": payload.title, "body": payload.body},
+                target_id=announcement_id,
+                payload={"title": p.get("title", ""), "body": p.get("body", ""), "announcement_id": str(announcement_id), "status": "published"},
                 created_at=now,
                 read_at=None,
-                dedupe_key=None,
+                dedupe_key=f"fanout:{announcement_id}:{uid}",
             )
             for uid in active_user_ids
         ]
         account.db.add_all(notifications)
 
+    p["status"] = "published"
+    p["published_at"] = now.isoformat()
+    p["recipients_count"] = len(active_user_ids)
+    master.payload = p
+
     account.db.add(AdminAuditLog(
         id=uuid4(),
         actor_id=account.user.id,
-        action="announcement.create",
+        action="announcement.publish",
         target_type="system",
-        target_id="all",
-        before_json={},
-        after_json={"title": payload.title, "recipients_count": len(active_user_ids)},
+        target_id=str(announcement_id),
+        before_json={"status": "draft"},
+        after_json=p,
         created_at=now
     ))
     account.db.flush()
-    return AnnouncementResponse(
-        success=True,
-        recipients_count=len(active_user_ids),
+
+    return AnnouncementItem(
+        id=master.id,
+        title=p.get("title", ""),
+        body=p.get("body", ""),
+        status="published",
+        actor_id=master.actor_user_id or account.user.id,
+        actor_username=account.user.username,
+        created_at=master.created_at,
+        published_at=now,
+        recipients_count=len(active_user_ids)
+    )
+
+
+@router.post("/announcements/{announcement_id}/withdraw", response_model=AnnouncementItem, operation_id="adminWithdrawAnnouncement",
+             responses=ERRORS | NOT_FOUND, openapi_extra=CSRF_HEADER)
+def withdraw_admin_announcement(announcement_id: UUID, request: Request,
+                                account=Depends(require_admin_mutation, scope="function")):
+    now = request.app.state.auth.now()
+    master = account.db.scalar(
+        select(Notification).where(
+            Notification.id == announcement_id,
+            Notification.dedupe_key == f"master:{announcement_id}"
+        ).with_for_update()
+    )
+    if master is None:
+        raise AuthError(404, "NOT_FOUND", "Announcement not found.")
+
+    p = dict(master.payload or {})
+    if p.get("status") != "published":
+        raise AuthError(409, "CONFLICT", "Only published announcements can be withdrawn.")
+
+    p["status"] = "withdrawn"
+    p["withdrawn_at"] = now.isoformat()
+    master.payload = p
+
+    fanouts = account.db.scalars(
+        select(Notification).where(
+            Notification.target_id == announcement_id,
+            Notification.type == "announcement"
+        ).with_for_update()
+    ).all()
+    for f in fanouts:
+        fp = dict(f.payload or {})
+        fp["status"] = "withdrawn"
+        f.payload = fp
+
+    account.db.add(AdminAuditLog(
+        id=uuid4(),
+        actor_id=account.user.id,
+        action="announcement.withdraw",
+        target_type="system",
+        target_id=str(announcement_id),
+        before_json={"status": "published"},
+        after_json=p,
         created_at=now
+    ))
+    account.db.flush()
+
+    return AnnouncementItem(
+        id=master.id,
+        title=p.get("title", ""),
+        body=p.get("body", ""),
+        status="withdrawn",
+        actor_id=master.actor_user_id or account.user.id,
+        actor_username=account.user.username,
+        created_at=master.created_at,
+        published_at=datetime.fromisoformat(p["published_at"]) if p.get("published_at") else master.created_at,
+        recipients_count=p.get("recipients_count", 0)
     )

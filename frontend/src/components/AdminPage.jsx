@@ -5,13 +5,13 @@ import {usePreferences} from '../PreferencesContext.jsx';
 import {adminPage,canAdmin} from '../admin-api.js';
 import '../workspace.css';
 
-const sections=[['users','Người dùng','Users',['users']],['content','Nội dung','Content',['posts','comments','categories']],['contacts','Liên hệ','Contacts',['contacts']],['moderation','Kiểm duyệt','Moderation',['audit-logs','assets']]];
-const labels={users:['Người dùng','Users'],posts:['Bài viết','Posts'],comments:['Bình luận','Comments'],categories:['Danh mục','Categories'],contacts:['Hộp thư liên hệ','Contact inbox'],'audit-logs':['Nhật ký kiểm duyệt','Audit log'],assets:['Trạng thái vật phẩm','Asset status']};
-const sectionIcons={users:'group',content:'article',contacts:'inbox',moderation:'shield'};
-const resourceNotes={users:['Quản lý trạng thái và quyền truy cập của thành viên.','Manage member status and access.'],posts:['Xem nội dung và kiểm soát những bài xuất hiện trong cộng đồng.','Review posts and control their visibility in the community.'],comments:['Xem và xử lý bình luận, kể cả nội dung đã ẩn.','Review comments, including hidden content.'],categories:['Sắp xếp nội dung bằng các danh mục dùng chung.','Organize community content with shared categories.'],contacts:['Đọc và phân loại tin nhắn gửi đến AuraMeme.','Read and triage messages sent to AuraMeme.'],'audit-logs':['Theo dõi ai đã thực hiện thay đổi và thời điểm xử lý.','See who made a change and when it happened.'],assets:['Kiểm tra trạng thái hoạt động và duyệt của danh mục vật phẩm.','Inspect catalog availability and review status.']};
+const sections=[['users','Người dùng','Users',['users']],['content','Nội dung','Content',['posts','comments','categories']],['contacts','Liên hệ','Contacts',['contacts']],['moderation','Kiểm duyệt','Moderation',['audit-logs','assets']],['notifications','Thông báo','Notifications',['announcements']]];
+const labels={users:['Người dùng','Users'],posts:['Bài viết','Posts'],comments:['Bình luận','Comments'],categories:['Danh mục','Categories'],contacts:['Hộp thư liên hệ','Contact inbox'],'audit-logs':['Nhật ký kiểm duyệt','Audit log'],assets:['Trạng thái vật phẩm','Asset status'],announcements:['Thông báo hệ thống','System announcements']};
+const sectionIcons={users:'group',content:'article',contacts:'inbox',moderation:'shield',notifications:'campaign'};
+const resourceNotes={users:['Quản lý trạng thái và quyền truy cập của thành viên.','Manage member status and access.'],posts:['Xem nội dung và kiểm soát những bài xuất hiện trong cộng đồng.','Review posts and control their visibility in the community.'],comments:['Xem và xử lý bình luận, kể cả nội dung đã ẩn.','Review comments, including hidden content.'],categories:['Sắp xếp nội dung bằng các danh mục dùng chung.','Organize community content with shared categories.'],contacts:['Đọc và phân loại tin nhắn gửi đến AuraMeme.','Read and triage messages sent to AuraMeme.'],'audit-logs':['Theo dõi ai đã thực hiện thay đổi và thời điểm xử lý.','See who made a change and when it happened.'],assets:['Kiểm tra trạng thái hoạt động và duyệt của danh mục vật phẩm.','Inspect catalog availability and review status.'],announcements:['Soạn thảo, quản lý và phát thông báo tới các thành viên.','Draft, manage, and broadcast announcements to community members.']};
 const Icon=({name,...props})=><span className="material-symbols-outlined" aria-hidden="true" {...props}>{name}</span>;
-const states={users:['active','locked','deleted'],posts:['draft','published','hidden','deleted'],comments:['visible','hidden','deleted'],categories:['active','hidden'],contacts:['new','in_review','resolved'],assets:['pending','approved','rejected','unknown']};
-const statusLabels={active:['Hoạt động','Active'],locked:['Đã khóa','Locked'],deleted:['Đã xóa','Deleted'],draft:['Bản nháp','Draft'],published:['Công khai','Published'],visible:['Hiển thị','Visible'],hidden:['Đã ẩn','Hidden'],new:['Mới','New'],in_review:['Đang xử lý','In review'],resolved:['Đã xử lý','Resolved'],pending:['Chờ duyệt','Pending'],approved:['Đã duyệt','Approved'],rejected:['Từ chối','Rejected'],unknown:['Chưa rõ','Unknown']};
+const states={users:['active','locked','deleted'],posts:['draft','published','hidden','deleted'],comments:['visible','hidden','deleted'],categories:['active','hidden'],contacts:['new','in_review','resolved'],assets:['pending','approved','rejected','unknown'],announcements:['draft','published','withdrawn']};
+const statusLabels={active:['Hoạt động','Active'],locked:['Đã khóa','Locked'],deleted:['Đã xóa','Deleted'],draft:['Bản nháp','Draft'],published:['Công khai','Published'],visible:['Hiển thị','Visible'],hidden:['Đã ẩn','Hidden'],new:['Mới','New'],in_review:['Đang xử lý','In review'],resolved:['Đã xử lý','Resolved'],pending:['Chờ duyệt','Pending'],approved:['Đã duyệt','Approved'],rejected:['Từ chối','Rejected'],unknown:['Chưa rõ','Unknown'],withdrawn:['Đã thu hồi','Withdrawn']};
 export default function AdminPage(){
  const session=useSyncExternalStore(auth.subscribe,auth.snapshot),{language}=usePreferences(),t=(vi,en)=>language==='en'?en:vi;
  const title=resource=>t(...labels[resource]),status=value=>statusLabels[value]?t(...statusLabels[value]):value;
@@ -32,14 +32,22 @@ export default function AdminPage(){
  },[allowed,owner,resource,search,filter,role,page,revision]);
  useEffect(()=>{if(edit&&!dialog.current?.open)dialog.current.showModal();else if(!edit)dialog.current?.close()},[edit]);
  function choose(value){setResource(value);setPage(1);setQuery('');setSearch('');setFilter('');setRole('');setError('');setSuccess('');}
- function confirm(row,body,label,path='/admin/'+resource+'/'+row.id){setError('');setEdit({type:'confirm',row,body,label,path,method:'PATCH'})}
+ function confirm(row,body,label,path='/admin/'+resource+'/'+row.id,method='PATCH'){setError('');setEdit({type:'confirm',row,body,label,path,method})}
  async function save(event){
   event.preventDefault();if(inflight.current||!edit)return;inflight.current=true;setBusy(true);setError('');setSuccess('');const requestOwner=owner;
   let method=edit.method||'PATCH',path=edit.path||'/admin/'+resource+'/'+(edit.row?.id||''),body=edit.body;
   if(edit.type==='roles'){method='PUT';path='/admin/users/'+edit.row.id+'/roles';body={roles:edit.roles}}
   if(edit.type==='category'){method=edit.row?'PATCH':'POST';path='/admin/categories'+(edit.row?'/'+edit.row.id:'');body=edit.row?{name:edit.name,status:edit.status}:{name:edit.name,slug:edit.slug};}
   if(edit.type==='contact'){path='/admin/contacts/'+edit.row.id;body={status:edit.status}}
-  if(edit.type==='announcement'){method='POST';path='/admin/announcements';body={title:edit.title.trim(),body:edit.body.trim()}}
+  if(edit.type==='announcement'){
+    if(edit.draft){
+      if(edit.row){method='PATCH';path='/admin/announcements/'+edit.row.id;body={title:edit.title.trim(),body:edit.body.trim()}}
+      else{method='POST';path='/admin/announcements';body={title:edit.title.trim(),body:edit.body.trim(),is_draft:true}}
+    }else{
+      if(edit.row&&edit.row.status==='draft'){method='POST';path='/admin/announcements/'+edit.row.id+'/publish';body={}}
+      else{method='POST';path='/admin/announcements';body={title:edit.title.trim(),body:edit.body.trim(),is_draft:false}}
+    }
+  }
   try{await auth.write(method,path,body);if(currentOwner.current!==requestOwner)return;setEdit(null);setRevision(n=>n+1);setSuccess(t('Đã lưu thay đổi.','Changes saved.'));if(resource==='users'&&edit.row?.id===requestOwner)await auth.refresh().catch(()=>{});}
   catch(e){if(currentOwner.current===requestOwner){setError(explain(e));if(e.status===403){setData(null);setDenied(true);setEdit(null);auth.refresh().catch(()=>{})}}}
   finally{inflight.current=false;setBusy(false)}
@@ -56,7 +64,7 @@ export default function AdminPage(){
   <div className="admin-main">
   <header className="admin-heading"><div><p className="admin-breadcrumb">Workspace <Icon name="chevron_right"/>{t(section[1],section[2])}</p><h1>{t('Không gian quản trị','Admin Workspace')}</h1></div><span className="admin-session-badge"><span/>{t('Phiên Admin','Admin session')}</span></header>
   {section[3].length>1&&<nav className="workspace-subtabs" aria-label={t('Chức năng quản trị','Admin tools')}>{section[3].map(value=><button type="button" key={value} aria-pressed={resource===value} onClick={()=>choose(value)}>{title(value)}</button>)}</nav>}
-  <section className="workspace-panel admin-list-panel" aria-labelledby="admin-list-title" data-resource={resource}><div className="workspace-panel-heading"><div><div className="admin-list-title"><h2 id="admin-list-title">{title(resource)}</h2>{data&&<span className="admin-count" aria-label={t('Tổng số mục','Total records')}>{data.pagination.total}</span>}</div><p className="admin-list-note">{t(...resourceNotes[resource])}</p></div><div className="admin-toolbar-actions"><button type="button" className="admin-refresh" disabled={loading||busy} aria-label={t('Tải lại danh sách','Refresh list')} onClick={()=>setRevision(n=>n+1)}><Icon name="refresh"/></button><button type="button" className="workspace-primary admin-broadcast-btn" disabled={loading||busy} onClick={()=>{setError('');setEdit({type:'announcement',title:'',body:''})}}><Icon name="campaign"/>{t('Phát thông báo','Broadcast')}</button>{resource==='categories'&&<button type="button" className="workspace-primary" onClick={()=>{setError('');setEdit({type:'category',row:null,name:'',slug:''})}}><Icon name="add"/>{t('Thêm danh mục','Add category')}</button>}</div></div>
+  <section className="workspace-panel admin-list-panel" aria-labelledby="admin-list-title" data-resource={resource}><div className="workspace-panel-heading"><div><div className="admin-list-title"><h2 id="admin-list-title">{title(resource)}</h2>{data&&<span className="admin-count" aria-label={t('Tổng số mục','Total records')}>{data.pagination.total}</span>}</div><p className="admin-list-note">{t(...resourceNotes[resource])}</p></div><div className="admin-toolbar-actions"><button type="button" className="admin-refresh" disabled={loading||busy} aria-label={t('Tải lại danh sách','Refresh list')} onClick={()=>setRevision(n=>n+1)}><Icon name="refresh"/></button>{resource==='announcements'&&<button type="button" className="workspace-primary admin-broadcast-btn" disabled={loading||busy} onClick={()=>{setError('');setEdit({type:'announcement',row:null,title:'',body:'',mode:'compose'})}}><Icon name="campaign"/>{t('Phát thông báo','Broadcast')}</button>}{resource==='categories'&&<button type="button" className="workspace-primary" onClick={()=>{setError('');setEdit({type:'category',row:null,name:'',slug:''})}}><Icon name="add"/>{t('Thêm danh mục','Add category')}</button>}</div></div>
    <form className="workspace-filters" role="search" aria-label={t('Tìm trong khu quản trị','Search Admin Workspace')} onSubmit={e=>{e.preventDefault();setSearch(query.trim());setPage(1)}}><label>{t('Tìm kiếm','Search')}<input type="search" maxLength={100} value={query} onChange={e=>setQuery(e.target.value)} /></label>{states[resource]&&<label>{t('Trạng thái','Status')}<select value={filter} onChange={e=>{setFilter(e.target.value);setPage(1)}}><option value="">{t('Tất cả','All')}</option>{states[resource].map(v=><option key={v} value={v}>{status(v)}</option>)}</select></label>}{resource==='users'&&<label>{t('Vai trò','Role')}<select value={role} onChange={e=>{setRole(e.target.value);setPage(1)}}><option value="">{t('Tất cả','All')}</option><option>USER</option><option>ADMIN</option></select></label>}<button type="submit" className="admin-search-button"><Icon name="search"/>{t('Tìm','Search')}</button></form>
    {error&&!edit&&<div className="workspace-error" role="alert">{error}<button type="button" onClick={()=>setRevision(n=>n+1)}>{t('Thử lại','Retry')}</button></div>}{success&&<p role="status" className="workspace-success">{success}</p>}
    <div className="admin-column-head" aria-hidden="true"><span>{resource==='users'?t('Thành viên / Vai trò','Member / Role'):title(resource)}</span><span>{resource==='audit-logs'?t('Thời gian','Time'):t('Trạng thái','Status')}</span><span>{resource==='audit-logs'?'':t('Thao tác','Actions')}</span></div>
@@ -67,6 +75,7 @@ export default function AdminPage(){
     {resource==='contacts'&&<><h3>{row.subject}</h3><p>{row.name}</p><p className="workspace-meta">{stamp(row.created_at)}</p></>}
     {resource==='assets'&&<><h3>{row.slug}</h3><p className="workspace-meta">{row.kind} · {row.rarity} · {status(row.review_status)}</p></>}
     {resource==='audit-logs'&&<><h3>{row.action}</h3><p className="workspace-meta">{row.target_type} · {row.target_id}</p><p className="workspace-meta">{t('Người thực hiện','Actor')}: {row.actor_id}</p></>}
+    {resource==='announcements'&&<><h3>{row.title}</h3><p className="workspace-meta">@{row.actor_username||'admin'} · {stamp(row.created_at)}</p><details><summary>{t('Xem nội dung','View content')}</summary><p className="workspace-text" translate="no">{row.body}</p>{row.published_at&&<p className="workspace-meta">{t('Phát lúc:','Broadcasted at:')} {stamp(row.published_at)} · {row.recipients_count} {t('người nhận','recipients')}</p>}</details></>}
    </div><div className="admin-row-status">
     {resource==='audit-logs'&&<time className="workspace-meta" dateTime={row.created_at}>{stamp(row.created_at)}</time>}
     {row.status&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='assets'&&<span className="workspace-badge">{row.active?t('Đang bật','Active'):t('Đang tắt','Inactive')}</span>}
@@ -74,17 +83,58 @@ export default function AdminPage(){
     {(resource==='posts'||resource==='comments')&&row.status!=='deleted'&&<button type="button" disabled={busy} onClick={()=>confirm(row,{status:row.status==='hidden'?(resource==='posts'?'published':'visible'):'hidden'},row.status==='hidden'?t('Hiển thị nội dung','Show content'):t('Ẩn nội dung','Hide content'))}>{row.status==='hidden'?t('Hiển thị','Show'):t('Ẩn','Hide')}</button>}
     {resource==='categories'&&<button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'category',row,name:row.name,status:row.status})}}>{t('Chỉnh sửa','Edit')}</button>}
     {resource==='contacts'&&<button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'contact',row,status:row.status})}}>{t('Xem và xử lý','View and update')}</button>}
+    {resource==='announcements'&&<>
+      {row.status==='draft'&&<>
+        <button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'announcement',row,title:row.title,body:row.body,mode:'compose'})}}>{t('Sửa','Edit')}</button>
+        <button type="button" disabled={busy} className="workspace-primary" onClick={()=>confirm(row,{},t('Phát thông báo này tới tất cả thành viên đang hoạt động?','Broadcast this announcement to all active members?'),'/admin/announcements/'+row.id+'/publish','POST')}>{t('Phát ngay','Publish')}</button>
+        <button type="button" disabled={busy} className="text-error" onClick={()=>confirm(row,{},t('Xóa bản nháp này?','Delete this draft?'),'/admin/announcements/'+row.id,'DELETE')}>{t('Xóa','Delete')}</button>
+      </>}
+      {row.status==='published'&&<>
+        <button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'announcement',row:null,title:`[${t('Đính chính','Correction')}] ${row.title}`,body:row.body,mode:'compose'})}}>{t('Đính chính','Rectify')}</button>
+        <button type="button" disabled={busy} className="text-error" onClick={()=>confirm(row,{},t('Thu hồi thông báo này? Người dùng sẽ không thấy thông báo này nữa.','Withdraw this announcement? Users will no longer see it as active.'),'/admin/announcements/'+row.id+'/withdraw','POST')}>{t('Thu hồi','Withdraw')}</button>
+      </>}
+      {row.status==='withdrawn'&&<span className="workspace-meta">{t('Đã thu hồi','Withdrawn')}</span>}
+    </>}
    </div></article>)}</div>}
    {data&&<nav className="workspace-pagination" aria-label={t('Phân trang quản trị','Admin pagination')}><button type="button" disabled={loading||page<=1} onClick={()=>setPage(n=>n-1)}>{t('Trước','Previous')}</button><span>{page} / {Math.max(1,data.pagination.total_pages)} · {data.pagination.total} {t('mục','records')}</span><button type="button" disabled={loading||page>=data.pagination.total_pages} onClick={()=>setPage(n=>n+1)}>{t('Sau','Next')}</button></nav>}
   </section>
   </div>
-  <dialog ref={dialog} className="workspace-dialog" aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else setEdit(null)}} onClose={()=>setEdit(null)}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='announcement'?t('Phát thông báo hệ thống','Broadcast announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Xử lý liên hệ','Update contact'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>setEdit(null)}>×</button></div>
-   {edit.type==='confirm'&&<><p className="admin-confirm-target">{edit.row.display_name||edit.row.title||edit.row.body}</p><p>{t('Xác nhận thao tác này?','Confirm this action?')}</p></>}
-   {edit.type==='announcement'&&<><label>{t('Tiêu đề thông báo','Announcement title')}<input value={edit.title} maxLength={150} required disabled={busy} placeholder={t('Tiêu đề thông báo…','Announcement title…')} onChange={e=>setEdit({...edit,title:e.target.value})}/></label><label>{t('Nội dung','Content')}<textarea value={edit.body} maxLength={2000} required disabled={busy} rows={4} placeholder={t('Nội dung thông báo toàn hệ thống…','Broadcast announcement body…')} onChange={e=>setEdit({...edit,body:e.target.value})}/></label><p className="workspace-meta">{t('Thông báo sẽ được gửi tới tất cả thành viên đang hoạt động.','Announcement will be delivered to all active members.')}</p></>}
+  <dialog ref={dialog} className="workspace-dialog" aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else setEdit(null)}} onClose={()=>setEdit(null)}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='announcement'?t('Soạn thông báo hệ thống','Compose announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Xử lý liên hệ','Update contact'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>setEdit(null)}>×</button></div>
+   {edit.type==='confirm'&&<><p className="admin-confirm-target">{edit.row?.display_name||edit.row?.title||edit.row?.body}</p><p>{edit.label||t('Xác nhận thao tác này?','Confirm this action?')}</p></>}
+   {edit.type==='announcement'&&<>
+     <div className="workspace-subtabs" style={{margin:'0 0 12px 0'}}>
+       <button type="button" aria-pressed={edit.mode!=='preview'} onClick={()=>setEdit({...edit,mode:'compose'})}>{t('Soạn thảo','Compose')}</button>
+       <button type="button" aria-pressed={edit.mode==='preview'} onClick={()=>setEdit({...edit,mode:'preview'})}>{t('Xem trước','Preview')}</button>
+     </div>
+     {edit.mode==='preview'?(
+       <div className="workspace-preview-box" style={{background:'#16171f',padding:'16px',borderRadius:'12px',border:'1px solid #33343d',marginBottom:'12px'}}>
+         <h4 style={{margin:'0 0 8px 0',color:'#fff',font:'700 15px/20px sans-serif'}}>{edit.title.trim()||t('(Chưa có tiêu đề)','(No title)')}</h4>
+         <p style={{margin:0,color:'#cac4d0',font:'400 13px/18px sans-serif',whiteSpace:'pre-wrap'}}>{edit.body.trim()||t('(Chưa có nội dung)','(No content)')}</p>
+         <span style={{display:'block',marginTop:'8px',fontSize:'11px',color:'#8e8a9a'}}>AuraMeme System · {t('vừa xong','just now')}</span>
+       </div>
+     ):(
+       <>
+         <label>{t('Tiêu đề thông báo','Announcement title')}<input value={edit.title} maxLength={150} required disabled={busy} placeholder={t('Tiêu đề thông báo…','Announcement title…')} onChange={e=>setEdit({...edit,title:e.target.value})}/></label>
+         <label>{t('Nội dung','Content')}<textarea value={edit.body} maxLength={2000} required disabled={busy} rows={6} placeholder={t('Nội dung thông báo toàn hệ thống…','Broadcast announcement body…')} onChange={e=>setEdit({...edit,body:e.target.value})}/></label>
+         <p className="workspace-meta">{t('Thông báo sẽ được gửi tới tất cả thành viên đang hoạt động khi phát.','Announcement will be delivered to all active members when broadcasted.')}</p>
+       </>
+     )}
+   </>}
    {edit.type==='roles'&&<><p>@{edit.row.username}</p><fieldset><legend>{t('Vai trò từ DB','Database roles')}</legend>{['USER','ADMIN'].map(value=><label className="workspace-checkbox" key={value}><input type="checkbox" checked={edit.roles.includes(value)} disabled={busy} onChange={e=>setEdit({...edit,roles:e.target.checked?[...edit.roles,value]:edit.roles.filter(r=>r!==value)})}/>{value}</label>)}</fieldset><p className="workspace-meta">{t('Thay đổi vai trò sẽ kết thúc các phiên của tài khoản đó.','Changing roles ends that account’s sessions.')}</p></>}
    {edit.type==='category'&&<><label>{t('Tên danh mục','Category name')}<input value={edit.name} maxLength={80} required disabled={busy} onChange={e=>setEdit({...edit,name:e.target.value})}/></label>{!edit.row?<label>Slug<input value={edit.slug} maxLength={80} pattern="[a-z0-9-]+" required disabled={busy} onChange={e=>setEdit({...edit,slug:e.target.value})}/></label>:<label>{t('Trạng thái','Status')}<select value={edit.status} disabled={busy} onChange={e=>setEdit({...edit,status:e.target.value})}>{states.categories.map(v=><option value={v} key={v}>{status(v)}</option>)}</select></label>}</>}
    {edit.type==='contact'&&<><h3>{edit.row.subject}</h3><p>{edit.row.name}</p><p className="workspace-text" translate="no">{edit.row.body}</p><label>{t('Trạng thái','Status')}<select value={edit.status} disabled={busy} onChange={e=>setEdit({...edit,status:e.target.value})}>{states.contacts.map(v=><option value={v} key={v}>{status(v)}</option>)}</select></label></>}
-   {error&&<p className="workspace-error" role="alert">{error}</p>}<div className="workspace-dialog-actions"><button type="button" disabled={busy} onClick={()=>setEdit(null)}>{t('Hủy','Cancel')}</button><button type="submit" className="workspace-primary" disabled={busy}>{busy?t('Đang lưu…','Saving…'):t('Xác nhận','Confirm')}</button></div>
+   {error&&<p className="workspace-error" role="alert">{error}</p>}
+   <div className="workspace-dialog-actions">
+     <button type="button" disabled={busy} onClick={()=>setEdit(null)}>{t('Hủy','Cancel')}</button>
+     {edit.type==='announcement'?(
+       <>
+         <button type="button" disabled={busy||!edit.title.trim()||!edit.body.trim()} onClick={e=>{edit.draft=true;save(e);}}>{t('Lưu bản nháp','Save draft')}</button>
+         <button type="submit" className="workspace-primary" disabled={busy||!edit.title.trim()||!edit.body.trim()}>{busy?t('Đang phát…','Broadcasting…'):t('Phát thông báo','Broadcast')}</button>
+       </>
+     ):(
+       <button type="submit" className="workspace-primary" disabled={busy}>{busy?t('Đang lưu…','Saving…'):t('Xác nhận','Confirm')}</button>
+     )}
+   </div>
   </form>}</dialog>
  </div></main>;
 }

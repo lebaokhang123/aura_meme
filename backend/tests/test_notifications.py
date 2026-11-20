@@ -388,6 +388,27 @@ def test_admin_announcements_openapi():
     assert post_op["security"] == [{"sessionCookie": []}]
     assert {"200", "401", "403"} <= set(post_op["responses"])
 
+    list_op = schema["paths"]["/api/v1/admin/announcements"]["get"]
+    assert list_op["operationId"] == "adminListAnnouncements"
+    assert list_op["security"] == [{"sessionCookie": []}]
+    assert {"200", "401", "403"} <= set(list_op["responses"])
+
+    patch_op = schema["paths"]["/api/v1/admin/announcements/{announcement_id}"]["patch"]
+    assert patch_op["operationId"] == "adminUpdateAnnouncement"
+    assert {"200", "401", "403", "404"} <= set(patch_op["responses"])
+
+    del_op = schema["paths"]["/api/v1/admin/announcements/{announcement_id}"]["delete"]
+    assert del_op["operationId"] == "adminDeleteAnnouncement"
+    assert {"204", "401", "403", "404"} <= set(del_op["responses"])
+
+    pub_op = schema["paths"]["/api/v1/admin/announcements/{announcement_id}/publish"]["post"]
+    assert pub_op["operationId"] == "adminPublishAnnouncement"
+    assert {"200", "401", "403", "404"} <= set(pub_op["responses"])
+
+    with_op = schema["paths"]["/api/v1/admin/announcements/{announcement_id}/withdraw"]["post"]
+    assert with_op["operationId"] == "adminWithdrawAnnouncement"
+    assert {"200", "401", "403", "404"} <= set(with_op["responses"])
+
 
 def test_admin_announcements_fanout():
     from app.admin_posts import create_admin_announcement, AnnouncementInput
@@ -419,3 +440,49 @@ def test_admin_announcements_fanout():
     assert all(item.type == "announcement" for item in created_items)
     assert all(item.payload["title"] == "Bảo trì hệ thống" for item in created_items)
     assert db.flush.assert_called_once is not None
+
+
+def test_admin_announcement_draft_lifecycle():
+    from app.admin_posts import (
+        create_admin_announcement,
+        update_admin_announcement,
+        delete_admin_announcement,
+        AnnouncementInput,
+        AnnouncementUpdateInput,
+    )
+    from app.models import Notification
+    from types import SimpleNamespace
+    db = MagicMock()
+    admin_id = uuid4()
+    now_val = datetime.now(timezone.utc)
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(auth=SimpleNamespace(now=lambda: now_val))))
+    account = SimpleNamespace(db=db, user=SimpleNamespace(id=admin_id, username="admin_tester"))
+
+    # 1. Create draft
+    draft_input = AnnouncementInput(title="Draft Title", body="Draft Body", is_draft=True)
+    res = create_admin_announcement(draft_input, request, account)
+    assert res.success is True
+    assert res.status == "draft"
+    assert res.recipients_count == 0
+
+    # 2. Update draft
+    master_mock = Notification(
+        id=res.id,
+        recipient_user_id=admin_id,
+        actor_user_id=admin_id,
+        type="announcement",
+        target_type="system",
+        payload={"title": "Draft Title", "body": "Draft Body", "status": "draft"},
+        created_at=now_val,
+        dedupe_key=f"master:{res.id}"
+    )
+    db.scalar.return_value = master_mock
+    update_input = AnnouncementUpdateInput(title="Updated Title", body="Updated Body")
+    up_res = update_admin_announcement(res.id, update_input, request, account)
+    assert up_res.title == "Updated Title"
+    assert up_res.body == "Updated Body"
+    assert up_res.status == "draft"
+
+    # 3. Delete draft
+    delete_admin_announcement(res.id, request, account)
+    db.delete.assert_called_with(master_mock)

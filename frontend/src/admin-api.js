@@ -17,6 +17,7 @@ export function adminPage(value,resource){
   if(resource==='contacts')return {id,name:text(row.name,100),subject:text(row.subject,160),body:text(row.body,4000),status:one(row.status,['new','in_review','resolved']),created_at:date(row.created_at)};
   if(resource==='assets'){if(typeof row.active!=='boolean')bad();return {id,slug:text(row.slug,100),kind:one(row.kind,['avatar','frame','icon','effect','background']),rarity:one(row.rarity,['D','C','B','A','S']),active:row.active,review_status:one(row.review_status,['pending','approved','rejected','unknown'])};}
   if(resource==='audit-logs')return {id,actor_id:apiId(row.actor_id),action:text(row.action,100),target_type:text(row.target_type,100),target_id:text(row.target_id,200),created_at:date(row.created_at)};
+  if(resource==='announcements')return {id,title:text(row.title,160),body:text(row.body,4000),status:one(row.status,['draft','published','withdrawn']),actor_id:apiId(row.actor_id),actor_username:row.actor_username?text(row.actor_username,32):null,recipients_count:typeof row.recipients_count==='number'?row.recipients_count:0,created_at:date(row.created_at),published_at:row.published_at?date(row.published_at):null};
   bad();
  });
  return {items,pagination:{...page.pagination}};
