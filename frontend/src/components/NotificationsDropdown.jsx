@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { getNotifications, markRead, markAllRead } from '../notifications-api.js';
 import { useLocalized } from '../localize.jsx';
+import { usePreferences } from '../PreferencesContext.jsx';
 
 const symbol = name => <span className="material-symbols-outlined" aria-hidden="true">{name}</span>;
 
@@ -18,6 +19,8 @@ function formatRelativeTime(dateString, t) {
 
 export function NotificationsDropdown({ onClose, onUnreadChange }) {
   const render = useLocalized();
+  const { language } = usePreferences();
+  const t = (vi, en) => language === 'en' ? en : vi;
   const [items, setItems] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState('all'); // 'all' | 'unread'
@@ -93,13 +96,12 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
     }
   };
 
-  const renderContent = (t) => {
-    return (
-      <div
-        className="notifications-dropdown"
-        id="site-notifications-menu"
-        role="dialog"
-        aria-label={t('Hộp thông báo', 'Notifications Inbox')}
+  return render(
+    <div
+      className="notifications-dropdown"
+      id="site-notifications-menu"
+      role="dialog"
+      aria-label={t('Hộp thông báo', 'Notifications Inbox')}
       >
         <div className="notifications-header">
           <div className="notifications-title-area">
@@ -282,7 +284,4 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
         </div>
       </div>
     );
-  };
-
-  return render(renderContent);
 }

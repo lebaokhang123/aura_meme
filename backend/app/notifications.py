@@ -114,12 +114,12 @@ def get_notifications(
     actors = {}
     if actor_ids:
         actor_users = db.execute(
-            select(User.id, User.username, Profile.display_name, Profile.avatar_url)
+            select(User, Profile)
             .join(Profile, Profile.user_id == User.id)
             .where(User.id.in_(actor_ids))
         ).all()
-        for u_id, uname, dname, aurl in actor_users:
-            actors[u_id] = ActorSummary(id=u_id, username=uname, display_name=dname, avatar_url=aurl)
+        for u, p in actor_users:
+            actors[u.id] = ActorSummary(id=u.id, username=u.username, display_name=p.display_name, avatar_url=p.avatar_url)
 
     unread_count = db.scalar(
         select(func.count()).select_from(Notification).where(
@@ -183,12 +183,13 @@ def mark_read(
     actor_summary = None
     if notif.actor_user_id:
         actor_row = account.db.execute(
-            select(User.id, User.username, Profile.display_name, Profile.avatar_url)
+            select(User, Profile)
             .join(Profile, Profile.user_id == User.id)
             .where(User.id == notif.actor_user_id)
         ).one_or_none()
         if actor_row:
-            actor_summary = ActorSummary(id=actor_row[0], username=actor_row[1], display_name=actor_row[2], avatar_url=actor_row[3])
+            u, p = actor_row
+            actor_summary = ActorSummary(id=u.id, username=u.username, display_name=p.display_name, avatar_url=p.avatar_url)
 
     return NotificationItem(
         id=notif.id,
