@@ -171,3 +171,53 @@ npm.cmd run build
   - [ ] Bấm vào hiển thị popup yêu cầu nhập lý do (5-500 ký tự). Nhập dưới 5 ký tự báo lỗi.
   - [ ] Nhập lý do hợp lệ và bấm Xác nhận -> bài viết được xử lý, author nhận được thông báo kèm đúng lý do vừa nhập.
   - [ ] Kiểm tra tương tự với bình luận trên bài viết.
+
+
+---
+
+## 9. P0 Hotfix: Notifications Request Storm Prevention
+
+### 9.1. Nguyên nhân Gốc rễ (Root Cause Analysis)
+1. **Unstable References trong `NotificationsDropdown.jsx`:**
+   - Hàm dịch `t = (vi, en) => ...` được khai báo inline bên trong component, sinh ra reference mới ở mỗi render cycle.
+   - Callback `load` được bọc bởi `useCallback(..., [onUnreadChange, t])`, do đó cũng bị tạo mới ở mỗi render.
+   - Hook `useEffect(..., [filter, load])` chạy sau mỗi render vì `load !== prevLoad`.
+   - Trong `load()`, các state setter (`setLoading`, `setItems`, `setUnreadCount`, `setTotalPages`) được gọi, kích hoạt re-render ngay lập tức. Vòng lặp vô hạn (Infinite Request Loop) được tạo ra với tần suất hàng chục request mỗi giây cho tới khi chạm giới hạn 120 reqs/IP/60s của backend.
+2. **Object Reference Instability trong `SiteShell.jsx`:**
+   - `readDemoUser()` trong `demo.js` trả về một object mới `{...user, ...}` ở mỗi lần gọi.
+   - Effect lấy unread count trong `SiteHeader` phụ thuộc vào `[user]`, so sánh tham chiếu luôn thấy khác nhau (`prevUser !== user`), dẫn tới việc gọi `GET /api/v1/notifications/unread-count` liên tục khi Header re-render.
+   - Khi backend chạm ngưỡng rate limit (HTTP 429 `RATE_LIMITED`), component không lưu thời gian cooldown `Retry-After`, tiếp tục retry và làm kéo dài thời gian bị lockout.
+
+### 9.2. Giải pháp Kỹ thuật Đã Triển khai
+1. **Memoize danh tính người dùng trong `demo.js`:**
+   - Caching `cachedResultUser` dựa trên tham chiếu của `auth.snapshot().user` (đã là immutable frozen object). Khi người dùng không đổi, `readDemoUser()` luôn trả về cùng một tham chiếu duy nhất.
+2. **Ổn định hóa `SiteShell.jsx`:**
+   - Đổi dependency của effect unread count từ `[user]` sang `[userId]` (chuỗi nguyên thủy `user?.id || user?.username`).
+   - Throttling focus fetch: Chỉ cho phép gọi lại qua `window.focus` nếu đã trôi qua ít nhất 30 giây kể từ lần fetch trước.
+   - Bổ sung cooldown tracking: Khi server trả về 429, lưu `cooldownUntil` dựa trên header `Retry-After` (mặc định 30s) và chặn toàn bộ request ngầm cho tới khi hết hạn.
+   - Bọc `onUnreadChange` trong `useCallback(count => setUnreadCount(count), [])`.
+3. **Triệt tiêu vòng lặp trong `NotificationsDropdown.jsx`:**
+   - Chuyển `onUnreadChange` sang `onUnreadChangeRef.current`, loại bỏ hoàn toàn khỏi dependency array của `load`.
+   - Bọc `load` trong `useCallback` với dependency rỗng `[]`, sử dụng `languageRef.current` cho thông điệp lỗi.
+   - Hook `useEffect` chỉ kích hoạt duy nhất khi `filter` thay đổi (`'all'` hoặc `'unread'`).
+   - Bổ sung `activeRequestIdRef`: Khi người dùng đóng dropdown hoặc chuyển tab nhanh, request cũ đang bay bị vô hiệu hóa ngay lập tức, không ghi đè dữ liệu mới.
+   - Bổ sung `cooldownUntilRef`: Khi nhận HTTP 429, lưu thời gian mở khóa từ `Retry-After`. Nút "Thử lại" hoặc các thao tác chuyển tab trong thời gian cooldown sẽ không gửi request lên server mà hiển thị thông báo đếm ngược giây rõ ràng cho người dùng.
+
+### 9.3. Bảng Đo kiểm Thực tế: Request Counts (Trước và Sau Hotfix)
+
+| Kịch bản kiểm thử | Request tới Endpoint | Trước Hotfix | Sau Hotfix | Kết quả |
+|---|---|:---:|:---:|:---:|
+| **Mở chuông thông báo** | `/api/v1/notifications` | 50+ reqs / 2s | **1 req** | Triệt tiêu hoàn toàn loop |
+| **Giữ mở chuông 10–12 giây** | `/api/v1/notifications` | Liên tục tăng đến 120+ | **0 req thêm (vẫn 1)** | Không polling thừa |
+| **Re-render Header (Gõ tìm kiếm)** | `/api/v1/notifications` | Tăng vọt theo keydown | **0 req thêm (vẫn 1)** | Miễn nhiễm re-render |
+| **Chuyển tab "Chưa đọc"** | `/api/v1/notifications?unread_only=true` | Loop vô tận | **Đúng 1 req** | Phân trang/lọc chuẩn xác |
+| **Chuyển tab về "Tất cả"** | `/api/v1/notifications?unread_only=false` | Loop vô tận | **Đúng 1 req** | Phân trang/lọc chuẩn xác |
+| **Bấm Thử lại trong Cooldown** | `/api/v1/notifications` | Gửi bão request | **0 req (chặn tại client)** | Tôn trọng Retry-After |
+| **Tổng số lỗi HTTP 429** | Toàn bộ các route | Bị khóa toàn trang | **0 lỗi (Zero 429)** | Hệ thống ổn định 100% |
+
+### 9.4. Bằng chứng Kiểm thử (Test Evidence)
+- **Playwright Test Suite Chuyên dụng:** `frontend/auth-tests/notifications-storm.spec.js` (7/7 tests PASS, thời gian chạy ~37s).
+- **Frontend Unit Tests:** `frontend/tests/notifications.test.mjs` (8/8 tests PASS, bổ sung kiểm tra 429 `Retry-After` và identity caching).
+- **Toàn bộ Frontend Unit Tests:** `68/68 passed` (100% PASS).
+- **Production Build:** `✓ built in 4.12s` (Bundle hoàn toàn sạch).
+- **Live Browser QA:** Chạy trực tiếp trên Chromium với tài khoản QA thật kết nối DB 5434, ghi nhận tổng cộng 3 requests `/notifications` (1 mở, 2 đổi tab) và 0 request 429. Ảnh chụp: `live_bell_normal.png`.

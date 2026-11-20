@@ -34,7 +34,9 @@ function formatFullDateTime(dateString, language) {
 export function NotificationsDropdown({ onClose, onUnreadChange }) {
   const render = useLocalized();
   const { language } = usePreferences();
-  const t = (vi, en) => language === 'en' ? en : vi;
+  const t = useCallback((vi, en) => language === 'en' ? en : vi, [language]);
+  const languageRef = useRef(language);
+  useEffect(() => { languageRef.current = language; }, [language]);
 
   const [items, setItems] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -51,30 +53,72 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
   const modalRef = useRef(null);
   const lastActiveElementRef = useRef(null);
 
+  const onUnreadChangeRef = useRef(onUnreadChange);
+  useEffect(() => {
+    onUnreadChangeRef.current = onUnreadChange;
+  }, [onUnreadChange]);
+
+  const activeRequestIdRef = useRef(0);
+  const cooldownUntilRef = useRef(0);
+
   const load = useCallback(async (isUnreadOnly = false) => {
+    const requestId = ++activeRequestIdRef.current;
+    const now = Date.now();
+    if (now < cooldownUntilRef.current) {
+      const remaining = Math.ceil((cooldownUntilRef.current - now) / 1000);
+      setError(languageRef.current === 'en'
+        ? `Too many attempts. Please wait ${remaining}s.`
+        : `Quá nhiều lần thử. Vui lòng đợi ${remaining} giây.`);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setPage(1);
     try {
       const data = await getNotifications({ page: 1, pageSize: 20, unreadOnly: isUnreadOnly });
+      if (requestId !== activeRequestIdRef.current) return;
       setItems(data.items || []);
       setTotalPages(data.pagination?.total_pages || 1);
       const count = typeof data.unread_count === 'number' ? data.unread_count : 0;
       setUnreadCount(count);
-      onUnreadChange?.(count);
+      onUnreadChangeRef.current?.(count);
     } catch (err) {
-      setError(err?.message || t('Lỗi khi tải thông báo', 'Failed to load notifications'));
+      if (requestId !== activeRequestIdRef.current) return;
+      if (err?.status === 429) {
+        const retrySec = err.retryAfter && err.retryAfter > 0 ? err.retryAfter : 15;
+        cooldownUntilRef.current = Date.now() + retrySec * 1000;
+        setError(languageRef.current === 'en'
+          ? `Too many attempts. Please wait ${retrySec}s.`
+          : `Quá nhiều lần thử. Vui lòng đợi ${retrySec} giây.`);
+      } else {
+        setError(err?.message || (languageRef.current === 'en' ? 'Failed to load notifications' : 'Lỗi khi tải thông báo'));
+      }
     } finally {
-      setLoading(false);
+      if (requestId === activeRequestIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [onUnreadChange, t]);
+  }, []);
 
   useEffect(() => {
     load(filter === 'unread');
+    return () => {
+      activeRequestIdRef.current++;
+    };
   }, [filter, load]);
 
   const handleLoadMore = async () => {
     if (loadingMore || page >= totalPages) return;
+    const now = Date.now();
+    if (now < cooldownUntilRef.current) {
+      const remaining = Math.ceil((cooldownUntilRef.current - now) / 1000);
+      setError(languageRef.current === 'en'
+        ? `Too many attempts. Please wait ${remaining}s.`
+        : `Quá nhiều lần thử. Vui lòng đợi ${remaining} giây.`);
+      return;
+    }
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
@@ -83,7 +127,15 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
       setPage(nextPage);
       setTotalPages(data.pagination?.total_pages || 1);
     } catch (err) {
-      setError(err?.message || t('Lỗi khi tải thêm', 'Failed to load more'));
+      if (err?.status === 429) {
+        const retrySec = err.retryAfter && err.retryAfter > 0 ? err.retryAfter : 15;
+        cooldownUntilRef.current = Date.now() + retrySec * 1000;
+        setError(languageRef.current === 'en'
+          ? `Too many attempts. Please wait ${retrySec}s.`
+          : `Quá nhiều lần thử. Vui lòng đợi ${retrySec} giây.`);
+      } else {
+        setError(err?.message || (languageRef.current === 'en' ? 'Failed to load more' : 'Lỗi khi tải thêm'));
+      }
     } finally {
       setLoadingMore(false);
     }
@@ -258,7 +310,16 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
             <div className="notifications-error">
               {symbol('error')}
               <p>{error}</p>
-              <button type="button" onClick={() => load(filter === 'unread')}>
+              <button type="button" onClick={() => {
+                if (Date.now() < cooldownUntilRef.current) {
+                  const remaining = Math.ceil((cooldownUntilRef.current - Date.now()) / 1000);
+                  setError(language === 'en'
+                    ? `Too many attempts. Please wait ${remaining}s.`
+                    : `Quá nhiều lần thử. Vui lòng đợi ${remaining} giây.`);
+                  return;
+                }
+                load(filter === 'unread');
+              }}>
                 {t('Thử lại', 'Retry')}
               </button>
             </div>

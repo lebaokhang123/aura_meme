@@ -1,5 +1,5 @@
 import { useLocalized } from '../localize.jsx';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { readDemoUser } from '../demo.js';
 import {MOCK_AUTH} from '../auth.js';
 import {logoutAccount} from '../runtime.js';
@@ -26,6 +26,7 @@ export function SiteHeader() {
   const [query, setQuery] = useState(filters.q);
   useEffect(() => setQuery(filters.q), [filters.q]);
   const user = readDemoUser();
+  const userId = user?.id || user?.username || null;
   const [open, setOpen] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const header = useRef(null);
@@ -35,25 +36,48 @@ export function SiteHeader() {
   const path = location.pathname.replace(/\/$/, '') || '/';
   const toggle = name => setOpen(current => current === name ? null : name);
 
+  const lastFetchRef = useRef(0);
+  const cooldownUntilRef = useRef(0);
+  const handleUnreadChange = useCallback(count => setUnreadCount(count), []);
+
   useEffect(() => {
-    if (!user) return;
+    if (!userId) {
+      setUnreadCount(0);
+      return;
+    }
     let active = true;
-    const fetchCount = () => {
+    let inFlight = false;
+    const fetchCount = (force = false) => {
+      const now = Date.now();
+      if (!force && now - lastFetchRef.current < 30000) return;
+      if (now < cooldownUntilRef.current) return;
+      if (inFlight) return;
+      inFlight = true;
+      lastFetchRef.current = now;
       getUnreadCount()
         .then(data => {
           if (active && typeof data?.unread_count === 'number') {
             setUnreadCount(data.unread_count);
           }
         })
-        .catch(() => {});
+        .catch(err => {
+          if (err?.status === 429) {
+            const sec = err.retryAfter && err.retryAfter > 0 ? err.retryAfter : 30;
+            cooldownUntilRef.current = Date.now() + sec * 1000;
+          }
+        })
+        .finally(() => {
+          inFlight = false;
+        });
     };
-    fetchCount();
-    window.addEventListener('focus', fetchCount);
+    fetchCount(true);
+    const onFocus = () => fetchCount(false);
+    window.addEventListener('focus', onFocus);
     return () => {
       active = false;
-      window.removeEventListener('focus', fetchCount);
+      window.removeEventListener('focus', onFocus);
     };
-  }, [user]);
+  }, [userId]);
   useEffect(() => {
     const outside = event => { if (!event.target.closest('[data-header-popup]')) setOpen(null); };
     const keys = event => {
@@ -104,7 +128,7 @@ export function SiteHeader() {
               {open === 'notifications' && (
                 <NotificationsDropdown
                   onClose={() => setOpen(null)}
-                  onUnreadChange={setUnreadCount}
+                  onUnreadChange={handleUnreadChange}
                 />
               )}
             </div>

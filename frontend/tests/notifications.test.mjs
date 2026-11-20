@@ -115,3 +115,37 @@ test('notifications API: delete notification by id', async () => {
   assert.equal(client.calls[0].method, 'DELETE');
   assert.equal(client.calls[0].path, `/notifications/${notifId}`);
 });
+
+test('notifications API: 429 RATE_LIMITED error preserves retryAfter metadata', async () => {
+  const { AuthError } = await import('../src/auth-client.js');
+  const client = {
+    read: async () => {
+      throw new AuthError(429, 'RATE_LIMITED', { retryAfter: 30 });
+    }
+  };
+  await assert.rejects(
+    async () => getNotifications({ client }),
+    (err) => {
+      assert.equal(err.status, 429);
+      assert.equal(err.code, 'RATE_LIMITED');
+      assert.equal(err.retryAfter, 30);
+      return true;
+    }
+  );
+  await assert.rejects(
+    async () => getUnreadCount({ client }),
+    (err) => {
+      assert.equal(err.status, 429);
+      assert.equal(err.code, 'RATE_LIMITED');
+      assert.equal(err.retryAfter, 30);
+      return true;
+    }
+  );
+});
+
+test('readDemoUser: identity caching preserves object reference', async () => {
+  const { readDemoUser } = await import('../src/demo.js');
+  const user1 = readDemoUser();
+  const user2 = readDemoUser();
+  assert.equal(user1, user2, 'readDemoUser must return stable object reference when user has not changed');
+});
