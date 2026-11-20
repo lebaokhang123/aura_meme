@@ -22,6 +22,7 @@ Tài liệu bàn giao kỹ thuật hoàn thành **Task 2: Tối ưu trải nghi�
   9. `4d63ad2` — `refactor(admin): unify announcement action icons` (Final Polish B)
   10. `f233fe9` — `style(admin): normalize content action buttons` (Final Polish C)
   11. `a42fa5b` — `test(admin): add visual and automated coverage for task 2 final polish`
+  12. *(HEAD)* — `fix(admin): bỏ nút đính chính thông báo đã phát` (Task 2 Final Fix)
 
 ---
 
@@ -102,8 +103,8 @@ Tài liệu bàn giao kỹ thuật hoàn thành **Task 2: Tối ưu trải nghi�
   - **Chuẩn hóa cụm Action Icons theo từng trạng thái:**
     - **Published (Đã phát):**
       - `visibility`: Mở modal xem trước chi tiết (read-only).
-      - `edit`: Mở composer đính chính với tiêu đề tiền tố `[Đính chính] <tiêu đề cũ>` và giữ nguyên nội dung để chỉnh sửa.
       - `undo`: Thu hồi thông báo với dialog xác nhận cảnh báo an toàn.
+      *(Lưu ý: Nút "Đính chính" đã được lược bỏ hoàn toàn theo yêu cầu chỉ đạo mới nhất của Owner, giữ cấu trúc tinh gọn với đúng 2 nút thao tác).*
     - **Draft (Bản nháp):**
       - `visibility`: Xem trước nội dung bản nháp trong modal.
       - `edit`: Sửa bản nháp trực tiếp trong composer.

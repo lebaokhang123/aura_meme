@@ -343,10 +343,10 @@ test.describe('Task 2 — Admin Workspace UX Refinement', () => {
     expect(Math.round(btnBox.width)).toBe(40);
     expect(Math.round(btnBox.height)).toBe(40);
 
-    // 3. Verify action icons for Published: visibility, edit, undo
-    await expect(publishedRow.locator('.admin-action-icons .admin-icon-btn')).toHaveCount(3);
+    // 3. Verify action icons for Published: visibility, undo (rectify button removed per Owner specification)
+    await expect(publishedRow.locator('.admin-action-icons .admin-icon-btn')).toHaveCount(2);
     await expect(publishedRow.locator('.admin-action-icons [aria-label="Xem chi tiết thông báo"]')).toBeVisible();
-    await expect(publishedRow.locator('.admin-action-icons [aria-label="Đính chính thông báo"]')).toBeVisible();
+    await expect(publishedRow.locator('.admin-action-icons [aria-label="Đính chính thông báo"]')).toHaveCount(0);
     await expect(publishedRow.locator('.admin-action-icons [aria-label="Thu hồi thông báo"]')).toBeVisible();
 
     // 4. Verify action icons for Draft: visibility, edit, send, delete
