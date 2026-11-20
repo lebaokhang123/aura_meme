@@ -1,6 +1,15 @@
-# AuraMeme — Task 3: Trang Chính sách Bảo mật (Privacy Policy V2 Polish) Engineering Handoff
+# AuraMeme — Task 3: Trang Chính sách Bảo mật (Privacy Policy V3 Final Polish) Engineering Handoff
 
-Tài liệu bàn giao kỹ thuật hoàn thành **Task 3 Final Polish: Privacy V2 — Tinh gọn nội dung và hoàn thiện bố cục trang Chính sách bảo mật** cho nền tảng AuraMeme, tuân thủ đúng yêu cầu chỉ đạo của Owner và bản mẫu thiết kế tham chiếu `privacy-aurameme-v2.html` từ ChatGPT.
+Tài liệu bàn giao kỹ thuật hoàn thành **Task 3 Final: Privacy Policy V3 — Hoàn thiện nội dung và đồng bộ Footer** cho nền tảng AuraMeme, tuân thủ đúng yêu cầu chỉ đạo cuối cùng của Owner.
+
+> [!NOTE]
+> **Cập nhật V3 Final Polish (Chốt Task 3):**
+> 1. **Bỏ nhãn phía trên:** Xóa hoàn toàn dòng "Dự án học tập & portfolio" ("Student & portfolio project") trong hero, chỉ giữ ngày cập nhật `20/11/2026` căn chỉnh gọn gàng.
+> 2. **Chỉnh khối "Ngắn gọn":** Thay văn bản bằng đúng nội dung yêu cầu: *"AuraMeme là dự án học tập, không phải dịch vụ thương mại. Trang này mô tả cách dữ liệu được xử lý theo các tính năng đang có; nội dung có thể được cập nhật khi dự án phát triển hoặc triển khai rộng rãi hơn."* (kèm bản tiếng Anh tương ứng).
+> 3. **Rút gọn mục "Về AuraMeme":** Chỉ giữ đoạn ngắn gọn: *"AuraMeme là website chia sẻ meme và giao lưu cộng đồng, kết hợp các tính năng Aura, xếp hạng và bộ sưu tập vật phẩm."*, loại bỏ hoàn toàn các nhắc đến CV, DevOps hay portfolio.
+> 4. **Bỏ câu không cần thiết:** Xóa câu khuyến cáo không đăng số điện thoại/địa chỉ trong mục "Thông tin công khai và riêng tư".
+> 5. **Đồng bộ Footer với website chính:** Xóa bố cục 3 cột cũ; thay bằng footer tối giản đồng bộ với `SiteFooter` của AuraMeme: bên trái là `© 2026 AuraMeme. All rights reserved.`, bên phải gồm 2 liên kết `Chính sách bảo mật` và `Github` (kèm icon).
+> 6. **Kiểm thử:** 12/12 Playwright tests PASS, 70/70 unit tests PASS, production build PASS.
 
 ---
 
