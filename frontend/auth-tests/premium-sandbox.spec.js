@@ -1,0 +1,275 @@
+import { test, expect } from '@playwright/test';
+
+const pageErrors = new WeakMap();
+test.beforeEach(({ page }) => {
+  const errors = [];
+  pageErrors.set(page, errors);
+  page.on('pageerror', (e) => errors.push(e.message));
+});
+test.afterEach(({ page }) => {
+  expect(pageErrors.get(page)).toEqual([]);
+});
+
+const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const now = '2026-11-14T00:00:00Z';
+
+async function setupMockApi(context, identity = 0, initialSub = null, vnpayApproved = false) {
+  const users = ['khang_dev', 'kien_dev', 'giga_user'].map((username, n) => ({
+    id: id(n + 1),
+    username,
+    display_name: username,
+    roles: ['USER'],
+    status: 'active',
+  }));
+
+  let currentSubscription = initialSub;
+  const requests = [];
+
+  await context.route('**/api/v1/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname.slice('/api/v1'.length);
+    const method = request.method();
+    let body;
+    try {
+      body = request.postDataJSON();
+    } catch {}
+    requests.push({ path, method, body, csrf: request.headers()['x-csrf-token'] });
+
+    const send = (status, data) =>
+      route.fulfill({
+        status,
+        contentType: 'application/json',
+        body: status === 204 ? '' : JSON.stringify(data),
+      });
+    const fail = (status, code) => send(status, { error: { code, message: 'safe' } });
+
+    if (path === '/users/me') {
+      return identity === null ? fail(401, 'UNAUTHORIZED') : send(200, users[identity]);
+    }
+    if (path === '/auth/csrf') {
+      return send(200, { csrf_token: 'server-csrf-test-token' });
+    }
+
+    if (path === '/premium/status') {
+      return send(200, {
+        subscription: currentSubscription,
+        vnpay_configured: vnpayApproved,
+        plans: [
+          { id: 'plus', name: 'Aura Plus', days: 30, amount_usd_cents: 500, price_formatted: '$5' },
+          { id: 'prime', name: 'Aura Prime', days: 365, amount_usd_cents: 5000, price_formatted: '$50' },
+        ],
+      });
+    }
+
+    if (path === '/premium/orders' && method === 'POST') {
+      if (request.headers()['x-csrf-token'] !== 'server-csrf-test-token') {
+        return fail(403, 'CSRF_INVALID');
+      }
+      const orderCode = 'AM-SUB-TEST-1234';
+      const isVnpay = body.provider === 'vnpay';
+      return send(201, {
+        order_code: orderCode,
+        plan_type: body.plan_type,
+        amount_usd_cents: body.plan_type === 'plus' ? 500 : 5000,
+        provider: body.provider,
+        payment_url: isVnpay ? 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_TxnRef=' + orderCode : null,
+      });
+    }
+
+    if (path.startsWith('/premium/orders/') && path.endsWith('/simulate') && method === 'POST') {
+      if (request.headers()['x-csrf-token'] !== 'server-csrf-test-token') {
+        return fail(403, 'CSRF_INVALID');
+      }
+      if (body.action === 'pay_success') {
+        currentSubscription = {
+          tier: 'plus',
+          active: true,
+          days_remaining: 30,
+          expires_at: '2026-12-14T00:00:00Z',
+          started_at: now,
+          multiplier: 2.0,
+        };
+        return send(200, {
+          status: 'paid',
+          subscription: currentSubscription,
+          order_code: 'AM-SUB-TEST-1234',
+        });
+      }
+      return send(200, {
+        status: 'failed',
+        subscription: null,
+        order_code: 'AM-SUB-TEST-1234',
+      });
+    }
+
+    if (path === '/premium/vnpay-return' && method === 'GET') {
+      const code = url.searchParams.get('vnp_ResponseCode');
+      if (code === '00') {
+        currentSubscription = {
+          tier: 'prime',
+          active: true,
+          days_remaining: 365,
+          expires_at: '2027-11-14T00:00:00Z',
+          started_at: now,
+          multiplier: 3.0,
+        };
+        return send(200, {
+          status: 'paid',
+          response_code: '00',
+          subscription: currentSubscription,
+        });
+      }
+      return send(200, {
+        status: 'failed',
+        response_code: code || '99',
+        subscription: null,
+      });
+    }
+
+    return fail(404, 'NOT_FOUND');
+  });
+
+  return { requests, getCurrentSub: () => currentSubscription };
+}
+
+test('Premium displays $5 and $50 across VI/EN and Dark/Light themes', async ({ page, context }) => {
+  await setupMockApi(context, null);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+
+  for (const theme of ['dark', 'light']) {
+    for (const language of ['vi', 'en']) {
+      await page.goto('/premium');
+      await page.evaluate((p) => localStorage.setItem('aurameme-ui-preferences', JSON.stringify(p)), {
+        theme,
+        language,
+      });
+      await page.goto('/premium');
+
+      // Verify header and kicker
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Aura Memberships');
+
+      // Verify exact prices $5 and $50
+      const content = await page.locator('.premium-selector-panel').innerText();
+      expect(content).toContain('$5');
+      expect(content).toContain('$50');
+
+      // Verify no obsolete "Giá chưa công bố" or commercial clutter
+      expect(content).not.toContain('Giá chưa công bố');
+      expect(content).not.toContain('Pricing is not announced');
+      expect(content).not.toMatch(/2 months free|Basic|Start Pro/);
+
+      // Verify duration pills
+      await expect(page.locator('.premium-plan')).toHaveCount(2);
+      await expect(page.locator('.premium-plus')).toContainText(language === 'en' ? '30 days' : '30 ngày');
+      await expect(page.locator('.premium-prime')).toContainText(language === 'en' ? '365 days' : '365 ngày');
+    }
+  }
+});
+
+test('Guest clicking CTA redirects to /login?next=%2Fpremium', async ({ page, context }) => {
+  await setupMockApi(context, null);
+  await page.goto('/premium');
+
+  const cta = page.locator('.u056-cta');
+  await expect(cta).toBeVisible();
+  await expect(cta).toBeEnabled();
+  await expect(cta).toContainText('Đăng nhập');
+
+  await cta.click();
+  await expect(page).toHaveURL(/\/login\?next=%2Fpremium$/);
+});
+
+test('Logged in user can open Sandbox modal, simulate successful payment, and see active badge', async ({ page, context }) => {
+  const s = await setupMockApi(context, 0, null, false);
+  await page.goto('/premium');
+
+  // Verify initial state: no active banner
+  await expect(page.locator('.premium-active-banner')).toHaveCount(0);
+
+  // Click CTA to open sandbox dialog
+  const cta = page.locator('.u056-cta');
+  await expect(cta).toBeVisible();
+  await expect(cta).toContainText('Thử nghiệm gói Plus ($5)');
+  await cta.click();
+
+  // Verify dialog is open
+  const dialog = page.locator('.premium-sandbox-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('#sandbox-dialog-title')).toContainText('Thử nghiệm Sandbox — Gói Aura Plus');
+  await expect(dialog.locator('.sandbox-price-usd')).toContainText('$5 USD');
+
+  // VNPAY should be disabled because pricing is not approved
+  const vnpayBtn = dialog.locator('.sandbox-btn-vnpay');
+  await expect(vnpayBtn).toBeDisabled();
+  await expect(vnpayBtn).toContainText('Chờ duyệt giá VND');
+
+  // Click Simulate Instant Payment (Success)
+  const successBtn = dialog.locator('.sandbox-btn-success');
+  await successBtn.click();
+
+  // Verify success alert inside dialog
+  const alert = dialog.locator('.sandbox-result-box.success');
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText('Kích hoạt thành công gói Aura Plus');
+
+  // Close dialog
+  await dialog.locator('.workspace-dialog-actions button').click();
+  await expect(dialog).not.toBeVisible();
+
+  // Verify active banner is now visible on page
+  const banner = page.locator('.premium-active-banner');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('Gói đang kích hoạt: Aura PLUS');
+  await expect(banner).toContainText('30 ngày');
+
+  // Verify CTA now shows active plan status
+  await expect(cta).toContainText('Gói đang kích hoạt');
+
+  // Verify CSRF token accompanied the mutation
+  const orderReq = s.requests.find((r) => r.path === '/premium/orders' && r.method === 'POST');
+  expect(orderReq).toBeDefined();
+  expect(orderReq.csrf).toBe('server-csrf-test-token');
+  expect(orderReq.body).toEqual({ plan_type: 'plus', provider: 'sandbox_simulated' });
+});
+
+test('Logged in user can simulate payment failure without corrupting state', async ({ page, context }) => {
+  await setupMockApi(context, 0, null, false);
+  await page.goto('/premium');
+
+  await page.locator('.u056-cta').click();
+  const dialog = page.locator('.premium-sandbox-dialog');
+  await expect(dialog).toBeVisible();
+
+  // Click Simulate Failure
+  const failBtn = dialog.locator('.sandbox-btn-fail');
+  await failBtn.click();
+
+  // Verify failure notice inside dialog
+  const alert = dialog.locator('.sandbox-result-box.error');
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText('thất bại');
+
+  // Close dialog
+  await dialog.locator('.workspace-dialog-actions button').click();
+
+  // Active banner should still not exist
+  await expect(page.locator('.premium-active-banner')).toHaveCount(0);
+});
+
+test('VNPAY return callback in URL updates subscription state and displays notice', async ({ page, context }) => {
+  await setupMockApi(context, 0, null, true);
+  await page.goto('/premium?vnp_ResponseCode=00&vnp_TxnRef=AM-SUB-TEST-1234&vnp_SecureHash=mockhash');
+
+  // Page should verify return and show success banner
+  await expect(page.locator('.premium-notice-banner.success')).toBeVisible();
+  await expect(page.locator('.premium-notice-banner.success')).toContainText('Thanh toán VNPAY thành công');
+
+  // Active banner should display prime membership
+  await expect(page.locator('.premium-active-banner')).toBeVisible();
+  await expect(page.locator('.premium-active-banner')).toContainText('Aura PRIME');
+  await expect(page.locator('.premium-active-banner')).toContainText('365 ngày');
+
+  // URL query params should be cleared
+  expect(new URL(page.url()).search).toBe('');
+});
