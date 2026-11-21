@@ -47,6 +47,26 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
     if (path === '/users/me') {
       return identity === null ? fail(401, 'UNAUTHORIZED') : send(200, users[identity]);
     }
+    if (path.startsWith('/users/')) {
+      const parts = path.split('/');
+      const targetUsername = parts[2];
+      const userObj = users.find((u) => u.username === targetUsername) || users[0];
+      if (path.endsWith('/comments')) {
+        return send(200, { items: [], pagination: { total: 0 } });
+      }
+      if (path.endsWith('/activity')) {
+        return send(200, { total: 0, days: [] });
+      }
+      return send(200, {
+        ...userObj,
+        created_at: now,
+        avatar_url: null,
+        level: 15,
+        realm: 'Trúc Cơ',
+        title: 'Bá Chủ Thiên Lôi',
+        membership_tier: currentSubscription?.is_active ? currentSubscription.tier : 'free',
+      });
+    }
     if (path === '/auth/csrf') {
       return send(200, { csrf_token: 'server-csrf-test-token' });
     }
@@ -462,5 +482,79 @@ test('Order creation error displays friendly message and never leaks INTERNAL_ER
   await expect(errorAlert).toContainText('Không thể tạo đơn hàng. Vui lòng thử lại.');
   expect(await errorAlert.innerText()).not.toMatch(/INTERNAL_ERROR/);
   await expect(confirmBtn).toBeEnabled();
+});
+
+test('Phase A Identity: swapped icons, avatar glow everywhere, profile badge, and selector panel glow', async ({ page, context }) => {
+  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
+
+  // 1. Plus identity test
+  const plusSub = {
+    tier: 'plus',
+    is_active: true,
+    days_remaining: 30,
+    expires_at: '2026-12-14T00:00:00Z',
+    starts_at: now,
+    boost_multiplier: 2.0,
+  };
+  await setupMockApi(context, 0, plusSub, false);
+
+  // Check Home with Plus
+  await page.goto('/');
+  const plusHeaderBtn = page.locator('.header-premium-btn--plus');
+  await expect(plusHeaderBtn.locator('.header-premium-icon')).toHaveText('diamond');
+  const perksPlusHeader = page.locator('.font-mono-tag:has-text("AURA PERKS")').locator('..');
+  await expect(perksPlusHeader.locator('.material-symbols-outlined')).toHaveText('diamond');
+  const perksPlusActive = page.locator('span:has-text("Đang kích hoạt")');
+  await expect(perksPlusActive).toHaveClass(/border-amber-400\/50/);
+  await page.screenshot({ path: `${artifactsDir}/task5_identity_home_plus.png` });
+
+  // Check Profile with Plus
+  await page.goto('/profile');
+  const plusProfileBadge = page.locator('.profile-premium-badge--plus');
+  await expect(plusProfileBadge).toBeVisible();
+  await expect(plusProfileBadge.locator('.profile-premium-badge-icon')).toHaveText('diamond');
+  await expect(plusProfileBadge).toContainText('Aura Plus');
+  await expect(page.locator('.am-profile-avatar img')).toHaveClass(/aura-avatar--plus/);
+  await page.screenshot({ path: `${artifactsDir}/task5_identity_profile_plus.png` });
+
+  // Check Premium Page with Plus
+  await page.goto('/premium');
+  await expect(page.locator('.premium-selector-panel')).toHaveClass(/premium-selector-panel--plus/);
+  await page.screenshot({ path: `${artifactsDir}/task5_identity_premium_plus.png` });
+
+  // 2. Prime identity test
+  const primeSub = {
+    tier: 'prime',
+    is_active: true,
+    days_remaining: 365,
+    expires_at: '2027-11-14T00:00:00Z',
+    starts_at: now,
+    boost_multiplier: 3.0,
+  };
+  await setupMockApi(context, 0, primeSub, false);
+
+  // Check Home with Prime
+  await page.goto('/');
+  const primeHeaderBtn = page.locator('.header-premium-btn--prime');
+  await expect(primeHeaderBtn.locator('.header-premium-icon')).toHaveText('workspace_premium');
+  const perksPrimeHeader = page.locator('.font-mono-tag:has-text("AURA PERKS")').locator('..');
+  await expect(perksPrimeHeader.locator('.material-symbols-outlined')).toHaveText('workspace_premium');
+  const perksPrimeActive = page.locator('span:has-text("Đang kích hoạt")');
+  await expect(perksPrimeActive).toHaveClass(/border-cyan-300\/60/);
+  await page.screenshot({ path: `${artifactsDir}/task5_identity_home_prime.png` });
+
+  // Check Profile with Prime
+  await page.goto('/profile');
+  const primeProfileBadge = page.locator('.profile-premium-badge--prime');
+  await expect(primeProfileBadge).toBeVisible();
+  await expect(primeProfileBadge.locator('.profile-premium-badge-icon')).toHaveText('workspace_premium');
+  await expect(primeProfileBadge).toContainText('Aura Prime');
+  await expect(page.locator('.am-profile-avatar img')).toHaveClass(/aura-avatar--prime/);
+  await page.screenshot({ path: `${artifactsDir}/task5_identity_profile_prime.png` });
+
+  // Check Premium Page with Prime
+  await page.goto('/premium');
+  await expect(page.locator('.premium-selector-panel')).toHaveClass(/premium-selector-panel--prime/);
+  await page.screenshot({ path: `${artifactsDir}/task5_identity_premium_prime.png` });
 });
 

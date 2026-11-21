@@ -16,10 +16,10 @@ export function AuraPerksCard() {
       <div className="absolute -left-8 -bottom-8 w-24 h-24 bg-secondary/15 rounded-full blur-2xl pointer-events-none" />
       <div className="flex items-center justify-between relative z-10">
         <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full ${isPrime ? 'bg-cyan-500/15 border border-cyan-400/60 text-cyan-300' : isPlus ? 'bg-orange-500/15 border border-orange-400/60 text-orange-300' : 'bg-cyan-500/10 border border-cyan-500/50 text-cyan-400'}`}>
-          <span className="material-symbols-outlined text-[15px]">{isPrime ? 'diamond' : 'workspace_premium'}</span>
+          <span className="material-symbols-outlined text-[15px]">{isPrime ? 'workspace_premium' : 'diamond'}</span>
           <span className="font-mono-tag text-[10px] uppercase font-bold tracking-wider">AURA PERKS</span>
         </div>
-        <span className={`font-mono-tag text-mono-tag px-2 py-0.5 rounded-full ${isActive ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30' : 'bg-surface-container-high/80 text-tertiary border border-tertiary/20'}`}>
+        <span className={`font-mono-tag text-mono-tag px-2 py-0.5 rounded-full ${isActive ? (isPrime ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-300/60 shadow-[0_0_12px_rgba(56,189,248,0.35)]' : 'bg-orange-500/20 text-amber-300 border border-amber-400/50 shadow-[0_0_10px_rgba(249,115,22,0.3)]') : 'bg-surface-container-high/80 text-tertiary border border-tertiary/20'}`}>
           {isActive ? (isEn ? 'Active' : 'Đang kích hoạt') : (isEn ? 'Available' : 'Đã mở đăng ký')}
         </span>
       </div>
@@ -64,7 +64,7 @@ export function AuraPerksCard() {
         className={`w-full py-2.5 px-3 rounded-lg ${isPrime ? 'bg-gradient-to-r from-cyan-500 via-sky-400 to-amber-300 text-surface-container-lowest shadow-[0_0_15px_rgba(6,182,212,0.5)]' : isPlus ? 'bg-gradient-to-r from-red-500 via-orange-400 to-amber-400 text-surface-container-lowest shadow-[0_0_15px_rgba(249,115,22,0.5)]' : 'bg-gradient-to-r from-secondary via-secondary to-tertiary text-surface-container-lowest shadow-[0_0_15px_rgba(208,188,255,0.4)]'} hover:opacity-95 font-label-md text-label-md font-bold active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer relative z-10`}
         href="/premium"
       >
-        <span className="material-symbols-outlined text-[18px]">workspace_premium</span>
+        <span className="material-symbols-outlined text-[18px]">{isPrime ? 'workspace_premium' : 'diamond'}</span>
         <span className="tracking-wide">
           {isActive ? (isEn ? 'Extend Subscription' : 'Gia hạn gói') : (isEn ? 'Explore Plus / Prime' : 'Xem Plus / Prime')}
         </span>

@@ -119,7 +119,7 @@ export function SiteHeader() {
             title={isPrime ? 'Aura Prime' : isPlus ? 'Aura Plus' : t('Mua gói hội viên Aura', 'Get Aura Membership')}
           >
             <span className="material-symbols-outlined header-premium-icon" aria-hidden="true">
-              {isPrime ? 'diamond' : isPlus ? 'workspace_premium' : 'stars'}
+              {isPrime ? 'workspace_premium' : isPlus ? 'diamond' : 'stars'}
             </span>
             <span className="header-premium-text">
               {isPrime ? 'Aura Prime' : isPlus ? 'Aura Plus' : t('Mua Aura', 'Get Aura')}
@@ -172,9 +172,9 @@ export function SiteHeader() {
                 />
                 {hasAura && (
                   <span
-                    className="aura-member-badge"
-                    title={t('Hội viên Aura', 'Aura Member')}
-                    aria-label={t('Hội viên Aura', 'Aura Member')}
+                    className={`aura-member-badge ${isPrime ? 'aura-member-badge--prime' : 'aura-member-badge--plus'}`}
+                    title={isPrime ? t('Hội viên Aura Prime', 'Aura Prime Member') : t('Hội viên Aura Plus', 'Aura Plus Member')}
+                    aria-label={isPrime ? t('Hội viên Aura Prime', 'Aura Prime Member') : t('Hội viên Aura Plus', 'Aura Plus Member')}
                   >
                     <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
                       <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />

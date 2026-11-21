@@ -1,6 +1,7 @@
 import {AuraProgress} from './AuraProgress.jsx';
 import React,{useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {auth} from '../auth.js';
+import {usePremium} from '../PremiumContext.jsx';
 import {apiMedia} from '../social-api.js';
 import {useSocial} from '../SocialContext.jsx';
 import {useCopy,useData,ErrorMessage,LoadState} from './account-ui.jsx';
@@ -22,11 +23,16 @@ export function ProfilePage(){
  useLayoutEffect(()=>{if(!editing&&restoreEditFocus.current){editButton.current?.focus();restoreEditFocus.current=false}},[editing]);
  const {state,posts,pagination,loading,error,retry,loadMore,loadFeed}=useSocial();
  const profile=useData(valid?'/users/'+username:null),comments=useData(valid?'/users/'+username+'/comments?page=1&page_size=1':null,state.revision),activity=useData(valid?'/users/'+username+'/activity':null,state.revision),memeInventory=useData(mine?'/inventory/me?kind=avatar&page_size=9':null),backgroundInventory=useData(mine?'/inventory/me?kind=background&page_size=9':null);
+ const { subscription } = usePremium();
  const p=profile.data,memeItems=topOwned(memeInventory.data?.items||[]),backgroundItems=topOwned(backgroundInventory.data?.items||[]);
+ const profileTier = (mine && subscription?.is_active) ? (subscription.tier || 'free') : (p?.membership_tier || 'free');
+ const isProfilePrime = profileTier === 'prime';
+ const isProfilePlus = profileTier === 'plus';
+ const hasProfileAura = isProfilePrime || isProfilePlus;
  return <main className="am-profile"><div className="am-profile-layout">{!valid?<p role="alert">{t('Không tìm thấy hồ sơ.','Profile not found.')}</p>:<LoadState state={profile}>{p&&<>
  <aside className="profile-rail am-profile-rail">
- <section className="am-profile-identity"><div className="am-profile-avatar"><div className="am-profile-avatar-glow"/><div className="am-profile-avatar-frame"><img src={apiMedia(p.avatar_url)||'/assets/identity/default-avatar.svg'} alt={t('Ảnh đại diện ','Avatar of ')+p.display_name} width="112" height="112"/></div></div>
- <div className="am-profile-name"><h1 translate="no">{p.display_name}</h1><p translate="no">@{p.username}</p>{(p.title||p.username==='khang_dev'||p.username==='kien_dev')&&<div className="mt-1 flex justify-center"><span className={`${authorClasses(apiStyleAuthor(p.username)).nickname} whitespace-nowrap`}>{p.title||(p.username==='khang_dev'?'Bá Chủ Thiên Lôi':'Thiên Tướng Độ Ách')}</span></div>}</div>
+ <section className="am-profile-identity"><div className={`am-profile-avatar ${hasProfileAura ? (isProfilePrime ? 'has-aura-prime' : 'has-aura-plus') : ''}`}><div className="am-profile-avatar-glow"/><div className="am-profile-avatar-frame"><img className={`${isProfilePrime ? 'aura-avatar--prime' : isProfilePlus ? 'aura-avatar--plus' : ''}`} src={apiMedia(p.avatar_url)||'/assets/identity/default-avatar.svg'} alt={t('Ảnh đại diện ','Avatar of ')+p.display_name} width="112" height="112"/></div>{hasProfileAura && <span className={`aura-member-badge ${isProfilePrime ? 'aura-member-badge--prime' : 'aura-member-badge--plus'} w-6 h-6 bottom-[6px] right-[6px]`} title={isProfilePrime ? t('Hội viên Aura Prime', 'Aura Prime Member') : t('Hội viên Aura Plus', 'Aura Plus Member')}><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg></span>}</div>
+ <div className="am-profile-name"><h1 translate="no">{p.display_name}</h1><p translate="no">@{p.username}</p>{(p.title||p.username==='khang_dev'||p.username==='kien_dev')&&<div className="mt-1 flex justify-center"><span className={`${authorClasses(apiStyleAuthor(p.username)).nickname} whitespace-nowrap`}>{p.title||(p.username==='khang_dev'?'Bá Chủ Thiên Lôi':'Thiên Tướng Độ Ách')}</span></div>}{hasProfileAura && <div className="mt-2 flex justify-center"><div className={`profile-premium-badge profile-premium-badge--${profileTier}`} title={isProfilePrime ? t('Hội viên Aura Prime', 'Aura Prime Member') : t('Hội viên Aura Plus', 'Aura Plus Member')}><span className="material-symbols-outlined profile-premium-badge-icon" aria-hidden="true">{isProfilePrime ? 'workspace_premium' : 'diamond'}</span><span className="profile-premium-badge-text">{isProfilePrime ? 'Aura Prime' : 'Aura Plus'}</span></div></div>}</div>
  {mine&&(editing?<EditProfile profile={p} onSaved={values=>{profile.update({...p,...values});closeEdit();loadFeed().catch(()=>{})}} onCancel={closeEdit}/>:<button ref={editButton} className="am-profile-edit" onClick={()=>setEditing(true)}>{icon('edit',16)}{t('Chỉnh sửa hồ sơ','Edit profile')}</button>)}
  <p className="am-profile-bio" translate="no">{p.bio||t('Chưa có tiểu sử.','No bio yet.')}</p>
  <dl className="am-profile-stats"><div><dd>{pagination?.total??'—'}</dd><dt>{t('Bài viết','Posts')}</dt></div><div><dd>{comments.data?.pagination.total??'—'}</dd><dt>{t('Bình luận','Comments')}</dt></div><div><dd>—</dd><dt>Reaction</dt></div></dl>

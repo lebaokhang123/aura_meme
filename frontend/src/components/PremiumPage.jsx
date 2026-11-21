@@ -15,7 +15,7 @@ const defaultPlans = [
     price: 5,
     priceFormatted: '$5',
     priceVndFormatted: '130.000 VNĐ',
-    icon: 'auto_awesome',
+    icon: 'diamond',
   },
   {
     id: 'prime',
@@ -25,7 +25,7 @@ const defaultPlans = [
     price: 50,
     priceFormatted: '$50',
     priceVndFormatted: '1.250.000 VNĐ',
-    icon: 'diamond',
+    icon: 'workspace_premium',
   },
 ];
 
@@ -69,6 +69,8 @@ export default function PremiumPage() {
   const root = useRef(null);
   const group = useId();
   const plan = plans[selected] || defaultPlans[selected] || defaultPlans[0];
+  const activeTier = subscription?.is_active ? subscription.tier : null;
+  const displayedTier = activeTier || plan?.id || 'plus';
 
   const [vnpayConfigured, setVnpayConfigured] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -272,7 +274,7 @@ export default function PremiumPage() {
         </div>
 
         <section
-          className="premium-selector-panel"
+          className={`premium-selector-panel premium-selector-panel--${displayedTier}`}
           aria-labelledby="premium-selector-title"
         >
           <div className="premium-selector-heading">
