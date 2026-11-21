@@ -147,3 +147,29 @@ Các tệp ảnh minh chứng giao diện thực tế đã được lưu vào th
    - Cần cấu hình địa chỉ IPN callback public có bảo vệ HTTPS (ví dụ thông qua domain production chính thức hoặc webhook gateway an toàn) để VNPAY có thể bắn tín hiệu server-to-server.
 4. **Quyết định kinh doanh về cơ chế nâng cấp gói (Upgrade Tier Policy):**
    - Hiện tại hệ thống đang bảo toàn ngày hết hạn theo nguyên tắc cộng dồn an toàn. Nếu người dùng chuyển từ Plus lên Prime giữa chu kỳ, cần quyết định của Owner về việc quy đổi giá trị ngày còn lại của gói cũ hay thay thế hoàn toàn.
+
+---
+
+## 6. BẢN VÁ KỸ THUẬT TOÀN DIỆN (TECHNICAL HOTFIX)
+
+Sau quá trình rà soát độc lập từ ChatGPT, nhánh `feat/premium-sandbox-task5` đã được bổ sung bản vá kỹ thuật hoàn chỉnh:
+
+### 6.1. Đồng bộ Hợp đồng DTO Frontend ↔ Backend
+- **Tên trường gói:** Thay thế trường `plan_type` không nhất quán bằng trường định danh chuẩn `plan_tier` (`'plus'` | `'prime'`) trên `CreateOrderInput` và toàn bộ flow tạo đơn của `PremiumPage.jsx`.
+- **Nhà cung cấp sandbox:** Đổi tên provider từ `'vnpay'` sang `'vnpay_sandbox'` để phản ánh chính xác môi trường thử nghiệm và phân biệt với cổng thanh toán thật.
+- **Trạng thái kích hoạt gói:** Chuẩn hóa toàn bộ schema DTO `SubscriptionDto` và client context sang thuộc tính duy nhất `is_active: bool`. Loại bỏ hoàn toàn fallback legacy `active: bool`.
+
+### 6.2. Phân tách và Xử lý Chuẩn xác VNPAY Return URL & IPN
+- **HTTP 302 Redirect:** Backend `handle_vnpay_return` trả về `RedirectResponse` chuẩn HTTP 302 chuyển hướng trình duyệt về `/premium?vnp_status=success&order_code=...`. Khắc phục triệt để lỗi trình duyệt cố gọi JSON fetch vào URL chuyển hướng.
+- **Phân định thẩm quyền:** Return URL tuyệt đối không tự ý ghi nhận kích hoạt subscription. Endpoint IPN (`handle_vnpay_ipn`) giữ vai trò duy nhất và có thẩm quyền tối cao (authoritative webhook) để xác thực chữ ký HMAC-SHA512, đối soát số tiền và kích hoạt gói cho người dùng.
+
+### 6.3. Siết chặt Bảo mật Endpoint Mô phỏng (Payment Simulation)
+- Cập nhật hàm `simulate_subscription_order` để đọc cấu hình môi trường thực tế từ `request.app.state.auth.settings.auth_environment` và `premium_settings.premium_sandbox_enabled`.
+- Chặn đứng mọi hành vi gọi simulate trên môi trường production bằng mã lỗi nghiêm ngặt `403 FORBIDDEN`.
+
+### 6.4. Helper Làm tròn Tiền tệ VND 10.000 đ
+- Bổ sung helper `round_vnd_to_nearest_10k` trong `backend/app/premium_plans.py` phục vụ tính toán và làm tròn số tiền VND đến mốc 10.000 đ gần nhất khi áp dụng bảng giá động trong tương lai.
+
+### 6.5. Cập nhật Fixture và Bổ sung Test Cases
+- Bổ sung 7 test cases mới trong `backend/tests/test_premium_sandbox.py` (nâng tổng số non-integration tests lên **435 tests passed**).
+- Cập nhật toàn diện mock fixtures trong `frontend/auth-tests/premium-sandbox.spec.js` tuân thủ 100% hợp đồng kỹ thuật mới (**16/16 Playwright tests passed**).
