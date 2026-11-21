@@ -211,3 +211,65 @@ Theo chỉ đạo kiểm tra lần cuối từ ChatGPT và Owner, toàn bộ 4 y
   - **Playwright Admin & Premium:** **16 passed** (100%).
   - **Playwright Core Regression:** **64 passed** (100%).
   - **Tổng cộng kiểm thử UI:** **80/80 passed** trên toàn bộ các tệp test hợp lệ của worktree.
+
+---
+
+## 8. BẢN TINH CHỈNH CUỐI CÙNG & TRẢI NGHIỆM THANH TOÁN (TASK 5 FINAL UI POLISH & PAYMENT EXPERIENCE - REVISED)
+
+Nhận phản hồi và chỉ đạo bổ sung từ Owner, nhánh `feat/premium-sandbox-task5` đã hoàn tất bản tinh chỉnh trải nghiệm người dùng và an ninh thanh toán:
+
+### 8.1. Bảo vệ Tuyệt đối Header — Zero Modification
+- Giữ nguyên 100% nút "Mua Aura" trên Header: văn bản `"Mua Aura"` (VI) / `"Get Aura"` (EN), dải màu gradient RGB chuyển động mượt mà, vị trí, kích thước và hành vi điều hướng.
+- Bảo toàn toàn bộ trạng thái nút "Aura Plus" / "Aura Prime" ở Header khi đã có gói, hiệu ứng avatar glow Grandmaster / Challenger và tích xanh hội viên `.aura-member-badge`.
+
+### 8.2. Auth Guard cho Trang `/premium`
+- Cập nhật `frontend/src/main.jsx`: bổ sung `'/premium'` vào danh sách `protectedPage`.
+- Khi người dùng chưa đăng nhập (khách) truy cập trực tiếp vào `/premium`, hệ thống chuyển hướng ngay lập tức qua `safeReturnUrl` sang `/login?next=%2Fpremium`.
+- Sau khi đăng nhập thành công, tự động đưa người dùng quay lại `/premium` mà không bị lặp chuyển hướng.
+- Trong quá trình nạp phiên (`authState.status !== 'authenticated'`), trả về `null` chống chớp nháy (no flash of unauthenticated content).
+
+### 8.3. Chuẩn hóa Bảng giá theo Ngôn ngữ (Không trộn tiền tệ)
+- **Tiếng Việt (VI):** Hiển thị duy nhất tiền VND: `130.000 VNĐ` (Aura Plus) và `1.250.000 VNĐ` (Aura Prime).
+- **Tiếng Anh (EN):** Hiển thị duy nhất tiền USD: `$5` (Aura Plus) và `$50` (Aura Prime).
+- Loại bỏ hoàn toàn sự pha trộn định dạng tiền tệ như `130.000 đ ($5)` tại các thẻ radio chọn gói (`.u056-nm b`) và huy hiệu thời hạn (`.u056-badge`).
+- Backend `backend/app/premium.py` định dạng số tiền VND với dấu chấm chuẩn Việt Nam và hậu tố `VNĐ`: `f"{vnd_price:,.0f} VNĐ".replace(",", ".")`.
+
+### 8.4. Cân đối Chiều ngang & Bố cục 2 Cột Desktop
+- `.premium-layout`: Mở rộng cột phải lên `490px`, khoảng cách `gap: 56px;`, độ rộng tối đa `max-width: 1240px;`.
+- `.premium-selector-panel`: Tăng padding lên `36px 32px`, bo góc `28px`.
+- Khung nội dung `.u056`: Mở rộng lên `410px; max-width: 100%;` giúp nội dung thoáng đạt, không bị bóp nghẽn.
+- Responsive: Hỗ trợ mượt mà từ màn hình lớn (1440px), máy tính bảng (1024px/768px) đến điện thoại di động (375px), đảm bảo `scrollWidth <= innerWidth` không tràn ngang.
+
+### 8.5. Tinh giản Chú thích, Chuẩn hóa EXP & Nút Bấm CTA
+- Rút gọn dòng chú thích dưới nút CTA còn một câu súc tích: `"Không tự động gia hạn."` (EN: `"No automatic renewal."`).
+- Chuẩn hóa toàn bộ thuật ngữ `XP` sang `EXP`: `×2 EXP`, `×3 EXP`, `bonus EXP cho Level`, `Level EXP`, và đồng bộ tại thẻ `AuraPerksCard.jsx`.
+- Nút bấm CTA (`.u056-cta`):
+  - Gói Plus: VI `"Mua gói Plus"`, EN `"Buy Aura Plus"` (không kèm giá tiền).
+  - Gói Prime: VI `"Mua gói Prime"`, EN `"Buy Aura Prime"` (không kèm giá tiền).
+  - Chữ và biểu tượng hiển thị màu trắng rõ ràng (`#ffffff !important`), độ tương phản cao trên nền gradient tím ở mọi trạng thái hover/active/disabled.
+
+### 8.6. Tích hợp Lucian UX/UI Prompt #081 Payment Ring & Check
+- Bổ sung `frontend/src/payment-ring-081.css` và component `frontend/src/components/PaymentModal081.jsx` (giấy phép MIT Seokwoooo).
+- Trạng thái thanh toán theo máy trạng thái xác thực: `idle` → `creating_order` → `processing` → `pending_confirmation` → `confirmed` / `failed`.
+- Vòng tròn xoay tiến trình SVG (`.u081-progress.spinning`) quanh icon trung tâm.
+- Hiệu ứng nét vẽ tích xanh SVG (`dashoffset`) kèm biên nhận trượt lên dạng lò xo (`--u081-spring`) khi xác thực thành công.
+- Hộp thoại nêu rõ số tiền thanh toán thực tế (VND) bên cạnh giá niêm yết tham chiếu (USD).
+- Khóa nút chống click kép, hỗ trợ phím Escape, focus trap, và `prefers-reduced-motion`.
+
+### 8.7. Siết chặt Xác thực VNPAY IPN `txn_status == "00"`
+- Cập nhật `backend/app/premium.py`: yêu cầu nghiêm ngặt `txn_status == "00"`, không chấp nhận fallback `None`.
+- Bổ sung kiểm thử `test_vnpay_ipn_requires_strict_transaction_status_00` trong `backend/tests/test_premium_sandbox.py`.
+
+### 8.8. Bằng chứng Kiểm thử Tổng hợp (Verification Matrix)
+- **Backend Non-Integration Pytest:** **442 passed**, 787 deselected, 0 failed (34.99s).
+- **Frontend Unit Tests:** **78 passed**, 0 failed (1.23s).
+- **Frontend Production Build:** Vite build thành công 2.84s, 0 lỗi.
+- **Playwright Admin & Premium:** **17 passed**, 0 failed (1.0m).
+- **Ảnh chụp minh chứng đã cập nhật:**
+  - [task5_premium_desktop_dark.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_premium_desktop_dark.png): Giao diện `/premium` Desktop Dark mode (VI: 130.000 VNĐ / 1.250.000 VNĐ, EXP, Mua gói Plus/Prime).
+  - [task5_premium_desktop_light.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_premium_desktop_light.png): Giao diện `/premium` Desktop Light mode.
+  - [task5_premium_desktop_en.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_premium_desktop_en.png): Giao diện `/premium` Desktop Dark mode (EN: $5 / $50, Buy Aura Plus/Prime).
+  - [task5_premium_mobile_dark.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_premium_mobile_dark.png): Giao diện `/premium` Mobile Dark mode (375px) không tràn viền.
+  - [task5_premium_modal_dark.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_premium_modal_dark.png): Hộp thoại đơn hàng với giá VND thực tế và giá USD tham chiếu.
+  - [task5_premium_modal_confirmed_dark.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_premium_modal_confirmed_dark.png): Hộp thoại xác nhận hoàn tất kèm vòng xoay Lucian #081, tích xanh vẽ động và biên nhận giao dịch trượt lên.
+  - [task5_home_header_perks_dark.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_home_header_perks_dark.png): Trang chủ xác nhận Header nguyên vẹn ("Mua Aura", gradient, avatar, tích xanh).
