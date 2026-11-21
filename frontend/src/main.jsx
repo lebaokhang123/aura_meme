@@ -83,7 +83,7 @@ function App() {
   useEffect(()=>{if(!MOCK_AUTH&&screen&&page.path==='/login'&&new URLSearchParams(location.search).has('registered'))showDemoMessage(language==='en'?'Account created. Please sign in.':'Đăng ký thành công. Vui lòng đăng nhập.');},[screen]);
   useEffect(()=>{if(screen)prepareAuthForm();},[screen,language]);
   useEffect(()=>{if(!MOCK_AUTH&&authState.error)showDemoMessage(authMessage(authState.error,language));},[authState.error]);
-  const protectedPage=['/admin','/contact','/vault','/admin/contacts','/profile'].includes(page.path);
+  const protectedPage=['/admin','/contact','/vault','/admin/contacts','/profile','/premium'].includes(page.path);
   useEffect(()=>{if(!MOCK_AUTH&&protectedPage&&authState.status==='guest')location.replace(loginUrl());},[protectedPage,authState.status]);
   if(!MOCK_AUTH&&protectedPage&&authState.status!=='authenticated')return null;
   // Reveal the header and page together after the lazy content and CSS are ready.
