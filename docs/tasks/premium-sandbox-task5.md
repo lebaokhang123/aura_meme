@@ -173,3 +173,41 @@ Sau quá trình rà soát độc lập từ ChatGPT, nhánh `feat/premium-sandbo
 ### 6.5. Cập nhật Fixture và Bổ sung Test Cases
 - Bổ sung 7 test cases mới trong `backend/tests/test_premium_sandbox.py` (nâng tổng số non-integration tests lên **435 tests passed**).
 - Cập nhật toàn diện mock fixtures trong `frontend/auth-tests/premium-sandbox.spec.js` tuân thủ 100% hợp đồng kỹ thuật mới (**16/16 Playwright tests passed**).
+
+---
+
+## 7. VÒNG RÀ SOÁT CUỐI CÙNG TRƯỚC NGHIỆM THU (FINAL PRE-ACCEPTANCE VERIFICATION)
+
+Theo chỉ đạo kiểm tra lần cuối từ ChatGPT và Owner, toàn bộ 4 yêu cầu đã được hiện thực hóa và xác thực nghiêm ngặt:
+
+### 7.1. Return URL: Xóa bỏ hoàn toàn Database Writes & Xác thực Authoritative
+- Backend `handle_vnpay_return` được tinh giản về vai trò thuần kiểm tra chữ ký và chuyển hướng HTTP 302 Redirect. **Tuyệt đối không ghi đè database**, không thay đổi `order.status` và không cấp quyền subscription.
+- Bổ sung endpoint authoritative `GET /api/v1/premium/orders/{order_code}` cho phép tài khoản chủ sở hữu truy vấn trạng thái đơn hàng thời gian thực.
+- Frontend `PremiumPage.jsx` khi nhận `vnp_status=success` không còn hiển thị thông báo "Đã kích hoạt" vội vàng; chuyển sang trạng thái `"Đang xác nhận thanh toán..."`, đồng thời truy vấn kép `GET /orders/{order_code}` và `/premium/status`. Chỉ khi backend xác nhận `order.status === 'success'` và `subscription.is_active === true` mới hiển thị thành công. Nếu IPN chưa tới, hệ thống giữ trạng thái đang xác nhận và hẹn tự động cập nhật khi nhận tín hiệu từ ngân hàng.
+
+### 7.2. IPN Webhook: Đa tầng bảo vệ, Khóa dòng Concurrency & Chống Callback lặp
+- Xác thực chữ ký số HMAC-SHA512 qua `verify_response`.
+- Kiểm tra mã định danh merchant: `vnp_TmnCode == vnpay.tmn_code`. Trả về `{"RspCode": "97", "Message": "Invalid Merchant Code"}` nếu sai lệch.
+- Khóa dòng cấp cơ sở dữ liệu (`select(...).with_for_update()`) trong transaction chống race condition và callback đồng thời.
+- Rào chắn Provider: Bắt buộc `order.provider == 'vnpay_sandbox'`. Từ chối tuyệt đối việc dùng IPN VNPAY để kích hoạt đơn giả lập `sandbox_simulated` (`RspCode 99`).
+- Đối soát số tiền tuyệt đối: `vnp_Amount == order.amount_vnd * 100` (`RspCode 04`).
+- Chống callback lặp & bảo vệ trạng thái cuối: Đơn hàng đã ở trạng thái `success`, `failed`, hoặc `cancelled` sẽ được phản hồi `RspCode 02` và không thể bị đảo ngược trạng thái.
+- Xác thực trạng thái ngân hàng: Yêu cầu đồng thời `vnp_ResponseCode == "00"` và `vnp_TransactionStatus in {"00", None}` cùng mã giao dịch hợp lệ `vnp_TransactionNo != "0"`.
+
+### 7.3. Chính sách Giá & Quy tắc Làm tròn 10.000 VND
+- Bảng giá niêm yết bất biến: Plus `$5` (30 ngày), Prime `$50` (365 ngày).
+- Quy tắc làm tròn 10.000 VND được áp dụng thực tế trên `default_amount_vnd` và cấu hình hệ thống:
+  - Gói Plus: `130.000 đ` (làm tròn từ mức tham chiếu 125.000 đ lên bội số 10k gần nhất).
+  - Gói Prime: `1.250.000 đ` (đã là bội số của 10.000 đ).
+- DTO `PlanInfoDto` cung cấp trực tiếp `amount_vnd` và `amount_vnd_formatted`.
+- `PremiumPage.jsx` đọc bảng giá trực tiếp từ `/premium/status`, xóa bỏ hoàn toàn giá VND hardcode độc lập. Tiếng Việt ưu tiên hiển thị VND (`130.000 đ ($5)`), tiếng Anh hiển thị USD (`$5`). Cổng VNPAY giữ trạng thái fail-closed ("Chờ duyệt giá VND") khi chưa có văn bản phê duyệt của Owner.
+
+### 7.4. Kết quả Kiểm thử & Giải trình `rank-api.spec.js`
+- **Nguyên nhân mã thoát 1 trước đó:** File `auth-tests/rank-api.spec.js` không có mặt trong worktree `aura_meme_p2_task5` (file này được tạo riêng trên nhánh `feat/p2-social-mvp` tại commit `317d1f5`). Việc đưa đường dẫn tệp không tồn tại vào lệnh chạy Playwright khiến Playwright dừng lại với lỗi `No tests found` (exit code 1).
+- **Kết quả kiểm thử thực tế:**
+  - **Backend Non-Integration Pytest:** **441 passed**, 787 deselected, 0 failed (35.95s).
+  - **Frontend Unit Tests:** **78 passed**, 0 failed (1.16s).
+  - **Frontend Production Build:** Thành công trong 4.33s.
+  - **Playwright Admin & Premium:** **16 passed** (100%).
+  - **Playwright Core Regression:** **64 passed** (100%).
+  - **Tổng cộng kiểm thử UI:** **80/80 passed** trên toàn bộ các tệp test hợp lệ của worktree.
