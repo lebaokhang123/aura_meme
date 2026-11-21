@@ -23,7 +23,8 @@ def test_premium_plans_authoritative_pricing():
     assert plus.boost_multiplier == 2
     assert plus.amount_usd_cents == 500
     assert plus.amount_usd_formatted == "$5"
-    assert plus.default_amount_vnd == 125000
+    assert plus.default_amount_vnd == 130000
+    assert plus.default_amount_vnd % 10000 == 0
 
     prime = get_plan("prime")
     assert prime.tier == "prime"
@@ -33,6 +34,7 @@ def test_premium_plans_authoritative_pricing():
     assert prime.amount_usd_cents == 5000
     assert prime.amount_usd_formatted == "$50"
     assert prime.default_amount_vnd == 1250000
+    assert prime.default_amount_vnd % 10000 == 0
 
     with pytest.raises(ValueError, match="Invalid plan tier"):
         get_plan("unknown_plan")
@@ -186,18 +188,24 @@ def test_openapi_premium_endpoints():
     assert {"201", "401", "403"} <= set(orders_op["responses"])
     assert any(param["name"] == "X-CSRF-Token" for param in orders_op["parameters"])
 
-    # 3. POST /api/v1/premium/orders/{order_code}/simulate
+    # 3. GET /api/v1/premium/orders/{order_code}
+    get_order_op = paths["/api/v1/premium/orders/{order_code}"]["get"]
+    assert get_order_op["operationId"] == "getSubscriptionOrder"
+    assert get_order_op["security"] == [{"sessionCookie": []}]
+    assert {"200", "401", "404"} <= set(get_order_op["responses"])
+
+    # 4. POST /api/v1/premium/orders/{order_code}/simulate
     sim_op = paths["/api/v1/premium/orders/{order_code}/simulate"]["post"]
     assert sim_op["operationId"] == "simulateSubscriptionOrder"
     assert sim_op["security"] == [{"sessionCookie": []}]
     assert {"200", "401", "403", "404"} <= set(sim_op["responses"])
     assert any(param["name"] == "X-CSRF-Token" for param in sim_op["parameters"])
 
-    # 4. GET /api/v1/premium/vnpay-return
+    # 5. GET /api/v1/premium/vnpay-return
     ret_op = paths["/api/v1/premium/vnpay-return"]["get"]
     assert ret_op["operationId"] == "handleVnpayReturn"
 
-    # 5. GET /api/v1/premium/vnpay-ipn
+    # 6. GET /api/v1/premium/vnpay-ipn
     ipn_op = paths["/api/v1/premium/vnpay-ipn"]["get"]
     assert ipn_op["operationId"] == "handleVnpayIpn"
 
@@ -350,7 +358,8 @@ def test_create_order_schema_contract():
     assert order_dto_plus.duration_days == 30
     assert order_dto_plus.amount_usd_cents == 500
     assert order_dto_plus.amount_usd_formatted == "$5"
-    assert order_dto_plus.amount_vnd == 125000
+    assert order_dto_plus.amount_vnd == 130000
+    assert order_dto_plus.amount_vnd % 10000 == 0
     assert order_dto_plus.status == "pending"
 
     # Prime order
@@ -432,7 +441,7 @@ def test_vnpay_ipn_confirms_and_activates_subscription():
     mock_request.app.state.vnpay = adapter
 
     params = {
-        "vnp_Amount": "12500000",
+        "vnp_Amount": "13000000",
         "vnp_Command": "pay",
         "vnp_ResponseCode": "00",
         "vnp_TmnCode": "TMN",
@@ -453,7 +462,7 @@ def test_vnpay_ipn_confirms_and_activates_subscription():
         tier="plus",
         duration_days=30,
         amount_cents=500,
-        amount_vnd=125000,
+        amount_vnd=130000,
         currency="USD",
         status="pending",
         provider="vnpay_sandbox",
@@ -489,7 +498,7 @@ def test_vnpay_ipn_duplicate_callback_returns_rspcode_02():
     mock_request.app.state.vnpay = adapter
 
     params = {
-        "vnp_Amount": "12500000",
+        "vnp_Amount": "13000000",
         "vnp_Command": "pay",
         "vnp_ResponseCode": "00",
         "vnp_TmnCode": "TMN",
@@ -509,7 +518,7 @@ def test_vnpay_ipn_duplicate_callback_returns_rspcode_02():
         tier="plus",
         duration_days=30,
         amount_cents=500,
-        amount_vnd=125000,
+        amount_vnd=130000,
         currency="USD",
         status="success",  # Already processed!
         provider="vnpay_sandbox",
@@ -537,7 +546,7 @@ def test_vnpay_ipn_failure_marks_order_failed():
     mock_request.app.state.vnpay = adapter
 
     params = {
-        "vnp_Amount": "12500000",
+        "vnp_Amount": "13000000",
         "vnp_Command": "pay",
         "vnp_ResponseCode": "24",  # Customer cancelled
         "vnp_TmnCode": "TMN",
@@ -557,7 +566,7 @@ def test_vnpay_ipn_failure_marks_order_failed():
         tier="plus",
         duration_days=30,
         amount_cents=500,
-        amount_vnd=125000,
+        amount_vnd=130000,
         currency="USD",
         status="pending",
         provider="vnpay_sandbox",
@@ -568,8 +577,252 @@ def test_vnpay_ipn_failure_marks_order_failed():
 
     res = handle_vnpay_ipn(mock_request)
     assert res == {"RspCode": "00", "Message": "Confirm Success"}
-    assert order.status == "failed"
+    assert order.status == "cancelled"
     assert not mock_db.add.called
+
+
+def test_pricing_and_rounding_policy_on_actual_plans_and_orders():
+    """Verify 10,000 VND rounding policy on authoritative plans, status responses, and order creation."""
+    from app.premium_plans import PLANS, round_vnd_to_nearest_10k
+    from app.premium import get_plans_info
+
+    # 1. Authoritative plans adhere to 10k VND rounding
+    for tier, plan in PLANS.items():
+        assert plan.default_amount_vnd % 10000 == 0, f"Plan {tier} VND price must be divisible by 10,000"
+
+    # 2. Status response plans adhere to 10k VND rounding and include formatted string
+    mock_req = MagicMock()
+    mock_req.app.state.premium = None
+    plans_info = get_plans_info(mock_req)
+    for p in plans_info:
+        assert p.amount_vnd % 10000 == 0
+        assert p.amount_vnd_formatted.endswith(" đ")
+
+    # 3. Dynamic odd settings are strictly rounded to nearest 10,000
+    mock_settings = MagicMock()
+    mock_settings.vnpay_price_plus_vnd = 124999  # Should round down to 120,000
+    mock_settings.vnpay_price_prime_vnd = 127500  # Should round up to 130,000
+    mock_req.app.state.premium = mock_settings
+    plans_rounded = get_plans_info(mock_req)
+    plus_p = next(p for p in plans_rounded if p.tier == "plus")
+    prime_p = next(p for p in plans_rounded if p.tier == "prime")
+    assert plus_p.amount_vnd == 120000
+    assert prime_p.amount_vnd == 130000
+
+
+def test_vnpay_return_strictly_redirects_without_any_db_writes():
+    """Verify handle_vnpay_return performs ZERO writes and never mutates order status."""
+    import urllib.parse
+    from unittest.mock import MagicMock
+    from app.premium import handle_vnpay_return
+    from app.models import SubscriptionOrder
+
+    mock_request = MagicMock()
+    adapter = VnpayAdapter(tmn_code="TMN", hash_secret="SECRET", pricing_approved=True)
+    mock_request.app.state.vnpay = adapter
+
+    params = {
+        "vnp_Amount": "13000000",
+        "vnp_Command": "pay",
+        "vnp_ResponseCode": "00",
+        "vnp_TmnCode": "TMN",
+        "vnp_TransactionNo": "140001",
+        "vnp_TxnRef": "AM-ORD-RETURN-TEST",
+        "vnp_Version": "2.1.0",
+    }
+    parts = [f"{urllib.parse.quote_plus(k)}={urllib.parse.quote_plus(params[k])}" for k in sorted(params.keys())]
+    params["vnp_SecureHash"] = adapter.calculate_signature("&".join(parts))
+    mock_request.query_params = params
+
+    mock_db = MagicMock()
+    order = SubscriptionOrder(
+        id=uuid4(),
+        order_code="AM-ORD-RETURN-TEST",
+        user_id=uuid4(),
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",  # Status must remain pending!
+        provider="vnpay_sandbox",
+        created_at=datetime(2026, 11, 21, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    mock_db.scalar.return_value = order
+    mock_request.app.state.auth_session_factory.return_value.__enter__.return_value = mock_db
+
+    res = handle_vnpay_return(mock_request)
+    assert res.status_code == 302
+    assert "/premium?vnp_status=success&order_code=AM-ORD-RETURN-TEST" in res.headers["location"]
+    # Order status MUST NOT be changed by Return URL!
+    assert order.status == "pending"
+    assert not mock_db.flush.called
+
+
+def test_vnpay_ipn_rejects_simulated_order_provider():
+    """Verify handle_vnpay_ipn rejects simulated order provider with RspCode 99."""
+    import urllib.parse
+    from unittest.mock import MagicMock
+    from app.premium import handle_vnpay_ipn
+    from app.models import SubscriptionOrder
+
+    mock_request = MagicMock()
+    now = datetime(2026, 11, 21, 12, 0, 0, tzinfo=timezone.utc)
+    mock_request.app.state.auth.now.return_value = now
+    adapter = VnpayAdapter(tmn_code="TMN", hash_secret="SECRET", pricing_approved=True)
+    mock_request.app.state.vnpay = adapter
+
+    params = {
+        "vnp_Amount": "13000000",
+        "vnp_Command": "pay",
+        "vnp_ResponseCode": "00",
+        "vnp_TmnCode": "TMN",
+        "vnp_TransactionNo": "140001",
+        "vnp_TxnRef": "AM-SIM-PLUS-123",
+        "vnp_Version": "2.1.0",
+    }
+    parts = [f"{urllib.parse.quote_plus(k)}={urllib.parse.quote_plus(params[k])}" for k in sorted(params.keys())]
+    params["vnp_SecureHash"] = adapter.calculate_signature("&".join(parts))
+    mock_request.query_params = params
+
+    mock_db = MagicMock()
+    order = SubscriptionOrder(
+        id=uuid4(),
+        order_code="AM-SIM-PLUS-123",
+        user_id=uuid4(),
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",
+        provider="sandbox_simulated",  # Not a VNPAY order!
+        created_at=datetime(2026, 11, 21, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    mock_db.scalar.return_value = order
+    mock_request.app.state.auth_session_factory.return_value.__enter__.return_value = mock_db
+
+    res = handle_vnpay_ipn(mock_request)
+    assert res == {"RspCode": "99", "Message": "Invalid order provider"}
+    assert order.status == "pending"
+
+
+def test_vnpay_ipn_rejects_terminal_state_orders():
+    """Verify handle_vnpay_ipn rejects orders that are already failed or cancelled with RspCode 02."""
+    import urllib.parse
+    from unittest.mock import MagicMock
+    from app.premium import handle_vnpay_ipn
+    from app.models import SubscriptionOrder
+
+    mock_request = MagicMock()
+    now = datetime(2026, 11, 21, 12, 0, 0, tzinfo=timezone.utc)
+    mock_request.app.state.auth.now.return_value = now
+    adapter = VnpayAdapter(tmn_code="TMN", hash_secret="SECRET", pricing_approved=True)
+    mock_request.app.state.vnpay = adapter
+
+    params = {
+        "vnp_Amount": "13000000",
+        "vnp_Command": "pay",
+        "vnp_ResponseCode": "00",
+        "vnp_TmnCode": "TMN",
+        "vnp_TransactionNo": "140001",
+        "vnp_TxnRef": "AM-PLUS-TERMINAL",
+        "vnp_Version": "2.1.0",
+    }
+    parts = [f"{urllib.parse.quote_plus(k)}={urllib.parse.quote_plus(params[k])}" for k in sorted(params.keys())]
+    params["vnp_SecureHash"] = adapter.calculate_signature("&".join(parts))
+    mock_request.query_params = params
+
+    mock_db = MagicMock()
+    for terminal_status in ["failed", "cancelled", "expired"]:
+        order = SubscriptionOrder(
+            id=uuid4(),
+            order_code="AM-PLUS-TERMINAL",
+            user_id=uuid4(),
+            tier="plus",
+            duration_days=30,
+            amount_cents=500,
+            amount_vnd=130000,
+            currency="USD",
+            status=terminal_status,
+            provider="vnpay_sandbox",
+            created_at=datetime(2026, 11, 21, 10, 0, 0, tzinfo=timezone.utc),
+        )
+        mock_db.scalar.return_value = order
+        mock_request.app.state.auth_session_factory.return_value.__enter__.return_value = mock_db
+
+        res = handle_vnpay_ipn(mock_request)
+        assert res == {"RspCode": "02", "Message": "Order already processed"}
+        assert order.status == terminal_status
+
+
+def test_vnpay_ipn_merchant_code_validation():
+    """Verify handle_vnpay_ipn rejects mismatched vnp_TmnCode with RspCode 97."""
+    import urllib.parse
+    from unittest.mock import MagicMock
+    from app.premium import handle_vnpay_ipn
+
+    mock_request = MagicMock()
+    adapter = VnpayAdapter(tmn_code="CORRECT_TMN", hash_secret="SECRET", pricing_approved=True)
+    mock_request.app.state.vnpay = adapter
+
+    params = {
+        "vnp_Amount": "13000000",
+        "vnp_Command": "pay",
+        "vnp_ResponseCode": "00",
+        "vnp_TmnCode": "WRONG_TMN",
+        "vnp_TransactionNo": "140001",
+        "vnp_TxnRef": "AM-ORD-TMN-TEST",
+        "vnp_Version": "2.1.0",
+    }
+    parts = [f"{urllib.parse.quote_plus(k)}={urllib.parse.quote_plus(params[k])}" for k in sorted(params.keys())]
+    params["vnp_SecureHash"] = adapter.calculate_signature("&".join(parts))
+    mock_request.query_params = params
+
+    res = handle_vnpay_ipn(mock_request)
+    assert res == {"RspCode": "97", "Message": "Invalid Merchant Code"}
+
+
+def test_get_subscription_order_endpoint():
+    """Verify GET /orders/{order_code} returns order details for owner and raises 404 for non-owners."""
+    from unittest.mock import MagicMock
+    from app.premium import get_subscription_order
+    from app.security import AuthError
+    from app.models import SubscriptionOrder
+
+    user_id = uuid4()
+    mock_account = MagicMock()
+    mock_account.user.id = user_id
+
+    mock_db = MagicMock()
+    order = SubscriptionOrder(
+        id=uuid4(),
+        order_code="AM-ORD-GET-123",
+        user_id=user_id,
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",
+        provider="vnpay_sandbox",
+        created_at=datetime(2026, 11, 21, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    mock_db.scalar.return_value = order
+    mock_account.db = mock_db
+
+    dto = get_subscription_order("AM-ORD-GET-123", account=mock_account)
+    assert dto.order_code == "AM-ORD-GET-123"
+    assert dto.tier == "plus"
+    assert dto.amount_vnd == 130000
+    assert dto.amount_vnd % 10000 == 0
+
+    # Non-existent or non-owned order
+    mock_db.scalar.return_value = None
+    with pytest.raises(AuthError) as exc_info:
+        get_subscription_order("AM-UNKNOWN-999", account=mock_account)
+    assert exc_info.value.status == 404
+    assert exc_info.value.code == "NOT_FOUND"
 
 
 

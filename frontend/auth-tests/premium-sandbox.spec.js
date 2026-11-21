@@ -56,9 +56,39 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
         subscription: currentSubscription,
         vnpay_configured: vnpayApproved,
         plans: [
-          { id: 'plus', name: 'Aura Plus', days: 30, amount_usd_cents: 500, price_formatted: '$5' },
-          { id: 'prime', name: 'Aura Prime', days: 365, amount_usd_cents: 5000, price_formatted: '$50' },
+          {
+            tier: 'plus',
+            name: 'Aura Plus',
+            duration_days: 30,
+            boost_multiplier: 2,
+            amount_usd_formatted: '$5',
+            amount_vnd: 130000,
+            amount_vnd_formatted: '130.000 đ',
+          },
+          {
+            tier: 'prime',
+            name: 'Aura Prime',
+            duration_days: 365,
+            boost_multiplier: 3,
+            amount_usd_formatted: '$50',
+            amount_vnd: 1250000,
+            amount_vnd_formatted: '1.250.000 đ',
+          },
         ],
+      });
+    }
+
+    if (path.startsWith('/premium/orders/') && method === 'GET') {
+      const code = path.split('/')[3];
+      return send(200, {
+        order_code: code,
+        tier: currentSubscription?.tier || 'plus',
+        duration_days: currentSubscription?.tier === 'prime' ? 365 : 30,
+        amount_usd_cents: currentSubscription?.tier === 'prime' ? 5000 : 500,
+        amount_usd_formatted: currentSubscription?.tier === 'prime' ? '$50' : '$5',
+        amount_vnd: currentSubscription?.tier === 'prime' ? 1250000 : 130000,
+        status: currentSubscription ? 'success' : 'pending',
+        provider: 'vnpay_sandbox',
       });
     }
 
