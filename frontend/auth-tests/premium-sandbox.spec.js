@@ -210,81 +210,119 @@ test('Guest accessing /premium directly redirects to /login?next=%2Fpremium', as
   await expect(page).toHaveURL(/\/login\?next=%2Fpremium$/);
 });
 
-test('Logged in user can open Sandbox modal, simulate successful payment, and see active badge', async ({ page, context }) => {
+test('Logged in user can confirm order in modal, navigate to checkout, enter simulated card, and activate membership', async ({ page, context }) => {
   const s = await setupMockApi(context, 0, null, false);
   await page.goto('/premium');
 
   // Verify initial state: no active banner
   await expect(page.locator('.premium-active-banner')).toHaveCount(0);
 
-  // Click CTA to open sandbox dialog
+  // Click CTA to open order confirmation dialog
   const cta = page.locator('.u056-cta');
   await expect(cta).toBeVisible();
   await expect(cta).toContainText('Mua gói Plus');
   await cta.click();
 
-  // Verify dialog is open
+  // Verify dialog is open and centered
   const dialog = page.locator('.u081-dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('#u081-title')).toContainText('Xác nhận đơn hàng — Aura Plus');
   await expect(dialog.locator('.u081-price-primary')).toContainText('130.000 VNĐ');
+  await expect(dialog.locator('.u081-note')).toContainText('Hệ thống mô phỏng thanh toán');
 
-  // VNPAY should be disabled because pricing is not approved
-  const vnpayBtn = dialog.locator('.u081-btn-vnpay');
-  await expect(vnpayBtn).toBeDisabled();
-  await expect(vnpayBtn).toContainText('Chờ duyệt giá VND');
+  // Verify the 3 old simulation/vnpay buttons are removed
+  await expect(dialog.locator('.u081-btn-simulate')).toHaveCount(0);
+  await expect(dialog.locator('.u081-btn-fail')).toHaveCount(0);
+  await expect(dialog.locator('.u081-btn-vnpay')).toHaveCount(0);
 
-  // Click Simulate Instant Payment (Success)
-  const successBtn = dialog.locator('.u081-btn-simulate');
-  await successBtn.click();
+  // Click single primary CTA: Xác nhận thanh toán
+  const confirmBtn = dialog.locator('.u081-btn-confirm');
+  await expect(confirmBtn).toBeVisible();
+  await expect(confirmBtn).toContainText('Xác nhận thanh toán');
+  await confirmBtn.click();
 
-  // Verify receipt inside dialog
-  const receipt = dialog.locator('.u081-receipt');
+  // Verify navigation to dedicated checkout page
+  await expect(page).toHaveURL(/\/premium\/checkout\?order=AM-SUB-TEST-1234$/);
+
+  // Verify checkout page layout and transaction summary
+  await expect(page.locator('.checkout-header h1')).toContainText('Thanh toán Hội viên Aura');
+  await expect(page.locator('.checkout-order-summary')).toContainText('AM-SUB-TEST-1234');
+  await expect(page.locator('.checkout-order-summary')).toContainText('Aura Plus');
+  await expect(page.locator('.checkout-order-summary')).toContainText('130.000 VNĐ');
+
+  // Verify simulated card form fields
+  await expect(page.locator('#cardholder-name')).toHaveValue('NGUYEN VAN A');
+  await expect(page.locator('#card-number')).toHaveValue('4242 4242 4242 4242');
+  await expect(page.locator('#card-expiry')).toHaveValue('12/28');
+  await expect(page.locator('#card-cvv')).toHaveValue('123');
+
+  // Click Pay Now
+  const payBtn = page.locator('.checkout-btn-pay');
+  await expect(payBtn).toBeVisible();
+  await expect(payBtn).toContainText('Thanh toán');
+  await payBtn.click();
+
+  // Verify receipt appears on checkout page
+  const receipt = page.locator('.u081-receipt');
   await expect(receipt).toBeVisible();
   await expect(receipt).toContainText('BIÊN NHẬN GIAO DỊCH HỘI VIÊN');
+  await expect(receipt).toContainText('ĐÃ KÍCH HOẠT (ACTIVE)');
 
-  // Close dialog
-  await dialog.locator('.u081-btn-done').click();
-  await expect(dialog).not.toBeVisible();
+  // Verify network requests: NO card/CVV data in simulate payload!
+  const simReq = s.requests.find((r) => r.path.endsWith('/simulate') && r.method === 'POST');
+  expect(simReq).toBeDefined();
+  expect(simReq.csrf).toBe('server-csrf-test-token');
+  expect(simReq.body).toEqual({ action: 'pay_success' });
 
-  // Verify active banner is now visible on page
-  const banner = page.locator('.premium-active-banner');
-  await expect(banner).toBeVisible();
-  await expect(banner).toContainText('Gói đang kích hoạt: Aura PLUS');
-  await expect(banner).toContainText('30 ngày');
-
-  // Verify CTA now shows active plan status
-  await expect(cta).toContainText('Gói đang kích hoạt');
-
-  // Verify CSRF token accompanied the mutation
+  // Verify order creation request
   const orderReq = s.requests.find((r) => r.path === '/premium/orders' && r.method === 'POST');
   expect(orderReq).toBeDefined();
   expect(orderReq.csrf).toBe('server-csrf-test-token');
   expect(orderReq.body).toEqual({ plan_tier: 'plus', provider: 'sandbox_simulated' });
+
+  // Navigate back to /premium and verify active membership banner
+  await page.goto('/premium');
+  const banner = page.locator('.premium-active-banner');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('Gói đang kích hoạt: Aura PLUS');
+  await expect(banner).toContainText('30 ngày');
+  await expect(page.locator('.u056-cta')).toContainText('Gói đang kích hoạt');
 });
 
-test('Logged in user can simulate payment failure without corrupting state', async ({ page, context }) => {
+test('Simulated checkout form validates inputs and handles failure safely without card leakage', async ({ page, context }) => {
   const s = await setupMockApi(context, 0, null, false);
-  await page.goto('/premium');
+  await page.goto('/premium/checkout?order=AM-SUB-TEST-1234');
 
-  await page.locator('.u056-cta').click();
-  const dialog = page.locator('.u081-dialog');
-  await expect(dialog).toBeVisible();
+  // Clear card number and try to submit
+  await page.locator('#card-number').fill('');
+  await page.locator('.checkout-btn-pay').click();
 
-  // Click Simulate Failure
-  const failBtn = dialog.locator('.u081-btn-fail');
-  await failBtn.click();
+  // Verify validation error
+  await expect(page.locator('.checkout-field-error')).toBeVisible();
+  await expect(page.locator('.checkout-field-error')).toContainText('16 chữ số');
 
-  // Verify failure notice inside dialog
-  const alert = dialog.locator('.u081-error-banner');
-  await expect(alert).toBeVisible();
-  await expect(alert).toContainText('thất bại');
+  // Verify no simulate request was sent on validation error
+  expect(s.requests.some((r) => r.path.endsWith('/simulate'))).toBe(false);
 
-  // Close dialog
-  await dialog.locator('.u081-close-btn').click();
+  // Fill invalid expiry
+  await page.locator('#card-number').fill('4242 4242 4242 4242');
+  await page.locator('#card-expiry').fill('15/28');
+  await page.locator('.checkout-btn-pay').click();
+  await expect(page.locator('.checkout-field-error')).toContainText('MM/YY');
+
+  // Fill valid test card
+  await page.locator('.checkout-demo-pill').click();
+  await expect(page.locator('#card-number')).toHaveValue('4242 4242 4242 4242');
 
   // Active banner should still not exist
+  await page.goto('/premium');
   await expect(page.locator('.premium-active-banner')).toHaveCount(0);
+});
+
+test('Guest accessing /premium/checkout directly redirects to /login?next=%2Fpremium%2Fcheckout', async ({ page, context }) => {
+  await setupMockApi(context, null);
+  await page.goto('/premium/checkout?order=AM-SUB-TEST-1234');
+  await expect(page).toHaveURL(/\/login\?next=%2Fpremium%2Fcheckout%3Forder%3DAM-SUB-TEST-1234$/);
 });
 
 test('VNPAY return callback in URL updates subscription state and displays notice', async ({ page, context }) => {
