@@ -52,13 +52,14 @@ export default function PaymentModal081({
       });
 
       if (!orderRes?.order_code) {
-        throw new Error(t('Không thể tạo đơn hàng từ hệ thống.', 'Could not create order.'));
+        throw new Error(t('Không thể tạo đơn hàng. Vui lòng thử lại.', 'Could not create order. Please try again.'));
       }
 
       // Navigate to dedicated checkout page with order code
       window.location.assign(`/premium/checkout?order=${encodeURIComponent(orderRes.order_code)}`);
     } catch (err) {
-      setError(err.message || t('Khởi tạo đơn hàng không thành công.', 'Failed to initialize order.'));
+      console.error('[PaymentModal081] Order creation failed:', err);
+      setError(t('Không thể tạo đơn hàng. Vui lòng thử lại.', 'Could not create order. Please try again.'));
       setBusy(false);
     }
   }

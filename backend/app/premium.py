@@ -1,5 +1,6 @@
 """Premium sandbox membership and payment orders API."""
 from datetime import datetime, timedelta, timezone
+import logging
 import math
 from typing import Literal
 from uuid import UUID, uuid4
@@ -17,6 +18,8 @@ from app.permissions import require_account_csrf, require_authenticated_user
 from app.premium_plans import PLANS, PlanDefinition, get_plan, round_vnd_to_nearest_10k
 from app.security import AuthError
 from app.vnpay_adapter import VnpayAdapter, VnpayConfigurationError
+
+logger = logging.getLogger("aurameme.premium")
 
 router = APIRouter(prefix="/api/v1/premium", tags=["Premium Sandbox"])
 
@@ -228,12 +231,22 @@ def create_subscription_order(
         currency="USD",
         status="pending",
         provider=payload.provider,
+        provider_payload={},
         payment_url=payment_url,
         created_at=now,
         updated_at=now,
     )
-    account.db.add(order)
-    account.db.flush()
+    try:
+        account.db.add(order)
+        account.db.flush()
+    except Exception as exc:
+        logger.error(
+            "Failed to save subscription order '%s' for user '%s': %s",
+            order_code,
+            account.user.id,
+            exc,
+        )
+        raise
 
     return OrderDto(
         id=order.id,

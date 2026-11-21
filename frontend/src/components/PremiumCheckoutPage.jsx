@@ -68,8 +68,9 @@ export default function PremiumCheckoutPage() {
       })
       .catch((err) => {
         if (!mounted) return;
+        console.error('[PremiumCheckoutPage] Load order failed:', err);
         setLoadError(
-          err.message || t('Đơn hàng không tồn tại hoặc đã hết hiệu lực.', 'Order does not exist or has expired.')
+          t('Đơn hàng không tồn tại hoặc đã hết hiệu lực.', 'Order does not exist or has expired.')
         );
         setLoading(false);
       });
@@ -169,8 +170,9 @@ export default function PremiumCheckoutPage() {
         throw new Error(t('Máy chủ chưa thể xác nhận kích hoạt gói.', 'Server could not confirm activation.'));
       }
     } catch (err) {
+      console.error('[PremiumCheckoutPage] Payment simulation failed:', err);
       setCheckoutState('failed');
-      setCheckoutError(err.message || t('Thanh toán mô phỏng thất bại.', 'Simulated payment failed.'));
+      setCheckoutError(t('Thanh toán mô phỏng thất bại. Vui lòng thử lại.', 'Simulated payment failed. Please try again.'));
     }
   }
 
