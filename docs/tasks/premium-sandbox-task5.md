@@ -445,3 +445,105 @@ SELECT to_regclass('public.subscription_orders'), to_regclass('public.user_subsc
 - **Playwright Admin & Premium:** **20 passed** (100%), 0 failed (1.3m).
 
 
+
+---
+
+## 12. TÍCH HỢP PAYPAL SANDBOX & BẢN SẮC HỘI VIÊN CHÍNH THỨC (TASK 5 FINAL: PREMIUM IDENTITY & PAYPAL SANDBOX INTEGRATION)
+
+Nhận quyết định chính thức từ Owner về việc chuyển cổng thanh toán từ VNPAY sang **PayPal Sandbox** (do cổng đăng ký thử nghiệm VNPAY không khả dụng), nhánh `feat/premium-sandbox-task5` đã hoàn tất trọn vẹn cả 4 giai đoạn theo yêu cầu:
+
+### 12.1. Quyết định của Owner & Nguyên tắc Bất biến
+1. **PayPal Sandbox là cổng thanh toán chính thức** được tích hợp cho Task 5:
+   - Chuẩn REST API PayPal v2 Checkout Orders (`intent=CAPTURE`).
+   - Tuyệt đối không phát sinh tiền thật hay trừ thẻ tín dụng thật.
+2. **Bảo toàn cơ sở dữ liệu:**
+   - Không chạy migration, reset, drop hay seed trên `aurameme_demo`, `aurameme_dev` hay production DB.
+   - Dữ liệu demo và môi trường sản xuất được cách ly 100%.
+3. **Bảo toàn các phần đã được duyệt:**
+   - Nút "Mua Aura" trên Header, gradient RGB và hiệu ứng chuyển động giữ nguyên 100%.
+   - Không giảm thời hạn hay đảo lộn quyền lợi gói.
+
+### 12.2. Giai đoạn A: Bản sắc Thị giác & Nhận diện Hội viên Toàn diện
+1. **Hoán đổi Hiệu ứng & Icon (Swap Visual Motion & Icons):**
+   - **Aura Plus ($5 / 30 ngày):** Biểu tượng Kim Cương (`diamond`), hiệu ứng Grandmaster (Đại Cao Thủ) với ánh lửa rực rỡ và tông màu ấm áp (`#ef4444`, `#f97316`, `#eab308`).
+   - **Aura Prime ($50 / 365 ngày):** Biểu tượng Huy hiệu Cao Cấp (`workspace_premium`), hiệu ứng Challenger (Thách Đấu) với hào quang thiên thể đa tầng rạng ngời (`#f8fafc`, `#38bdf8`, `#06b6d4`, `#fbbf24`).
+2. **Đồng bộ Avatar Glow & Tích xanh Hội viên Xuyên suốt Ứng dụng:**
+   - Lớp bọc `.user-avatar-wrap` đồng bộ thống nhất tại:
+     - Header (`SiteShell.jsx`).
+     - Bài viết Bảng tin (`SocialPostCard.jsx`).
+     - Trang Khám phá Meme (`MemeCard.jsx`).
+     - Mục Bình luận (`CommentItem.jsx`).
+     - Trang Hồ sơ cá nhân (`ProfilePage.jsx`).
+   - Tích xanh `.aura-member-badge` gắn liền kề avatar với nhãn rõ ràng: "Hội viên Aura Plus" / "Hội viên Aura Prime", tránh nhầm lẫn với xác minh danh tính tài khoản.
+3. **Hiển thị Trạng thái Hội viên Công khai (Zero N+1 DB Queries):**
+   - Bổ sung trường `membership_tier: Optional[Literal["plus", "prime"]] = None` vào schema công khai của tác giả (`AuthorDto`).
+   - Tối ưu hóa truy vấn cơ sở dữ liệu bằng cách kết hợp quan hệ `subscriptions` có sẵn hoặc cache bộ nhớ, bảo đảm **zero N+1 queries** khi duyệt danh sách bài viết hay bình luận.
+
+### 12.3. Giai đoạn B: Tích hợp PayPal Sandbox Authoritative API
+1. **Adapter PayPal v2 Chuyên dụng (`backend/app/paypal_adapter.py`):**
+   - Quản lý OAuth2 token server-to-server tự động với bộ nhớ đệm (in-memory token caching).
+   - `create_order(amount_usd, order_code, return_url, cancel_url)`: Tạo order v2 trên `https://api-m.sandbox.paypal.com` với `intent=CAPTURE` và metadata `custom_id`.
+   - `capture_order(paypal_order_id)`: Gửi yêu cầu capture đơn hàng có thẩm quyền.
+   - `verify_webhook_signature(...)`: Xác thực chữ ký số webhook thông qua PayPal webhook verification endpoint.
+2. **Cấu hình Bảo mật (`backend/app/config.py`):**
+   - Khai báo các tham số `paypal_mode`, `paypal_client_id`, `paypal_client_secret`, `paypal_webhook_id`.
+   - **Quy tắc an toàn tuyệt đối:** Client Secret chỉ lưu trữ độc quyền ở backend; chỉ duy nhất Client ID và Mode (`sandbox`) được phép công khai tới frontend qua `GET /api/v1/premium/status`.
+3. **Luồng Thanh toán & Kích hoạt Thẩm quyền (`backend/app/premium.py`):**
+   - `POST /api/v1/premium/orders`: Tạo đơn hàng trạng thái `pending`, ghi nhận `provider: "paypal_sandbox"`, sinh URL điều hướng PayPal Checkout.
+   - `POST /api/v1/premium/orders/{order_code}/capture`: Endpoint xác nhận thanh toán an toàn, yêu cầu CSRF token và bắt buộc người gọi là chính chủ đơn hàng. Hỗ trợ cả PayPal capture thật từ Sandbox API và chế độ Sandbox Capture mô phỏng trên môi trường test.
+   - **Gia hạn Cộng dồn (Subscription Accumulation):** Nếu tài khoản đang có gói hội viên còn hiệu lực, thời hạn mới được cộng nối tiếp từ mốc `expires_at` hiện tại.
+   - Webhook `POST /api/v1/premium/paypal/webhook`: Lắng nghe sự kiện thanh toán từ PayPal và kích hoạt đơn idempotent.
+4. **Giao diện Checkout Hoàn thiện (`frontend/src/components/PremiumCheckoutPage.jsx`):**
+   - Bổ sung thẻ hành động **PayPal Sandbox** (`.paypal-action-card`) nổi bật:
+     - Nút chính: `"Thanh toán với PayPal Sandbox"` (`.checkout-btn-paypal`) với biểu tượng PayPal chính thức.
+     - Nút phụ tiện lợi: `"Mô phỏng duyệt PayPal Sandbox tức thì"` (`.checkout-btn-secondary`) giúp kiểm thử luồng capture trực tiếp không cần qua trang trung gian của PayPal.
+   - Vẫn duy trì biểu mẫu nhập thẻ thử nghiệm bên dưới nhằm phục vụ trọn vẹn các kịch bản kiểm thử tự động.
+
+### 12.4. Giai đoạn C: Ma trận Bằng chứng Kiểm thử Thực tế (Verification Matrix)
+1. **Backend Unit & Regression Pytest:**
+   ```powershell
+   cd backend
+   Remove-Item Env:AUTH_ENVIRONMENT -ErrorAction SilentlyContinue
+   Set-Item -Path Env:DATABASE_URL -Value "postgresql+psycopg://test:not-a-real-secret@127.0.0.1:1/test"
+   .\.venv\Scripts\python.exe -m pytest -m "not integration" -q
+   ```
+   - **Kết quả:** **443 passed**, 788 deselected, 0 failed (32.9s).
+   - Kiểm thử PayPal chuyên biệt (`tests/test_paypal_sandbox.py`): **4/4 passed** (100% pass).
+     - `test_paypal_adapter_create_and_capture_order`: Mock API PayPal Orders v2 hợp lệ.
+     - `test_paypal_order_creation_endpoint`: Xác thực endpoint `POST /premium/orders` với PayPal.
+     - `test_paypal_capture_endpoint_requires_ownership`: Xác thực bảo mật phân quyền chính chủ đơn.
+     - `test_paypal_webhook_idempotent_activation`: Xác thực webhook xử lý đơn trùng an toàn.
+2. **Frontend Unit Tests:**
+   ```powershell
+   node --test frontend/tests/*.test.mjs
+   ```
+   - **Kết quả:** **78/78 passed**, 0 failed (1.09s).
+3. **Frontend Production Build:**
+   ```powershell
+   cd frontend
+   npm.cmd run build
+   ```
+   - **Kết quả:** Vite 7.3.8 build thành công trong 3.33s với 0 lỗi cú pháp hay chunking.
+4. **Playwright Browser Automation Suites:**
+   - **Premium & PayPal Suite (`auth-tests/premium-sandbox.spec.js`):** **11/11 passed** (49.3s).
+   - **Core Regression Suites (`auth-tests/*.spec.js`):** **64/64 passed** (3.9m).
+     - `auth-tests/rank-api.spec.js`: 4 passed.
+     - `auth-tests/aura-api.spec.js`: 18 passed.
+     - `auth-tests/profile-fidelity.spec.js`: 9 passed.
+     - `auth-tests/profile-contact.spec.js`: 8 passed.
+     - `auth-tests/social-api.spec.js`: 25 passed.
+   - **Tổng cộng Playwright E2E:** **75/75 passed** (100% tỷ lệ thành công).
+
+### 12.5. Minh chứng Hình ảnh Đã Tạo (Artifact Screenshots)
+Toàn bộ ảnh chụp màn hình kiểm chứng đã được ghi nhận trong thư mục artifacts:
+1. **Bản sắc thị giác Plus:**
+   - [task5_identity_home_plus.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_home_plus.png): Trang chủ với avatar Plus glow ánh lửa Grandmaster, tích xanh và nút Header Plus.
+   - [task5_identity_profile_plus.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_profile_plus.png): Hồ sơ cá nhân với avatar Plus glow và thông tin hội viên.
+   - [task5_identity_premium_plus.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_premium_plus.png): Thẻ gói Plus với icon Kim Cương (`diamond`) và màu sắc Grandmaster.
+2. **Bản sắc thị giác Prime:**
+   - [task5_identity_home_prime.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_home_prime.png): Trang chủ với avatar Prime glow hào quang Challenger, tích xanh và nút Header Prime.
+   - [task5_identity_profile_prime.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_profile_prime.png): Hồ sơ cá nhân với avatar Prime glow và thông tin hội viên.
+   - [task5_identity_premium_prime.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_premium_prime.png): Thẻ gói Prime với icon Huy hiệu (`workspace_premium`) và hào quang Challenger.
+3. **Thanh toán PayPal Sandbox:**
+   - [task5_paypal_checkout_page.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_paypal_checkout_page.png): Trang thanh toán với thẻ hành động PayPal Sandbox chuyên biệt.
+   - [task5_paypal_receipt_success.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_paypal_receipt_success.png): Biên nhận kích hoạt thành công gói hội viên thông qua PayPal Sandbox capture.
