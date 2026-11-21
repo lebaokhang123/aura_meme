@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 TierCode = Literal["plus", "prime"]
-ProviderCode = Literal["sandbox_simulated", "vnpay_sandbox"]
+ProviderCode = Literal["sandbox_simulated", "vnpay_sandbox", "paypal_sandbox"]
 OrderStatus = Literal["pending", "success", "failed", "cancelled", "expired"]
 SubscriptionStatus = Literal["active", "expired", "cancelled"]
 

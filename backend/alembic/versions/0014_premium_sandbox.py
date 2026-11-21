@@ -35,7 +35,7 @@ def upgrade():
         sa.UniqueConstraint("order_code", name=op.f("uq_subscription_orders_order_code")),
         sa.CheckConstraint("tier IN ('plus', 'prime')", name=op.f("ck_subscription_orders_tier")),
         sa.CheckConstraint("status IN ('pending', 'success', 'failed', 'cancelled', 'expired')", name=op.f("ck_subscription_orders_status")),
-        sa.CheckConstraint("provider IN ('sandbox_simulated', 'vnpay_sandbox')", name=op.f("ck_subscription_orders_provider")),
+        sa.CheckConstraint("provider IN ('sandbox_simulated', 'vnpay_sandbox', 'paypal_sandbox')", name=op.f("ck_subscription_orders_provider")),
     )
     op.create_index("ix_subscription_orders_user_created", "subscription_orders", ["user_id", sa.text("created_at DESC")])
     op.create_index("ix_subscription_orders_order_code", "subscription_orders", ["order_code"], unique=True)

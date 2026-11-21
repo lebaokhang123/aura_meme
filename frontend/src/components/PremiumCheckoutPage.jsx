@@ -65,6 +65,12 @@ export default function PremiumCheckoutPage() {
           });
         }
         setLoading(false);
+
+        // If returned from PayPal approval with token, automatically capture
+        const token = params.get('token');
+        if (token && data.status === 'pending') {
+          executeCapture(token, data);
+        }
       })
       .catch((err) => {
         if (!mounted) return;
@@ -125,32 +131,36 @@ export default function PremiumCheckoutPage() {
     return Object.keys(errs).length === 0;
   }
 
-  async function handlePaymentSubmit(e) {
-    e.preventDefault();
+  async function executeCapture(paypalToken = null, targetOrder = null) {
+    const currentOrder = targetOrder || order;
+    if (!currentOrder) return;
     if (checkoutState === 'processing' || checkoutState === 'verifying') return;
-    if (!validateForm()) return;
 
     setCheckoutState('processing');
     setCheckoutError('');
-    setStatusText(t('Đang kết nối cổng mô phỏng...', 'Processing simulated payment...'));
+    setStatusText(t('Đang xử lý thanh toán PayPal Sandbox...', 'Processing PayPal Sandbox payment...'));
 
     try {
-      // Step 1: Simulated payment request
-      // ZERO card details, CVVs, or cardholder names are ever transmitted to the server
-      const simRes = await auth.write('POST', `/premium/orders/${order.order_code}/simulate`, {
-        action: 'pay_success',
-      });
-
-      if (!simRes || simRes.status !== 'success') {
-        throw new Error(t('Mô phỏng thanh toán không thành công.', 'Payment simulation failed.'));
+      let captureRes;
+      if (currentOrder.provider === 'paypal_sandbox') {
+        captureRes = await auth.write('POST', `/premium/orders/${currentOrder.order_code}/capture`, {
+          paypal_order_id: paypalToken || currentOrder.provider_txn_id || 'MOCK_SANDBOX_TOKEN',
+        });
+      } else {
+        captureRes = await auth.write('POST', `/premium/orders/${currentOrder.order_code}/simulate`, {
+          action: 'pay_success',
+        });
       }
 
-      // Step 2: Authoritative verification with backend status
+      if (!captureRes || captureRes.status !== 'success') {
+        throw new Error(t('Xác thực thanh toán không thành công.', 'Payment capture verification failed.'));
+      }
+
       setCheckoutState('verifying');
-      setStatusText(t('Đang xác thực giao dịch với máy chủ...', 'Verifying transaction with server...'));
+      setStatusText(t('Đang kích hoạt đặc quyền hội viên...', 'Activating membership perks...'));
 
       const [orderStatus, premiumStatus] = await Promise.all([
-        auth.read(`/premium/orders/${order.order_code}`).catch(() => null),
+        auth.read(`/premium/orders/${currentOrder.order_code}`).catch(() => null),
         auth.read('/premium/status').catch(() => null),
         refreshPremium(),
       ]);
@@ -158,11 +168,11 @@ export default function PremiumCheckoutPage() {
       if (premiumStatus?.subscription?.is_active && orderStatus?.status === 'success') {
         setCheckoutState('success');
         setReceipt({
-          orderCode: order.order_code,
-          tierName: order.tier === 'prime' ? 'Prime' : 'Plus',
-          amountVnd: `${Number(order.amount_vnd).toLocaleString('vi-VN')} VNĐ`,
-          amountUsd: order.amount_usd_formatted || (order.tier === 'prime' ? '$50' : '$5'),
-          durationDays: order.duration_days,
+          orderCode: currentOrder.order_code,
+          tierName: currentOrder.tier === 'prime' ? 'Prime' : 'Plus',
+          amountVnd: `${Number(currentOrder.amount_vnd).toLocaleString('vi-VN')} VNĐ`,
+          amountUsd: currentOrder.amount_usd_formatted || (currentOrder.tier === 'prime' ? '$50' : '$5'),
+          durationDays: currentOrder.duration_days,
           activatedAt: new Date().toLocaleString(language === 'en' ? 'en-US' : 'vi-VN'),
           status: 'ACTIVE',
         });
@@ -170,10 +180,17 @@ export default function PremiumCheckoutPage() {
         throw new Error(t('Máy chủ chưa thể xác nhận kích hoạt gói.', 'Server could not confirm activation.'));
       }
     } catch (err) {
-      console.error('[PremiumCheckoutPage] Payment simulation failed:', err);
+      console.error('[PremiumCheckoutPage] Capture failed:', err);
       setCheckoutState('failed');
-      setCheckoutError(t('Thanh toán mô phỏng thất bại. Vui lòng thử lại.', 'Simulated payment failed. Please try again.'));
+      setCheckoutError(t('Thanh toán thất bại. Vui lòng thử lại.', 'Payment failed. Please try again.'));
     }
+  }
+
+  async function handlePaymentSubmit(e) {
+    e.preventDefault();
+    if (checkoutState === 'processing' || checkoutState === 'verifying') return;
+    if (!validateForm()) return;
+    await executeCapture();
   }
 
   if (loading) {
@@ -283,12 +300,18 @@ export default function PremiumCheckoutPage() {
               </div>
               <div className="u081-summary-row">
                 <span className="u081-row-label">{t('Giá thanh toán thực tế', 'Actual Payment')}</span>
-                <strong className="u081-row-val u081-price-primary">{formattedVnd}</strong>
+                <strong className="u081-row-val u081-price-primary">
+                  {language === 'en'
+                    ? `${order.amount_usd_formatted || (order.tier === 'prime' ? '$50' : '$5')} USD`
+                    : formattedVnd}
+                </strong>
               </div>
               <div className="u081-summary-row">
-                <span className="u081-row-label">{t('Giá niêm yết tham chiếu', 'Reference Price')}</span>
+                <span className="u081-row-label">{t('Giá quy đổi tham chiếu', 'Reference Price')}</span>
                 <span className="u081-row-val">
-                  {order.amount_usd_formatted || (order.tier === 'prime' ? '$50' : '$5')} USD
+                  {language === 'en'
+                    ? formattedVnd
+                    : `${order.amount_usd_formatted || (order.tier === 'prime' ? '$50' : '$5')} USD`}
                 </span>
               </div>
               <div className="u081-summary-row">
@@ -305,17 +328,17 @@ export default function PremiumCheckoutPage() {
 
             <div className="u081-note">
               <span className="material-symbols-outlined" aria-hidden="true">info</span>
-              <span>{t('Hệ thống mô phỏng thanh toán', 'Simulated payment system')}</span>
+              <span>{t('Hệ thống PayPal Sandbox — Không thu tiền thật', 'PayPal Sandbox — No real money charged')}</span>
             </div>
           </section>
 
-          {/* Column 2: Simulated Card Form & Payment Ring Stage */}
+          {/* Column 2: PayPal Sandbox & Payment Ring Stage */}
           <section className="checkout-card checkout-payment-section" aria-labelledby="card-form-title">
             <div className="checkout-card-header">
               <span className="material-symbols-outlined checkout-card-icon" aria-hidden="true">
-                credit_card
+                payments
               </span>
-              <h2 id="card-form-title">{t('Thông tin thẻ thử nghiệm', 'Simulated Card Information')}</h2>
+              <h2 id="card-form-title">{t('Thanh toán PayPal Sandbox', 'PayPal Sandbox Payment')}</h2>
             </div>
 
             {/* Stage indicator for Lucian #081 Ring and Checkmark */}
@@ -402,6 +425,106 @@ export default function PremiumCheckoutPage() {
                   <span>{t('Trải nghiệm đặc quyền ngay', 'Experience Perks Now')}</span>
                 </a>
               </div>
+            )}
+
+            {/* PayPal Sandbox Primary Action and Card Input Form */}
+            {!isConfirmed && (
+              <>
+                <div
+                  className="paypal-action-card"
+                  style={{
+                    background: 'rgba(0, 112, 186, 0.08)',
+                    border: '1px solid rgba(0, 112, 186, 0.35)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    marginBottom: '20px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="material-symbols-outlined" style={{ color: '#0070ba', fontSize: '24px' }}>
+                        account_balance_wallet
+                      </span>
+                      <strong style={{ color: 'var(--am-on-surface)', fontSize: '16px' }}>PayPal Sandbox</strong>
+                    </div>
+                    <span style={{ fontSize: '11px', background: 'rgba(0, 112, 186, 0.2)', color: '#38bdf8', padding: '2px 8px', borderRadius: '999px', fontWeight: '600' }}>
+                      SANDBOX
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '13px', color: 'var(--am-on-surface-variant)', marginBottom: '14px', lineHeight: '1.4' }}>
+                    {t(
+                      'Thanh toán an toàn không dùng tiền thật qua PayPal Sandbox v2. Đăng nhập tài khoản cá nhân thử nghiệm để duyệt thanh toán.',
+                      'Secure checkout using PayPal Sandbox v2 without real charges. Log in with your sandbox buyer account to approve.'
+                    )}
+                  </p>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="checkout-btn-paypal"
+                      style={{
+                        flex: 1,
+                        background: 'linear-gradient(135deg, #0070ba 0%, #003087 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        fontWeight: '700',
+                        padding: '12px 18px',
+                        borderRadius: '10px',
+                        cursor: isSpinning ? 'not-allowed' : 'pointer',
+                        opacity: isSpinning ? 0.7 : 1,
+                      }}
+                      disabled={isSpinning}
+                      onClick={() => {
+                        if (order.payment_url && !order.payment_url.includes('token=MOCK-')) {
+                          window.location.assign(order.payment_url);
+                        } else {
+                          executeCapture();
+                        }
+                      }}
+                    >
+                      <span className="material-symbols-outlined">shopping_cart_checkout</span>
+                      <span>{t('Thanh toán với PayPal', 'Pay with PayPal')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="checkout-btn-secondary"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid var(--am-outline)',
+                        color: 'var(--am-on-surface)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        fontWeight: '600',
+                        fontSize: '13px',
+                        padding: '12px 16px',
+                        borderRadius: '10px',
+                        cursor: isSpinning ? 'not-allowed' : 'pointer',
+                      }}
+                      disabled={isSpinning}
+                      onClick={() => executeCapture()}
+                      title={t('Mô phỏng duyệt và capture đơn ngay lập tức', 'Simulate instant approval and capture')}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                        bolt
+                      </span>
+                      <span>{t('Duyệt Sandbox nhanh', 'Quick Sandbox Capture')}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '16px 0 16px' }}>
+                  <div style={{ flex: 1, height: '1px', background: 'var(--am-outline)' }} />
+                  <span style={{ fontSize: '12px', color: 'var(--am-on-surface-variant)' }}>
+                    {t('Hoặc điền thẻ thử nghiệm', 'Or use simulated test card')}
+                  </span>
+                  <div style={{ flex: 1, height: '1px', background: 'var(--am-outline)' }} />
+                </div>
+              </>
             )}
 
             {/* Card Input Form (Shown when idle or failed) */}

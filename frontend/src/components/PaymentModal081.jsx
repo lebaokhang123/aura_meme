@@ -48,7 +48,7 @@ export default function PaymentModal081({
     try {
       const orderRes = await auth.write('POST', '/premium/orders', {
         plan_tier: plan.id,
-        provider: 'sandbox_simulated',
+        provider: 'paypal_sandbox',
       });
 
       if (!orderRes?.order_code) {
@@ -129,7 +129,7 @@ export default function PaymentModal081({
         {/* Discreet note */}
         <div className="u081-note">
           <span className="material-symbols-outlined" aria-hidden="true">info</span>
-          <span>{t('Hệ thống mô phỏng thanh toán', 'Simulated payment system')}</span>
+          <span>{t('Hệ thống PayPal Sandbox — Không thu tiền thật', 'PayPal Sandbox — No real money charged')}</span>
         </div>
 
         {/* Single Primary Action Button */}

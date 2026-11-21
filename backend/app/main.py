@@ -34,6 +34,7 @@ from app.vault_runtime import router as vault_runtime_router
 from app.notifications import router as notifications_router
 from app.premium import router as premium_router
 from app.vnpay_adapter import VnpayAdapter
+from app.paypal_adapter import PaypalAdapter
 from app.security import AuthBoundaryMiddleware, AuthError, AuthRuntime
 
 
@@ -56,6 +57,15 @@ async def lifespan(app: FastAPI):
             payment_url=app.state.premium.vnpay_payment_url,
             return_url=app.state.premium.vnpay_return_url,
             pricing_approved=app.state.premium.vnpay_pricing_approved,
+        )
+        paypal_secret = app.state.premium.paypal_client_secret.get_secret_value() if app.state.premium.paypal_client_secret else None
+        app.state.paypal = PaypalAdapter(
+            client_id=app.state.premium.paypal_client_id,
+            client_secret=paypal_secret,
+            mode=app.state.premium.paypal_mode,
+            webhook_id=app.state.premium.paypal_webhook_id,
+            return_url=app.state.premium.paypal_return_url,
+            cancel_url=app.state.premium.paypal_cancel_url,
         )
         yield
     finally:

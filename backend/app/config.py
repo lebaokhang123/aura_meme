@@ -57,6 +57,12 @@ class PremiumSettings(BaseSettings):
     vnpay_price_plus_vnd: int = Field(default=130000, ge=1000)
     vnpay_price_prime_vnd: int = Field(default=1250000, ge=1000)
     vnpay_pricing_approved: bool = False
+    paypal_mode: Literal["sandbox", "live"] = "sandbox"
+    paypal_client_id: str | None = None
+    paypal_client_secret: SecretStr | None = None
+    paypal_webhook_id: str | None = None
+    paypal_return_url: str = "http://localhost:5173/premium/checkout"
+    paypal_cancel_url: str = "http://localhost:5173/premium"
 
 
 class AuthSettings(BaseSettings):

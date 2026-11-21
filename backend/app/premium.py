@@ -1,5 +1,6 @@
 """Premium sandbox membership and payment orders API."""
 from datetime import datetime, timedelta, timezone
+import json
 import logging
 import math
 from typing import Literal
@@ -18,6 +19,7 @@ from app.permissions import require_account_csrf, require_authenticated_user
 from app.premium_plans import PLANS, PlanDefinition, get_plan, round_vnd_to_nearest_10k
 from app.security import AuthError
 from app.vnpay_adapter import VnpayAdapter, VnpayConfigurationError
+from app.paypal_adapter import PaypalAdapter, PaypalError
 
 logger = logging.getLogger("aurameme.premium")
 
@@ -26,11 +28,16 @@ router = APIRouter(prefix="/api/v1/premium", tags=["Premium Sandbox"])
 
 class CreateOrderInput(BaseModel):
     plan_tier: Literal["plus", "prime"]
-    provider: Literal["sandbox_simulated", "vnpay_sandbox"] = "sandbox_simulated"
+    provider: Literal["sandbox_simulated", "vnpay_sandbox", "paypal_sandbox"] = "paypal_sandbox"
 
 
 class SimulateOrderInput(BaseModel):
     action: Literal["pay_success", "pay_fail", "cancel"]
+
+
+class CaptureOrderInput(BaseModel):
+    paypal_order_id: str | None = None
+    mock_fail: bool = False
 
 
 class OrderDto(BaseModel):
@@ -75,6 +82,9 @@ class PremiumStatusResponse(BaseModel):
     plans: list[PlanInfoDto]
     vnpay_configured: bool
     vnpay_pricing_approved: bool
+    paypal_configured: bool = False
+    paypal_client_id: str | None = None
+    paypal_mode: str = "sandbox"
     sandbox_notice: str
 
 
@@ -145,9 +155,13 @@ def get_premium_status(request: Request, raw=Depends(session_cookie)):
     now = request.app.state.auth.now()
     premium_settings = getattr(request.app.state, "premium", None)
     vnpay: VnpayAdapter | None = getattr(request.app.state, "vnpay", None)
+    paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
 
     vnpay_configured = bool(vnpay and vnpay.is_configured())
     vnpay_pricing_approved = bool(premium_settings and premium_settings.vnpay_pricing_approved)
+    paypal_configured = bool(paypal and paypal.is_configured())
+    paypal_client_id = paypal.get_client_id() if (paypal and paypal.is_configured()) else None
+    paypal_mode = getattr(paypal, "mode", "sandbox") if paypal else "sandbox"
 
     sub_dto = SubscriptionDto(tier="free", is_active=False, boost_multiplier=1)
 
@@ -169,6 +183,9 @@ def get_premium_status(request: Request, raw=Depends(session_cookie)):
         plans=get_plans_info(request),
         vnpay_configured=vnpay_configured,
         vnpay_pricing_approved=vnpay_pricing_approved,
+        paypal_configured=paypal_configured,
+        paypal_client_id=paypal_client_id,
+        paypal_mode=paypal_mode,
         sandbox_notice="Môi trường thử nghiệm Sandbox — Không thu tiền thật.",
     )
 
@@ -201,6 +218,8 @@ def create_subscription_order(
     amount_vnd = round_vnd_to_nearest_10k(amount_vnd)
 
     payment_url = None
+    provider_txn_id = None
+    provider_payload = {}
 
     if payload.provider == "vnpay_sandbox":
         if not vnpay or not vnpay.is_configured():
@@ -217,6 +236,27 @@ def create_subscription_order(
             ip_addr=request.client.host if request.client else "127.0.0.1",
             created_at=now,
         )
+    elif payload.provider == "paypal_sandbox":
+        paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
+        order_code = f"AM-PP-{plan.tier.upper()}-{uuid4().hex[:10].upper()}"
+        if paypal and paypal.is_configured():
+            try:
+                pp_order = paypal.create_order(
+                    order_code=order_code,
+                    plan_tier=plan.tier,
+                )
+                payment_url = pp_order.get("approve_url")
+                provider_txn_id = pp_order.get("id")
+                provider_payload = pp_order
+            except PaypalError as exc:
+                logger.error("Failed to create PayPal order: %s", exc)
+                raise AuthError(502, "PAYPAL_ERROR", f"Không thể tạo đơn hàng PayPal: {str(exc)}")
+        else:
+            # Sandbox simulated token when PayPal credentials are not yet configured in local test
+            mock_id = f"MOCK-PP-{uuid4().hex[:12].upper()}"
+            provider_txn_id = mock_id
+            payment_url = f"https://www.sandbox.paypal.com/checkoutnow?token={mock_id}"
+            provider_payload = {"mock": True, "id": mock_id}
     else:
         order_code = f"AM-SIM-{plan.tier.upper()}-{uuid4().hex[:10].upper()}"
 
@@ -231,7 +271,8 @@ def create_subscription_order(
         currency="USD",
         status="pending",
         provider=payload.provider,
-        provider_payload={},
+        provider_txn_id=provider_txn_id,
+        provider_payload=provider_payload,
         payment_url=payment_url,
         created_at=now,
         updated_at=now,
@@ -413,6 +454,160 @@ def simulate_subscription_order(
     )
 
 
+@router.post(
+    "/orders/{order_code}/capture",
+    response_model=OrderDto,
+    operation_id="captureSubscriptionOrder",
+    responses={**ERRORS, 404: {"model": ErrorResponse}},
+    openapi_extra=CSRF_HEADER,
+)
+def capture_subscription_order(
+    order_code: str,
+    request: Request,
+    payload: CaptureOrderInput | None = None,
+    account=Depends(require_account_csrf),
+):
+    now = request.app.state.auth.now()
+    order = account.db.scalar(
+        select(SubscriptionOrder).where(
+            SubscriptionOrder.order_code == order_code,
+            SubscriptionOrder.user_id == account.user.id,
+        )
+    )
+    if not order:
+        raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại hoặc không thuộc tài khoản của bạn.")
+
+    plan = get_plan(order.tier)
+
+    # Idempotent response if order is already resolved
+    if order.status == "success":
+        return OrderDto(
+            id=order.id,
+            order_code=order.order_code,
+            tier=order.tier,
+            duration_days=order.duration_days,
+            amount_usd_cents=order.amount_cents,
+            amount_usd_formatted=plan.amount_usd_formatted,
+            amount_vnd=order.amount_vnd,
+            currency=order.currency,
+            status=order.status,
+            provider=order.provider,
+            payment_url=order.payment_url,
+            created_at=order.created_at,
+            completed_at=order.completed_at,
+        )
+
+    if order.status in {"failed", "cancelled", "expired"}:
+        raise AuthError(400, "ORDER_FINALIZED", f"Đơn hàng đã kết thúc với trạng thái '{order.status}'. Không thể xử lý lại.")
+
+    paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
+
+    if order.provider == "paypal_sandbox":
+        pp_order_id = (payload.paypal_order_id if payload else None) or order.provider_txn_id
+        if not pp_order_id:
+            raise AuthError(400, "MISSING_PAYPAL_ID", "Thiếu mã định danh giao dịch PayPal (PayPal Order ID).")
+
+        if paypal and paypal.is_configured():
+            try:
+                capture_res = paypal.capture_order(pp_order_id, idempotency_key=order.order_code)
+            except PaypalError as exc:
+                logger.error("PayPal capture API call failed for order %s: %s", order.order_code, exc)
+                order.status = "failed"
+                order.completed_at = now
+                order.updated_at = now
+                account.db.flush()
+                raise AuthError(400, "CAPTURE_FAILED", f"Lỗi capture từ PayPal: {str(exc)}")
+
+            is_valid, reason = paypal.verify_capture(
+                capture_res,
+                expected_amount_cents=order.amount_cents,
+                expected_order_code=order.order_code,
+            )
+            if not is_valid:
+                logger.warning("PayPal capture verification failed for %s: %s", order.order_code, reason)
+                order.status = "failed"
+                order.provider_response_code = reason
+                order.provider_payload = capture_res
+                order.completed_at = now
+                order.updated_at = now
+                account.db.flush()
+                raise AuthError(400, "CAPTURE_INVALID", f"Xác thực thanh toán thất bại: {reason}")
+
+            cap_id = pp_order_id
+            try:
+                cap_id = capture_res["purchase_units"][0]["payments"]["captures"][0]["id"]
+            except Exception:
+                pass
+
+            order.provider_txn_id = cap_id
+            order.provider_payload = capture_res
+            order.provider_response_code = "COMPLETED"
+        else:
+            # Mock sandbox simulation mode
+            if payload and payload.mock_fail:
+                order.status = "failed"
+                order.completed_at = now
+                order.updated_at = now
+                account.db.flush()
+                raise AuthError(400, "PAYMENT_FAILED", "Mô phỏng thanh toán PayPal thất bại.")
+            order.provider_txn_id = f"SIM-PP-{uuid4().hex[:12].upper()}"
+            order.provider_payload = {"mock": True, "captured": True}
+            order.provider_response_code = "COMPLETED"
+
+    elif order.provider == "sandbox_simulated":
+        order.provider_txn_id = f"SIM-{uuid4().hex[:12].upper()}"
+        order.provider_response_code = "SUCCESS"
+    else:
+        raise AuthError(400, "INVALID_PROVIDER", f"Không hỗ trợ capture cho nhà cung cấp '{order.provider}'.")
+
+    # Authoritative activation / extension
+    order.status = "success"
+    order.completed_at = now
+    order.updated_at = now
+
+    sub = account.db.scalar(select(UserSubscription).where(UserSubscription.user_id == account.user.id))
+    if sub:
+        sub.tier = order.tier
+        sub.status = "active"
+        base_time = sub.expires_at if (sub.expires_at and sub.expires_at > now) else now
+        sub.expires_at = base_time + timedelta(days=order.duration_days)
+        if not sub.starts_at or sub.starts_at > now:
+            sub.starts_at = now
+        sub.order_id = order.id
+        sub.updated_at = now
+    else:
+        sub = UserSubscription(
+            id=uuid4(),
+            user_id=account.user.id,
+            tier=order.tier,
+            status="active",
+            starts_at=now,
+            expires_at=now + timedelta(days=order.duration_days),
+            order_id=order.id,
+            created_at=now,
+            updated_at=now,
+        )
+        account.db.add(sub)
+
+    account.db.flush()
+
+    return OrderDto(
+        id=order.id,
+        order_code=order.order_code,
+        tier=order.tier,
+        duration_days=order.duration_days,
+        amount_usd_cents=order.amount_cents,
+        amount_usd_formatted=plan.amount_usd_formatted,
+        amount_vnd=order.amount_vnd,
+        currency=order.currency,
+        status=order.status,
+        provider=order.provider,
+        payment_url=order.payment_url,
+        created_at=order.created_at,
+        completed_at=order.completed_at,
+    )
+
+
 @router.get("/vnpay-return", operation_id="handleVnpayReturn")
 def handle_vnpay_return(request: Request):
     """Handle VNPAY browser return callback.
@@ -550,3 +745,75 @@ def handle_vnpay_ipn(request: Request):
             order.status = "cancelled" if response_code == "24" else "failed"
             order.completed_at = now
             return {"RspCode": "00", "Message": "Confirm Success"}
+
+
+@router.post("/paypal/webhook", operation_id="handlePaypalWebhook")
+async def handle_paypal_webhook(request: Request):
+    """Handle PayPal webhook events (e.g. PAYMENT.CAPTURE.COMPLETED)."""
+    now = request.app.state.auth.now()
+    paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
+    raw_body = await request.body()
+    headers = dict(request.headers)
+
+    if paypal and paypal.is_configured() and paypal.webhook_id:
+        is_valid = paypal.verify_webhook_signature(headers, raw_body)
+        if not is_valid:
+            logger.warning("PayPal webhook signature verification failed.")
+            return {"status": "ignored", "reason": "invalid_signature"}
+
+    try:
+        event = json.loads(raw_body.decode("utf-8"))
+    except Exception:
+        return {"status": "error", "reason": "invalid_json"}
+
+    event_type = event.get("event_type")
+    resource = event.get("resource", {})
+
+    if event_type == "PAYMENT.CAPTURE.COMPLETED":
+        order_code = resource.get("custom_id") or resource.get("invoice_id")
+        if not order_code:
+            order_code = resource.get("supplementary_data", {}).get("related_ids", {}).get("order_id")
+
+        if order_code:
+            with request.app.state.auth_session_factory() as db, db.begin():
+                order = db.scalar(
+                    select(SubscriptionOrder)
+                    .where(
+                        (SubscriptionOrder.order_code == order_code)
+                        | (SubscriptionOrder.provider_txn_id == resource.get("id"))
+                    )
+                    .with_for_update()
+                )
+                if order and order.status != "success":
+                    order.status = "success"
+                    order.completed_at = now
+                    order.provider_txn_id = resource.get("id")
+                    order.provider_payload = resource
+                    order.updated_at = now
+
+                    sub = db.scalar(select(UserSubscription).where(UserSubscription.user_id == order.user_id))
+                    if sub:
+                        sub.tier = order.tier
+                        sub.status = "active"
+                        base_time = sub.expires_at if (sub.expires_at and sub.expires_at > now) else now
+                        sub.expires_at = base_time + timedelta(days=order.duration_days)
+                        if not sub.starts_at or sub.starts_at > now:
+                            sub.starts_at = now
+                        sub.order_id = order.id
+                        sub.updated_at = now
+                    else:
+                        sub = UserSubscription(
+                            id=uuid4(),
+                            user_id=order.user_id,
+                            tier=order.tier,
+                            status="active",
+                            starts_at=now,
+                            expires_at=now + timedelta(days=order.duration_days),
+                            order_id=order.id,
+                            created_at=now,
+                            updated_at=now,
+                        )
+                        db.add(sub)
+
+    return {"status": "received"}
+
