@@ -13,7 +13,7 @@ test.afterEach(({ page }) => {
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const now = '2026-11-14T00:00:00Z';
 
-async function setupMockApi(context, identity = 0, initialSub = null, vnpayApproved = false) {
+async function setupMockApi(context, identity = 0, initialSub = null, vnpayApproved = false, orderError = null) {
   const users = ['khang_dev', 'kien_dev', 'giga_user'].map((username, n) => ({
     id: id(n + 1),
     username,
@@ -93,6 +93,9 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
     }
 
     if (path === '/premium/orders' && method === 'POST') {
+      if (orderError) {
+        return fail(orderError.status || 500, orderError.code || 'INTERNAL_ERROR');
+      }
       if (request.headers()['x-csrf-token'] !== 'server-csrf-test-token') {
         return fail(403, 'CSRF_INVALID');
       }
@@ -439,5 +442,25 @@ test('Order confirmation modal displays single currency and centers across VI/EN
   await expect(dialog.locator('.u081-price-primary')).toContainText('1.250.000 VNĐ');
   expect(await dialog.locator('.u081-price-primary').innerText()).not.toMatch(/USD|\$/);
   await dialog.locator('.u081-close-btn').click();
+});
+
+test('Order creation error displays friendly message and never leaks INTERNAL_ERROR', async ({ page, context }) => {
+  await setupMockApi(context, 0, null, false, { status: 500, code: 'INTERNAL_ERROR' });
+
+  await page.goto('/premium');
+  await page.locator('.u056-cta').click();
+  const dialog = page.locator('.u081-dialog');
+  await expect(dialog).toBeVisible();
+
+  // Click confirm payment
+  const confirmBtn = dialog.locator('.u081-btn-confirm');
+  await confirmBtn.click();
+
+  // Verify friendly error is shown and raw INTERNAL_ERROR is never displayed
+  const errorAlert = dialog.locator('.u081-error-banner');
+  await expect(errorAlert).toBeVisible();
+  await expect(errorAlert).toContainText('Không thể tạo đơn hàng. Vui lòng thử lại.');
+  expect(await errorAlert.innerText()).not.toMatch(/INTERNAL_ERROR/);
+  await expect(confirmBtn).toBeEnabled();
 });
 

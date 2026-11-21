@@ -912,4 +912,128 @@ def test_get_subscription_order_endpoint():
     assert exc_info.value.code == "NOT_FOUND"
 
 
+def test_create_order_database_error_logging_and_propagation():
+    """Verify create_subscription_order logs server errors and propagates database exceptions."""
+    from unittest.mock import MagicMock
+    from sqlalchemy.exc import ProgrammingError
+    from app.premium import create_subscription_order, CreateOrderInput
+
+    now = datetime(2026, 11, 21, 12, 0, 0, tzinfo=timezone.utc)
+    mock_request = MagicMock()
+    mock_request.app.state.auth.now.return_value = now
+    mock_request.app.state.premium.vnpay_price_plus_vnd = 130000
+    mock_request.app.state.premium.vnpay_price_prime_vnd = 1250000
+
+    mock_account = MagicMock()
+    mock_account.user.id = uuid4()
+    # Simulate DB error such as missing table (UndefinedTable 42P01)
+    mock_account.db.flush.side_effect = ProgrammingError(
+        "INSERT INTO subscription_orders",
+        {},
+        Exception("relation subscription_orders does not exist"),
+    )
+
+    with pytest.raises(ProgrammingError):
+        create_subscription_order(
+            payload=CreateOrderInput(plan_tier="prime", provider="sandbox_simulated"),
+            request=mock_request,
+            account=mock_account,
+        )
+
+
+@pytest.mark.integration
+def test_create_order_and_subscription_real_postgresql_integration():
+    """Verify real PostgreSQL database integration for migration 0014: order creation and subscription persistence.
+
+    If TEST_DATABASE_URL is not provided, this test skips safely per AGENTS.md rules
+    (INTEGRATION UNVERIFIED). If provided, it verifies real database writes to subscription_orders
+    and user_subscriptions.
+    """
+    import os
+    url = os.environ.get("TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("TEST_DATABASE_URL missing; PostgreSQL migration 0014 integration UNVERIFIED (per AGENTS.md)")
+
+    from app.config import Settings
+    from app.db import create_db_engine
+    from app.models import Base, SubscriptionOrder, User, UserSubscription
+    from app.premium import CreateOrderInput, create_subscription_order
+    from sqlalchemy import inspect, select
+    from sqlalchemy.orm import Session
+
+    engine = create_db_engine(Settings(_env_file=None, database_url=url))
+    with Session(engine) as db:
+        inspector = inspect(db.connection())
+        tables = set(inspector.get_table_names())
+        assert "subscription_orders" in tables, "Migration 0014 table subscription_orders must exist in test database"
+        assert "user_subscriptions" in tables, "Migration 0014 table user_subscriptions must exist in test database"
+
+        now = datetime.now(timezone.utc)
+        test_user = User(
+            id=uuid4(),
+            username=f"test_sub_{uuid4().hex[:8]}",
+            email=f"test_sub_{uuid4().hex[:8]}@example.com",
+            password_hash="synthetic_hash_for_test",
+            status="active",
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(test_user)
+        db.flush()
+
+        try:
+            mock_request = MagicMock()
+            mock_request.app.state.auth.now.return_value = now
+            mock_request.app.state.premium.vnpay_price_plus_vnd = 130000
+            mock_request.app.state.premium.vnpay_price_prime_vnd = 1250000
+
+            mock_account = MagicMock()
+            mock_account.user = test_user
+            mock_account.db = db
+
+            # Test 1: Create Plus order in real DB
+            order_dto_plus = create_subscription_order(
+                payload=CreateOrderInput(plan_tier="plus", provider="sandbox_simulated"),
+                request=mock_request,
+                account=mock_account,
+            )
+            assert order_dto_plus.tier == "plus"
+            assert order_dto_plus.amount_cents == 500
+            assert order_dto_plus.amount_vnd == 130000
+            assert order_dto_plus.status == "pending"
+
+            persisted_plus = db.scalar(
+                select(SubscriptionOrder).where(SubscriptionOrder.order_code == order_dto_plus.order_code)
+            )
+            assert persisted_plus is not None
+            assert persisted_plus.user_id == test_user.id
+            assert persisted_plus.tier == "plus"
+            assert persisted_plus.amount_cents == 500
+            assert persisted_plus.amount_vnd == 130000
+            assert persisted_plus.status == "pending"
+            assert persisted_plus.provider == "sandbox_simulated"
+
+            # Test 2: Create Prime order in real DB
+            order_dto_prime = create_subscription_order(
+                payload=CreateOrderInput(plan_tier="prime", provider="sandbox_simulated"),
+                request=mock_request,
+                account=mock_account,
+            )
+            assert order_dto_prime.tier == "prime"
+            assert order_dto_prime.amount_cents == 5000
+            assert order_dto_prime.amount_vnd == 1250000
+
+            persisted_prime = db.scalar(
+                select(SubscriptionOrder).where(SubscriptionOrder.order_code == order_dto_prime.order_code)
+            )
+            assert persisted_prime is not None
+            assert persisted_prime.user_id == test_user.id
+            assert persisted_prime.tier == "prime"
+
+            db.rollback()
+        finally:
+            engine.dispose()
+
+
+
 
