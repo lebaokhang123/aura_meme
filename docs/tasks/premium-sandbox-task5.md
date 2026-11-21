@@ -273,3 +273,71 @@ Nhận phản hồi và chỉ đạo bổ sung từ Owner, nhánh `feat/premium-
   - [task5_premium_modal_dark.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_premium_modal_dark.png): Hộp thoại đơn hàng với giá VND thực tế và giá USD tham chiếu.
   - [task5_premium_modal_confirmed_dark.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_premium_modal_confirmed_dark.png): Hộp thoại xác nhận hoàn tất kèm vòng xoay Lucian #081, tích xanh vẽ động và biên nhận giao dịch trượt lên.
   - [task5_home_header_perks_dark.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_home_header_perks_dark.png): Trang chủ xác nhận Header nguyên vẹn ("Mua Aura", gradient, avatar, tích xanh).
+
+---
+
+## 9. HOÀN THIỆN LUỒNG THANH TOÁN & TRANG CHECKOUT THỬ NGHIỆM (TASK 5 CHECKOUT FLOW FINAL POLISH)
+
+Nhận chỉ đạo trực tiếp từ Owner sau khi kiểm tra giao diện Premium, hệ thống đã tinh chỉnh toàn diện trải nghiệm thanh toán:
+
+### 9.1. Căn chỉnh Hình học & Tinh gọn Hộp Xác nhận Đơn hàng
+- **Vị trí chuẩn xác:** Modal `<dialog className="u081-dialog">` nằm chính giữa viewport cả chiều dọc và chiều ngang (`position: fixed; inset: 0; margin: auto;`), `box-sizing: border-box`, `max-height: calc(100vh - 48px)`, hỗ trợ cuộn mượt mà trên mobile.
+- **Thẳng hàng & Cân đối:** Các mép trái/phải của tiêu đề, bảng tóm tắt 2 cột, dòng ghi chú và nút bấm được căn thẳng hàng tuyệt đối trong khung container padding 24px. Không bị lệch hay nhảy vị trí khi chuyển đổi qua lại giữa gói Plus và gói Prime.
+- **Bảng thông tin 2 cột:** Nhãn bên trái (`Gói hội viên`, `Số tiền thanh toán`, `Thời hạn sử dụng`, `Đặc quyền hệ số EXP`), giá trị bên phải rõ ràng.
+- **Xóa bỏ triệt để 3 nút mô phỏng cũ trong modal:** Loại bỏ hoàn toàn 3 nút:
+  1. `Thanh toán tức thì (Mô phỏng Sandbox)`
+  2. `Mô phỏng Thất bại / Hủy đơn`
+  3. `Cổng VNPAY Sandbox`
+- **Duy nhất một nút hành động chính:**
+  - VI: `"Xác nhận thanh toán"`
+  - EN: `"Confirm Payment"`
+  - Nền tím AuraMeme gradient, chữ trắng `#ffffff !important`, icon `arrow_forward`.
+  - Khi bấm: gọi `POST /premium/orders`, tạo đơn hàng `pending` trên server và điều hướng người dùng sang trang checkout riêng: `/premium/checkout?order=<order_code>`.
+
+### 9.2. Xây dựng Trang Checkout Mô phỏng Riêng (`/premium/checkout`)
+- **Route riêng biệt:** Bổ sung trang checkout độc lập tại `/premium/checkout` với `order=<order_code>`, bảo vệ bằng Auth Guard (yêu cầu đăng nhập, khách bị chuyển hướng về `/login?next=...`).
+- **Giao diện hiện đại đồng bộ:** Phong cách Cyberpunk Cultivation Stitch, hỗ trợ trọn vẹn cả Dark Mode và Light Mode.
+- **Hai khu vực chức năng rõ ràng (2-Column Desktop Grid, 1-Column Mobile):**
+  1. **Thông tin giao dịch:** Hiển thị dữ liệu xác thực từ backend qua `GET /premium/orders/{order_code}`: Tên gói, Mã đơn hàng, Thời hạn, Giá thanh toán thực tế VND (`130.000 VNĐ` / `1.250.000 VNĐ`), Giá niêm yết USD tham chiếu (`$5` / `$50`).
+  2. **Thông tin thẻ thử nghiệm:** Biểu mẫu nhập thông tin thẻ mô phỏng gồm:
+     - Tên trên thẻ (Tự động viết hoa).
+     - Số thẻ thử nghiệm (Định dạng tự động nhóm 4 số `•••• •••• •••• ••••`, giới hạn 16 số).
+     - Ngày hết hạn (Định dạng `MM/YY`, kiểm tra tháng 01-12).
+     - Mã CVV (3 chữ số).
+     - Nút trợ giúp điền mẫu thẻ thử nghiệm (`4242 · 12/28 · 123`) tiện lợi cho quá trình test.
+- **Ghi chú chuẩn hóa:**
+  - VI: `"Hệ thống mô phỏng thanh toán"`
+  - EN: `"Simulated payment system"`
+- **Nút hành động chính:**
+  - VI: `"Thanh toán"`
+  - EN: `"Pay Now"`
+  - Nền tím AuraMeme, chữ trắng `#ffffff !important`, icon ổ khóa an toàn.
+  - Có liên kết nhỏ `"Quay lại gói hội viên"` dẫn về `/premium`.
+
+### 9.3. An toàn Dữ liệu & Bảo mật Tuyệt đối
+- **Zero Card Data Leakage:** Dữ liệu thẻ và CVV chỉ tồn tại tạm thời trong state của form trên trình duyệt phục vụ mô phỏng trải nghiệm. **Tuyệt đối không gửi bất kỳ số thẻ, CVV hay tên thẻ nào lên backend**, không ghi log, không lưu vào `localStorage`, `sessionStorage` hay cơ sở dữ liệu.
+- **Xác thực Authoritative Backend:** Quá trình thanh toán gọi `POST /premium/orders/{order_code}/simulate` (chỉ gửi `{ action: 'pay_success' }` kèm CSRF token), chỉ thực thi trên môi trường development/sandbox được phép (production từ chối 403 Forbidden).
+- **Chống đơn trùng & Cấp trùng:** Refresh trang không tạo đơn mới (trang chỉ đọc `GET /orders/{order_code}`). Đơn đã thanh toán thành công sẽ hiển thị ngay biên nhận mà không thực hiện thanh toán lại.
+
+### 9.4. Tận dụng Mẫu Lucian UX/UI Prompt #081 trên Trang Checkout
+- **Trạng thái Processing / Verifying:** Nút kích hoạt vòng tròn xoay tiến trình SVG (`.u081-progress.spinning`), trạng thái đang xử lý.
+- **Trạng thái Thành công:** Vòng chuyển sang màu xanh lá, nét vẽ tích xanh động (`dashoffset`) được hoàn tất.
+- **Biên nhận Slide-up:** Bảng biên nhận giao dịch (`.u081-receipt`) trượt lên từ dưới dạng lò xo mượt mà, hiển thị đầy đủ mã đơn, gói, số tiền, ngày giờ và huy hiệu `ĐÃ KÍCH HOẠT (ACTIVE)`.
+- **Cập nhật Toàn diện:** Gọi `refreshPremium()` kích hoạt cập nhật ngay lập tức nút Header, avatar glow, tích xanh hội viên và thẻ AURA PERKS ở trang chủ.
+
+### 9.5. Ma trận Bằng chứng Kiểm thử (Verification Matrix)
+- **Frontend Unit Tests:** `node --test frontend/tests/*.test.mjs` — **78 passed**, 0 failed.
+- **Frontend Production Build:** `npm.cmd run build` — Vite build thành công trong 2.54s, 0 lỗi.
+- **Backend Non-Integration Pytest:** `pytest -m "not integration" -q` — **442 passed**, 0 failed (31.20s).
+- **Playwright Test Suite:** `playwright test auth-tests/premium-sandbox.spec.js auth-tests/admin-premium.spec.js` — **18 passed**, 0 failed (55.0s).
+  - Test 14: Logged in user can confirm order in modal, navigate to checkout, enter simulated card, and activate membership (PASS).
+  - Test 15: Simulated checkout form validates inputs and handles failure safely without card leakage (PASS).
+  - Test 16: Guest accessing /premium/checkout directly redirects to login (PASS).
+
+#### Minh chứng Ảnh chụp Giao diện Checkout Thực tế:
+- [task5_modal_confirm_plus.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_modal_confirm_plus.png): Hộp thoại xác nhận gói Plus căn giữa cân xứng, bảng 2 cột, 1 nút CTA "Xác nhận thanh toán".
+- [task5_modal_confirm_prime.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_modal_confirm_prime.png): Hộp thoại xác nhận gói Prime căn giữa cân xứng, giá 1.250.000 VNĐ.
+- [task5_checkout_form.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_form.png): Trang `/premium/checkout` Desktop Dark mode: Thông tin giao dịch & Form thẻ thử nghiệm.
+- [task5_checkout_processing.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_processing.png): Trạng thái xử lý thanh toán với vòng quay Lucian #081.
+- [task5_checkout_receipt_success.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_receipt_success.png): Trạng thái thanh toán thành công: Tích xanh vẽ động, biên nhận slide-up và nút "Trải nghiệm đặc quyền ngay".
+- [task5_checkout_mobile.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_mobile.png): Trang checkout hiển thị trên điện thoại (375px) không tràn viền ngang.
