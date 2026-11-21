@@ -444,6 +444,7 @@ def test_vnpay_ipn_confirms_and_activates_subscription():
         "vnp_Amount": "13000000",
         "vnp_Command": "pay",
         "vnp_ResponseCode": "00",
+        "vnp_TransactionStatus": "00",
         "vnp_TmnCode": "TMN",
         "vnp_TransactionNo": "140001",
         "vnp_TxnRef": "AM-ORD-123",
@@ -501,6 +502,7 @@ def test_vnpay_ipn_duplicate_callback_returns_rspcode_02():
         "vnp_Amount": "13000000",
         "vnp_Command": "pay",
         "vnp_ResponseCode": "00",
+        "vnp_TransactionStatus": "00",
         "vnp_TmnCode": "TMN",
         "vnp_TransactionNo": "140001",
         "vnp_TxnRef": "AM-ORD-123",
@@ -581,6 +583,91 @@ def test_vnpay_ipn_failure_marks_order_failed():
     assert not mock_db.add.called
 
 
+def test_vnpay_ipn_requires_strict_transaction_status_00():
+    """Verify handle_vnpay_ipn strictly requires vnp_TransactionStatus == '00'."""
+    import urllib.parse
+    from unittest.mock import MagicMock
+    from app.premium import handle_vnpay_ipn
+    from app.models import SubscriptionOrder
+
+    now = datetime(2026, 11, 21, 12, 0, 0, tzinfo=timezone.utc)
+    mock_request = MagicMock()
+    mock_request.app.state.auth.now.return_value = now
+    adapter = VnpayAdapter(tmn_code="TMN", hash_secret="SECRET", pricing_approved=True)
+    mock_request.app.state.vnpay = adapter
+
+    # Case A: Missing vnp_TransactionStatus
+    params_missing = {
+        "vnp_Amount": "13000000",
+        "vnp_Command": "pay",
+        "vnp_ResponseCode": "00",
+        "vnp_TmnCode": "TMN",
+        "vnp_TransactionNo": "140001",
+        "vnp_TxnRef": "AM-ORD-MISSING-STATUS",
+        "vnp_Version": "2.1.0",
+    }
+    parts = [f"{urllib.parse.quote_plus(k)}={urllib.parse.quote_plus(params_missing[k])}" for k in sorted(params_missing.keys())]
+    params_missing["vnp_SecureHash"] = adapter.calculate_signature("&".join(parts))
+    mock_request.query_params = params_missing
+
+    mock_db = MagicMock()
+    order_a = SubscriptionOrder(
+        id=uuid4(),
+        order_code="AM-ORD-MISSING-STATUS",
+        user_id=uuid4(),
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",
+        provider="vnpay_sandbox",
+        created_at=datetime(2026, 11, 21, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    mock_db.scalar.return_value = order_a
+    mock_request.app.state.auth_session_factory.return_value.__enter__.return_value = mock_db
+
+    res_a = handle_vnpay_ipn(mock_request)
+    assert res_a == {"RspCode": "00", "Message": "Confirm Success"}
+    # Must NOT become success
+    assert order_a.status != "success"
+    assert order_a.status == "failed"
+
+    # Case B: Invalid vnp_TransactionStatus == "02" (failed)
+    params_invalid = {
+        "vnp_Amount": "13000000",
+        "vnp_Command": "pay",
+        "vnp_ResponseCode": "00",
+        "vnp_TransactionStatus": "02",
+        "vnp_TmnCode": "TMN",
+        "vnp_TransactionNo": "140001",
+        "vnp_TxnRef": "AM-ORD-INVALID-STATUS",
+        "vnp_Version": "2.1.0",
+    }
+    parts_b = [f"{urllib.parse.quote_plus(k)}={urllib.parse.quote_plus(params_invalid[k])}" for k in sorted(params_invalid.keys())]
+    params_invalid["vnp_SecureHash"] = adapter.calculate_signature("&".join(parts_b))
+    mock_request.query_params = params_invalid
+
+    order_b = SubscriptionOrder(
+        id=uuid4(),
+        order_code="AM-ORD-INVALID-STATUS",
+        user_id=uuid4(),
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",
+        provider="vnpay_sandbox",
+        created_at=datetime(2026, 11, 21, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    mock_db.scalar.return_value = order_b
+    res_b = handle_vnpay_ipn(mock_request)
+    assert res_b == {"RspCode": "00", "Message": "Confirm Success"}
+    assert order_b.status != "success"
+    assert order_b.status == "failed"
+
+
 def test_pricing_and_rounding_policy_on_actual_plans_and_orders():
     """Verify 10,000 VND rounding policy on authoritative plans, status responses, and order creation."""
     from app.premium_plans import PLANS, round_vnd_to_nearest_10k
@@ -596,7 +683,7 @@ def test_pricing_and_rounding_policy_on_actual_plans_and_orders():
     plans_info = get_plans_info(mock_req)
     for p in plans_info:
         assert p.amount_vnd % 10000 == 0
-        assert p.amount_vnd_formatted.endswith(" đ")
+        assert p.amount_vnd_formatted.endswith(" VNĐ")
 
     # 3. Dynamic odd settings are strictly rounded to nearest 10,000
     mock_settings = MagicMock()

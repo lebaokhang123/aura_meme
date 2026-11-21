@@ -117,7 +117,7 @@ def get_plans_info(request: Request) -> list[PlanInfoDto]:
             elif plan.tier == "prime":
                 vnd_price = premium_settings.vnpay_price_prime_vnd
         vnd_price = round_vnd_to_nearest_10k(vnd_price)
-        formatted_vnd = f"{vnd_price:,.0f} đ".replace(",", ".")
+        formatted_vnd = f"{vnd_price:,.0f} VNĐ".replace(",", ".")
         result.append(
             PlanInfoDto(
                 tier=plan.tier,
@@ -501,7 +501,7 @@ def handle_vnpay_ipn(request: Request):
 
         is_success = (
             response_code == "00"
-            and txn_status in {"00", None}
+            and txn_status == "00"
             and bool(txn_no)
             and txn_no != "0"
         )
