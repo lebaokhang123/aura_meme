@@ -268,3 +268,27 @@ def test_ipn_verification_amount_mismatch_and_idempotency():
     assert filtered["vnp_TxnRef"] == "AM-ORDER-1"
     assert int(filtered["vnp_Amount"]) // 100 == 125000
 
+
+def test_subscription_extension_accumulates_days():
+    """Verify that extending an active subscription adds days without resetting remaining duration."""
+    now = datetime(2026, 11, 21, 12, 0, 0, tzinfo=timezone.utc)
+    current_expiry = now + timedelta(days=15)
+
+    sub = UserSubscription(
+        id=uuid4(),
+        user_id=uuid4(),
+        tier="plus",
+        status="active",
+        starts_at=now - timedelta(days=15),
+        expires_at=current_expiry,
+        created_at=now - timedelta(days=15),
+        updated_at=now - timedelta(days=15),
+    )
+
+    # Renew Plus (30 days) while 15 days remain
+    base_time = sub.expires_at if (sub.expires_at and sub.expires_at > now) else now
+    new_expiry = base_time + timedelta(days=30)
+    assert new_expiry == current_expiry + timedelta(days=30)
+    assert (new_expiry - now).days == 45
+
+

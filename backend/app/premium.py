@@ -260,6 +260,10 @@ def simulate_subscription_order(
     request: Request,
     account=Depends(require_account_csrf),
 ):
+    settings = getattr(request.app.state, "settings", None)
+    if settings and getattr(settings, "ENVIRONMENT", "").lower() == "production":
+        raise AuthError(403, "FORBIDDEN", "Môi trường giả lập (simulate) bị vô hiệu hóa trên môi trường production.")
+
     now = request.app.state.auth.now()
     order = account.db.scalar(
         select(SubscriptionOrder).where(
@@ -296,13 +300,15 @@ def simulate_subscription_order(
         order.provider_txn_id = f"SIM-{uuid4().hex[:12].upper()}"
         order.updated_at = now
 
-        # Activate membership idempotently
+        # Activate or extend membership idempotently without losing remaining days
         sub = account.db.scalar(select(UserSubscription).where(UserSubscription.user_id == account.user.id))
         if sub:
             sub.tier = order.tier
             sub.status = "active"
-            sub.starts_at = now
-            sub.expires_at = now + timedelta(days=order.duration_days)
+            base_time = sub.expires_at if (sub.expires_at and sub.expires_at > now) else now
+            sub.expires_at = base_time + timedelta(days=order.duration_days)
+            if not sub.starts_at or sub.starts_at > now:
+                sub.starts_at = now
             sub.order_id = order.id
             sub.updated_at = now
         else:
@@ -472,8 +478,10 @@ def handle_vnpay_ipn(request: Request):
             if sub:
                 sub.tier = order.tier
                 sub.status = "active"
-                sub.starts_at = now
-                sub.expires_at = now + timedelta(days=order.duration_days)
+                base_time = sub.expires_at if (sub.expires_at and sub.expires_at > now) else now
+                sub.expires_at = base_time + timedelta(days=order.duration_days)
+                if not sub.starts_at or sub.starts_at > now:
+                    sub.starts_at = now
                 sub.order_id = order.id
                 sub.updated_at = now
             else:
