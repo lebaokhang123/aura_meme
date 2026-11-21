@@ -54,7 +54,7 @@ class PremiumSettings(BaseSettings):
     vnpay_hash_secret: SecretStr | None = None
     vnpay_payment_url: str = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
     vnpay_return_url: str = "http://127.0.0.1:5173/premium"
-    vnpay_price_plus_vnd: int = Field(default=125000, ge=1000)
+    vnpay_price_plus_vnd: int = Field(default=130000, ge=1000)
     vnpay_price_prime_vnd: int = Field(default=1250000, ge=1000)
     vnpay_pricing_approved: bool = False
 

@@ -14,7 +14,7 @@ from app.auth import CSRF_HEADER, ERRORS, current_session, session_cookie
 from app.auth_schemas import ErrorResponse
 from app.models import SubscriptionOrder, User, UserSubscription
 from app.permissions import require_account_csrf, require_authenticated_user
-from app.premium_plans import PLANS, PlanDefinition, get_plan
+from app.premium_plans import PLANS, PlanDefinition, get_plan, round_vnd_to_nearest_10k
 from app.security import AuthError
 from app.vnpay_adapter import VnpayAdapter, VnpayConfigurationError
 
@@ -64,6 +64,7 @@ class PlanInfoDto(BaseModel):
     boost_multiplier: int
     amount_usd_formatted: str
     amount_vnd: int
+    amount_vnd_formatted: str
 
 
 class PremiumStatusResponse(BaseModel):
@@ -115,6 +116,8 @@ def get_plans_info(request: Request) -> list[PlanInfoDto]:
                 vnd_price = premium_settings.vnpay_price_plus_vnd
             elif plan.tier == "prime":
                 vnd_price = premium_settings.vnpay_price_prime_vnd
+        vnd_price = round_vnd_to_nearest_10k(vnd_price)
+        formatted_vnd = f"{vnd_price:,.0f} đ".replace(",", ".")
         result.append(
             PlanInfoDto(
                 tier=plan.tier,
@@ -123,6 +126,7 @@ def get_plans_info(request: Request) -> list[PlanInfoDto]:
                 boost_multiplier=plan.boost_multiplier,
                 amount_usd_formatted=plan.amount_usd_formatted,
                 amount_vnd=vnd_price,
+                amount_vnd_formatted=formatted_vnd,
             )
         )
     return result
@@ -184,13 +188,14 @@ def create_subscription_order(
     premium_settings = getattr(request.app.state, "premium", None)
     vnpay: VnpayAdapter | None = getattr(request.app.state, "vnpay", None)
 
-    # Resolve configured VND price
+    # Resolve configured VND price and enforce 10,000 VND rounding policy
     amount_vnd = plan.default_amount_vnd
     if premium_settings:
         if plan.tier == "plus":
             amount_vnd = premium_settings.vnpay_price_plus_vnd
         elif plan.tier == "prime":
             amount_vnd = premium_settings.vnpay_price_prime_vnd
+    amount_vnd = round_vnd_to_nearest_10k(amount_vnd)
 
     payment_url = None
 
@@ -230,6 +235,44 @@ def create_subscription_order(
     account.db.add(order)
     account.db.flush()
 
+    return OrderDto(
+        id=order.id,
+        order_code=order.order_code,
+        tier=order.tier,
+        duration_days=order.duration_days,
+        amount_usd_cents=order.amount_cents,
+        amount_usd_formatted=plan.amount_usd_formatted,
+        amount_vnd=order.amount_vnd,
+        currency=order.currency,
+        status=order.status,
+        provider=order.provider,
+        payment_url=order.payment_url,
+        created_at=order.created_at,
+        completed_at=order.completed_at,
+    )
+
+
+@router.get(
+    "/orders/{order_code}",
+    response_model=OrderDto,
+    operation_id="getSubscriptionOrder",
+    responses={**ERRORS, 404: {"model": ErrorResponse}},
+)
+def get_subscription_order(
+    order_code: str,
+    account=Depends(require_authenticated_user),
+):
+    """Retrieve authoritative order status for authenticated user."""
+    order = account.db.scalar(
+        select(SubscriptionOrder).where(
+            SubscriptionOrder.order_code == order_code,
+            SubscriptionOrder.user_id == account.user.id,
+        )
+    )
+    if not order:
+        raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại hoặc không thuộc tài khoản của bạn.")
+
+    plan = get_plan(order.tier)
     return OrderDto(
         id=order.id,
         order_code=order.order_code,
@@ -359,61 +402,45 @@ def simulate_subscription_order(
 
 @router.get("/vnpay-return", operation_id="handleVnpayReturn")
 def handle_vnpay_return(request: Request):
-    """Handle VNPAY browser return callback."""
-    now = request.app.state.auth.now()
+    """Handle VNPAY browser return callback.
+
+    IMPORTANT: This endpoint strictly performs signature verification and user redirection.
+    It DOES NOT mutate order status, and DOES NOT grant subscription entitlements.
+    Authoritative state mutation is performed exclusively by handle_vnpay_ipn.
+    """
     vnpay: VnpayAdapter | None = getattr(request.app.state, "vnpay", None)
     params = dict(request.query_params)
 
     if not vnpay or not vnpay.is_configured():
-        return RedirectResponse("/premium?vnp_status=error&message=not_configured")
+        return RedirectResponse("/premium?vnp_status=error&message=not_configured", status_code=302)
 
     is_valid, filtered = vnpay.verify_response(params)
     if not is_valid:
-        return RedirectResponse("/premium?vnp_status=error&message=invalid_signature")
+        return RedirectResponse("/premium?vnp_status=error&message=invalid_signature", status_code=302)
 
     order_code = filtered.get("vnp_TxnRef")
     response_code = filtered.get("vnp_ResponseCode")
-    vnp_amount_str = filtered.get("vnp_Amount")
-    txn_no = filtered.get("vnp_TransactionNo")
 
-    with request.app.state.auth_session_factory() as db, db.begin():
+    with request.app.state.auth_session_factory() as db:
         order = db.scalar(select(SubscriptionOrder).where(SubscriptionOrder.order_code == order_code))
         if not order:
-            return RedirectResponse("/premium?vnp_status=error&message=order_not_found")
-
-        # Amount check
-        try:
-            paid_amount_vnd = int(vnp_amount_str) // 100
-        except (ValueError, TypeError):
-            return RedirectResponse("/premium?vnp_status=error&message=invalid_amount")
-
-        if paid_amount_vnd != order.amount_vnd:
-            order.status = "failed"
-            order.updated_at = now
-            order.provider_response_code = response_code
-            return RedirectResponse("/premium?vnp_status=error&message=amount_mismatch")
-
-        order.provider_txn_id = txn_no
-        order.provider_response_code = response_code
-        order.provider_payload = filtered
-        order.updated_at = now
+            return RedirectResponse("/premium?vnp_status=error&message=order_not_found", status_code=302)
 
         if response_code == "00":
-            # Return URL displays result only. Authoritative confirmation & subscription activation happens via IPN.
-            return RedirectResponse(f"/premium?vnp_status=success&order_code={order.order_code}")
+            return RedirectResponse(f"/premium?vnp_status=success&order_code={order.order_code}", status_code=302)
         elif response_code == "24":
-            order.status = "cancelled"
-            order.completed_at = now
-            return RedirectResponse(f"/premium?vnp_status=cancelled&order_code={order.order_code}")
+            return RedirectResponse(f"/premium?vnp_status=cancelled&order_code={order.order_code}", status_code=302)
         else:
-            order.status = "failed"
-            order.completed_at = now
-            return RedirectResponse(f"/premium?vnp_status=failed&order_code={order.order_code}")
+            return RedirectResponse(f"/premium?vnp_status=failed&order_code={order.order_code}&code={response_code}", status_code=302)
 
 
 @router.get("/vnpay-ipn", operation_id="handleVnpayIpn")
 def handle_vnpay_ipn(request: Request):
-    """Handle VNPAY server-to-server IPN callback."""
+    """Handle VNPAY server-to-server IPN callback.
+
+    This is the sole authoritative webhook endpoint that validates transactions,
+    updates order status, and activates user subscription entitlements.
+    """
     now = request.app.state.auth.now()
     vnpay: VnpayAdapter | None = getattr(request.app.state, "vnpay", None)
     params = dict(request.query_params)
@@ -425,34 +452,61 @@ def handle_vnpay_ipn(request: Request):
     if not is_valid:
         return {"RspCode": "97", "Message": "Invalid Checksum"}
 
+    # Merchant code check
+    vnp_tmn_code = filtered.get("vnp_TmnCode")
+    if not vnp_tmn_code or vnp_tmn_code != vnpay.tmn_code:
+        return {"RspCode": "97", "Message": "Invalid Merchant Code"}
+
     order_code = filtered.get("vnp_TxnRef")
     response_code = filtered.get("vnp_ResponseCode")
     vnp_amount_str = filtered.get("vnp_Amount")
     txn_no = filtered.get("vnp_TransactionNo")
+    txn_status = filtered.get("vnp_TransactionStatus")
 
     with request.app.state.auth_session_factory() as db, db.begin():
-        order = db.scalar(select(SubscriptionOrder).where(SubscriptionOrder.order_code == order_code))
+        # Concurrency safety: acquire row-level lock on the order
+        order = db.scalar(
+            select(SubscriptionOrder)
+            .where(SubscriptionOrder.order_code == order_code)
+            .with_for_update()
+        )
         if not order:
             return {"RspCode": "01", "Message": "Order not found"}
 
-        # Amount check
+        # Provider check: VNPAY IPN must never process simulated orders
+        if order.provider != "vnpay_sandbox":
+            return {"RspCode": "99", "Message": "Invalid order provider"}
+
+        # Amount check: vnp_Amount is actual_vnd * 100
         try:
-            paid_amount_vnd = int(vnp_amount_str) // 100
+            vnp_amount_raw = int(vnp_amount_str)
         except (ValueError, TypeError):
             return {"RspCode": "04", "Message": "Invalid amount"}
 
-        if paid_amount_vnd != order.amount_vnd:
+        if vnp_amount_raw != order.amount_vnd * 100:
             return {"RspCode": "04", "Message": "Invalid amount"}
 
+        # Idempotency: if order is already successful, acknowledge without re-granting
         if order.status == "success":
             return {"RspCode": "02", "Message": "Order already confirmed"}
+
+        # Terminal state protection: do not revive failed or cancelled orders
+        if order.status in {"failed", "cancelled", "expired"}:
+            return {"RspCode": "02", "Message": "Order already processed"}
 
         order.provider_txn_id = txn_no
         order.provider_response_code = response_code
         order.provider_payload = filtered
         order.updated_at = now
 
-        if response_code == "00":
+        is_success = (
+            response_code == "00"
+            and txn_status in {"00", None}
+            and bool(txn_no)
+            and txn_no != "0"
+        )
+
+        if is_success:
             order.status = "success"
             order.completed_at = now
             sub = db.scalar(select(UserSubscription).where(UserSubscription.user_id == order.user_id))
@@ -480,6 +534,6 @@ def handle_vnpay_ipn(request: Request):
                 db.add(sub)
             return {"RspCode": "00", "Message": "Confirm Success"}
         else:
-            order.status = "failed"
+            order.status = "cancelled" if response_code == "24" else "failed"
             order.completed_at = now
             return {"RspCode": "00", "Message": "Confirm Success"}
