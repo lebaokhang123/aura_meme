@@ -67,11 +67,11 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
         return fail(403, 'CSRF_INVALID');
       }
       const orderCode = 'AM-SUB-TEST-1234';
-      const isVnpay = body.provider === 'vnpay';
+      const isVnpay = body.provider === 'vnpay_sandbox';
       return send(201, {
         order_code: orderCode,
-        plan_type: body.plan_type,
-        amount_usd_cents: body.plan_type === 'plus' ? 500 : 5000,
+        plan_tier: body.plan_tier,
+        amount_usd_cents: body.plan_tier === 'plus' ? 500 : 5000,
         provider: body.provider,
         payment_url: isVnpay ? 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_TxnRef=' + orderCode : null,
       });
@@ -84,14 +84,14 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
       if (body.action === 'pay_success') {
         currentSubscription = {
           tier: 'plus',
-          active: true,
+          is_active: true,
           days_remaining: 30,
           expires_at: '2026-12-14T00:00:00Z',
-          started_at: now,
-          multiplier: 2.0,
+          starts_at: now,
+          boost_multiplier: 2.0,
         };
         return send(200, {
-          status: 'paid',
+          status: 'success',
           subscription: currentSubscription,
           order_code: 'AM-SUB-TEST-1234',
         });
@@ -108,22 +108,24 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
       if (code === '00') {
         currentSubscription = {
           tier: 'prime',
-          active: true,
+          is_active: true,
           days_remaining: 365,
           expires_at: '2027-11-14T00:00:00Z',
-          started_at: now,
-          multiplier: 3.0,
+          starts_at: now,
+          boost_multiplier: 3.0,
         };
-        return send(200, {
-          status: 'paid',
-          response_code: '00',
-          subscription: currentSubscription,
+        return route.fulfill({
+          status: 302,
+          headers: {
+            Location: '/premium?vnp_status=success&order_code=AM-SUB-TEST-1234',
+          },
         });
       }
-      return send(200, {
-        status: 'failed',
-        response_code: code || '99',
-        subscription: null,
+      return route.fulfill({
+        status: 302,
+        headers: {
+          Location: '/premium?vnp_status=failed&message=' + (code || '99'),
+        },
       });
     }
 
@@ -230,7 +232,7 @@ test('Logged in user can open Sandbox modal, simulate successful payment, and se
   const orderReq = s.requests.find((r) => r.path === '/premium/orders' && r.method === 'POST');
   expect(orderReq).toBeDefined();
   expect(orderReq.csrf).toBe('server-csrf-test-token');
-  expect(orderReq.body).toEqual({ plan_type: 'plus', provider: 'sandbox_simulated' });
+  expect(orderReq.body).toEqual({ plan_tier: 'plus', provider: 'sandbox_simulated' });
 });
 
 test('Logged in user can simulate payment failure without corrupting state', async ({ page, context }) => {
@@ -289,11 +291,11 @@ test('Header button, avatar indicators, and Home Aura Perks card sync with subsc
   // Test Plus subscriber:
   const plusSub = {
     tier: 'plus',
-    active: true,
+    is_active: true,
     days_remaining: 30,
     expires_at: '2026-12-14T00:00:00Z',
-    started_at: now,
-    multiplier: 2.0,
+    starts_at: now,
+    boost_multiplier: 2.0,
   };
   await setupMockApi(context, 0, plusSub, false);
   await page.goto('/');
@@ -308,11 +310,11 @@ test('Header button, avatar indicators, and Home Aura Perks card sync with subsc
   // Test Prime subscriber:
   const primeSub = {
     tier: 'prime',
-    active: true,
+    is_active: true,
     days_remaining: 365,
     expires_at: '2027-11-14T00:00:00Z',
-    started_at: now,
-    multiplier: 3.0,
+    starts_at: now,
+    boost_multiplier: 3.0,
   };
   await setupMockApi(context, 0, primeSub, false);
   await page.goto('/');
