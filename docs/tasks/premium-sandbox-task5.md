@@ -386,3 +386,62 @@ Thực hiện yêu cầu tinh chỉnh trực tiếp từ Owner trước khi mở
 - [task5_modal_confirm_tablet.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_modal_confirm_tablet.png): Modal căn giữa trên màn hình tablet 768px.
 - [task5_modal_confirm_1920.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_modal_confirm_1920.png): Modal căn giữa trên màn hình lớn 1920px.
 
+---
+
+## 11. ĐIỀU TRA NGUYÊN NHÂN GỐC RỄ `INTERNAL_ERROR` & THÔNG BÁO THÂN THIỆN (TASK 5 ORDER ERROR FIX)
+
+Nhận báo cáo từ Owner về lỗi `INTERNAL_ERROR` khi bấm "Xác nhận thanh toán" tại hộp thoại mua gói, hệ thống đã tiến hành điều tra kỹ thuật chuyên sâu và xử lý triệt để:
+
+### 11.1. Bằng chứng Truy vấn Database & Xác định Nguyên nhân Gốc rễ
+Thực hiện truy vấn chỉ đọc (read-only) kiểm tra database thực tế đang kết nối với máy chủ:
+```sql
+SELECT current_database(), current_user, current_schema();
+-- Kết quả: ('aurameme_demo', 'aurameme_demo', 'public')
+
+SELECT version_num FROM alembic_version;
+-- Kết quả: ('0012_aura_v1',)
+
+SELECT to_regclass('public.subscription_orders'), to_regclass('public.user_subscriptions');
+-- Kết quả: (None, None)
+```
+- **Nguyên nhân chính xác:** Máy chủ cục bộ đang chạy môi trường `aurameme_demo`. Database này được chốt phiên bản an toàn tại `0012_aura_v1` theo cơ chế bảo vệ của `backend/app/demo.py` (`DEMO_REVISION = '0012_aura_v1'`). Do đó, bảng `subscription_orders` và `user_subscriptions` (thuộc migration mới `0014_premium_sandbox`) **chưa tồn tại** trên `aurameme_demo`.
+- **Exception & SQLSTATE:**
+  Khi `POST /api/v1/premium/orders` thực thi `account.db.flush()`, SQLAlchemy cố gắng chèn bản ghi vào bảng `subscription_orders`, dẫn đến lỗi cơ sở dữ liệu:
+  `UndefinedTable: relation "subscription_orders" does not exist` (SQLSTATE `42P01`).
+  FastAPI `@app.exception_handler(SQLAlchemyError)` bắt lỗi và trả về HTTP 500:
+  `{"error": {"code": "INTERNAL_ERROR", "message": "Database operation failed."}}`.
+- **Rào chắn bảo vệ dữ liệu (AGENTS.md & RULES.md):**
+  Tuân thủ nghiêm ngặt quy tắc: **Không tự ý chạy migration trên database demo, dev hoặc production**. Do đó, hệ thống không tự động migrate `aurameme_demo`, mà dừng lại ở bước báo cáo để Owner phê duyệt riêng.
+
+### 11.2. Khắc phục Thông báo Giao diện & Ghi Log An toàn
+1. **Frontend `PaymentModal081.jsx`:**
+   - Thay thế việc hiển thị trực tiếp mã lỗi server (`INTERNAL_ERROR`) bằng thông báo thân thiện:
+     - VI: `"Không thể tạo đơn hàng. Vui lòng thử lại."`
+     - EN: `"Could not create order. Please try again."`
+   - Ghi thông tin lỗi kỹ thuật vào `console.error` phía client, không để lộ thông tin nhạy cảm cho người dùng cuối.
+2. **Frontend `PremiumCheckoutPage.jsx`:**
+   - Bảo vệ tương tự cho các trạng thái nạp đơn hàng và mô phỏng thanh toán, hiển thị thông báo localized rõ ràng, tránh hiển thị chuỗi lỗi thô (`INTERNAL_ERROR` / `NOT_FOUND`).
+3. **Backend `backend/app/premium.py`:**
+   - Bổ sung `logger = logging.getLogger("aurameme.premium")`.
+   - Trong `create_subscription_order`: khởi tạo tường minh `provider_payload={}` và bắt exception khi lưu DB để ghi log an toàn:
+     `logger.error("Failed to save subscription order '%s' for user '%s': %s", order_code, account.user.id, exc)`.
+   - Log server lưu lại đầy đủ ngữ cảnh kỹ thuật mà không làm lộ credentials hay mật khẩu.
+
+### 11.3. Bổ sung Kiểm thử Tự động (Tests Added)
+1. **Kiểm thử Integration PostgreSQL Thực tế (Migration 0014):**
+   - Bổ sung `@pytest.mark.integration def test_create_order_and_subscription_real_postgresql_integration()` trong `backend/tests/test_premium_sandbox.py`.
+   - Khi có `TEST_DATABASE_URL`: thực hiện tạo đơn thật trong bảng `subscription_orders`, xác minh tính toàn vẹn dữ liệu, các ràng buộc check constraints và persistence.
+   - Khi chưa có `TEST_DATABASE_URL`: tự động skip an toàn với nhãn `INTEGRATION UNVERIFIED` theo đúng quy định `AGENTS.md`.
+2. **Kiểm thử Non-Integration Pytest:**
+   - Bổ sung `test_create_order_database_error_logging_and_propagation()`: kiểm chứng việc ghi log server và lan truyền ngoại lệ khi gặp lỗi DB.
+3. **Kiểm thử Playwright Browser Suite (Test 20):**
+   - Bổ sung `Order creation error displays friendly message and never leaks INTERNAL_ERROR`: giả lập phản hồi 500 `INTERNAL_ERROR` từ server và kiểm tra giao diện hiển thị đúng banner `"Không thể tạo đơn hàng. Vui lòng thử lại."`, tuyệt đối không lộ chuỗi `INTERNAL_ERROR`.
+
+### 11.4. Ma trận Kiểm thử Thực tế
+- **Frontend Unit Tests:** **78 passed** (1.96s), 0 failed.
+- **Frontend Production Build:** Vite build thành công trong 2.54s, 0 lỗi.
+- **Backend Non-Integration Pytest:** **443 passed**, 788 deselected, 0 failed (33.20s).
+- **Backend Integration / Full Sandbox Pytest:** **24 passed**, 1 skipped (`INTEGRATION UNVERIFIED`), 0 failed (3.03s).
+- **Playwright Admin & Premium:** **20 passed** (100%), 0 failed (1.3m).
+
+
