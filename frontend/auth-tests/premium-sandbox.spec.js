@@ -190,13 +190,13 @@ test('Logged in user can open Sandbox modal, simulate successful payment, and se
   // Click CTA to open sandbox dialog
   const cta = page.locator('.u056-cta');
   await expect(cta).toBeVisible();
-  await expect(cta).toContainText('Thử nghiệm gói Plus ($5)');
+  await expect(cta).toContainText('Mua gói Plus ($5)');
   await cta.click();
 
   // Verify dialog is open
   const dialog = page.locator('.premium-sandbox-dialog');
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('#sandbox-dialog-title')).toContainText('Thử nghiệm Sandbox — Gói Aura Plus');
+  await expect(dialog.locator('#sandbox-dialog-title')).toContainText('Xác nhận đơn hàng — Gói Aura Plus');
   await expect(dialog.locator('.sandbox-price-usd')).toContainText('$5 USD');
 
   // VNPAY should be disabled because pricing is not approved
@@ -273,3 +273,61 @@ test('VNPAY return callback in URL updates subscription state and displays notic
   // URL query params should be cleared
   expect(new URL(page.url()).search).toBe('');
 });
+
+test('Header button, avatar indicators, and Home Aura Perks card sync with subscription state', async ({ page, context }) => {
+  // Test Free user:
+  await setupMockApi(context, 0, null, false);
+  await page.goto('/');
+
+  const freeHeaderBtn = page.locator('.header-premium-btn');
+  await expect(freeHeaderBtn).toBeVisible();
+  await expect(freeHeaderBtn).toHaveClass(/header-premium-btn--free/);
+  await expect(freeHeaderBtn).toContainText('Mua Aura');
+  await expect(page.locator('.aura-member-badge')).toHaveCount(0);
+  await expect(page.locator('.aura-avatar--plus, .aura-avatar--prime')).toHaveCount(0);
+
+  // Test Plus subscriber:
+  const plusSub = {
+    tier: 'plus',
+    active: true,
+    days_remaining: 30,
+    expires_at: '2026-12-14T00:00:00Z',
+    started_at: now,
+    multiplier: 2.0,
+  };
+  await setupMockApi(context, 0, plusSub, false);
+  await page.goto('/');
+
+  const plusHeaderBtn = page.locator('.header-premium-btn');
+  await expect(plusHeaderBtn).toBeVisible();
+  await expect(plusHeaderBtn).toHaveClass(/header-premium-btn--plus/);
+  await expect(plusHeaderBtn).toContainText('Aura Plus');
+  await expect(page.locator('.account-avatar')).toHaveClass(/aura-avatar--plus/);
+  await expect(page.locator('.aura-member-badge')).toBeVisible();
+
+  // Test Prime subscriber:
+  const primeSub = {
+    tier: 'prime',
+    active: true,
+    days_remaining: 365,
+    expires_at: '2027-11-14T00:00:00Z',
+    started_at: now,
+    multiplier: 3.0,
+  };
+  await setupMockApi(context, 0, primeSub, false);
+  await page.goto('/');
+
+  const primeHeaderBtn = page.locator('.header-premium-btn');
+  await expect(primeHeaderBtn).toBeVisible();
+  await expect(primeHeaderBtn).toHaveClass(/header-premium-btn--prime/);
+  await expect(primeHeaderBtn).toContainText('Aura Prime');
+  await expect(page.locator('.account-avatar')).toHaveClass(/aura-avatar--prime/);
+  await expect(page.locator('.aura-member-badge')).toBeVisible();
+
+  // Verify Home Aura Perks card reflects Prime
+  const perksCard = page.locator('.font-headline-sm:has-text("Aura Prime")');
+  await expect(perksCard).toBeVisible();
+  await expect(page.getByText('365 ngày sử dụng')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Gia hạn gói' })).toBeVisible();
+});
+
