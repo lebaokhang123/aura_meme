@@ -63,7 +63,7 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
             boost_multiplier: 2,
             amount_usd_formatted: '$5',
             amount_vnd: 130000,
-            amount_vnd_formatted: '130.000 đ',
+            amount_vnd_formatted: '130.000 VNĐ',
           },
           {
             tier: 'prime',
@@ -72,7 +72,7 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
             boost_multiplier: 3,
             amount_usd_formatted: '$50',
             amount_vnd: 1250000,
-            amount_vnd_formatted: '1.250.000 đ',
+            amount_vnd_formatted: '1.250.000 VNĐ',
           },
         ],
       });
@@ -166,12 +166,12 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
 }
 
 test('Premium displays $5 and $50 across VI/EN and Dark/Light themes', async ({ page, context }) => {
-  await setupMockApi(context, null);
+  await setupMockApi(context, 0);
   await page.emulateMedia({ reducedMotion: 'reduce' });
 
   for (const theme of ['dark', 'light']) {
     for (const language of ['vi', 'en']) {
-      await page.goto('/premium');
+      await page.goto('/');
       await page.evaluate((p) => localStorage.setItem('aurameme-ui-preferences', JSON.stringify(p)), {
         theme,
         language,
@@ -181,10 +181,15 @@ test('Premium displays $5 and $50 across VI/EN and Dark/Light themes', async ({ 
       // Verify header and kicker
       await expect(page.getByRole('heading', { level: 1 })).toHaveText('Aura Memberships');
 
-      // Verify exact prices $5 and $50
+      // Verify exact prices: EN displays $5 and $50, VI displays 130.000 VNĐ and 1.250.000 VNĐ
       const content = await page.locator('.premium-selector-panel').innerText();
-      expect(content).toContain('$5');
-      expect(content).toContain('$50');
+      if (language === 'en') {
+        expect(content).toContain('$5');
+        expect(content).toContain('$50');
+      } else {
+        expect(content).toContain('130.000 VNĐ');
+        expect(content).toContain('1.250.000 VNĐ');
+      }
 
       // Verify no obsolete "Giá chưa công bố" or commercial clutter
       expect(content).not.toContain('Giá chưa công bố');
@@ -199,16 +204,9 @@ test('Premium displays $5 and $50 across VI/EN and Dark/Light themes', async ({ 
   }
 });
 
-test('Guest clicking CTA redirects to /login?next=%2Fpremium', async ({ page, context }) => {
+test('Guest accessing /premium directly redirects to /login?next=%2Fpremium', async ({ page, context }) => {
   await setupMockApi(context, null);
   await page.goto('/premium');
-
-  const cta = page.locator('.u056-cta');
-  await expect(cta).toBeVisible();
-  await expect(cta).toBeEnabled();
-  await expect(cta).toContainText('Đăng nhập');
-
-  await cta.click();
   await expect(page).toHaveURL(/\/login\?next=%2Fpremium$/);
 });
 
@@ -222,31 +220,31 @@ test('Logged in user can open Sandbox modal, simulate successful payment, and se
   // Click CTA to open sandbox dialog
   const cta = page.locator('.u056-cta');
   await expect(cta).toBeVisible();
-  await expect(cta).toContainText('Mua gói Plus ($5)');
+  await expect(cta).toContainText('Mua gói Plus');
   await cta.click();
 
   // Verify dialog is open
-  const dialog = page.locator('.premium-sandbox-dialog');
+  const dialog = page.locator('.u081-dialog');
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('#sandbox-dialog-title')).toContainText('Xác nhận đơn hàng — Gói Aura Plus');
-  await expect(dialog.locator('.sandbox-price-usd')).toContainText('$5 USD');
+  await expect(dialog.locator('#u081-title')).toContainText('Xác nhận đơn hàng — Aura Plus');
+  await expect(dialog.locator('.u081-price-primary')).toContainText('130.000 VNĐ');
 
   // VNPAY should be disabled because pricing is not approved
-  const vnpayBtn = dialog.locator('.sandbox-btn-vnpay');
+  const vnpayBtn = dialog.locator('.u081-btn-vnpay');
   await expect(vnpayBtn).toBeDisabled();
   await expect(vnpayBtn).toContainText('Chờ duyệt giá VND');
 
   // Click Simulate Instant Payment (Success)
-  const successBtn = dialog.locator('.sandbox-btn-success');
+  const successBtn = dialog.locator('.u081-btn-simulate');
   await successBtn.click();
 
-  // Verify success alert inside dialog
-  const alert = dialog.locator('.sandbox-result-box.success');
-  await expect(alert).toBeVisible();
-  await expect(alert).toContainText('Kích hoạt thành công gói Aura Plus');
+  // Verify receipt inside dialog
+  const receipt = dialog.locator('.u081-receipt');
+  await expect(receipt).toBeVisible();
+  await expect(receipt).toContainText('BIÊN NHẬN GIAO DỊCH HỘI VIÊN');
 
   // Close dialog
-  await dialog.locator('.workspace-dialog-actions button').click();
+  await dialog.locator('.u081-btn-done').click();
   await expect(dialog).not.toBeVisible();
 
   // Verify active banner is now visible on page
@@ -266,24 +264,24 @@ test('Logged in user can open Sandbox modal, simulate successful payment, and se
 });
 
 test('Logged in user can simulate payment failure without corrupting state', async ({ page, context }) => {
-  await setupMockApi(context, 0, null, false);
+  const s = await setupMockApi(context, 0, null, false);
   await page.goto('/premium');
 
   await page.locator('.u056-cta').click();
-  const dialog = page.locator('.premium-sandbox-dialog');
+  const dialog = page.locator('.u081-dialog');
   await expect(dialog).toBeVisible();
 
   // Click Simulate Failure
-  const failBtn = dialog.locator('.sandbox-btn-fail');
+  const failBtn = dialog.locator('.u081-btn-fail');
   await failBtn.click();
 
   // Verify failure notice inside dialog
-  const alert = dialog.locator('.sandbox-result-box.error');
+  const alert = dialog.locator('.u081-error-banner');
   await expect(alert).toBeVisible();
   await expect(alert).toContainText('thất bại');
 
   // Close dialog
-  await dialog.locator('.workspace-dialog-actions button').click();
+  await dialog.locator('.u081-close-btn').click();
 
   // Active banner should still not exist
   await expect(page.locator('.premium-active-banner')).toHaveCount(0);

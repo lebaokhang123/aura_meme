@@ -3,6 +3,7 @@ import React, { useId, useLayoutEffect, useRef, useState, useEffect, useSyncExte
 import { usePreferences } from '../PreferencesContext.jsx';
 import { usePremium } from '../PremiumContext.jsx';
 import { auth, MOCK_AUTH } from '../auth.js';
+import PaymentModal081 from './PaymentModal081.jsx';
 import '../workspace.css';
 
 const defaultPlans = [
@@ -13,7 +14,7 @@ const defaultPlans = [
     boost: 2,
     price: 5,
     priceFormatted: '$5',
-    priceVndFormatted: '130.000 đ',
+    priceVndFormatted: '130.000 VNĐ',
     icon: 'auto_awesome',
   },
   {
@@ -23,7 +24,7 @@ const defaultPlans = [
     boost: 3,
     price: 50,
     priceFormatted: '$50',
-    priceVndFormatted: '1.250.000 đ',
+    priceVndFormatted: '1.250.000 VNĐ',
     icon: 'diamond',
   },
 ];
@@ -62,17 +63,15 @@ export default function PremiumPage() {
   const isAuthenticated = !MOCK_AUTH && session.status === 'authenticated' && !!session.user;
 
   const [plans, setPlans] = useState(defaultPlans);
+  const [pricingReliable, setPricingReliable] = useState(false);
   const [selected, setSelected] = useState(0);
   const [wiggle, setWiggle] = useState(false);
   const root = useRef(null);
-  const dialogRef = useRef(null);
   const group = useId();
   const plan = plans[selected] || defaultPlans[selected] || defaultPlans[0];
 
   const [vnpayConfigured, setVnpayConfigured] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [actionMessage, setActionMessage] = useState(null);
   const [notice, setNotice] = useState(null);
 
   // Check gateway configuration and authoritative server plan prices
@@ -83,14 +82,16 @@ export default function PremiumPage() {
       .then((res) => {
         if (mounted && res) {
           setVnpayConfigured(!!res.vnpay_configured);
-          if (res.plans && Array.isArray(res.plans)) {
+          if (res.plans && Array.isArray(res.plans) && res.plans.length > 0) {
+            setPricingReliable(true);
             setPlans((prev) =>
               prev.map((p) => {
                 const sp = res.plans.find((item) => item.tier === p.id);
                 if (!sp) return p;
                 const vndFormatted =
-                  sp.amount_vnd_formatted ||
-                  (sp.amount_vnd ? `${Number(sp.amount_vnd).toLocaleString('vi-VN')} đ` : p.priceVndFormatted);
+                  sp.amount_vnd
+                    ? `${Number(sp.amount_vnd).toLocaleString('vi-VN')} VNĐ`
+                    : (sp.amount_vnd_formatted?.replace(' đ', ' VNĐ') || p.priceVndFormatted);
                 return {
                   ...p,
                   days: sp.duration_days ?? p.days,
@@ -223,93 +224,15 @@ export default function PremiumPage() {
   }
 
   function openDialog() {
-    setActionMessage(null);
+    if (!isAuthenticated) {
+      window.location.href = '/login?next=%2Fpremium';
+      return;
+    }
     setDialogOpen(true);
-    dialogRef.current?.showModal();
   }
 
   function closeDialog() {
-    if (busy) return;
-    dialogRef.current?.close();
     setDialogOpen(false);
-    setActionMessage(null);
-  }
-
-  async function handleSimulatePayment(action) {
-    setBusy(true);
-    setActionMessage(null);
-    try {
-      const orderRes = await auth.write('POST', '/premium/orders', {
-        plan_tier: plan.id,
-        provider: 'sandbox_simulated',
-      });
-      if (!orderRes?.order_code) {
-        throw new Error(t('Không thể tạo đơn hàng thử nghiệm.', 'Could not create test order.'));
-      }
-      const simRes = await auth.write(
-        'POST',
-        `/premium/orders/${orderRes.order_code}/simulate`,
-        { action }
-      );
-      if (action === 'pay_success') {
-        await refreshPremium();
-        setActionMessage({
-          type: 'success',
-          text: t(
-            `Kích hoạt thành công gói Aura ${plan.name}! Thời hạn ${plan.days} ngày sử dụng.`,
-            `Successfully activated Aura ${plan.name}! Duration: ${plan.days} days.`
-          ),
-        });
-      } else {
-        setActionMessage({
-          type: 'error',
-          text: t(
-            'Mô phỏng thanh toán thất bại / hủy đơn thành công.',
-            'Simulated payment failure / order cancellation successfully.'
-          ),
-        });
-      }
-    } catch (err) {
-      setActionMessage({
-        type: 'error',
-        text:
-          err.message ||
-          t(
-            'Đã xảy ra lỗi trong quá trình thử nghiệm.',
-            'An error occurred during sandbox test.'
-          ),
-      });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleVnpayCheckout() {
-    if (!vnpayConfigured) return;
-    setBusy(true);
-    setActionMessage(null);
-    try {
-      const orderRes = await auth.write('POST', '/premium/orders', {
-        plan_tier: plan.id,
-        provider: 'vnpay_sandbox',
-      });
-      if (orderRes?.payment_url) {
-        window.location.href = orderRes.payment_url;
-      } else {
-        throw new Error(
-          t('Không nhận được đường dẫn thanh toán VNPAY.', 'No VNPAY payment URL received.')
-        );
-      }
-    } catch (err) {
-      setActionMessage({
-        type: 'error',
-        text:
-          err.message ||
-          t('Không thể khởi tạo cổng VNPAY.', 'Could not initialize VNPAY gateway.'),
-      });
-    } finally {
-      setBusy(false);
-    }
   }
 
   function handleCtaClick() {
@@ -317,13 +240,14 @@ export default function PremiumPage() {
       window.location.href = '/login?next=%2Fpremium';
       return;
     }
+    if (!pricingReliable) return;
     openDialog();
   }
 
   const features = [
-    t(`×${plan.boost} bonus XP cho Level`, `×${plan.boost} bonus XP for Level`),
+    t(`×${plan.boost} bonus EXP cho Level`, `×${plan.boost} bonus Level EXP`),
     t(`${plan.days} ngày quyền lợi hội viên`, `${plan.days} days of membership benefits`),
-    t('Hết hạn vẫn giữ XP đã nhận', 'Keep earned XP after expiry'),
+    t('Hết hạn vẫn giữ EXP đã nhận', 'Keep earned EXP after expiry'),
     t('Không tự động gia hạn', 'No automatic renewal'),
   ];
 
@@ -466,7 +390,7 @@ export default function PremiumPage() {
                   <span className="u056-dot" aria-hidden="true" />
                   <span className="u056-nm">
                     <b>
-                      Aura {item.name} · {language === 'en' ? item.priceFormatted : `${item.priceVndFormatted} (${item.priceFormatted})`}
+                      Aura {item.name} · {language === 'en' ? item.priceFormatted : item.priceVndFormatted}
                       {i === 0 && (
                         <em className="u056-badge-exp u056-badge-exp--plus">
                           ×2 EXP
@@ -483,7 +407,7 @@ export default function PremiumPage() {
                     </b>
                     <small>
                       {item.days} {t('ngày', 'days')} · ×{item.boost}{' '}
-                      {t('bonus XP cho Level', 'bonus Level XP')}
+                      {t('bonus EXP cho Level', 'bonus Level EXP')}
                     </small>
                   </span>
                   <span
@@ -509,7 +433,9 @@ export default function PremiumPage() {
                   <span>{t('ngày', 'days')}</span>
                 </div>
               </div>
-              <span className="u056-badge">{language === 'en' ? plan.priceFormatted : `${plan.priceVndFormatted} (${plan.priceFormatted})`}</span>
+              <span className="u056-badge">
+                {language === 'en' ? plan.priceFormatted : plan.priceVndFormatted}
+              </span>
             </div>
 
             <ul className="u056-feat" aria-live="polite" aria-atomic="true">
@@ -526,6 +452,7 @@ export default function PremiumPage() {
             <button
               className="u056-cta"
               type="button"
+              disabled={isAuthenticated && !pricingReliable}
               onClick={handleCtaClick}
             >
               <span className="material-symbols-outlined" aria-hidden="true">
@@ -542,171 +469,38 @@ export default function PremiumPage() {
                     `Gói đang kích hoạt (${subscription.days_remaining} ngày)`,
                     `Active Plan (${subscription.days_remaining} days left)`
                   )
-                : t(
-                    `Mua gói ${plan.name} (${plan.priceFormatted})`,
-                    `Buy Aura ${plan.name} (${plan.priceFormatted})`
-                  )}
+                : !pricingReliable
+                ? t('Đang tải bảng giá...', 'Loading pricing...')
+                : plan.id === 'plus'
+                ? t('Mua gói Plus', 'Buy Aura Plus')
+                : t('Mua gói Prime', 'Buy Aura Prime')}
             </button>
 
             <p className="u056-price-note">
-              {t(
-                'Giá niêm yết: $5/30 ngày và $50/365 ngày. Không tự động gia hạn.',
-                'Listed prices: $5/30 days and $50/365 days. No recurring charges.'
-              )}
+              {t('Không tự động gia hạn.', 'No automatic renewal.')}
             </p>
           </div>
         </section>
       </div>
 
-      <dialog
-        ref={dialogRef}
-        className="workspace-dialog premium-sandbox-dialog"
-        aria-labelledby="sandbox-dialog-title"
-        onCancel={closeDialog}
+      {/* Lucian UX/UI Prompt #081 Payment Modal */}
+      <PaymentModal081
+        plan={plan}
+        isOpen={dialogOpen}
         onClose={closeDialog}
-      >
-        {dialogOpen && (
-          <div className="sandbox-dialog-content">
-            <div className="workspace-panel-heading">
-              <h2 id="sandbox-dialog-title">
-                {t(
-                  `Xác nhận đơn hàng — Gói Aura ${plan.name}`,
-                  `Order Confirmation — Aura ${plan.name}`
-                )}
-              </h2>
-              <button
-                type="button"
-                aria-label={t('Đóng', 'Close')}
-                disabled={busy}
-                onClick={closeDialog}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="sandbox-summary-card">
-              <div className="sandbox-summary-row">
-                <span>{t('Gói hội viên', 'Membership Plan')}:</span>
-                <strong>Aura {plan.name}</strong>
-              </div>
-              <div className="sandbox-summary-row">
-                <span>{t('Giá niêm yết (USD)', 'Listed Price (USD)')}:</span>
-                <strong className="sandbox-price-usd">
-                  {plan.priceFormatted} USD
-                </strong>
-              </div>
-              <div className="sandbox-summary-row">
-                <span>{t('Giá quy đổi VNPAY (VND)', 'VNPAY Equivalent (VND)')}:</span>
-                <span>{plan.priceVndFormatted}</span>
-              </div>
-              <div className="sandbox-summary-row">
-                <span>{t('Thời hạn sử dụng', 'Duration')}:</span>
-                <span>
-                  {plan.days} {t('ngày', 'days')}
-                </span>
-              </div>
-              <div className="sandbox-summary-row">
-                <span>{t('Quyền lợi bonus', 'Bonus benefit')}:</span>
-                <span className="sandbox-bonus-tag">×{plan.boost} Level XP</span>
-              </div>
-            </div>
-
-            <div className="sandbox-note-box">
-              <span className="material-symbols-outlined" aria-hidden="true">
-                info
-              </span>
-              <div>
-                <strong>
-                  {t(
-                    'Môi trường thử nghiệm — Không phát sinh thanh toán thật.',
-                    'Sandbox Environment — No real charges applied.'
-                  )}
-                </strong>
-                <p>
-                  {t(
-                    'Hệ thống thử nghiệm phục vụ đồ án & portfolio. Không yêu cầu thông tin thẻ tín dụng.',
-                    'Portfolio demo sandbox. No credit card required.'
-                  )}
-                </p>
-              </div>
-            </div>
-
-            {actionMessage && (
-              <div
-                className={
-                  'sandbox-result-box ' +
-                  (actionMessage.type === 'error' ? 'error' : 'success')
-                }
-                role="alert"
-              >
-                {actionMessage.text}
-              </div>
-            )}
-
-            <div className="sandbox-actions">
-              <button
-                type="button"
-                className="sandbox-btn-success"
-                disabled={busy}
-                onClick={() => handleSimulatePayment('pay_success')}
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  check_circle
-                </span>
-                {busy
-                  ? t('Đang xử lý...', 'Processing...')
-                  : t(
-                      'Thanh toán tức thì (Mô phỏng thành công)',
-                      'Instant Payment (Simulate Success)'
-                    )}
-              </button>
-
-              <button
-                type="button"
-                className="sandbox-btn-fail"
-                disabled={busy}
-                onClick={() => handleSimulatePayment('pay_fail')}
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  cancel
-                </span>
-                {t('Mô phỏng Thất bại / Hủy đơn', 'Simulate Failure / Cancel')}
-              </button>
-
-              <button
-                type="button"
-                className="sandbox-btn-vnpay"
-                disabled={busy || !vnpayConfigured}
-                onClick={handleVnpayCheckout}
-                title={
-                  !vnpayConfigured
-                    ? t(
-                        'Chờ Owner phê duyệt giá VND trước khi mở checkout VNPAY',
-                        'Pending Owner approval for VND pricing before enabling VNPAY checkout'
-                      )
-                    : ''
-                }
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  payments
-                </span>
-                <span>{t('Cổng VNPAY Sandbox', 'VNPAY Sandbox Gateway')}</span>
-                {!vnpayConfigured && (
-                  <small className="sandbox-vnpay-badge">
-                    ({t('Chờ duyệt giá VND', 'Pending VND Approval')})
-                  </small>
-                )}
-              </button>
-            </div>
-
-            <div className="workspace-dialog-actions">
-              <button type="button" disabled={busy} onClick={closeDialog}>
-                {t('Đóng', 'Close')}
-              </button>
-            </div>
-          </div>
-        )}
-      </dialog>
+        onSuccess={async () => {
+          await refreshPremium();
+          setNotice({
+            type: 'success',
+            text: t(
+              `Kích hoạt thành công gói Aura ${plan.name}! Thời hạn ${plan.days} ngày sử dụng.`,
+              `Successfully activated Aura ${plan.name}! Duration: ${plan.days} days.`
+            ),
+          });
+        }}
+        language={language}
+        vnpayConfigured={vnpayConfigured}
+      />
     </main>
   );
 }

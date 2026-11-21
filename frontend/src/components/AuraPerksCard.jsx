@@ -31,26 +31,26 @@ export function AuraPerksCard() {
         <p className="font-body-sm text-[12px] text-on-surface-variant leading-relaxed">
           {isActive
             ? (isEn ? `Active · ${subscription.days_remaining} days remaining.` : `Đang kích hoạt · Còn ${subscription.days_remaining} ngày sử dụng.`)
-            : (isEn ? 'Earn bonus EXP towards your Level.' : 'Nhận bonus Exp hấp dẫn cho Level.')}
+            : (isEn ? 'Earn bonus EXP towards your Level.' : 'Nhận bonus EXP hấp dẫn cho Level.')}
         </p>
       </div>
       <div className="flex flex-col gap-2 pt-0.5 relative z-10">
         <div className="flex items-center gap-2.5 text-body-sm text-[13px] text-on-surface">
           <span className="text-[15px] shrink-0">✨</span>
           <span className="font-medium">
-            {isEn ? 'Plus 30 days: ×2 bonus EXP for Level' : 'Plus 30 ngày: x2 bonus Exp cho Level'}
+            {isEn ? 'Plus 30 days: ×2 bonus EXP for Level' : 'Plus 30 ngày: ×2 bonus EXP cho Level'}
           </span>
         </div>
         <div className="flex items-center gap-2.5 text-body-sm text-[13px] text-on-surface">
           <span className="text-[15px] shrink-0">🎨</span>
           <span className="font-medium">
-            {isEn ? 'Prime 365 days: ×3 bonus EXP for Level' : 'Prime 365 ngày: x3 bonus Exp cho Level'}
+            {isEn ? 'Prime 365 days: ×3 bonus EXP for Level' : 'Prime 365 ngày: ×3 bonus EXP cho Level'}
           </span>
         </div>
         <div className="flex items-center gap-2.5 text-body-sm text-[13px] text-on-surface">
           <span className="text-[15px] shrink-0">💎</span>
           <span className="font-medium">
-            {isEn ? 'Rank retains base earned EXP' : 'Rank giữ Exp earned gốc'}
+            {isEn ? 'Rank retains base earned EXP' : 'Rank giữ EXP earned gốc'}
           </span>
         </div>
         <div className="flex items-center gap-2.5 text-body-sm text-[13px] text-on-surface">
