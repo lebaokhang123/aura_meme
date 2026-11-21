@@ -30,12 +30,12 @@ export function PremiumProvider({ children }) {
       const res = await auth.read('/premium/status');
       if (res?.subscription) {
         const sub = res.subscription;
-        const is_active = !!(sub.is_active || sub.active);
+        const is_active = !!sub.is_active;
         const tier = (sub.tier || 'free').toLowerCase();
         setSubscription({
           tier: is_active ? tier : 'free',
           is_active,
-          boost_multiplier: sub.boost_multiplier || sub.multiplier || (tier === 'prime' ? 3 : tier === 'plus' ? 2 : 1),
+          boost_multiplier: sub.boost_multiplier || 1,
           days_remaining: sub.days_remaining || 0,
           expires_at: sub.expires_at || null,
         });

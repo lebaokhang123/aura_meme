@@ -47,3 +47,13 @@ def get_plan(tier: str) -> PlanDefinition:
     if not plan:
         raise ValueError(f"Invalid plan tier: '{tier}'. Must be 'plus' or 'prime'.")
     return plan
+
+
+def round_vnd_to_nearest_10k(amount: int | float) -> int:
+    """Round VND amount to the nearest 10,000 VND (e.g., 156,345.333 -> 160,000)."""
+    val = float(amount)
+    remainder = val % 10000.0
+    if remainder >= 5000.0:
+        return int((val - remainder) + 10000)
+    return int(val - remainder)
+

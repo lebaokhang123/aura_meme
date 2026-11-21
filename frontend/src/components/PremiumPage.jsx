@@ -1,6 +1,7 @@
 // Lucian UX/UI Prompt #056 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#056
 import React, { useId, useLayoutEffect, useRef, useState, useEffect, useSyncExternalStore } from 'react';
 import { usePreferences } from '../PreferencesContext.jsx';
+import { usePremium } from '../PremiumContext.jsx';
 import { auth, MOCK_AUTH } from '../auth.js';
 import '../workspace.css';
 
@@ -56,6 +57,7 @@ function RollingDays({ days, label }) {
 export default function PremiumPage() {
   const { language } = usePreferences(),
     t = (vi, en) => (language === 'en' ? en : vi);
+  const { subscription, refresh: refreshPremium } = usePremium();
   const session = useSyncExternalStore(auth.subscribe, auth.snapshot);
   const isAuthenticated = !MOCK_AUTH && session.status === 'authenticated' && !!session.user;
 
@@ -66,15 +68,13 @@ export default function PremiumPage() {
   const group = useId();
   const plan = plans[selected];
 
-  const [subscription, setSubscription] = useState(null);
   const [vnpayConfigured, setVnpayConfigured] = useState(false);
-  const [refreshCount, setRefreshCount] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionMessage, setActionMessage] = useState(null);
   const [notice, setNotice] = useState(null);
 
-  // Fetch active subscription & gateway config
+  // Check gateway configuration
   useEffect(() => {
     let mounted = true;
     if (isAuthenticated) {
@@ -82,67 +82,52 @@ export default function PremiumPage() {
         .read('/premium/status')
         .then((res) => {
           if (mounted && res) {
-            setSubscription(res.subscription || null);
             setVnpayConfigured(!!res.vnpay_configured);
           }
         })
-        .catch(() => {
-          // Gracefully fallback if network or mock
-        });
-    } else {
-      setSubscription(null);
+        .catch(() => {});
     }
     return () => {
       mounted = false;
     };
-  }, [isAuthenticated, session.user?.id, refreshCount]);
+  }, [isAuthenticated, session.user?.id]);
 
-  // Handle return callback from VNPAY if query parameters are present
+  // Handle return callback from VNPAY (HTTP redirect query parameters)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
-    if (params.has('vnp_ResponseCode') || params.has('vnp_SecureHash')) {
-      const qs = window.location.search;
-      auth
-        .read('/premium/vnpay-return' + qs)
-        .then((res) => {
-          if (res?.status === 'paid') {
-            if (res.subscription) setSubscription(res.subscription);
-            setNotice({
-              type: 'success',
-              text: t(
-                'Thanh toán VNPAY thành công! Gói hội viên đã được kích hoạt.',
-                'VNPAY payment successful! Membership activated.'
-              ),
-            });
-            setRefreshCount((c) => c + 1);
-          } else {
-            setNotice({
-              type: 'error',
-              text: t(
-                'Thanh toán VNPAY không thành công (mã: ' +
-                  (res?.response_code || 'error') +
-                  ').',
-                'VNPAY payment failed (code: ' +
-                  (res?.response_code || 'error') +
-                  ').'
-              ),
-            });
-          }
-          window.history.replaceState({}, document.title, window.location.pathname);
-        })
-        .catch(() => {
-          setNotice({
-            type: 'error',
-            text: t(
-              'Lỗi kiểm tra phản hồi từ cổng VNPAY.',
-              'Error verifying response from VNPAY gateway.'
-            ),
-          });
-          window.history.replaceState({}, document.title, window.location.pathname);
+    if (params.has('vnp_status')) {
+      const status = params.get('vnp_status');
+      if (status === 'success') {
+        refreshPremium();
+        setNotice({
+          type: 'success',
+          text: t(
+            'Thanh toán VNPAY thành công! Gói hội viên đã được kích hoạt.',
+            'VNPAY payment successful! Membership activated.'
+          ),
         });
+      } else if (status === 'cancelled') {
+        setNotice({
+          type: 'error',
+          text: t('Giao dịch VNPAY đã bị hủy.', 'VNPAY transaction was cancelled.'),
+        });
+      } else {
+        const msg = params.get('message') || 'error';
+        setNotice({
+          type: 'error',
+          text: t(
+            'Thanh toán VNPAY không thành công (' + msg + ').',
+            'VNPAY payment failed (' + msg + ').'
+          ),
+        });
+      }
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (params.has('vnp_ResponseCode')) {
+      // In case user arrived directly with gateway query parameters, forward to backend return handler
+      window.location.replace('/api/v1/premium/vnpay-return' + window.location.search);
     }
-  }, []);
+  }, [refreshPremium, language]);
 
   useLayoutEffect(() => {
     const element = root.current;
@@ -192,7 +177,7 @@ export default function PremiumPage() {
     setActionMessage(null);
     try {
       const orderRes = await auth.write('POST', '/premium/orders', {
-        plan_type: plan.id,
+        plan_tier: plan.id,
         provider: 'sandbox_simulated',
       });
       if (!orderRes?.order_code) {
@@ -204,21 +189,14 @@ export default function PremiumPage() {
         { action }
       );
       if (action === 'pay_success') {
-        if (simRes?.subscription) {
-          setSubscription(simRes.subscription);
-        }
+        await refreshPremium();
         setActionMessage({
           type: 'success',
           text: t(
-            `Kích hoạt thành công gói Aura ${plan.name}! Còn ${
-              simRes?.subscription?.days_remaining || plan.days
-            } ngày sử dụng.`,
-            `Successfully activated Aura ${plan.name}! Duration: ${
-              simRes?.subscription?.days_remaining || plan.days
-            } days remaining.`
+            `Kích hoạt thành công gói Aura ${plan.name}! Thời hạn ${plan.days} ngày sử dụng.`,
+            `Successfully activated Aura ${plan.name}! Duration: ${plan.days} days.`
           ),
         });
-        setRefreshCount((c) => c + 1);
       } else {
         setActionMessage({
           type: 'error',
@@ -249,8 +227,8 @@ export default function PremiumPage() {
     setActionMessage(null);
     try {
       const orderRes = await auth.write('POST', '/premium/orders', {
-        plan_type: plan.id,
-        provider: 'vnpay',
+        plan_tier: plan.id,
+        provider: 'vnpay_sandbox',
       });
       if (orderRes?.payment_url) {
         window.location.href = orderRes.payment_url;
@@ -286,7 +264,7 @@ export default function PremiumPage() {
     t('Không tự động gia hạn', 'No automatic renewal'),
   ];
 
-  const isCurrentPlanActive = subscription?.active && subscription?.tier === plan.id;
+  const isCurrentPlanActive = subscription?.is_active && subscription?.tier === plan.id;
 
   return (
     <main className="workspace-page premium-page">
@@ -336,7 +314,7 @@ export default function PremiumPage() {
               </div>
             )}
 
-            {subscription?.active && (
+            {subscription?.is_active && (
               <div className="premium-active-banner" role="status">
                 <span className="material-symbols-outlined" aria-hidden="true">
                   verified
