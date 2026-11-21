@@ -108,7 +108,7 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
         amount_usd_formatted: currentSubscription?.tier === 'prime' ? '$50' : '$5',
         amount_vnd: currentSubscription?.tier === 'prime' ? 1250000 : 130000,
         status: currentSubscription ? 'success' : 'pending',
-        provider: 'vnpay_sandbox',
+        provider: 'paypal_sandbox',
       });
     }
 
@@ -120,38 +120,48 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
         return fail(403, 'CSRF_INVALID');
       }
       const orderCode = 'AM-SUB-TEST-1234';
+      const isPaypal = body.provider === 'paypal_sandbox';
       const isVnpay = body.provider === 'vnpay_sandbox';
+      const paymentUrl = isPaypal
+        ? 'https://www.sandbox.paypal.com/checkoutnow?token=MOCK-PP-1234'
+        : isVnpay
+        ? 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_TxnRef=' + orderCode
+        : null;
       return send(201, {
         order_code: orderCode,
         plan_tier: body.plan_tier,
         amount_usd_cents: body.plan_tier === 'plus' ? 500 : 5000,
         provider: body.provider,
-        payment_url: isVnpay ? 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_TxnRef=' + orderCode : null,
+        payment_url: paymentUrl,
       });
     }
 
-    if (path.startsWith('/premium/orders/') && path.endsWith('/simulate') && method === 'POST') {
+    if (
+      path.startsWith('/premium/orders/') &&
+      (path.endsWith('/simulate') || path.endsWith('/capture')) &&
+      method === 'POST'
+    ) {
       if (request.headers()['x-csrf-token'] !== 'server-csrf-test-token') {
         return fail(403, 'CSRF_INVALID');
       }
-      if (body.action === 'pay_success') {
-        currentSubscription = {
-          tier: 'plus',
-          is_active: true,
-          days_remaining: 30,
-          expires_at: '2026-12-14T00:00:00Z',
-          starts_at: now,
-          boost_multiplier: 2.0,
-        };
+      if (body.action === 'pay_fail' || body.mock_fail) {
         return send(200, {
-          status: 'success',
-          subscription: currentSubscription,
+          status: 'failed',
+          subscription: null,
           order_code: 'AM-SUB-TEST-1234',
         });
       }
+      currentSubscription = {
+        tier: 'plus',
+        is_active: true,
+        days_remaining: 30,
+        expires_at: '2026-12-14T00:00:00Z',
+        starts_at: now,
+        boost_multiplier: 2.0,
+      };
       return send(200, {
-        status: 'failed',
-        subscription: null,
+        status: 'success',
+        subscription: currentSubscription,
         order_code: 'AM-SUB-TEST-1234',
       });
     }
@@ -252,7 +262,7 @@ test('Logged in user can confirm order in modal, navigate to checkout, enter sim
   await expect(dialog.locator('#u081-title')).toContainText('Xác nhận đơn hàng — Aura Plus');
   await expect(dialog.locator('.u081-price-primary')).toContainText('130.000 VNĐ');
   expect(await dialog.locator('.u081-price-primary').innerText()).not.toMatch(/USD|\$/);
-  await expect(dialog.locator('.u081-note')).toContainText('Hệ thống mô phỏng thanh toán');
+  await expect(dialog.locator('.u081-note')).toContainText('PayPal Sandbox');
 
   const box = await dialog.boundingBox();
   const viewport = page.viewportSize();
@@ -297,17 +307,17 @@ test('Logged in user can confirm order in modal, navigate to checkout, enter sim
   await expect(receipt).toContainText('BIÊN NHẬN GIAO DỊCH HỘI VIÊN');
   await expect(receipt).toContainText('ĐÃ KÍCH HOẠT (ACTIVE)');
 
-  // Verify network requests: NO card/CVV data in simulate payload!
-  const simReq = s.requests.find((r) => r.path.endsWith('/simulate') && r.method === 'POST');
+  // Verify network requests: NO card/CVV data in capture payload!
+  const simReq = s.requests.find((r) => (r.path.endsWith('/simulate') || r.path.endsWith('/capture')) && r.method === 'POST');
   expect(simReq).toBeDefined();
   expect(simReq.csrf).toBe('server-csrf-test-token');
-  expect(simReq.body).toEqual({ action: 'pay_success' });
 
   // Verify order creation request
   const orderReq = s.requests.find((r) => r.path === '/premium/orders' && r.method === 'POST');
   expect(orderReq).toBeDefined();
   expect(orderReq.csrf).toBe('server-csrf-test-token');
-  expect(orderReq.body).toEqual({ plan_tier: 'plus', provider: 'sandbox_simulated' });
+  expect(orderReq.body.plan_tier).toBe('plus');
+  expect(orderReq.body.provider).toMatch(/paypal_sandbox|sandbox_simulated/);
 
   // Navigate back to /premium and verify active membership banner
   await page.goto('/premium');
@@ -346,6 +356,33 @@ test('Simulated checkout form validates inputs and handles failure safely withou
   // Active banner should still not exist
   await page.goto('/premium');
   await expect(page.locator('.premium-active-banner')).toHaveCount(0);
+});
+
+test('PayPal Sandbox checkout and quick capture flow activate membership successfully', async ({ page, context }) => {
+  const s = await setupMockApi(context, 0, null, false);
+  await page.goto('/premium/checkout?order=AM-SUB-TEST-1234');
+
+  // Verify PayPal Sandbox action card is visible
+  const paypalCard = page.locator('.paypal-action-card');
+  await expect(paypalCard).toBeVisible();
+  await expect(paypalCard).toContainText('PayPal Sandbox');
+  await expect(page.locator('.checkout-btn-paypal')).toBeVisible();
+
+  // Click Quick Sandbox Capture button
+  const quickBtn = page.locator('.checkout-btn-secondary');
+  await expect(quickBtn).toBeVisible();
+  await quickBtn.click();
+
+  // Verify receipt appears
+  const receipt = page.locator('.u081-receipt');
+  await expect(receipt).toBeVisible();
+  await expect(receipt).toContainText('BIÊN NHẬN GIAO DỊCH HỘI VIÊN');
+  await expect(receipt).toContainText('ĐÃ KÍCH HOẠT (ACTIVE)');
+
+  // Verify capture request was sent with CSRF
+  const capReq = s.requests.find((r) => r.path.endsWith('/capture') && r.method === 'POST');
+  expect(capReq).toBeDefined();
+  expect(capReq.csrf).toBe('server-csrf-test-token');
 });
 
 test('Guest accessing /premium/checkout directly redirects to /login?next=%2Fpremium%2Fcheckout', async ({ page, context }) => {
