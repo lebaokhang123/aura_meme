@@ -483,23 +483,12 @@ export default function PremiumPage() {
         </section>
       </div>
 
-      {/* Lucian UX/UI Prompt #081 Payment Modal */}
+      {/* Lucian UX/UI Prompt #081 Order Confirmation Modal */}
       <PaymentModal081
         plan={plan}
         isOpen={dialogOpen}
         onClose={closeDialog}
-        onSuccess={async () => {
-          await refreshPremium();
-          setNotice({
-            type: 'success',
-            text: t(
-              `Kích hoạt thành công gói Aura ${plan.name}! Thời hạn ${plan.days} ngày sử dụng.`,
-              `Successfully activated Aura ${plan.name}! Duration: ${plan.days} days.`
-            ),
-          });
-        }}
         language={language}
-        vnpayConfigured={vnpayConfigured}
       />
     </main>
   );
