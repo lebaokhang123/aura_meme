@@ -260,8 +260,12 @@ def simulate_subscription_order(
     request: Request,
     account=Depends(require_account_csrf),
 ):
-    settings = getattr(request.app.state, "settings", None)
-    if settings and getattr(settings, "ENVIRONMENT", "").lower() == "production":
+    auth_runtime = getattr(request.app.state, "auth", None)
+    auth_env = getattr(auth_runtime.settings, "auth_environment", "production") if auth_runtime and hasattr(auth_runtime, "settings") else "production"
+    premium_settings = getattr(request.app.state, "premium", None)
+    sandbox_enabled = getattr(premium_settings, "premium_sandbox_enabled", False) if premium_settings else False
+
+    if auth_env == "production" or not sandbox_enabled:
         raise AuthError(403, "FORBIDDEN", "Môi trường giả lập (simulate) bị vô hiệu hóa trên môi trường production.")
 
     now = request.app.state.auth.now()
@@ -395,30 +399,7 @@ def handle_vnpay_return(request: Request):
         order.updated_at = now
 
         if response_code == "00":
-            if order.status != "success":
-                order.status = "success"
-                order.completed_at = now
-                sub = db.scalar(select(UserSubscription).where(UserSubscription.user_id == order.user_id))
-                if sub:
-                    sub.tier = order.tier
-                    sub.status = "active"
-                    sub.starts_at = now
-                    sub.expires_at = now + timedelta(days=order.duration_days)
-                    sub.order_id = order.id
-                    sub.updated_at = now
-                else:
-                    sub = UserSubscription(
-                        id=uuid4(),
-                        user_id=order.user_id,
-                        tier=order.tier,
-                        status="active",
-                        starts_at=now,
-                        expires_at=now + timedelta(days=order.duration_days),
-                        order_id=order.id,
-                        created_at=now,
-                        updated_at=now,
-                    )
-                    db.add(sub)
+            # Return URL displays result only. Authoritative confirmation & subscription activation happens via IPN.
             return RedirectResponse(f"/premium?vnp_status=success&order_code={order.order_code}")
         elif response_code == "24":
             order.status = "cancelled"
