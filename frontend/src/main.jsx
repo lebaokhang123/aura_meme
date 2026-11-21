@@ -91,5 +91,6 @@ function App() {
   return render(<><EquippedBackground/><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : [AdminPage,PremiumPage,ProfilePage,ContactPage,VaultPage,ContactInbox].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}</>);
 }
 
+import {PremiumProvider} from './PremiumContext.jsx';
 applyPreferences(readPreferences());
-createRoot(document.getElementById('root')).render(<PreferencesProvider><AuthBoundary><SocialProvider><FeedProvider><App /></FeedProvider></SocialProvider></AuthBoundary></PreferencesProvider>);
+createRoot(document.getElementById('root')).render(<PreferencesProvider><AuthBoundary><SocialProvider><FeedProvider><PremiumProvider><App /></PremiumProvider></FeedProvider></SocialProvider></AuthBoundary></PreferencesProvider>);
