@@ -48,9 +48,10 @@ class CommentPage(BaseModel):
     pagination: Pagination
 
 
-def comment_dto(comment, user, profile, level=None):
+def comment_dto(comment, user, profile, level=None, membership_tier="free"):
     author = UserPublic(id=user.id, username=user.username, display_name=profile.display_name,
-                        created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url, level=level)
+                        created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url, level=level,
+                        membership_tier=membership_tier if membership_tier in {"plus", "prime"} else "free")
     return CommentResponse(id=comment.id, post_id=comment.post_id, author=author,
                            body=comment.body, created_at=comment.created_at)
 
@@ -96,7 +97,10 @@ def list_comments(post_id: UUID, request: Request, page: int = Query(1, ge=1),
             statement = statement.where(User.username == author)
         ordering = (Comment.created_at, Comment.id) if sort == "created_asc" else (Comment.created_at.desc(), Comment.id.desc())
         rows, pagination = page_rows(db, statement.order_by(*ordering), page, page_size)
-        return CommentPage(items=[comment_dto(*row) for row in rows], pagination=pagination)
+        user_ids = {row[1].id for row in rows}
+        from app.membership import read_users_membership_tiers
+        tiers = read_users_membership_tiers(db, user_ids, request.app.state.auth.now())
+        return CommentPage(items=[comment_dto(*row, membership_tier=tiers.get(row[1].id, "free")) for row in rows], pagination=pagination)
 
 
 @router.post("/posts/{post_id}/comments", status_code=201, response_model=CommentResponse,
@@ -110,7 +114,9 @@ def add_comment(post_id: UUID, payload: CommentInput, request: Request, account=
         if existing is not None:
             if existing.author_id!=account.user.id or existing.post_id!=post_id or existing.body!=payload.body or existing.status!="visible" or existing.deleted_at is not None:
                 raise AuthError(409,"CONFLICT","Request ID already used.")
-            return comment_dto(existing,account.user,account.db.get(Profile,account.user.id),read_public_level(account.db,account.user.id,now))
+            from app.membership import read_users_membership_tiers
+            tiers = read_users_membership_tiers(account.db, {account.user.id}, now)
+            return comment_dto(existing,account.user,account.db.get(Profile,account.user.id),read_public_level(account.db,account.user.id,now),membership_tier=tiers.get(account.user.id, "free"))
     comment = Comment(id=payload.request_id or uuid4(), post_id=post_id, author_id=account.user.id, body=payload.body,
                       status="visible", created_at=now, updated_at=now, deleted_at=None)
     account.db.add(comment)
@@ -139,7 +145,9 @@ def add_comment(post_id: UUID, payload: CommentInput, request: Request, account=
             dedupe_key=f"comment:{comment.id}",
             now=now,
         )
-    return comment_dto(comment, account.user, account.db.get(Profile, account.user.id), read_public_level(account.db, account.user.id, now))
+    from app.membership import read_users_membership_tiers
+    tiers = read_users_membership_tiers(account.db, {account.user.id}, now)
+    return comment_dto(comment, account.user, account.db.get(Profile, account.user.id), read_public_level(account.db, account.user.id, now), membership_tier=tiers.get(account.user.id, "free"))
 
 
 @router.delete("/comments/{comment_id}", status_code=204, operation_id="deleteComment",

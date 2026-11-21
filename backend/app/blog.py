@@ -173,9 +173,10 @@ def public_posts(now=None):
         Category.status == "active", or_(Post.media_id.is_(None), ready))
 
 
-def post_dto(post, user, profile, category, level=None):
+def post_dto(post, user, profile, category, level=None, membership_tier="free"):
     author = UserPublic(id=user.id, username=user.username, display_name=profile.display_name,
-        bio=profile.bio, created_at=user.created_at, avatar_url=profile.avatar_url, level=level)
+        bio=profile.bio, created_at=user.created_at, avatar_url=profile.avatar_url, level=level,
+        membership_tier=membership_tier if membership_tier in {"plus", "prime"} else "free")
     # comments_count is optional and omitted until a real aggregate is requested.
     return PostResponse(id=post.id, author=author, category=category_dto(category), title=post.title,
         content=post.content, status=post.status, created_at=post.created_at, updated_at=post.updated_at, media_url=media_url(post.media_id))
@@ -222,13 +223,16 @@ def list_posts(request: Request, page: int = Query(1, ge=1), page_size: int = Qu
                 "created_asc": (Post.created_at, Post.id), "title_asc": (Post.title, Post.id)}
     db,viewer_id=reader
     rows, pagination = page_rows(db, statement.order_by(*ordering[sort]), page, page_size)
+    user_ids = {row[1].id for row in rows}
+    from app.membership import read_users_membership_tiers
+    tiers = read_users_membership_tiers(db, user_ids, request.app.state.auth.now())
     meme_states={}
     if include_interactions:
         from app.meme_reactions import meme_reaction_states
         meme_states=meme_reaction_states(db,PostReaction,[row[0].id for row in rows],viewer_id,request)
     items=[]
     for row in rows:
-        dto=post_dto(*row)
+        dto=post_dto(*row, membership_tier=tiers.get(row[1].id, "free"))
         if include_interactions:
             from app.interactions import read_post_state
             try:dto.interactions=read_post_state(dto.id,db,viewer_id,request,meme_states.get(dto.id,{}))
@@ -251,7 +255,10 @@ def create_post(payload: PostInput, request: Request, account=Depends(require_ac
                 raise AuthError(409,"CONFLICT","Request ID already used.")
             category=validate_post(account.db,account.user.id,existing.category_id,existing.media_id,existing.content)
             from app.aura_runtime import read_public_level
-            return post_dto(existing,account.user,account.db.get(Profile,account.user.id),category,read_public_level(account.db,account.user.id,request.app.state.auth.now()))
+            from app.membership import read_users_membership_tiers
+            now = request.app.state.auth.now()
+            tiers = read_users_membership_tiers(account.db, {account.user.id}, now)
+            return post_dto(existing,account.user,account.db.get(Profile,account.user.id),category,read_public_level(account.db,account.user.id,now),membership_tier=tiers.get(account.user.id, "free"))
     category = validate_post(account.db, account.user.id, payload.category_id, payload.media_id, payload.content)
     now = request.app.state.auth.now()
     post = Post(id=payload.request_id or uuid4(), author_id=account.user.id, created_at=now, updated_at=now, **values)
@@ -263,17 +270,22 @@ def create_post(payload: PostInput, request: Request, account=Depends(require_ac
     from app.aura_runtime import award_post, read_public_level
     if post.status == "published":
         award_post(account.db, post, now)
-    return post_dto(post, account.user, account.db.get(Profile, account.user.id), category, read_public_level(account.db, account.user.id, now))
+    from app.membership import read_users_membership_tiers
+    tiers = read_users_membership_tiers(account.db, {account.user.id}, now)
+    return post_dto(post, account.user, account.db.get(Profile, account.user.id), category, read_public_level(account.db, account.user.id, now), membership_tier=tiers.get(account.user.id, "free"))
 
 
 @router.get("/posts/{post_id}", response_model=PostResponse, operation_id="getPost",
             responses={s: {"model": ErrorResponse} for s in (404, 422, 429, 500)})
 def get_post(post_id: UUID, request: Request):
     with request.app.state.auth_session_factory() as db:
-        row = db.execute(public_posts(request.app.state.auth.now()).where(Post.id == post_id)).one_or_none()
+        now = request.app.state.auth.now()
+        row = db.execute(public_posts(now).where(Post.id == post_id)).one_or_none()
         if row is None:
             raise AuthError(404, "NOT_FOUND", "Post not found.")
-        return post_dto(*row)
+        from app.membership import read_users_membership_tiers
+        tiers = read_users_membership_tiers(db, {row[1].id}, now)
+        return post_dto(*row, membership_tier=tiers.get(row[1].id, "free"))
 
 
 def owned_post(db, user_id, post_id, editing=False):

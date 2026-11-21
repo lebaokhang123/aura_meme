@@ -1,5 +1,6 @@
 """Public identity and private account field allowlists."""
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, StrictInt, field_validator, model_validator
@@ -29,6 +30,7 @@ class UserPublic(BaseModel):
     # Derived only from the validated public level with the reviewed Aura V1 mapping; never client input.
     realm: str | None = Field(default=None, exclude_if=lambda value: value is None)
     title: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    membership_tier: Literal["free", "plus", "prime"] = "free"
 
     @model_validator(mode="after")
     def public_identity(self):
