@@ -228,7 +228,13 @@ test('Logged in user can confirm order in modal, navigate to checkout, enter sim
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('#u081-title')).toContainText('Xác nhận đơn hàng — Aura Plus');
   await expect(dialog.locator('.u081-price-primary')).toContainText('130.000 VNĐ');
+  expect(await dialog.locator('.u081-price-primary').innerText()).not.toMatch(/USD|\$/);
   await expect(dialog.locator('.u081-note')).toContainText('Hệ thống mô phỏng thanh toán');
+
+  const box = await dialog.boundingBox();
+  const viewport = page.viewportSize();
+  expect(Math.abs((box.y + box.height / 2) - viewport.height / 2)).toBeLessThan(2);
+  expect(Math.abs((box.x + box.width / 2) - viewport.width / 2)).toBeLessThan(2);
 
   // Verify the 3 old simulation/vnpay buttons are removed
   await expect(dialog.locator('.u081-btn-simulate')).toHaveCount(0);
@@ -397,5 +403,41 @@ test('Header button, avatar indicators, and Home Aura Perks card sync with subsc
   await expect(perksCard).toBeVisible();
   await expect(page.getByText('365 ngày sử dụng')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Gia hạn gói' })).toBeVisible();
+});
+
+test('Order confirmation modal displays single currency and centers across VI/EN and Plus/Prime', async ({ page, context }) => {
+  await setupMockApi(context, 0, null, false);
+  // Test EN Plus
+  await page.goto('/premium');
+  await page.evaluate(() => localStorage.setItem('aurameme-ui-preferences', JSON.stringify({ theme: 'dark', language: 'en' })));
+  await page.goto('/premium');
+  await page.locator('.u056-cta').click();
+  const dialog = page.locator('.u081-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.u081-price-primary')).toContainText('$5 USD');
+  expect(await dialog.locator('.u081-price-primary').innerText()).not.toMatch(/VNĐ|đ/);
+
+  // Check centering
+  const boxEn = await dialog.boundingBox();
+  const vp = page.viewportSize();
+  expect(Math.abs((boxEn.y + boxEn.height / 2) - vp.height / 2)).toBeLessThan(2);
+  expect(Math.abs((boxEn.x + boxEn.width / 2) - vp.width / 2)).toBeLessThan(2);
+  await dialog.locator('.u081-close-btn').click();
+
+  // Test EN Prime
+  await page.locator('.premium-prime').click();
+  await page.locator('.u056-cta').click();
+  await expect(dialog.locator('.u081-price-primary')).toContainText('$50 USD');
+  expect(await dialog.locator('.u081-price-primary').innerText()).not.toMatch(/VNĐ|đ/);
+  await dialog.locator('.u081-close-btn').click();
+
+  // Test VI Prime
+  await page.evaluate(() => localStorage.setItem('aurameme-ui-preferences', JSON.stringify({ theme: 'dark', language: 'vi' })));
+  await page.goto('/premium');
+  await page.locator('.premium-prime').click();
+  await page.locator('.u056-cta').click();
+  await expect(dialog.locator('.u081-price-primary')).toContainText('1.250.000 VNĐ');
+  expect(await dialog.locator('.u081-price-primary').innerText()).not.toMatch(/USD|\$/);
+  await dialog.locator('.u081-close-btn').click();
 });
 
