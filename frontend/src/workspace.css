@@ -255,3 +255,68 @@
 .admin-copy-btn { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; min-height:24px; border-radius:4px; background:var(--am-surface-container); border:1px solid var(--am-outline-variant); color:var(--am-on-surface); font-size:11px; cursor:pointer; transition:all .15s ease; }
 .admin-copy-btn:hover { background:var(--am-surface-container-high); border-color:var(--am-outline); color:var(--am-primary); }
 .admin-copy-btn .material-symbols-outlined { font-size:14px; }
+
+/* ==========================================================================
+   Aura Membership - Plan Theming & EXP Badges
+   ========================================================================== */
+.u056-p.premium-plus {
+  --plan-accent: #f97316;
+  --plan-accent-glow: rgba(249, 115, 22, 0.25);
+  --plan-gold: #eab308;
+  border-color: rgba(249, 115, 22, 0.35);
+}
+.u056-p.premium-plus:hover {
+  border-color: rgba(249, 115, 22, 0.7);
+  box-shadow: 0 0 16px rgba(249, 115, 22, 0.2);
+}
+
+.u056-p.premium-prime {
+  --plan-accent: #38bdf8;
+  --plan-accent-glow: rgba(56, 189, 248, 0.3);
+  --plan-gold: #fbbf24;
+  border-color: rgba(56, 189, 248, 0.4);
+}
+.u056-p.premium-prime:hover {
+  border-color: rgba(56, 189, 248, 0.8);
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+}
+
+.u056-badge-exp {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 9999px;
+  margin-left: 8px;
+  letter-spacing: 0.3px;
+  font-style: normal;
+}
+.u056-badge-exp--plus {
+  background: rgba(249, 115, 22, 0.18);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.45);
+}
+.u056-badge-exp--prime {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.5);
+}
+
+.u056-badge-exp.wig {
+  animation: expBadgeWiggle 0.5s ease;
+}
+
+@keyframes expBadgeWiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg) scale(1.1); }
+  75% { transform: rotate(8deg) scale(1.1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u056-badge-exp.wig {
+    animation: none !important;
+  }
+}
+

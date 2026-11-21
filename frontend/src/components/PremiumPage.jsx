@@ -292,10 +292,6 @@ export default function PremiumPage() {
     <main className="workspace-page premium-page">
       <div className="workspace-content premium-layout">
         <div className="premium-intro">
-          <span className="premium-coming">
-            <span />
-            {t('Thử nghiệm Sandbox', 'Sandbox Trial')}
-          </span>
           <div className="premium-aura">
             <img
               src="/assets/brand/symbol-dark-2048.png"
@@ -323,8 +319,8 @@ export default function PremiumPage() {
             </h2>
             <p>
               {t(
-                'Thanh toán thử nghiệm Sandbox · Không trừ tiền thật',
-                'Sandbox Test Payment · No real money charged'
+                'Nâng tầm trải nghiệm với đặc quyền nhân hệ số EXP và nhận diện độc quyền.',
+                'Elevate your journey with bonus EXP multipliers and exclusive tier identities.'
               )}
             </p>
 
@@ -429,13 +425,18 @@ export default function PremiumPage() {
                   <span className="u056-dot" aria-hidden="true" />
                   <span className="u056-nm">
                     <b>
-                      Aura {item.name} · {item.priceFormatted}
+                      Aura {item.name} · {language === 'en' ? item.priceFormatted : `${item.priceVndFormatted} (${item.priceFormatted})`}
+                      {i === 0 && (
+                        <em className="u056-badge-exp u056-badge-exp--plus">
+                          ×2 EXP
+                        </em>
+                      )}
                       {i === 1 && (
                         <em
-                          className={wiggle ? 'wig' : ''}
+                          className={`u056-badge-exp u056-badge-exp--prime ${wiggle ? 'wig' : ''}`}
                           onAnimationEnd={() => setWiggle(false)}
                         >
-                          ×3 XP
+                          ×3 EXP
                         </em>
                       )}
                     </b>
@@ -467,7 +468,7 @@ export default function PremiumPage() {
                   <span>{t('ngày', 'days')}</span>
                 </div>
               </div>
-              <span className="u056-badge">{plan.priceFormatted}</span>
+              <span className="u056-badge">{language === 'en' ? plan.priceFormatted : `${plan.priceVndFormatted} (${plan.priceFormatted})`}</span>
             </div>
 
             <ul className="u056-feat" aria-live="polite" aria-atomic="true">
@@ -491,25 +492,25 @@ export default function PremiumPage() {
                   ? 'login'
                   : isCurrentPlanActive
                   ? 'verified'
-                  : 'science'}
+                  : 'shopping_cart'}
               </span>
               {!isAuthenticated
-                ? t('Đăng nhập để thử nghiệm', 'Sign in to try sandbox')
+                ? t('Đăng nhập để mua gói', 'Sign in to purchase')
                 : isCurrentPlanActive
                 ? t(
                     `Gói đang kích hoạt (${subscription.days_remaining} ngày)`,
                     `Active Plan (${subscription.days_remaining} days left)`
                   )
                 : t(
-                    `Thử nghiệm gói ${plan.name} (${plan.priceFormatted})`,
-                    `Try ${plan.name} (${plan.priceFormatted})`
+                    `Mua gói ${plan.name} (${plan.priceFormatted})`,
+                    `Buy Aura ${plan.name} (${plan.priceFormatted})`
                   )}
             </button>
 
             <p className="u056-price-note">
               {t(
-                'Thanh toán thử nghiệm Sandbox · Không thu tiền thật. Giá niêm yết: $5/30 ngày và $50/365 ngày.',
-                'Sandbox trial payment · No real money charged. Listed prices: $5/30 days and $50/365 days.'
+                'Giá niêm yết: $5/30 ngày và $50/365 ngày. Không tự động gia hạn.',
+                'Listed prices: $5/30 days and $50/365 days. No recurring charges.'
               )}
             </p>
           </div>
@@ -528,8 +529,8 @@ export default function PremiumPage() {
             <div className="workspace-panel-heading">
               <h2 id="sandbox-dialog-title">
                 {t(
-                  `Thử nghiệm Sandbox — Gói Aura ${plan.name}`,
-                  `Sandbox Trial — Aura ${plan.name}`
+                  `Xác nhận đơn hàng — Gói Aura ${plan.name}`,
+                  `Order Confirmation — Aura ${plan.name}`
                 )}
               </h2>
               <button
@@ -574,10 +575,18 @@ export default function PremiumPage() {
                 info
               </span>
               <div>
-                {t(
-                  'Lưu ý: Môi trường thử nghiệm Sandbox dành cho đồ án & portfolio. Hệ thống không trừ tiền thật và không yêu cầu thông tin thẻ tín dụng.',
-                  'Notice: Sandbox testing environment for portfolio demo. No real money will be charged and no credit card is required.'
-                )}
+                <strong>
+                  {t(
+                    'Môi trường thử nghiệm — Không phát sinh thanh toán thật.',
+                    'Sandbox Environment — No real charges applied.'
+                  )}
+                </strong>
+                <p>
+                  {t(
+                    'Hệ thống thử nghiệm phục vụ đồ án & portfolio. Không yêu cầu thông tin thẻ tín dụng.',
+                    'Portfolio demo sandbox. No credit card required.'
+                  )}
+                </p>
               </div>
             </div>
 
