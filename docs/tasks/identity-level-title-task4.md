@@ -64,6 +64,27 @@ Tài liệu bàn giao kỹ thuật hoàn thành **Task 4: Chuẩn hóa Level, Ch
   - Nhãn, nhóm chủ đề và văn bản hướng dẫn: Chuẩn hóa về `'Inter', sans-serif`.
   - Giữ nguyên cấu trúc form, validation và toàn bộ hành vi gửi thông tin liên hệ.
 
+### 2.5. Hạng mục 5 — Bản vá Hoàn thiện (Task 4 Final Polish)
+- **Chuẩn hóa Helper Thời gian Tương đối (`relativeTime`):**
+  - Tự động chuyển đổi đa đơn vị mốc thời gian: giây (`giây trước` / `seconds ago`), phút (`phút trước` / `minutes ago`), giờ (`giờ trước` / `hours ago`), ngày (`ngày trước` / `days ago`), tháng (`tháng trước` / `months ago`), năm (`năm trước` / `years ago`).
+  - Sử dụng chuẩn `Intl.RelativeTimeFormat(lang, { numeric: 'always' })` quốc tế, hỗ trợ đầy đủ song ngữ VI và EN theo tùy chọn người dùng.
+  - Xử lý biên an toàn: các mốc thời gian trong tương lai, 0 giây trôi qua hoặc giá trị không hợp lệ (`null`, `undefined`, `NaN`, chuỗi không phải ngày) đều trả về `Vừa xong` (VI) hoặc `Just now` (EN).
+  - Tách thành module `frontend/src/relative-time.js` độc lập để phục vụ kiểm thử đơn vị nhanh và tối ưu tải trang.
+  - Ưu tiên tính động theo `post.createdAt` trên cả `PostCard` và `PostHeader`, không để nhãn tĩnh che khuất thời gian thực tế.
+- **Tái cấu trúc Tiêu đề Bình luận thành 2 Dòng:**
+  - Dòng 1: Tên hiển thị · @username · LevelPill · Chức danh.
+  - Dòng 2: Mốc thời gian tương đối hiển thị màu mờ (muted, `text-outline`), font mono nhỏ gọn (`10.5px`), nằm ngay dưới dòng 1 và ở trên nội dung bình luận.
+  - Dòng 3: Nội dung văn bản bình luận.
+  - Bố cục flex dọc bảo đảm không bị tràn ngang hoặc che khuất menu thao tác (xóa/ẩn) trên cả di động và máy tính.
+- **Đồng bộ Song ngữ VI / EN cho ô "AURA PERKS" tại Trang chủ:**
+  - Tạo component tái sử dụng `AuraPerksCard.jsx` tích hợp hook `usePreferences()`.
+  - Thay thế toàn bộ mã cố định tiếng Việt bằng cơ chế song ngữ:
+    - Kicker badge: `AURA PERKS` & `Sắp ra mắt` / `Coming soon`.
+    - Tiêu đề & mô tả: `Aura Plus / Prime` & `Sắp ra mắt: bonus Exp dành cho Level.` / `Coming soon: bonus EXP for your Level.`.
+    - 4 dòng đặc quyền (perks): dịch mượt mà, giữ trọn icon và màu sắc.
+    - Nút CTA: `Xem Plus / Prime` -> `Explore Plus / Prime` trỏ về `/premium`.
+  - Giữ trọn bố cục Stitch gốc, không làm vỡ viền hay hiệu ứng ánh sáng gradient.
+
 ---
 
 ## 3. Kết quả Kiểm thử & Xác minh (Verification Evidence)
