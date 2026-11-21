@@ -341,3 +341,48 @@ Nhận chỉ đạo trực tiếp từ Owner sau khi kiểm tra giao diện Prem
 - [task5_checkout_processing.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_processing.png): Trạng thái xử lý thanh toán với vòng quay Lucian #081.
 - [task5_checkout_receipt_success.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_receipt_success.png): Trạng thái thanh toán thành công: Tích xanh vẽ động, biên nhận slide-up và nút "Trải nghiệm đặc quyền ngay".
 - [task5_checkout_mobile.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_mobile.png): Trang checkout hiển thị trên điện thoại (375px) không tràn viền ngang.
+
+---
+
+## 10. BẢN VÁ HOÀN THIỆN: CĂN GIỮA MODAL & ĐƠN VỊ TIỀN TỆ ĐƠN LẺ THEO NGÔN NGỮ
+
+Thực hiện yêu cầu tinh chỉnh trực tiếp từ Owner trước khi mở kiểm thử nghiệm thu:
+
+### 10.1. Căn giữa Tuyệt đối Viewport Hộp thoại Xác nhận Đơn hàng
+- **Nguyên nhân lệch trước đó:** Mặc định của Chromium Blink đối với thẻ native `<dialog>` có `margin: auto`. Khi kết hợp với `position: fixed; inset: 0;`, Blink phân bổ toàn bộ khoảng trống dọc vào `margin-top` (`marginTop: 577.844px; marginBottom: 0px`), khiến modal bị đẩy sát cạnh đáy của viewport thay vì căn giữa.
+- **Giải pháp dứt điểm bằng CSS:**
+  Trong `frontend/src/payment-ring-081.css`, thiết lập cho `.u081-dialog`:
+  ```css
+  position: fixed;
+  top: 50% !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
+  ```
+- **Kết quả đo đạc tọa độ (Bounding Box):**
+  - Viewport 1440x950: `x = 480px, y = 288.92px, width = 480px, height = 372.16px` -> Tâm Y: `475.00px` (trung tâm chính xác tuyệt đối `950 / 2 = 475px`).
+  - Viewport 375x812: `x = 17px, y = 208.73px, width = 341px, height = 394.53px` -> Tâm Y: `406.00px` (trung tâm chính xác tuyệt đối `812 / 2 = 406px`).
+  - Viewport 768x1024: `x = 144px, y = 325.92px` -> Tâm Y: `512.00px` (trung tâm chính xác tuyệt đối `1024 / 2 = 512px`).
+  - Viewport 1920x1080: `x = 720px, y = 353.92px` -> Tâm Y: `540.00px` (trung tâm chính xác tuyệt đối `1080 / 2 = 540px`).
+
+### 10.2. Hiển thị Duy nhất Một Đơn vị Tiền tệ theo Ngôn ngữ
+- Cập nhật dòng `Số tiền thanh toán` trong `frontend/src/components/PaymentModal081.jsx`:
+  - **Tiếng Việt (VI):** Chỉ hiển thị duy nhất tiền VND: `130.000 VNĐ` (Plus) hoặc `1.250.000 VNĐ` (Prime). Xóa bỏ hoàn toàn hậu tố `($5 USD)` / `($50 USD)`.
+  - **Tiếng Anh (EN):** Chỉ hiển thị duy nhất tiền USD: `$5 USD` (Plus) hoặc `$50 USD` (Prime). Xóa bỏ hoàn toàn tiền VND.
+
+### 10.3. Đánh giá Toàn diện Trang Thanh toán (`/premium/checkout`)
+- Đã nghiệm thu trọn vẹn hành trình người dùng:
+  `/premium` -> Chọn gói -> Bấm CTA -> Modal xác nhận căn giữa -> `/premium/checkout?order=...` -> Form thẻ thử nghiệm -> Bấm Thanh toán -> Vòng xoay Lucian #081 -> Tích xanh vẽ nét động -> Biên nhận slide-up -> Header & Avatar cập nhật tức thì.
+- **Bảo mật tuyệt đối (Zero Card Leakage):** Không gửi dữ liệu thẻ/CVV lên backend, không lưu localStorage/sessionStorage/DB.
+- **Fail-closed VNPAY:** Cổng VNPAY Sandbox tiếp tục giữ trạng thái khóa an toàn chờ Owner duyệt tỷ giá văn bản.
+
+### 10.4. Bằng chứng Ảnh chụp Bổ sung:
+- [task5_modal_confirm_plus.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_modal_confirm_plus.png): Modal Plus tiếng Việt căn giữa hoàn hảo, hiển thị duy nhất `130.000 VNĐ`.
+- [task5_modal_confirm_prime.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_modal_confirm_prime.png): Modal Prime tiếng Việt căn giữa hoàn hảo, hiển thị duy nhất `1.250.000 VNĐ`.
+- [task5_modal_confirm_en.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_modal_confirm_en.png): Modal Plus tiếng Anh căn giữa hoàn hảo, hiển thị duy nhất `$5 USD`.
+- [task5_modal_confirm_mobile.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_modal_confirm_mobile.png): Modal căn giữa trên màn hình điện thoại 375px.
+- [task5_modal_confirm_tablet.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_modal_confirm_tablet.png): Modal căn giữa trên màn hình tablet 768px.
+- [task5_modal_confirm_1920.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_modal_confirm_1920.png): Modal căn giữa trên màn hình lớn 1920px.
+
