@@ -104,8 +104,7 @@ export default function PaymentModal081({
           <div className="u081-summary-row">
             <span className="u081-row-label">{t('Số tiền thanh toán', 'Payment Amount')}</span>
             <strong className="u081-row-val u081-price-primary">
-              {plan.priceVndFormatted}
-              <span className="u081-price-usd"> ({plan.priceFormatted} USD)</span>
+              {language === 'en' ? `${plan.priceFormatted} USD` : plan.priceVndFormatted}
             </strong>
           </div>
           <div className="u081-summary-row">
