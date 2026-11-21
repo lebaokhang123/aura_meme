@@ -1,8 +1,8 @@
-# TÀI LIỆU BÀN GIAO KỸ THUẬT — TASK 5: PREMIUM SANDBOX & VNPAY ADAPTER
+# TÀI LIỆU BÀN GIAO KỸ THUẬT — TASK 5: PREMIUM SANDBOX & VNPAY ADAPTER (FINAL POLISH)
 
-**Mã Task:** TASK-5-PREMIUM-SANDBOX  
+**Mã Task:** TASK-5-PREMIUM-SANDBOX-FINAL  
 **Nhánh Git:** `feat/premium-sandbox-task5`  
-**Base Commit:** `8c8ba24` (`docs(task4): tài liệu bàn giao kỹ thuật chuẩn hóa level, chức danh và ui polish`)  
+**Base Commit Kế thừa:** `75a2a98` (Task 5 ban đầu) kết hợp cherry-pick Task 4 (`c72f8b2`, `27a3b7a`)  
 **Kỹ sư thực hiện:** Google Antigravity (Gemini Flash)  
 **Đơn vị giám sát & điều phối:** ChatGPT  
 **Cấp thẩm quyền nghiệm thu:** AuraMeme Project Owner  
@@ -13,184 +13,137 @@
 ## 1. TỔNG QUAN YÊU CẦU & QUYẾT ĐỊNH CỦA OWNER
 
 ### 1.1. Bối cảnh dự án
-AuraMeme là nền tảng đồ án và portfolio Web/DevOps cao cấp (Cyberpunk Cultivation Meme Platform). Theo chỉ đạo của Owner, hệ thống gói hội viên (Premium) được xây dựng dưới hình thức **Môi trường thử nghiệm Sandbox (Sandbox Trial Flow)**, phục vụ kiểm thử end-to-end trọn vẹn luồng đăng ký, quản lý gói, và tích hợp cổng thanh toán mà **tuyệt đối không phát sinh giao dịch tiền thật**.
+AuraMeme là nền tảng đồ án và portfolio Web/DevOps cao cấp (Cyberpunk Cultivation Meme Community Platform). Hệ thống hội viên (Aura Membership) được phát triển hoàn chỉnh trải nghiệm thị giác và quy trình đăng ký, quản lý gói, tích hợp cổng thanh toán Sandbox mà **tuyệt đối không phát sinh giao dịch tiền thật**.
 
-### 1.2. Quyết định của Owner về bảng giá
-Owner đã phê duyệt bảng giá chuẩn cho 2 gói hội viên:
-1. **Aura Plus:** `$5` USD / 30 ngày (quy đổi tham chiếu VNPAY: `125.000 đ`, hệ số `×2` bonus Level XP).
-2. **Aura Prime:** `$50` USD / 365 ngày (quy đổi tham chiếu VNPAY: `1.250.000 đ`, hệ số `×3` bonus Level XP).
+### 1.2. Bảng giá chính thức do Owner phê duyệt
+Owner đã phê duyệt giá niêm yết chuẩn:
+1. **Aura Plus:** `$5` USD / 30 ngày (tham chiếu quy đổi VND: `125.000 đ`, hệ số `×2` bonus Level XP).
+2. **Aura Prime:** `$50` USD / 365 ngày (tham chiếu quy đổi VND: `1.250.000 đ`, hệ số `×3` bonus Level XP).
 
-### 1.3. Nguyên tắc an toàn & Ranh giới kỹ thuật
-- **Authoritative Backend Pricing:** Toàn bộ giá gói, thời hạn và hệ số quyền lợi được lưu trữ và kiểm soát độc quyền tại backend (`backend/app/premium_plans.py`). Backend không bao giờ tin tưởng giá do frontend gửi lên.
-- **Fail-Closed VNPAY VND Gate:** VNPAY Sandbox thanh toán bằng VND. Thuộc tính `vnpay_pricing_approved` được cấu hình mặc định là `False` (fail-closed). Khi chưa có phê duyệt chính thức bằng văn bản/chỉ đạo từ Owner, cổng thanh toán VNPAY Sandbox sẽ từ chối mở checkout để bảo đảm tuyệt đối tính an toàn tỷ giá.
-- **Order Snapshot Immutability:** Khi người dùng tạo đơn hàng, thông tin gói (`plan_type`), số tiền (`amount_usd_cents`, `amount_vnd`), đơn vị tiền tệ, thời hạn (`duration_days`) và mã đơn (`order_code`) được đóng băng cố định vào bảng `subscription_orders`. Mọi callback VNPAY IPN/Return đều kiểm tra đối chiếu chữ ký HMAC-SHA512 và số tiền chính xác từng xu (`vnp_Amount == expected_amount * 100`).
-- **Bảo toàn Game Mechanics Aura V1:** Hệ số `multipliers_enabled = false` tại `backend/app/aura.py` được giữ nguyên để bảo đảm tính công bằng tuyệt đối cho bảng xếp hạng Aura Rank trong phạm vi MVP V1.
-
----
-
-## 2. KIẾN TRÚC & TRIỂN KHAI BACKEND
-
-### 2.1. Cấu hình & Settings (`backend/app/config.py`)
-Bổ sung `PremiumSettings` kế thừa BaseSettings với cơ chế nạp biến môi trường tự động:
-- `premium_sandbox_enabled: bool = True`
-- `vnpay_tmn_code: str = "AURAMEME"`
-- `vnpay_hash_secret: str = "AURAMEME_SANDBOX_SECRET_KEY_512"`
-- `vnpay_payment_url: str = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"`
-- `vnpay_return_url: str = "http://localhost:5173/premium"`
-- `vnpay_price_plus_vnd: int = 125000`
-- `vnpay_price_prime_vnd: int = 1250000`
-- `vnpay_pricing_approved: bool = False` (mặc định đóng, bảo vệ tỷ giá).
-
-### 2.2. Định nghĩa gói hội viên (`backend/app/premium_plans.py`)
-Mô hình dữ liệu bất biến định nghĩa rõ:
-- `PREMIUM_PLANS['plus']`: 30 ngày, 500 cents ($5), bonus multiplier 2.0x.
-- `PREMIUM_PLANS['prime']`: 365 ngày, 5000 cents ($50), bonus multiplier 3.0x.
-Hàm `resolve_plan(plan_type)` trả về snapshot dữ liệu tin cậy.
-
-### 2.3. VNPAY Adapter Sandbox (`backend/app/vnpay_adapter.py`)
-Hiện thực hóa chuẩn giao thức VNPAY:
-- Sắp xếp alphabet toàn bộ tham số `vnp_*` theo đúng chuẩn RFC.
-- Tính toán mã băm kiểm tra toàn vẹn dữ liệu bằng thuật toán `HMAC-SHA512`.
-- Kiểm tra chữ ký số chiều về (`verify_response`), phát hiện và chặn đứng mọi hành vi giả mạo tham số (tamper detection).
-- Đóng gói URL thanh toán VNPAY an toàn.
-
-### 2.4. Mô hình cơ sở dữ liệu (`backend/app/models.py` & `docs/design/03-database.dbml`)
-Thiết kế 2 bảng theo chuẩn PostgreSQL & SQLAlchemy 2.0 ORM:
-1. `subscription_orders`:
-   - `id`: UUID Primary Key.
-   - `user_id`: Foreign Key liên kết `users.id` (ON DELETE CASCADE).
-   - `order_code`: Mã đơn duy nhất (`AM-SUB-YYYYMMDD-...`, UNIQUE index).
-   - `plan_type`: Loại gói (`plus`, `prime`).
-   - `provider`: Cổng thanh toán (`sandbox_simulated`, `vnpay`).
-   - `amount_usd_cents`: Số tiền cố định USD tính theo cents.
-   - `amount_vnd`: Số tiền cố định quy đổi VND.
-   - `duration_days`: Thời hạn sử dụng (30 hoặc 365 ngày).
-   - `status`: Trạng thái đơn (`pending`, `paid`, `failed`, `cancelled`, `expired`).
-   - `raw_response_json`: Lưu vết JSON payload phản hồi phục vụ audit log.
-   - `created_at`, `updated_at`.
-2. `user_subscriptions`:
-   - `id`: UUID Primary Key.
-   - `user_id`: Foreign Key liên kết `users.id` (UNIQUE, 1 active subscription per user).
-   - `tier`: Cấp độ gói (`plus`, `prime`).
-   - `status`: Trạng thái (`active`, `expired`, `cancelled`).
-   - `started_at`, `expires_at`.
-   - `multiplier`: Hệ số XP bonus (2.0 hoặc 3.0).
-   - `last_order_id`: UUID tham chiếu đơn hàng kích hoạt gần nhất.
-   - `created_at`, `updated_at`.
-
-### 2.5. Migration Alembic (`backend/alembic/versions/0014_premium_sandbox.py`)
-Tạo migration an toàn với lock timeout 5 giây, bảo đảm zero downtime và tuân thủ schema contract với DBML.
-
-### 2.6. API Endpoints (`backend/app/premium.py`)
-Mounted tại `/api/v1/premium`:
-- `GET /status`: Lấy trạng thái gói của người dùng hiện tại, số ngày còn lại, danh sách gói niêm yết và trạng thái cấu hình VNPAY.
-- `POST /orders`: Khởi tạo đơn hàng mới (yêu cầu session hợp lệ và CSRF token).
-- `POST /orders/{order_code}/simulate`: Endpoint sandbox mô phỏng thanh toán (`pay_success`, `pay_fail`, `cancel`). Khi mô phỏng thành công, hệ thống tự động cộng dồn ngày sử dụng nếu người dùng đã có gói trước đó.
-- `GET /vnpay-return`: Nhận chuyển hướng từ trình duyệt sau thanh toán VNPAY, kiểm tra chữ ký HMAC, cập nhật trạng thái đơn và kích hoạt gói.
-- `GET /vnpay-ipn`: Endpoint server-to-server xử lý IPN chuẩn mã VNPAY (`00` thành công, `01` đơn không tồn tại, `02` đơn đã xử lý, `04` sai số tiền, `97` sai chữ ký).
+### 1.3. Nhận diện thị giác cao cấp (High-Tier Visual Identity)
+- **Aura Plus (Grandmaster — Đại Cao Thủ):** Sắc đỏ lửa, cam cháy, vàng kim và đen (`#ef4444`, `#f97316`, `#eab308`). Năng lượng nóng bỏng, viền phát sáng tỏa nhẹ ra ngoài.
+- **Aura Prime (Challenger — Thách Đấu):** Sắc trắng bạc, xanh dương, cyan và vàng kim (`#f8fafc`, `#38bdf8`, `#06b6d4`, `#fbbf24`). Hào quang đa tầng sáng ngời, nổi bật vượt trội.
+- **Bảo tồn mỹ thuật:** Không sao chép logo/tài sản Riot Games; không phá vỡ khung viền (Vault frame) hay background của prompt #056; hỗ trợ chuẩn `prefers-reduced-motion: reduce`.
 
 ---
 
-## 3. GIAO DIỆN & TRẢI NGHIỆM NGƯỜI DÙNG (FRONTEND)
+## 2. KIẾN TRÚC & TRIỂN KHAI HOÀN THIỆN
 
-### 3.1. Trang `/premium` (`frontend/src/components/PremiumPage.jsx`)
-- **Hiển thị giá rõ ràng:**
-  - Aura Plus: `$5` / 30 ngày (VI: `$5 · 30 ngày`, EN: `$5 · 30 days`).
-  - Aura Prime: `$50` / 365 ngày (VI: `$50 · 365 ngày`, EN: `$50 · 365 days`) kèm badge `×3 XP`.
-  - Duration pill và price tag tự động chuyển đổi theo gói đang chọn.
-- **Bỏ thông báo cũ:** Đã xóa bỏ hoàn toàn các thông báo cũ như `"Giá chưa công bố"`, `"Chưa mở đăng ký"`.
-- **Badge Sandbox:** Tiêu đề phụ hiển thị rõ ràng `"Thử nghiệm Sandbox"` / `"Sandbox Trial"` với dot neon cyan phát sáng.
-- **Active Subscription Banner:** Khi người dùng đang sở hữu gói hoạt động, giao diện hiển thị banner thông báo nổi bật:
-  `Gói đang kích hoạt: Aura PLUS · Còn 30 ngày`
-- **CTA thích ứng:**
-  - Khách vãng lai (Guest): Nút `"Đăng nhập để thử nghiệm"` -> Bấm vào điều hướng sang `/login?next=%2Fpremium`.
-  - Người dùng đã đăng nhập: Nút `"Thử nghiệm gói Plus ($5)"` -> Mở Sandbox Dialog.
-  - Người dùng đang kích hoạt đúng gói đó: Nút `"Gói đang kích hoạt (còn X ngày)"`.
+### 2.1. Nút Premium trên Header (`frontend/src/components/SiteShell.jsx` & `site.css`)
+- **Trạng thái Free (Chưa có gói):** Nút `.header-premium-btn--free` hiển thị nhãn `"Mua Aura"` (VI) / `"Get Aura"` (EN) với hiệu ứng gradient RGB tím-cyan-xanh chuyển động mượt mà từ trái sang phải (`auraRgbSweep`).
+- **Trạng thái Plus:** Nút `.header-premium-btn--plus` hiển thị `"Aura Plus"` theo phong cách Grandmaster đỏ-cam-vàng-đen với viền ánh lửa.
+- **Trạng thái Prime:** Nút `.header-premium-btn--prime` hiển thị `"Aura Prime"` theo phong cách Challenger trắng-xanh-cyan-vàng với glow nổi bật.
+- Cả ba trạng thái đều click điều hướng trực tiếp sang `/premium` để xem thông tin gói.
 
-### 3.2. Hộp thoại Thử nghiệm Sandbox (Sandbox Payment Dialog)
-- Thiết kế theo chuẩn `workspace-dialog` đồng bộ với hệ thống Admin/Workspace của AuraMeme.
-- Hiển thị bảng tóm tắt chi tiết: Gói hội viên, Giá niêm yết (USD), Giá quy đổi VNPAY (VND), Thời hạn sử dụng, Quyền lợi bonus XP.
-- Khung lưu ý màu tím/xanh: Nhắc nhở người dùng đây là môi trường thử nghiệm giả lập dành cho portfolio đồ án, không trừ tiền thật và không yêu cầu thẻ tín dụng.
-- **3 tùy chọn hành động:**
-  1. `[Thanh toán tức thì (Mô phỏng thành công)]`: Tạo đơn hàng và kích hoạt gói ngay lập tức, tự động cập nhật banner và số ngày còn lại.
-  2. `[Mô phỏng Thất bại / Hủy đơn]`: Kiểm chứng xử lý lỗi an toàn mà không làm hỏng trạng thái hệ thống.
-  3. `[Cổng VNPAY Sandbox]`: Nút bị vô hiệu hóa kèm badge `"Chờ duyệt giá VND"` khi `vnpay_pricing_approved=False`. Khi được Owner duyệt mở, nút sẽ tự động kích hoạt chuyển hướng sang cổng sandbox của VNPAY.
+### 2.2. Avatar Indicator & Tích xanh Hội viên (`SiteShell.jsx` & `site.css`)
+- **Avatar Glow:** Khi có gói hội viên, avatar người dùng trên Header được bao bọc bởi viền phát sáng tương ứng (`.aura-avatar--plus`, `.aura-avatar--prime`) với chu kỳ nhịp thở (pulse) 3 giây.
+- **Blue Member Checkmark (`.aura-member-badge`):** Biểu tượng tích xanh nhỏ gọn nằm ở góc dưới bên phải avatar, mang ý nghĩa khẳng định **Hội viên Aura** (Aura Member), có tooltip và accessible label chuẩn xác (không gây hiểu nhầm thành tài khoản xác minh danh tính).
+- Khi gói hết hạn, cả viền glow và dấu tick tự động biến mất mà không ảnh hưởng avatar gốc hay frame vật phẩm Vault.
+
+### 2.3. Nguồn trạng thái Subscription dùng chung (`frontend/src/PremiumContext.jsx`)
+- Cung cấp React Context `PremiumProvider` bọc toàn ứng dụng tại `main.jsx`.
+- Lưu trữ `subscription`, `loading` và phương thức `refresh()`.
+- Tự động nạp trạng thái khi người dùng đăng nhập, làm mới khi thanh toán hoặc đăng xuất; không thăm dò liên tục và không lưu trái phép vào localStorage.
+
+### 2.4. Đồng bộ ô AURA PERKS tại Trang chủ (`frontend/src/components/AuraPerksCard.jsx`)
+- **Free:** Hiển thị nhãn `"Đã mở đăng ký"` / `"Available"`, mô tả nhận bonus EXP khi nâng cấp Level, nút `"Xem Plus / Prime"` dẫn sang `/premium`.
+- **Plus / Prime:** Hiển thị tên gói tương ứng kèm tích xanh verified, badge `"Đang kích hoạt"`, số ngày sử dụng còn lại chính xác từ server, và nút `"Gia hạn gói"` / `"Extend Subscription"`.
+
+### 2.5. Tinh gọn giao diện `/premium` (`frontend/src/components/PremiumPage.jsx` & `workspace.css`)
+- Đã loại bỏ hoàn toàn nhãn `"Sandbox Trial"` phía trên logo và các dòng disclaimer lặp lại.
+- Thêm huy hiệu `×2 EXP` (`.u056-badge-exp--plus`) cho thẻ Plus và `×3 EXP` (`.u056-badge-exp--prime`) cho thẻ Prime.
+- Nút CTA chuyển sang hành động trực quan:
+  - Khách: `"Đăng nhập để mua gói"` / `"Sign in to purchase"`.
+  - Chưa có gói: `"Mua gói Plus ($5)"` / `"Mua gói Prime ($50)"` (EN: `"Buy Aura Plus ($5)"` / `"Buy Aura Prime ($50)"`).
+  - Đã có gói: `"Gói đang kích hoạt (còn X ngày)"`.
+- Hiển thị giá: tiếng Anh hiển thị `$5` và `$50`; tiếng Việt hiển thị giá VND làm tròn kèm USD (`125.000 đ ($5)` và `1.250.000 đ ($50)`).
+
+### 2.6. Tăng cường bảo mật thanh toán Backend (`backend/app/premium.py`)
+1. **Khóa Endpoint Mô phỏng:** `POST /premium/orders/{order_code}/simulate` được bổ sung guard kiểm tra nghiêm ngặt môi trường: nếu `ENVIRONMENT == 'production'`, từ chối ngay lập tức với mã lỗi `403 FORBIDDEN`.
+2. **User Scoping & CSRF:** Bắt buộc session xác thực hợp lệ và CSRF token server cấp; chỉ cho phép chính chủ đơn hàng thao tác trên đơn của mình.
+3. **Cộng dồn ngày sử dụng (Subscription Extension):** Khắc phục lỗi làm mất số ngày còn lại khi gia hạn. Logic mới:
+   `base_time = sub.expires_at if (sub.expires_at and sub.expires_at > now) else now`
+   `sub.expires_at = base_time + timedelta(days=plan.duration_days)`
+4. **Phân tách Return URL và IPN:** Return URL chỉ phục vụ điều hướng và hiển thị kết quả cho người dùng; IPN là kênh thông báo server-to-server có thẩm quyền cao nhất để ghi nhận đơn và kích hoạt subscription với kiểm tra chữ ký số HMAC-SHA512.
+5. **Fail-Closed VNPAY Gateway:** Cổng VNPAY Sandbox giữ trạng thái khóa (`vnpay_pricing_approved=False`) cho đến khi Owner phê duyệt giá VND chính thức.
 
 ---
 
-## 4. KẾT QUẢ KIỂM THỬ & MINH CHỨNG (TEST EVIDENCE)
+## 3. KẾT QUẢ KIỂM THỬ TOÀN DIỆN (TEST EVIDENCE)
 
-### 4.1. Backend Unit & Non-Integration Tests
+### 3.1. Backend Non-Integration Pytest Suite
 ```powershell
-.\.venv_p2\Scripts\python.exe -m pytest tests/test_premium_sandbox.py tests/test_migrations.py tests/test_health.py -q
+cd backend
+Remove-Item Env:AUTH_ENVIRONMENT -ErrorAction SilentlyContinue
+Set-Item -Path Env:DATABASE_URL -Value "postgresql+psycopg://test:not-a-real-secret@127.0.0.1:1/test"
+.\.venv\Scripts\python.exe -m pytest -m "not integration" -q
 ```
-- `test_premium_plans_authoritative_pricing`: Đạt (kiểm chứng giá $5 và $50 bất biến tại backend).
-- `test_vnpay_adapter_url_generation_and_signature_verification`: Đạt (kiểm chứng HMAC-SHA512).
-- `test_vnpay_adapter_tampered_payload_rejected`: Đạt (chặn đứng mọi payload bị sửa đổi).
-- `test_vnpay_pricing_approval_fail_closed`: Đạt (kiểm chứng fail-closed khi chưa duyệt giá).
-- `test_premium_dto_and_order_lifecycle`: Đạt (kiểm chứng vòng đời đơn hàng và snapshot).
-- `test_openapi_premium_endpoints`: Đạt (5 endpoint premium tuân thủ OpenAPI spec).
-- `test_guest_cannot_access_orders_or_simulate`: Đạt (401 Unauthorized đối với guest).
-- `test_vnpay_ipn_verification_lifecycle`: Đạt (kiểm chứng mã phản hồi IPN 00, 04, 97).
-- `test_migrations.py`: 15/15 migration tests đạt, DBML schema contract trùng khớp 100%.
-- **Toàn bộ backend test suite:** **427/427 passed** (0 failures).
+- **Kết quả:** **428 passed**, 787 deselected, 0 failed (36.85s).
+- Bao gồm 9/9 tests chuyên biệt cho Premium (`tests/test_premium_sandbox.py`):
+  - `test_premium_plans_authoritative_pricing`: Đạt (giá $5 và $50 bất biến).
+  - `test_vnpay_adapter_url_generation_and_signature_verification`: Đạt (HMAC-SHA512).
+  - `test_vnpay_adapter_tampered_payload_rejected`: Đạt (chặn dữ liệu giả mạo).
+  - `test_vnpay_pricing_approval_fail_closed`: Đạt (khóa cổng khi chưa duyệt giá).
+  - `test_premium_dto_and_order_lifecycle`: Đạt (vòng đời đơn hàng).
+  - `test_openapi_premium_endpoints`: Đạt (OpenAPI spec contract).
+  - `test_guest_cannot_access_orders_or_simulate`: Đạt (401 Unauthorized).
+  - `test_vnpay_ipn_verification_lifecycle`: Đạt (IPN 00, 04, 97).
+  - `test_subscription_extension_accumulates_days`: Đạt (gia hạn gói cộng dồn ngày chính xác).
 
-### 4.2. Frontend Unit Tests
+### 3.2. Frontend Unit Tests
 ```powershell
 node --test frontend/tests/*.test.mjs
 ```
-- **70/70 frontend unit tests passed** (0 failures).
+- **Kết quả:** **78/78 passed**, 0 failed (1.1s).
+- Kiểm chứng toàn diện: Relative Time scaling (8 tests), Notifications, Identity caching, Meme toggle, Vault, Sound, Preferences, Profile heatmap.
 
-### 4.3. Frontend Production Build
+### 3.3. Frontend Production Build
 ```powershell
-cd frontend; npm.cmd run build
+cd frontend
+npm.cmd run build
 ```
-- Vite 7.3.8 build thành công trong 4.70 giây với 0 lỗi cú pháp hay bundle chunk.
+- **Kết quả:** Vite 7.3.8 build thành công trong 3.25 giây với 0 lỗi cú pháp hay chunking error.
 
-### 4.4. Playwright Browser Automation Test Suites
-```powershell
-cd frontend; npx.cmd playwright test --config=../.github/playwright.auth.config.mjs auth-tests/admin-premium.spec.js auth-tests/premium-sandbox.spec.js --workers=1 --retries=0
-```
-- **15/15 tests passed** (1.3 phút):
-  1. `Guest and USER cannot enter Admin by URL or forged local identity` — OK
-  2. `Admin searches users and updates status/roles using CSRF contracts` — OK
-  3. `Last Admin conflict keeps the confirmation and unchanged state` — OK
-  4. `Content/category/inbox workflows and safe audit/catalog views` — OK
-  5. `Failed reads retry; revoked Admin role removes private workspace` — OK
-  6. `Admin sidebar geometry and keyboard dialog focus survive resource changes` — OK
-  7. `Membership minimal intro, unframed logo and home button honor reduced motion` — OK
-  8. `Premium plan selection, arrows and reduced motion keep real benefits without writes` — OK
-  9. `Premium moving frame follows selection through live language/theme switches and resize` — OK (geometry pixel-perfect < 1px)
-  10. `Admin/Premium responsive VI/EN dark/light and disabled Premium without transactions` — OK
-  11. `Premium displays $5 and $50 across VI/EN and Dark/Light themes` — OK
-  12. `Guest clicking CTA redirects to /login?next=%2Fpremium` — OK
-  13. `Logged in user can open Sandbox modal, simulate successful payment, and see active badge` — OK
-  14. `Logged in user can simulate payment failure without corrupting state` — OK
-  15. `VNPAY return callback in URL updates subscription state and displays notice` — OK
+### 3.4. Playwright Browser Automation Test Suites
+1. **Premium & Admin Suite (16 tests):**
+   ```powershell
+   cd frontend
+   npx.cmd playwright test --config=../.github/playwright.auth.config.mjs auth-tests/premium-sandbox.spec.js auth-tests/admin-premium.spec.js --workers=1 --retries=0
+   ```
+   - **Kết quả:** **16/16 passed** (1.2m).
+   - Bao gồm kiểm thử mới: `Header button, avatar indicators, and Home Aura Perks card sync with subscription state` (Free, Plus, Prime).
+
+2. **Core Auth & Social Suite (64 tests):**
+   ```powershell
+   cd frontend
+   npx.cmd playwright test --config=../.github/playwright.auth.config.mjs auth-tests/social-api.spec.js auth-tests/profile-fidelity.spec.js auth-tests/profile-contact.spec.js auth-tests/aura-api.spec.js auth-tests/rank-api.spec.js --workers=1 --retries=0
+   ```
+   - **Kết quả:** **64/64 passed** (3.2m).
+- **Tổng cộng Playwright:** **80/80 passed** (100% tỷ lệ thành công).
 
 ---
 
-## 5. ẢNH CHỤP MINH CHỨNG GIAO DIỆN (UI SCREENSHOTS)
+## 4. ẢNH CHỤP MINH CHỨNG GIAO DIỆN (UI SCREENSHOTS)
 
-Các tệp ảnh đã được lưu trữ trực tiếp vào thư mục artifact:
-1. `task5_premium_desktop_dark.png`: Giao diện `/premium` Desktop giao diện Tối (Dark mode), hiển thị gói Plus $5 và Prime $50.
-2. `task5_premium_desktop_light.png`: Giao diện `/premium` Desktop giao diện Sáng (Light mode).
-3. `task5_premium_mobile_dark.png`: Giao diện `/premium` Mobile giao diện Tối.
-4. `task5_premium_mobile_light.png`: Giao diện `/premium` Mobile giao diện Sáng.
-5. `task5_premium_modal_dark.png`: Hộp thoại Thử nghiệm Sandbox với thông tin giá, lưu ý an toàn và 3 tùy chọn mô phỏng thanh toán.
+Các tệp ảnh minh chứng giao diện thực tế đã được lưu vào thư mục artifact:
+1. [task5_premium_desktop_dark.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_premium_desktop_dark.png): Giao diện `/premium` Desktop Dark mode tinh gọn, hiển thị giá $5 / $50, badge ×2 EXP & ×3 EXP, nút Mua gói.
+2. [task5_premium_desktop_light.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_premium_desktop_light.png): Giao diện `/premium` Desktop Light mode.
+3. [task5_premium_mobile_dark.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_premium_mobile_dark.png): Giao diện `/premium` Mobile Dark mode (viewport 375px) không tràn viền.
+4. [task5_premium_modal_dark.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_premium_modal_dark.png): Hộp thoại Xác nhận đơn hàng với bảng tóm tắt, lưu ý sandbox an toàn và nút VNPAY Sandbox giữ trạng thái fail-closed.
+5. [task5_home_header_perks_dark.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_home_header_perks_dark.png): Trang chủ Desktop Dark mode thể hiện nút Header "Aura Prime", avatar glow Challenger, tích xanh hội viên và thẻ AURA PERKS phản ánh gói Prime đang kích hoạt.
 
 ---
 
-## 6. HƯỚNG DẪN NGHIỆM THU CHO OWNER
+## 5. RÀO CẢN KỸ THUẬT & ĐIỂM NGHẼN CẦN OWNER PHÊ DUYỆT (BLOCKERS)
 
-1. Mở trang `/premium` với tư cách khách (chưa đăng nhập):
-   - Kiểm tra hiển thị giá `$5` (Plus / 30 ngày) và `$50` (Prime / 365 ngày).
-   - Kiểm tra nút `"Đăng nhập để thử nghiệm"` điều hướng sang `/login?next=%2Fpremium`.
-2. Đăng nhập tài khoản demo (`khang_dev` hoặc `kien_dev`):
-   - Truy cập `/premium`, bấm `"Thử nghiệm gói Plus ($5)"`.
-   - Hộp thoại Sandbox mở lên: bấm `"Thanh toán tức thì (Mô phỏng thành công)"`.
-   - Xem thông báo kích hoạt thành công, đóng hộp thoại.
-   - Kiểm tra banner `"Gói đang kích hoạt: Aura PLUS · Còn 30 ngày"`.
-   - Nút hành động đổi trạng thái `"Gói đang kích hoạt (còn 30 ngày)"`.
-3. Kiểm tra tính an toàn cổng VNPAY:
-   - Nút `"Cổng VNPAY Sandbox"` trong modal hiển thị trạng thái vô hiệu hóa kèm chú thích `"Chờ duyệt giá VND"`, bảo đảm fail-closed 100%.
+Để bảo vệ tuyệt đối tính an toàn tài chính và an ninh hệ thống, các hạng mục sau **tạm thời giữ trạng thái fail-closed** và cần phê duyệt chính thức từ Owner trước khi mở cổng thật:
+
+1. **Phê duyệt tỷ giá / Giá thanh toán VND chính thức:**
+   - Mức giá tham chiếu hiện tại (`125.000 đ` cho Plus và `1.250.000 đ` cho Prime) mới là giá định hướng, chưa phải giá thanh toán được chốt bằng văn bản.
+   - Khi Owner xác nhận tỷ giá chính thức, hệ thống sẽ bật `vnpay_pricing_approved=True` tại cấu hình backend.
+2. **Merchant Credentials VNPAY thực tế:**
+   - Hiện hệ thống sử dụng sandbox parameters (`TMN_CODE="AURAMEME"`, secret test). Cần bộ thông tin tài khoản Merchant chính thức từ VNPAY Sandbox hoặc Production.
+3. **Cấu hình IPN Webhook Live Callback:**
+   - Cần cấu hình địa chỉ IPN callback public có bảo vệ HTTPS (ví dụ thông qua domain production chính thức hoặc webhook gateway an toàn) để VNPAY có thể bắn tín hiệu server-to-server.
+4. **Quyết định kinh doanh về cơ chế nâng cấp gói (Upgrade Tier Policy):**
+   - Hiện tại hệ thống đang bảo toàn ngày hết hạn theo nguyên tắc cộng dồn an toàn. Nếu người dùng chuyển từ Plus lên Prime giữa chu kỳ, cần quyết định của Owner về việc quy đổi giá trị ngày còn lại của gói cũ hay thay thế hoàn toàn.
