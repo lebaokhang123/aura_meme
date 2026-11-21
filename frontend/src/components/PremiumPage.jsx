@@ -5,7 +5,7 @@ import { usePremium } from '../PremiumContext.jsx';
 import { auth, MOCK_AUTH } from '../auth.js';
 import '../workspace.css';
 
-const plans = [
+const defaultPlans = [
   {
     id: 'plus',
     name: 'Plus',
@@ -13,7 +13,7 @@ const plans = [
     boost: 2,
     price: 5,
     priceFormatted: '$5',
-    priceVndFormatted: '125.000 đ',
+    priceVndFormatted: '130.000 đ',
     icon: 'auto_awesome',
   },
   {
@@ -61,12 +61,13 @@ export default function PremiumPage() {
   const session = useSyncExternalStore(auth.subscribe, auth.snapshot);
   const isAuthenticated = !MOCK_AUTH && session.status === 'authenticated' && !!session.user;
 
+  const [plans, setPlans] = useState(defaultPlans);
   const [selected, setSelected] = useState(0);
   const [wiggle, setWiggle] = useState(false);
   const root = useRef(null);
   const dialogRef = useRef(null);
   const group = useId();
-  const plan = plans[selected];
+  const plan = plans[selected] || defaultPlans[selected] || defaultPlans[0];
 
   const [vnpayConfigured, setVnpayConfigured] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -74,19 +75,35 @@ export default function PremiumPage() {
   const [actionMessage, setActionMessage] = useState(null);
   const [notice, setNotice] = useState(null);
 
-  // Check gateway configuration
+  // Check gateway configuration and authoritative server plan prices
   useEffect(() => {
     let mounted = true;
-    if (isAuthenticated) {
-      auth
-        .read('/premium/status')
-        .then((res) => {
-          if (mounted && res) {
-            setVnpayConfigured(!!res.vnpay_configured);
+    auth
+      .read('/premium/status')
+      .then((res) => {
+        if (mounted && res) {
+          setVnpayConfigured(!!res.vnpay_configured);
+          if (res.plans && Array.isArray(res.plans)) {
+            setPlans((prev) =>
+              prev.map((p) => {
+                const sp = res.plans.find((item) => item.tier === p.id);
+                if (!sp) return p;
+                const vndFormatted =
+                  sp.amount_vnd_formatted ||
+                  (sp.amount_vnd ? `${Number(sp.amount_vnd).toLocaleString('vi-VN')} đ` : p.priceVndFormatted);
+                return {
+                  ...p,
+                  days: sp.duration_days ?? p.days,
+                  boost: sp.boost_multiplier ?? p.boost,
+                  priceFormatted: sp.amount_usd_formatted ?? p.priceFormatted,
+                  priceVndFormatted: vndFormatted,
+                };
+              })
+            );
           }
-        })
-        .catch(() => {});
-    }
+        }
+      })
+      .catch(() => {});
     return () => {
       mounted = false;
     };
@@ -98,22 +115,68 @@ export default function PremiumPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.has('vnp_status')) {
       const status = params.get('vnp_status');
-      if (status === 'success') {
-        refreshPremium();
+      const orderCode = params.get('order_code');
+
+      if (status === 'success' && orderCode) {
+        // Authoritative verification: Check order status and subscription from backend
         setNotice({
-          type: 'success',
+          type: 'info',
           text: t(
-            'Thanh toán VNPAY thành công! Gói hội viên đã được kích hoạt.',
-            'VNPAY payment successful! Membership activated.'
+            'Đang xác nhận thanh toán... Xin vui lòng đợi trong giây lát.',
+            'Payment is being confirmed... Please wait a moment.'
           ),
         });
+
+        const verify = async (attempt = 1) => {
+          try {
+            const [order, statusRes] = await Promise.all([
+              auth.read('/premium/orders/' + orderCode).catch(() => null),
+              auth.read('/premium/status').catch(() => null),
+            ]);
+            await refreshPremium();
+
+            const isSubActive = !!statusRes?.subscription?.is_active;
+            const isOrderSuccess = order?.status === 'success';
+
+            if (isOrderSuccess && isSubActive) {
+              setNotice({
+                type: 'success',
+                text: t(
+                  'Thanh toán VNPAY thành công! Gói hội viên đã được kích hoạt.',
+                  'VNPAY payment successful! Membership activated.'
+                ),
+              });
+            } else if (attempt < 3) {
+              // Retry in case IPN arrives slightly after browser return
+              setTimeout(() => verify(attempt + 1), 2000);
+            } else {
+              setNotice({
+                type: 'info',
+                text: t(
+                  'Đang xác nhận thanh toán với cổng VNPAY. Gói sẽ tự động kích hoạt khi có thông báo IPN từ ngân hàng.',
+                  'Payment is being confirmed with VNPAY. Membership will be activated as soon as IPN confirmation arrives.'
+                ),
+              });
+            }
+          } catch {
+            setNotice({
+              type: 'info',
+              text: t(
+                'Đang xác nhận thanh toán... Xin vui lòng kiểm tra lại sau giây lát.',
+                'Payment is being confirmed... Please check back in a moment.'
+              ),
+            });
+          }
+        };
+
+        verify();
       } else if (status === 'cancelled') {
         setNotice({
           type: 'error',
           text: t('Giao dịch VNPAY đã bị hủy.', 'VNPAY transaction was cancelled.'),
         });
       } else {
-        const msg = params.get('message') || 'error';
+        const msg = params.get('message') || params.get('code') || 'error';
         setNotice({
           type: 'error',
           text: t(
