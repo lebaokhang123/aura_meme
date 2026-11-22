@@ -109,7 +109,7 @@ def test_create_default_draft_author_timestamp_and_publish(blog):
     response = create_post(blog)
     assert response.status_code == 201
     body = response.json();assert body["status"] == "draft" and body["author"]["id"] == str(user_id)
-    assert set(body["author"]) == {"id", "username", "display_name", "created_at", "bio", "avatar_url"}
+    assert set(body["author"]) == {"id", "username", "display_name", "created_at", "bio", "avatar_url", "membership_tier"}
     assert body["media_url"] is None and body["created_at"] == body["updated_at"]
     assert "email" not in body["author"] and "comments_count" not in body
     path = "/posts/" + body["id"]

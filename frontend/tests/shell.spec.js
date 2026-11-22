@@ -4,6 +4,8 @@ const routes = ['/', '/explore', '/about', '/contact', '/rank', '/vault', '/logi
 
 test('one header keeps logo, navigation, search and controls aligned on every route', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
+  await page.route('https://fonts.googleapis.com/**', route => route.abort());
+  await page.route('https://fonts.gstatic.com/**', route => route.abort());
   let baseline;
   for (const route of routes) {
     await page.goto(route, { waitUntil: 'networkidle' });
@@ -44,7 +46,7 @@ for (const width of [375, 768, 1024, 1280, 1920]) {
   });
 }
 
-test('footer is shared, omitted on Home and opens a blank policy page', async ({ page, context }) => {
+test('footer is shared, omitted on Home and opens the privacy policy', async ({ page, context }) => {
   await page.goto('/');
   await expect(page.locator('footer')).toHaveCount(0);
   await expect(page.getByText('Chính sách bảo mật', { exact: true })).toHaveCount(0);
@@ -63,7 +65,7 @@ test('footer is shared, omitted on Home and opens a blank policy page', async ({
   const popup = await popupPromise;
   await popup.waitForLoadState();
   expect(popup.url()).toContain('/privacy.html');
-  expect(await popup.locator('body').innerText()).toBe('');
+  await expect(popup.locator('main')).toContainText('Chính sách bảo mật', {ignoreCase:true});
   await popup.close();
 });
 

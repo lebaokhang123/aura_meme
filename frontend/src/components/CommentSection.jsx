@@ -22,8 +22,8 @@ function CommentRow({comment}) {
     (comment.author&&current.username&&comment.author.toLowerCase()===current.username.toLowerCase())||
     (comment.handle&&current.username&&comment.handle.toLowerCase()===`@${current.username.toLowerCase()}`)
   ));
-  const effectiveAuthorTier=(isCurrentAuthor&&subscription?.is_active?subscription.tier:null)||comment.membershipTier||comment.membership_tier||author?.membershipTier||author?.membership_tier||'free';
   const author=comment.api?{avatar:comment.authorId===current?.id?current.avatar:comment.avatar,displayName:comment.authorId===current?.id?current.displayName:comment.authorName,membershipTier:comment.membershipTier||comment.membership_tier}:DEMO_USERS.find(user=>user.username===comment.author);
+  const effectiveAuthorTier=(isCurrentAuthor&&subscription?.is_active?subscription.tier:null)||comment.membershipTier||comment.membership_tier||author?.membershipTier||author?.membership_tier||'free';
   const profile=comment.api?{handle:comment.handle,level:comment.level,nickname:comment.nickname}:POSTS.find(post=>post.id===({Khang_dev:'khang',Kien_dev:'kien',Gigachad:'gigachad'}[comment.author]));
   const classes=authorClasses(comment.api?apiStyleAuthor(comment.author):comment.author,true);
   const isAuthor=comment.api?current?.id===comment.authorId:current?.username===comment.author;
@@ -90,8 +90,8 @@ function CommentRow({comment}) {
             />
           </label>}
           <div className="flex gap-2 mt-2 justify-end">
-            <button type="button" disabled={busy} className="px-2 py-1 text-xs text-outline hover:text-on-surface" onClick={()=>{setConfirm(null);setReason('');setError('')}}>Hủy</button>
-            <button type="button" disabled={busy} className={`px-2 py-1 text-xs rounded font-semibold ${confirm==='hide'?'bg-secondary-container text-on-secondary-container':'bg-error/20 text-error hover:bg-error/30'}`} onClick={handleAction}>{busy?'Đang lưu...':'Xác nhận'}</button>
+            <button type="button" disabled={busy} className="px-2 py-1 text-xs text-outline hover:text-on-surface" onClick={()=>{setMenuOpen(false);setConfirm(null);setReason('');setError('');menuButton.current?.focus()}}>Hủy</button>
+            <button type="button" disabled={busy} className={`px-2 py-1 text-xs rounded font-semibold ${confirm==='hide'?'bg-secondary-container text-on-secondary-container':'bg-error/20 text-error hover:bg-error/30'}`} onClick={handleAction}>{busy?'Đang lưu...':confirm==='author-delete'?'Xác nhận xóa':'Xác nhận'}</button>
           </div>
         </div>}
       </div>}</div>}

@@ -782,7 +782,7 @@ test('Avatar halo renders for Plus and Prime users on Home and Explore', async (
 
   // Check Home Composer avatar has prime halo
   await page.goto('/');
-  const composerAvatar = page.locator('[data-current-user-avatar] img');
+  const composerAvatar = page.locator('img[data-current-user-avatar]');
   await expect(composerAvatar).toBeVisible();
   await expect(composerAvatar).toHaveClass(/aura-avatar--prime/);
 

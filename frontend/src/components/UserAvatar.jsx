@@ -7,6 +7,7 @@ export default function UserAvatar({
   tier = 'free',
   size = 'md',
   className = '',
+  currentUserAvatar,
   wrapClassName = '',
   badge = true,
   width,
@@ -40,6 +41,7 @@ export default function UserAvatar({
   return (
     <div className={`user-avatar-wrap ${wrapClassName}`}>
       <img
+        data-current-user-avatar={currentUserAvatar || undefined}
         src={src || '/assets/identity/default-avatar.svg'}
         alt={alt}
         className={`rounded-full object-cover shrink-0 ${sizeClasses} ${

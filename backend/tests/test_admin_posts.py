@@ -60,7 +60,7 @@ def test_moderation_csrf_origin(admin,method,problem):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("values", [{},{"author_id":"forged"},{"status":"deleted"},{"status":None},
+@pytest.mark.parametrize("values", [{},{"author_id":"forged"},{"status":"unknown"},{"status":None},
     {"title":" "},{"content":None},{"title":"x\x00"},{"media_id":"bad"},{"category_id":None}])
 def test_admin_post_strict_patch(admin,values):
     client,*_=admin
@@ -155,3 +155,13 @@ def test_admin_post_body_boundary_preserves_legitimate_maximum(admin):
     assert client.patch(path,content=json.dumps({'content':'🐱'*20000}),headers=headers).status_code==200
     response=client.patch(path,content=b'x'*262145,headers=headers)
     assert response.status_code==422 and response.json()['error']['message']=='Request body too large.'
+
+
+@pytest.mark.integration
+def test_moderation_delete_sets_timestamp_before_flush(admin):
+    client, connection, *_ = admin
+    ident = UUID(create_post(admin, status="published").json()["id"])
+    response = mutation(client, "PATCH", "/admin/posts/" + str(ident), {"status": "deleted", "reason": "Moderation test"})
+    assert response.status_code == 200, response.text
+    assert connection.scalar(select(Post.deleted_at).where(Post.id == ident)) is not None
+    assert client.get("/api/v1/posts/" + str(ident)).status_code == 404

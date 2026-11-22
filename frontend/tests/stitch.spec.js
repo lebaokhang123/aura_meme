@@ -108,7 +108,7 @@ for (const user of users) {
     expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain('demo-password-only');
     const logout = page.getByRole('button', { name: /đăng xuất/i }).or(page.getByRole('link', { name: /đăng xuất/i })).first();
     if (!(await logout.isVisible())) {
-      await page.locator('header button[aria-haspopup="true"]').click();
+      await page.locator('header button[aria-controls="site-account-menu"]').click();
     }
     await expect(logout).toBeVisible();
     await logout.click();

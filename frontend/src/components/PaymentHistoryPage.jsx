@@ -176,7 +176,7 @@ export default function PaymentHistoryPage() {
       // Fallback to orders in view
       historyList = orders.filter(o => o.status === 'success' || o.status === 'completed');
     }
-    const success = downloadReceiptPdf(order, auth.user, historyList);
+    const success = downloadReceiptPdf(order, auth.snapshot().user, historyList);
     if (success) {
       setDownloadSuccess(order.order_code);
       setTimeout(() => setDownloadSuccess(null), 3000);

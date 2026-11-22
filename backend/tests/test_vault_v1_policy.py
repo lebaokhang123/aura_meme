@@ -111,7 +111,7 @@ def test_cooldown_details_are_allowlisted_and_old_errors_keep_their_shape():
     assert set(json.loads(error_response(403, 'FORBIDDEN', 'Denied.').body)['error']) == {'code', 'message', 'request_id'}
 
 
-@pytest.mark.parametrize('revisions,expected', [(['0012_aura_v1'], True), (['0011_vault_v1'], False), (['0012_aura_v1', '0011_vault_v1'], False), ([], False)])
+@pytest.mark.parametrize('revisions,expected', [(['0014_premium_sandbox'], True), (['0013_notifications'], True), (['0012_aura_v1'], True), (['0011_vault_v1'], False), (['0012_aura_v1', '0011_vault_v1'], False), ([], False)])
 def test_runtime_requires_single_reviewed_current_schema(revisions, expected):
     from unittest.mock import Mock
     from app.vault_runtime import schema_ready

@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { usePreferences } from '../PreferencesContext.jsx';
 import { usePremium } from '../PremiumContext.jsx';
 import { auth } from '../auth.js';
-import { readDemoUser } from '../demo.js';
 import { downloadReceiptPdf } from '../receipt-pdf.js';
 import '../payment-ring-081.css';
 
@@ -129,6 +128,7 @@ export default function PremiumCheckoutPage() {
           // Order was already paid
           setCheckoutState('success');
           setReceipt({
+            ...data,
             orderCode: data.order_code,
             tierName: data.tier === 'prime' ? 'Prime' : 'Plus',
             amountVnd: `${Number(data.amount_vnd).toLocaleString('vi-VN')} VNĐ`,
@@ -279,6 +279,7 @@ export default function PremiumCheckoutPage() {
       if (premiumStatus?.subscription?.is_active && orderStatus?.status === 'success') {
         setCheckoutState('success');
         setReceipt({
+          ...orderStatus,
           orderCode: currentOrder.order_code,
           tierName: currentOrder.tier === 'prime' ? 'Prime' : 'Plus',
           amountVnd: `${Number(currentOrder.amount_vnd).toLocaleString('vi-VN')} VNĐ`,
@@ -566,10 +567,10 @@ export default function PremiumCheckoutPage() {
                       type="button"
                       className="checkout-btn-download-receipt"
                       onClick={async () => {
-                        const activeUser = auth.snapshot()?.user || readDemoUser?.();
+                        const activeUser = auth.snapshot().user;
                         let historyList = null;
                         try {
-                          historyList = await auth.read('/premium/orders/successful');
+                          if (receipt?.owner_username === activeUser?.username) historyList = await auth.read('/premium/orders/successful');
                         } catch {}
                         downloadReceiptPdf(receipt || order, activeUser, historyList);
                       }}

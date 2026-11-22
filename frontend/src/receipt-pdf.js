@@ -65,9 +65,9 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
   const durationDays = order.duration_days || order.durationDays || (isPrime ? 365 : 30);
 
   // Exact USD and reference VND amounts
-  const amountUsdValue = isPrime ? '50.00' : '5.00';
+  const amountUsdValue = (order.amount_usd_cents / 100).toFixed(2);
   const amountUsdFormatted = `${amountUsdValue} USD`;
-  const amountVndFormatted = isPrime ? '1.250.000 VNĐ' : '130.000 VNĐ';
+  const amountVndFormatted = Number(order.amount_vnd).toLocaleString('vi-VN') + ' VNĐ';
 
   // Transaction reference (distinguish PayPal Order ID/Capture ID from AuraMeme order code)
   const txnRef = order.paypal_order_id || order.provider_txn_id || orderCode;
@@ -87,7 +87,7 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
   } else if (order.provider === 'vnpay_sandbox') {
     providerName = 'VNPAY';
   }
-  const username = user?.username || user?.displayName || 'khang_dev';
+  const username = order.owner_username || user?.username || user?.displayName || '—';
 
   const rawDate = order.completed_at || order.activatedAt || order.created_at;
   const dateFormatted = formatReceiptDate(rawDate);

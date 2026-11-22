@@ -122,9 +122,11 @@ def test_idor_order_authorization():
     admin_account.db = MagicMock()
     admin_account.db.scalar.return_value = order
 
+    admin_account.db.get.return_value.username = "order_owner"
     admin_dto = get_subscription_order(order_code, account=admin_account)
     assert admin_dto.order_code == order_code
     assert admin_dto.tier == "plus"
+    assert admin_dto.owner_username == "order_owner"
 
 
 def test_idempotency_prevent_double_capture():
@@ -362,6 +364,7 @@ def test_pending_order_auto_expiration_after_1_hour():
     account.db = MagicMock()
     account.db.scalar.return_value = order
 
+    account.db.get.return_value.username = "order_owner"
     dto = get_subscription_order(order_code, account=account)
     assert dto.status == "expired"
     assert order.status == "expired"
@@ -753,6 +756,7 @@ def test_pending_order_expiry_checks_paypal_capture_first():
     req1 = MagicMock()
     req1.app.state.paypal = mock_paypal
 
+    account1.db.get.return_value.username = "order_owner"
     dto1 = get_subscription_order("AM-PLUS-1795330000-CAPTURED1", request=req1, account=account1)
     assert dto1.status == "success"
     assert captured_order.status == "success"
@@ -786,6 +790,7 @@ def test_pending_order_expiry_checks_paypal_capture_first():
         "status": "CREATED",
     }
 
+    account2.db.get.return_value.username = "order_owner"
     dto2 = get_subscription_order("AM-PLUS-1795330000-ABANDONED", request=req1, account=account2)
     assert dto2.status == "expired"
     assert uncaptured_order.status == "expired"
@@ -842,6 +847,12 @@ def test_production_blocks_simulated_order_creation_and_capture():
         )
     assert exc_info.value.status == 403
     assert exc_info.value.code == "FORBIDDEN"
+
+    req.app.state.auth.settings.auth_environment = "development"
+    with pytest.raises(AuthError) as disabled:
+        capture_subscription_order(sim_order.order_code, payload=CaptureOrderInput(), request=req, account=account)
+    assert disabled.value.status == 403
+    req.app.state.auth.settings.auth_environment = "production"
 
     # 3. Block unconfigured PayPal capture fallback in production
     pp_order = SubscriptionOrder(

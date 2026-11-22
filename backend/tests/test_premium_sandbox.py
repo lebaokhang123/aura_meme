@@ -898,6 +898,7 @@ def test_get_subscription_order_endpoint():
     mock_db.scalar.return_value = order
     mock_account.db = mock_db
 
+    mock_db.get.return_value.username = "order_owner"
     dto = get_subscription_order("AM-PLUS-1795330001-GET12345", account=mock_account)
     assert dto.order_code == "AM-PLUS-1795330001-GET12345"
     assert dto.tier == "plus"

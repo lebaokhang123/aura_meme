@@ -70,6 +70,10 @@ class OrderDto(BaseModel):
     completed_at: datetime | None = None
 
 
+class OrderDetailDto(OrderDto):
+    owner_username: str
+
+
 class Pagination(BaseModel):
     page: int
     page_size: int
@@ -698,7 +702,7 @@ def list_successful_orders(
 
 @router.get(
     "/orders/{order_code}",
-    response_model=OrderDto,
+    response_model=OrderDetailDto,
     operation_id="getSubscriptionOrder",
     responses={**ERRORS, 404: {"model": ErrorResponse}},
 )
@@ -726,7 +730,8 @@ def get_subscription_order(
     _check_and_expire_order(order, account.db, now, paypal)
 
     plan = get_plan(order.tier)
-    return OrderDto(
+    return OrderDetailDto(
+        owner_username=account.db.get(User, order.user_id).username,
         id=order.id,
         order_code=order.order_code,
         tier=order.tier,
@@ -904,6 +909,7 @@ def capture_subscription_order(
     auth_runtime = getattr(request.app.state, "auth", None)
     auth_env = getattr(auth_runtime.settings, "auth_environment", "production") if auth_runtime and hasattr(auth_runtime, "settings") else "production"
 
+    sandbox_enabled = getattr(getattr(request.app.state, "premium", None), "premium_sandbox_enabled", False)
     paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
 
     if order.provider in ("paypal_sandbox", "unselected"):
