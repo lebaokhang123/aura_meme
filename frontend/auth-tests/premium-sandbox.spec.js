@@ -86,7 +86,7 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
         avatar_url: null,
         level: 15,
         realm: 'Trúc Cơ',
-        title: 'Bá Chủ Thiên Lôi',
+        title: 'Sáng Thế Thần',
         membership_tier: currentSubscription?.is_active ? currentSubscription.tier : 'free',
       });
     }

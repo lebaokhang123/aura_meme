@@ -620,13 +620,45 @@ class UserSubscription(Base):
     )
 
 
+class UserOAuthIdentity(Base):
+    __tablename__ = "user_oauth_identities"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_sub: Mapped[str] = mapped_column(Text, nullable=False)
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("provider IN ('google')", name="provider"),
+        UniqueConstraint("provider", "provider_sub", name="uq_user_oauth_identities_provider_sub"),
+        Index("ix_user_oauth_identities_user_id", "user_id"),
+    )
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("ix_password_reset_tokens_user_created", "user_id", "created_at"),
+    )
+
+
 def reviewed_metadata(revision):
     """Exact reviewed predecessor shapes; never mutate mapped runtime metadata."""
     if revision not in {'0009_vault_open','0010_social_reactions','0011_vault_v1','0012_aura_v1'}:
         raise ValueError('Unknown reviewed schema revision')
     metadata = MetaData(naming_convention=Base.metadata.naming_convention)
     for table in Base.metadata.sorted_tables:
-        if table.name in {'notifications', 'subscription_orders', 'user_subscriptions'}:
+        if table.name in {'notifications', 'subscription_orders', 'user_subscriptions', 'user_oauth_identities', 'password_reset_tokens'}:
             continue
         if revision != '0012_aura_v1' and table.name == 'aura_reward_events':
             continue

@@ -1,7 +1,7 @@
 import React,{useState} from 'react';
 import {useLocalized} from '../localize.jsx';
 import {PostCategory,PostLink} from '../FeedContext.jsx';
-import {OriginalBody,authorClasses} from '../generated/social-stitch.jsx';
+import {OriginalBody} from '../generated/social-stitch.jsx';
 import {ReactionBar} from './ReactionBar.jsx';
 import {icon,SocialMessage,CategorySelect} from './social-ui.jsx';
 import {CommentSection,relativeTime} from './CommentSection.jsx';
@@ -14,16 +14,17 @@ import {usePremium} from '../PremiumContext.jsx';
 import {readDemoUser} from '../demo.js';
 import {POSTS} from '../feed-data.js';
 import UserAvatar from './UserAvatar.jsx';
+import {LevelPill,TitleBadge} from './RealmBadges.jsx';
 
 const authors={khang:'Khang_dev',kien:'Kien_dev',gigachad:'Gigachad'};
 export const apiStyleAuthor=username=>username==='kien_dev'?'Kien_dev':'Khang_dev';
-export function LevelPill({level,className}){return level?<span className={className} translate="no">{level}</span>:null;}
+export {LevelPill,TitleBadge};
 export function HallIdentity({id}) {
-  const post=POSTS.find(post=>post.id===id),classes=authorClasses(authors[id]);
-  return <div className="flex items-center gap-1.5 flex-wrap min-w-0 hall-identity"><span className="font-label-md text-label-md font-bold text-on-surface whitespace-nowrap">{post.authorName}</span><span className="font-mono-tag text-mono-tag text-outline whitespace-nowrap">@{authors[id]}</span><span className={`${classes.level} whitespace-nowrap`}>{post.level}</span><span className={`${classes.nickname} whitespace-nowrap`}>{post.nickname}</span></div>;
+  const post=POSTS.find(post=>post.id===id);
+  return <div className="flex items-center gap-1.5 flex-wrap min-w-0 hall-identity"><span className="font-label-md text-label-md font-bold text-on-surface whitespace-nowrap">{post.authorName}</span><span className="font-mono-tag text-mono-tag text-outline whitespace-nowrap">@{authors[id]}</span><LevelPill level={post.level} size="md"/><TitleBadge level={post.level} realm={post.realm} title={post.nickname} size="md"/></div>;
 }
 export function PostHeader({post,variant,menu}) {
-  const render=useLocalized(),classes=authorClasses(post.api?apiStyleAuthor(post.author):post.author||authors[post.id]),{language}=usePreferences();
+  const render=useLocalized(),{language}=usePreferences();
   const {subscription}=usePremium?.()||{};
   const currentUser=readDemoUser?.();
   const isCurrentAuthor=Boolean(currentUser&&(
@@ -33,11 +34,14 @@ export function PostHeader({post,variant,menu}) {
   ));
   const effectiveTier=(isCurrentAuthor&&subscription?.is_active?subscription.tier:null)||post.membershipTier||post.membership_tier||'free';
   const timeLabel=post.createdAt?relativeTime(post.createdAt,language):(post.timeLabel||'');
+  const profileHref=post.api&&post.author?'/profile/'+encodeURIComponent(post.author):null;
+  const stopExplore=variant==='explore'?e=>e.stopPropagation():undefined;
   return render(<div className="flex items-center justify-between social-post-header">
-    <div className="flex items-center gap-3 min-w-0 social-post-identity"><UserAvatar src={post.avatar} alt={post.authorName} tier={effectiveTier} size="md"/>
+    <div className="flex items-center gap-3 min-w-0 social-post-identity">{profileHref?<a href={profileHref} onClick={stopExplore} aria-label={`Hồ sơ ${post.authorName}`} className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-secondary"><UserAvatar src={post.avatar} alt={post.authorName} tier={effectiveTier} size="md"/></a>:<UserAvatar src={post.avatar} alt={post.authorName} tier={effectiveTier} size="md"/>}
       <div className="flex flex-col min-w-0"><div className="flex items-center gap-1.5 flex-wrap">
-        <span className={`font-label-lg text-label-lg text-on-surface font-bold hover:underline cursor-pointer ${post.api?'inline-block max-w-full break-words':variant==='explore'?'flex flex-col whitespace-nowrap':''}`}>{variant==='profile'?<a href={'/profile/'+encodeURIComponent(post.author)} translate="no">{post.authorName}</a>:variant==='explore'?<PostLink post={post}/>:post.authorName}{' '}{post.api?<a href={'/profile/'+encodeURIComponent(post.author)} className="text-xs text-outline font-normal">{post.handle}</a>:<span className="text-xs text-outline font-normal">{post.handle}</span>}</span>
-        <LevelPill level={post.level} className={`${classes.level} whitespace-nowrap shrink-0`}/>{post.nickname&&<span className={`${classes.nickname} whitespace-nowrap shrink-0`} translate="no">{post.nickname}</span>}
+        <span className={`font-label-lg text-label-lg text-on-surface font-bold hover:underline cursor-pointer ${post.api?'inline-block max-w-full break-words':variant==='explore'?'flex flex-col whitespace-nowrap':''}`}>{profileHref?<a href={profileHref} onClick={stopExplore} translate="no">{post.authorName}</a>:variant==='explore'?<PostLink post={post}/>:post.authorName}{' '}{profileHref?<a href={profileHref} onClick={stopExplore} className="text-xs text-outline font-normal">{post.handle}</a>:<span className="text-xs text-outline font-normal">{post.handle}</span>}</span>
+        <LevelPill level={post.level} size="md"/>
+        <TitleBadge level={post.level} realm={post.realm} title={post.nickname} size="md"/>
       </div><div className="flex items-center gap-2 text-outline font-body-sm text-body-sm">{variant==='profile'?<a href={'/#post-'+post.id} className="font-mono-tag text-mono-tag">{timeLabel}</a>:<span className="font-mono-tag text-mono-tag">{timeLabel}</span>}<span>·</span><PostCategory post={post} label={variant==='profile'?post.categoryLabel:undefined} className="text-secondary font-medium"/></div></div>
     </div>{menu||<button type="button" className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors" aria-label="Tùy chọn bài viết">{icon('more_horiz')}</button>}
   </div>);

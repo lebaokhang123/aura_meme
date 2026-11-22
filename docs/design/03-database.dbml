@@ -869,3 +869,39 @@ Ref: notifications.actor_user_id > users.id [delete: set null]
 Ref: subscription_orders.user_id > users.id [delete: no action]
 Ref: user_subscriptions.user_id > users.id [delete: no action]
 Ref: user_subscriptions.order_id > subscription_orders.id [delete: no action]
+
+Table user_oauth_identities {
+  id uuid [not null, pk]
+  user_id uuid [not null]
+  provider text [not null]
+  provider_sub text [not null]
+  email text [not null]
+  email_verified boolean [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (provider, provider_sub) [unique]
+    user_id
+  }
+
+  Note: 'Task 7 | Định danh OAuth Google (sub ổn định, không tự gộp email)'
+}
+
+Table password_reset_tokens {
+  id uuid [not null, pk]
+  user_id uuid [not null]
+  token_hash text [not null, unique]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id, created_at)
+  }
+
+  Note: 'Task 7 | Token khôi phục mật khẩu một lần (lưu SHA-256 hash, 30 phút)'
+}
+
+Ref: user_oauth_identities.user_id > users.id [delete: restrict]
+Ref: password_reset_tokens.user_id > users.id [delete: restrict]

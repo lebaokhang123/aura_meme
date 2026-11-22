@@ -45,6 +45,25 @@ def read_public_level(db,owner,now):
     return db.scalar(select(public_level_column(now)).select_from(User).where(User.id==owner))
 
 
+def public_is_admin_column():
+    """Correlated EXISTS subquery verifying DB ADMIN role for cosmetic title; zero N+1 queries."""
+    return exists(
+        select(UserRole.user_id)
+        .join(Role, Role.id == UserRole.role_id)
+        .where(UserRole.user_id == User.id, Role.code == "ADMIN")
+    ).correlate(User).label("is_admin")
+
+
+def read_public_is_admin(db, owner) -> bool:
+    return bool(db.scalar(
+        select(exists(
+            select(UserRole.user_id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(UserRole.user_id == owner, Role.code == "ADMIN")
+        ))
+    ))
+
+
 def _streak(db,owner,last_day):
     from app.checkin import streak_length
     return streak_length(db,owner,last_day)

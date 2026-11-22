@@ -2,8 +2,10 @@ import React,{useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {auth} from '../auth.js';
 import {apiAuraProgress,apiAuraCheckIn,resetSeconds} from '../aura-api.js';
 import {useCopy,ErrorMessage} from './account-ui.jsx';
+import {LevelPill,TitleBadge} from './RealmBadges.jsx';
+import {parseLevel} from '../realm-tier.js';
 
-export function AuraProgress({profileId,home=false,publicLevel,publicRealm}){
+export function AuraProgress({profileId,home=false,publicLevel,publicRealm,publicTitle}){
  const t=useCopy(),session=useSyncExternalStore(auth.subscribe,auth.snapshot),identity=session.user?.id;
  const own=session.status==='authenticated'&&(home||profileId===identity);
  const [state,setState]=useState({}),[revision,setRevision]=useState(0),[now,setNow]=useState(Date.now());
@@ -30,11 +32,13 @@ export function AuraProgress({profileId,home=false,publicLevel,publicRealm}){
   }finally{locked.current=false;}
  }
  const percentage=data?(data.next_level_xp===null?100:Math.min(100,100*data.level_xp/Math.max(1,data.next_level_xp))):0;
- const displayLevel=data?.level??(publicLevel!==undefined&&publicLevel!==null?publicLevel:'—');
+ const numericLevel=parseLevel(data?.level??publicLevel);
+ const displayLevel=numericLevel??'—';
  const displayRealm=data?.realm||publicRealm||t('Chưa có dữ liệu','No data yet');
- const titleBadge=home?(session.user?.username==='khang_dev'?'Bá Chủ Thiên Lôi':session.user?.username==='kien_dev'?'Thiên Tướng Độ Ách':displayRealm):displayRealm;
+ const serverTitle=publicTitle||(own?session.user?.title:null)||null;
+ const titleBadge=numericLevel?(serverTitle||displayRealm):displayRealm;
  return <div data-aura className={home?'am-profile-progress am-home-aura-progress':'am-profile-progress'} aria-busy={current.busy||current.saving||undefined}>
- <div className="am-profile-badges"><span translate="no">LVL {displayLevel}</span><span translate="no">{titleBadge}</span></div>
+ <div className="am-profile-badges">{numericLevel?<><LevelPill level={numericLevel} size="lg"/><TitleBadge level={numericLevel} realm={displayRealm} title={titleBadge} size="lg"/></>:<><span translate="no">LVL {displayLevel}</span><span translate="no">{titleBadge}</span></>}</div>
  <div className="am-profile-progress-track" role="progressbar" aria-label={t('Tiến độ Level','Level progress')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={data?Math.floor(percentage):undefined}><div style={{width:percentage+'%',height:'100%',background:'var(--am-secondary)'}}/></div>
  <div className="am-profile-progress-caption"><span>{data?data.total_xp+' Exp':'— Exp'}</span><span>{t('Chuỗi: ','Streak: ')}{data?.streak_days??'—'}</span></div>
  {data&&<><span className="block font-body-sm text-[12px] text-on-surface-variant leading-relaxed">{data.next_level_xp===null?t('Đã đạt cấp tối đa','Maximum level reached'):t('Exp cần để lên cấp: ','Exp to next level: ')+data.xp_to_next}</span><span className="block font-body-sm text-[12px] text-on-surface-variant leading-relaxed">{t('Exp gốc: ','Earned Exp: ')}{data.earned_xp} · {t('Exp thưởng: ','Bonus Exp: ')}{data.bonus_xp}</span></>}

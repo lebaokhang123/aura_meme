@@ -238,11 +238,13 @@ def test_user_public_level_contract_and_policy_gated_sql():
         assert dumped['realm'] == realm
         assert dumped['title'] == realm
     assert 'realm' not in UserPublic(**base, realm='Phi Thăng').model_dump()
-    assert 'title' not in UserPublic(**base, title='Bá Chủ').model_dump()
-    khang = UserPublic(**{**base, 'username': 'khang_dev'}, level=79).model_dump()
-    assert khang['title'] == 'Bá Chủ Thiên Lôi'
-    kien = UserPublic(**{**base, 'username': 'kien_dev'}, level=9).model_dump()
-    assert kien['title'] == 'Thiên Tướng Độ Ách'
+    assert 'title' not in UserPublic(**base, title='Sáng Thế Thần').model_dump()
+    khang = UserPublic(**{**base, 'username': 'khang_dev'}, level=79, is_admin_title=True).model_dump()
+    assert khang['title'] == 'Sáng Thế Thần' and khang['realm'] == 'Đại Thừa'
+    kien = UserPublic(**{**base, 'username': 'kien_dev'}, level=9, is_admin_title=True).model_dump()
+    assert kien['title'] == 'Sáng Thế Thần' and kien['realm'] == 'Luyện Khí'
+    spoof = UserPublic(**{**base, 'username': 'khang_dev'}, level=79, is_admin_title=False).model_dump()
+    assert spoof['title'] == 'Đại Thừa'
     for invalid in (0, 101, -1, True, '11', 1.5):
         with pytest.raises(ValidationError):
             UserPublic(**base, level=invalid)

@@ -8,9 +8,8 @@ import {usePremium} from '../PremiumContext.jsx';
 import {useLocalized} from '../localize.jsx';
 import {ReactionBar} from './ReactionBar.jsx';
 import {icon,SocialMessage} from './social-ui.jsx';
-import {authorClasses} from '../generated/social-stitch.jsx';
 import {POSTS} from '../feed-data.js';
-import {apiStyleAuthor,LevelPill} from './PostCard.jsx';
+import {LevelPill,TitleBadge} from './RealmBadges.jsx';
 import {relativeTime} from '../relative-time.js';
 import UserAvatar from './UserAvatar.jsx';
 export {relativeTime};
@@ -24,7 +23,7 @@ function CommentRow({comment}) {
   ));
   const author=comment.api?{avatar:comment.authorId===current?.id?current.avatar:comment.avatar,displayName:comment.authorId===current?.id?current.displayName:comment.authorName,membershipTier:comment.membershipTier||comment.membership_tier}:DEMO_USERS.find(user=>user.username===comment.author);
   const effectiveAuthorTier=(isCurrentAuthor&&subscription?.is_active?subscription.tier:null)||comment.membershipTier||comment.membership_tier||author?.membershipTier||author?.membership_tier||'free';
-  const profile=comment.api?{handle:comment.handle,level:comment.level,nickname:comment.nickname}:POSTS.find(post=>post.id===({Khang_dev:'khang',Kien_dev:'kien',Gigachad:'gigachad'}[comment.author]));
+  const profile=comment.api?{handle:comment.handle,level:comment.level,realm:comment.realm,nickname:comment.nickname}:POSTS.find(post=>post.id===({Khang_dev:'khang',Kien_dev:'kien',Gigachad:'gigachad'}[comment.author]));
   const classes=authorClasses(comment.api?apiStyleAuthor(comment.author):comment.author,true);
   const isAuthor=comment.api?current?.id===comment.authorId:current?.username===comment.author;
   const isAdmin=!MOCK_AUTH&&Array.isArray(current?.roles)&&current.roles.includes('ADMIN');
@@ -50,16 +49,17 @@ function CommentRow({comment}) {
       setMenuOpen(false);setConfirm(null);setReason('');
     }catch(e){setError(e.message)}finally{pending.current=false;setBusy(false)}
   };
+  const commentProfileHref=comment.api&&comment.author?'/profile/'+encodeURIComponent(comment.author):null;
   return render(<div className="flex items-start gap-3 p-2.5 rounded-xl bg-surface-container/40 hover:bg-surface-container/70 transition-colors" data-comment-id={comment.id}>
-    <UserAvatar src={author.avatar} alt={author.displayName} tier={effectiveAuthorTier} size="sm"/>
+    {commentProfileHref?<a href={commentProfileHref} aria-label={`Hồ sơ ${author.displayName}`} className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-secondary"><UserAvatar src={author.avatar} alt={author.displayName} tier={effectiveAuthorTier} size="sm"/></a>:<UserAvatar src={author.avatar} alt={author.displayName} tier={effectiveAuthorTier} size="sm"/>}
     <div className="flex-1 flex flex-col gap-1 min-w-0">
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col min-w-0 gap-0.5">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-            <span translate={comment.api?'no':undefined} className="font-label-md text-[13px] font-bold text-on-surface hover:underline cursor-pointer break-all">{author.displayName}</span>
-            <span translate={comment.api?'no':undefined} className="text-[11px] text-outline font-normal">{profile.handle}</span>
-            <LevelPill level={profile.level} className={`${classes.level} whitespace-nowrap shrink-0`}/>
-            {profile.nickname&&<span className={`${classes.nickname} whitespace-nowrap shrink-0`} translate="no">{profile.nickname}</span>}
+            {commentProfileHref?<a href={commentProfileHref} translate="no" className="font-label-md text-[13px] font-bold text-on-surface hover:underline cursor-pointer break-all">{author.displayName}</a>:<span translate={comment.api?'no':undefined} className="font-label-md text-[13px] font-bold text-on-surface hover:underline cursor-pointer break-all">{author.displayName}</span>}
+            {commentProfileHref?<a href={commentProfileHref} translate="no" className="text-[11px] text-outline font-normal hover:underline">{profile.handle}</a>:<span translate={comment.api?'no':undefined} className="text-[11px] text-outline font-normal">{profile.handle}</span>}
+            <LevelPill level={profile.level} size="sm"/>
+            <TitleBadge level={profile.level} realm={profile.realm} title={profile.nickname} size="sm"/>
           </div>
           <time className="text-outline text-[10.5px] font-mono-tag leading-tight" dateTime={comment.createdAt?new Date(comment.createdAt).toISOString():undefined}>
             {comment.createdAt ? relativeTime(comment.createdAt, language) : (comment.timeLabel || (language==='en'?'Just now':'Vừa xong'))}
