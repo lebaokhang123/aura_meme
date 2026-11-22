@@ -56,7 +56,7 @@ function formatDateObj(d) {
  * @returns {jsPDF|null} Configured jsPDF instance
  */
 export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null) {
-  if (!order) return null;
+  if (!['success', 'completed'].includes(order?.status)) return null;
 
   const orderCode = order.order_code || order.orderCode || 'AM-ORDER';
   const tier = (order.tier || order.tierName || 'plus').toLowerCase().replace('aura ', '');
@@ -381,8 +381,9 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
         hProvider = 'VNPAY';
       }
       const hDate = formatReceiptDate(histItem.completed_at || histItem.created_at);
-      const isHistPrime = (histItem.tier || '').toLowerCase() === 'prime';
-      const hAmount = histItem.amount_usd_formatted || (isHistPrime ? '$50' : '$5');
+      const hAmount = Number.isInteger(histItem.amount_usd_cents)
+        ? (histItem.amount_usd_cents / 100).toFixed(2) + ' USD'
+        : histItem.amount_usd_formatted || '—';
       const hRef = histItem.provider_txn_id || histItem.order_code || '—';
 
       // Determine row height needed
