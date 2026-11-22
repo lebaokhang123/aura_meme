@@ -1,5 +1,9 @@
 # AuraMeme
 
+## Hotfix 23/11/2026
+
+Owner cho phép tích hợp sau khi checkout, pending recovery, Admin transactions và PDF đạt gate. Bằng chứng và quyết định kỹ thuật tại docs/tasks/premium-sandbox-task5.md. Quy tắc cập nhật tài liệu hiện có áp dụng khi tích hợp Task 6–8 sau này.
+
 ## Nghiệm thu Task 1–5 · 22/11/2026
 
 Bản nghiệm thu xuất phát từ Task 5 `682d247`. Baseline GitHub `dev` là `eacfa7d`. Tích hợp chờ Owner duyệt. Frontend React/Vite JSX, backend FastAPI và PostgreSQL.

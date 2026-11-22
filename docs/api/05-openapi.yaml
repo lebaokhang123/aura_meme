@@ -490,7 +490,15 @@ paths:
               - success
               - failed
               - cancelled
+              - expired
             type: string
+            nullable: true
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
             nullable: true
       responses:
         "200":
@@ -4353,6 +4361,7 @@ components:
             - success
             - failed
             - cancelled
+            - expired
           title: Status
         provider_txn_id:
           title: Provider Txn Id
@@ -4362,6 +4371,19 @@ components:
           type: string
           format: date-time
           title: Created At
+        owner_username:
+          type: string
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        amount_usd_cents:
+          type: integer
+          nullable: true
+        currency:
+          type: string
+          default: USD
       type: object
       required:
         - id

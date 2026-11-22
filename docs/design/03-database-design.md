@@ -796,3 +796,6 @@ Các điểm dưới đây là **tham số nghiệp vụ chưa phê duyệt chí
 ### Reaction bình luận — DRAFT0010 / REVIEW
 
 `comment_reactions`: comment_id UUID FK comments.id RESTRICT; user_id UUID FK users.id RESTRICT; reaction_type TEXT CHECK sáu loại; created_at/updated_at TIMESTAMPTZ NOT NULL. PK(comment_id,user_id), index(comment_id,reaction_type) cho counts và index(user_id) cho FK. Xóa mềm giữ nguyên các hàng reaction, public reads loại nội dung hidden/deleted và actor inactive. Không có cascade hoặc reward. Upgrade không đổi dữ liệu cũ; downgrade chỉ khi bảng mới rỗng và post_reactions không có loại mới. Chưa apply test/E2E/demo/development.
+
+
+Hotfix 23/11/2026 giữ schema 0014 và DBML. Khóa User trong transaction để serialize create-order, rồi khóa pending theo user+tier. Không có migration, thao tác sửa tier hay dọn giao dịch lịch sử.

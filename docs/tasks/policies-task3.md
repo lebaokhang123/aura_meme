@@ -109,3 +109,6 @@ Tài liệu bàn giao kỹ thuật hoàn thành **Task 3 Final: Privacy Policy V
 3. **Kiểm tra 6 Mục Tinh Gọn:** Đọc lướt 6 mục súc tích, không còn thuật ngữ pháp lý/kỹ thuật nặng nề.
 4. **Thử Dark/Light & Song Ngữ:** Nhấp nút `☾`/`☀` và nút `EN`/`VI` trên thanh header.
 5. **Kiểm tra Cuộn & Responsive:** Click các mục trong mục lục để thấy hiệu ứng cuộn mượt và thử co nhỏ màn hình điện thoại (375px) để xem menu rút gọn.
+
+
+Hotfix 23/11/2026 tích hợp cùng nền Task 1–5. Chi tiết payment/Admin/PDF và bằng chứng regression được nối trong premium-sandbox-task5.md. Phạm vi hotfix giữ các quyết định UI của task này.

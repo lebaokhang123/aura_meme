@@ -141,3 +141,6 @@ npx.cmd playwright test --config=../.github/playwright.auth.config.mjs auth-test
   - `task4_contact_desktop_light.png` (Desktop 1440px Light Mode)
   - `task4_contact_mobile_dark.png` (Mobile 375px Dark Mode)
   - `task4_contact_mobile_light.png` (Mobile 375px Light Mode)
+
+
+Hotfix 23/11/2026 tích hợp cùng nền Task 1–5. Chi tiết payment/Admin/PDF và bằng chứng regression được nối trong premium-sandbox-task5.md. Phạm vi hotfix giữ các quyết định UI của task này.

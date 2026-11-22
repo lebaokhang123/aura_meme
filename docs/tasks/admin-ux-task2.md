@@ -204,3 +204,6 @@ Khi Codex thực hiện review kỹ thuật:
    npx.cmd playwright test --config=../.github/playwright.auth.config.mjs auth-tests/notifications-storm.spec.js auth-tests/admin-ux.spec.js auth-tests/admin-premium.spec.js --workers=1 --retries=0
    ```
 4. Kiểm tra an toàn bảo mật: Không phá vỡ hotfix request storm, không rò rỉ dữ liệu ngoài luồng, không ảnh hưởng các hệ thống khác ngoài phạm vi được chỉ định.
+
+
+Hotfix 23/11/2026 tích hợp cùng nền Task 1–5. Chi tiết payment/Admin/PDF và bằng chứng regression được nối trong premium-sandbox-task5.md. Phạm vi hotfix giữ các quyết định UI của task này.

@@ -257,3 +257,6 @@ Sau vòng nghiệm thu sơ bộ, Owner yêu cầu hoàn thiện 3 điểm UI tr�
   - `live_qa_v1_1_modal_centered.png`: Modal chi tiết căn chính giữa màn hình qua Portal, hiển thị chuẩn thông tin announcement/reaction.
   - `live_qa_v1_1_composer_dark.png`: Trình soạn thông báo Admin nền tối cyberpunk, textarea chuẩn màu, nút mắt xem trước.
   - `live_qa_v1_1_composer_preview.png`: Thẻ xem trước trực tiếp hiển thị mượt mà khi nhấn giữ nút mắt.
+
+
+Hotfix 23/11/2026 tích hợp cùng nền Task 1–5. Chi tiết payment/Admin/PDF và bằng chứng regression được nối trong premium-sandbox-task5.md. Phạm vi hotfix giữ các quyết định UI của task này.
