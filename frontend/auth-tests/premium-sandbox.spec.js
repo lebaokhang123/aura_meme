@@ -45,7 +45,30 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
     const fail = (status, code) => send(status, { error: { code, message: 'safe' } });
 
     if (path === '/users/me') {
-      return identity === null ? fail(401, 'UNAUTHORIZED') : send(200, users[identity]);
+      return identity === null
+        ? fail(401, 'UNAUTHORIZED')
+        : send(200, {
+            ...users[identity],
+            membership_tier: currentSubscription?.is_active ? currentSubscription.tier : 'free',
+          });
+    }
+    if (path === '/admin/orders') {
+      return send(200, {
+        items: [
+          {
+            id: '00000000-0000-4000-8000-000000000001',
+            order_code: 'AM-PRIME-1700000000-A1B2C3D4',
+            tier: 'prime',
+            provider: 'paypal_sandbox',
+            amount_vnd: 1250000,
+            amount_vnd_formatted: '1.250.000 đ',
+            status: 'success',
+            provider_txn_id: 'PP-TXN-12345',
+            created_at: now,
+          },
+        ],
+        pagination: { page: 1, page_size: 10, total: 1, total_pages: 1 },
+      });
     }
     if (path.startsWith('/users/')) {
       const parts = path.split('/');
@@ -368,22 +391,27 @@ test('PayPal Sandbox checkout and quick capture flow activate membership success
   const s = await setupMockApi(context, 0, null, false);
   await page.goto('/premium/checkout?order=AM-SUB-TEST-1234');
 
-  // Verify PayPal Sandbox action card is visible
-  const paypalCard = page.locator('.paypal-action-card');
-  await expect(paypalCard).toBeVisible();
-  await expect(paypalCard).toContainText('PayPal Sandbox');
+  // Verify PayPal action card is visible with image and primary button
+  const paypalMethod = page.locator('.checkout-method-card[data-method="paypal"]');
+  await expect(paypalMethod).toBeVisible();
+  await expect(paypalMethod.locator('.checkout-method-img')).toHaveAttribute('src', '/assets/payment/paypal.png');
   await expect(page.locator('.checkout-btn-paypal')).toBeVisible();
 
-  // Click Quick Sandbox Capture button
-  const quickBtn = page.locator('.checkout-btn-secondary');
-  await expect(quickBtn).toBeVisible();
-  await quickBtn.click();
+  // 2-step instant approval click
+  const instantBtn = page.locator('.checkout-btn-instant');
+  await expect(instantBtn).toBeVisible();
+  // Click 1: turns to confirming state
+  await instantBtn.click();
+  await expect(instantBtn).toHaveClass(/confirming/);
+  // Click 2: executes capture
+  await instantBtn.click();
 
   // Verify receipt appears
   const receipt = page.locator('.u081-receipt');
   await expect(receipt).toBeVisible();
   await expect(receipt).toContainText('BIÊN NHẬN GIAO DỊCH HỘI VIÊN');
   await expect(receipt).toContainText('ĐÃ KÍCH HOẠT (ACTIVE)');
+  await expect(receipt.locator('.checkout-btn-download-receipt')).toBeVisible();
 
   // Verify capture request was sent with CSRF
   const capReq = s.requests.find((r) => r.path.endsWith('/capture') && r.method === 'POST');
@@ -443,7 +471,7 @@ test('Header button, avatar indicators, and Home Aura Perks card sync with subsc
   await expect(plusHeaderBtn).toHaveClass(/header-premium-btn--plus/);
   await expect(plusHeaderBtn).toContainText('Aura Plus');
   await expect(page.locator('.account-avatar')).toHaveClass(/aura-avatar--plus/);
-  await expect(page.locator('.aura-member-badge')).toBeVisible();
+  await expect(page.locator('.aura-member-badge').first()).toBeVisible();
 
   // Test Prime subscriber:
   const primeSub = {
@@ -462,7 +490,7 @@ test('Header button, avatar indicators, and Home Aura Perks card sync with subsc
   await expect(primeHeaderBtn).toHaveClass(/header-premium-btn--prime/);
   await expect(primeHeaderBtn).toContainText('Aura Prime');
   await expect(page.locator('.account-avatar')).toHaveClass(/aura-avatar--prime/);
-  await expect(page.locator('.aura-member-badge')).toBeVisible();
+  await expect(page.locator('.aura-member-badge').first()).toBeVisible();
 
   // Verify Home Aura Perks card reflects Prime
   const perksCard = page.locator('.font-headline-sm:has-text("Aura Prime")');
@@ -628,10 +656,69 @@ test('Payment method selector switches between PayPal and Card inputs', async ({
   await expect(paypalMethod).toHaveClass(/active/);
   await expect(page.locator('.checkout-card-form-expand')).toHaveCount(0);
 
-  // Quick sandbox capture to verify receipt artifact
-  await page.locator('.checkout-btn-secondary').click();
+  // Quick sandbox capture (2-step instant approval) to verify receipt artifact
+  const instantBtn = page.locator('.checkout-btn-instant');
+  await instantBtn.click();
+  await instantBtn.click();
   const receipt = page.locator('.u081-receipt');
   await expect(receipt).toBeVisible();
+  await expect(receipt.locator('.checkout-btn-download-receipt')).toBeVisible();
   await page.screenshot({ path: `${artifactsDir}/task5_checkout_paypal_receipt.png` });
+});
+
+test('Avatar halo renders for Plus and Prime users on Home and Explore', async ({ page, context }) => {
+  const primeSub = {
+    tier: 'prime',
+    is_active: true,
+    days_remaining: 365,
+    expires_at: '2027-11-14T00:00:00Z',
+    starts_at: now,
+    boost_multiplier: 3.0,
+  };
+  await setupMockApi(context, 0, primeSub, false);
+
+  // Check Home Composer avatar has prime halo
+  await page.goto('/');
+  const composerAvatar = page.locator('[data-current-user-avatar] img');
+  await expect(composerAvatar).toBeVisible();
+  await expect(composerAvatar).toHaveClass(/aura-avatar--prime/);
+
+  // Check Explore page
+  await page.goto('/explore');
+  await expect(page.locator('.header-premium-btn--prime')).toBeVisible();
+});
+
+test('Admin page moderation section includes Tab 3 Giao dịch (orders)', async ({ page, context }) => {
+  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
+  await setupMockApi(context, 0, null, false);
+  // Give admin role
+  await context.route('**/api/v1/users/me', async (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: id(1),
+        username: 'khang_dev',
+        display_name: 'khang_dev',
+        roles: ['ADMIN', 'USER'],
+        status: 'active',
+      }),
+    });
+  });
+
+  await page.goto('/admin');
+  // Click Kiểm duyệt section
+  await page.getByRole('button', { name: /Kiểm duyệt|Moderation/ }).click();
+
+  // Verify Tab 3 Giao dịch exists and click it
+  const ordersTab = page.getByRole('button', { name: /Giao dịch|Transactions/ });
+  await expect(ordersTab).toBeVisible();
+  await ordersTab.click();
+
+  // Verify order row is rendered with order_code, tier badge and amount
+  await expect(page.locator('.workspace-rows')).toContainText('AM-PRIME-1700000000-A1B2C3D4');
+  await expect(page.locator('.workspace-rows')).toContainText('Aura Prime');
+  await expect(page.locator('.workspace-rows')).toContainText('1.250.000 đ');
+  await page.screenshot({ path: `${artifactsDir}/task5_admin_orders_tab.png` });
 });
 
