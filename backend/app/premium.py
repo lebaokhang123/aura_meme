@@ -40,7 +40,7 @@ router = APIRouter(prefix="/api/v1/premium", tags=["Premium Sandbox"])
 
 class CreateOrderInput(BaseModel):
     plan_tier: Literal["plus", "prime"]
-    provider: Literal["sandbox_simulated", "vnpay_sandbox", "paypal_sandbox"] = "paypal_sandbox"
+    provider: Literal["sandbox_simulated", "vnpay_sandbox", "paypal_sandbox", "unselected"] = "unselected"
 
 
 class SimulateOrderInput(BaseModel):
@@ -260,12 +260,15 @@ def create_subscription_order(
         select(SubscriptionOrder).where(
             SubscriptionOrder.user_id == account.user.id,
             SubscriptionOrder.tier == plan.tier,
-            SubscriptionOrder.provider == payload.provider,
             SubscriptionOrder.status == "pending",
             SubscriptionOrder.created_at >= now - timedelta(minutes=15),
         ).order_by(SubscriptionOrder.created_at.desc())
     )
     if existing_active and isinstance(existing_active, SubscriptionOrder):
+        if payload.provider != "unselected" and existing_active.provider == "unselected":
+            existing_active.provider = payload.provider
+            existing_active.updated_at = now
+            account.db.flush()
         plan_active = get_plan(existing_active.tier)
         return OrderDto(
             id=existing_active.id,
@@ -372,6 +375,118 @@ def create_subscription_order(
         currency=order.currency,
         status=order.status,
         provider=order.provider,
+        payment_url=order.payment_url,
+        created_at=order.created_at,
+        completed_at=order.completed_at,
+    )
+
+
+@router.post(
+    "/orders/{order_code}/init-paypal",
+    response_model=OrderDto,
+    operation_id="initPaypalOrder",
+    responses={**ERRORS, 404: {"model": ErrorResponse}},
+    openapi_extra=CSRF_HEADER,
+)
+def init_paypal_order(
+    order_code: str,
+    request: Request,
+    account=Depends(require_account_csrf),
+):
+    """Authoritative PayPal order initialization when user starts PayPal payment at checkout."""
+    validate_order_code(order_code)
+    now = request.app.state.auth.now()
+    order = account.db.scalar(
+        select(SubscriptionOrder).where(
+            SubscriptionOrder.order_code == order_code,
+            SubscriptionOrder.user_id == account.user.id,
+        ).with_for_update()
+    )
+    if not order:
+        raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại.")
+
+    plan = get_plan(order.tier)
+    if order.status == "success":
+        return OrderDto(
+            id=order.id,
+            order_code=order.order_code,
+            tier=order.tier,
+            duration_days=order.duration_days,
+            amount_usd_cents=order.amount_cents,
+            amount_usd_formatted=plan.amount_usd_formatted,
+            amount_vnd=order.amount_vnd,
+            amount_vnd_formatted=f"{order.amount_vnd:,} VNĐ".replace(",", "."),
+            currency=order.currency,
+            status=order.status,
+            provider=order.provider,
+            provider_txn_id=order.provider_txn_id,
+            payment_url=order.payment_url,
+            created_at=order.created_at,
+            completed_at=order.completed_at,
+        )
+
+    if order.status in {"failed", "cancelled", "expired"}:
+        raise AuthError(409, "ORDER_NOT_PAYABLE", "Đơn hàng không ở trạng thái có thể thanh toán.")
+
+    if order.provider == "paypal_sandbox" and order.payment_url:
+        return OrderDto(
+            id=order.id,
+            order_code=order.order_code,
+            tier=order.tier,
+            duration_days=order.duration_days,
+            amount_usd_cents=order.amount_cents,
+            amount_usd_formatted=plan.amount_usd_formatted,
+            amount_vnd=order.amount_vnd,
+            amount_vnd_formatted=f"{order.amount_vnd:,} VNĐ".replace(",", "."),
+            currency=order.currency,
+            status=order.status,
+            provider=order.provider,
+            provider_txn_id=order.provider_txn_id,
+            payment_url=order.payment_url,
+            created_at=order.created_at,
+            completed_at=order.completed_at,
+        )
+
+    order.provider = "paypal_sandbox"
+    paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
+    return_url = f"http://localhost:5173/premium/checkout?order={order.order_code}"
+    cancel_url = f"http://localhost:5173/premium/checkout?order={order.order_code}&cancelled=true"
+
+    if paypal and paypal.is_configured():
+        try:
+            pp_order = paypal.create_order(
+                order_code=order.order_code,
+                plan_tier=order.tier,
+                return_url=return_url,
+                cancel_url=cancel_url,
+            )
+            order.payment_url = pp_order.get("approve_url")
+            order.provider_txn_id = pp_order.get("id")
+            order.provider_payload = pp_order
+        except PaypalError as exc:
+            logger.error("Failed to initialize PayPal order: %s", exc)
+            raise AuthError(502, "PAYPAL_ERROR", f"Không thể tạo đơn hàng PayPal: {str(exc)}")
+    else:
+        mock_id = f"MOCK-PP-{uuid4().hex[:12].upper()}"
+        order.provider_txn_id = mock_id
+        order.payment_url = f"https://www.sandbox.paypal.com/checkoutnow?token={mock_id}"
+        order.provider_payload = {"mock": True, "id": mock_id}
+
+    order.updated_at = now
+    account.db.flush()
+    return OrderDto(
+        id=order.id,
+        order_code=order.order_code,
+        tier=order.tier,
+        duration_days=order.duration_days,
+        amount_usd_cents=order.amount_cents,
+        amount_usd_formatted=plan.amount_usd_formatted,
+        amount_vnd=order.amount_vnd,
+        amount_vnd_formatted=f"{order.amount_vnd:,} VNĐ".replace(",", "."),
+        currency=order.currency,
+        status=order.status,
+        provider=order.provider,
+        provider_txn_id=order.provider_txn_id,
         payment_url=order.payment_url,
         created_at=order.created_at,
         completed_at=order.completed_at,
@@ -680,11 +795,23 @@ def simulate_subscription_order(
         raise AuthError(409, "ORDER_NOT_PAYABLE", "Đơn hàng không ở trạng thái có thể thanh toán.")
 
     if payload.action == "pay_success":
+        # Guard: if order already has an active real PayPal transaction, ensure it was not already captured
+        if order.provider == "paypal_sandbox" and order.provider_txn_id and not order.provider_txn_id.startswith("SIM-") and not order.provider_txn_id.startswith("MOCK-"):
+            paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
+            if paypal and paypal.is_configured():
+                try:
+                    pp_check = paypal.get_order_details(order.provider_txn_id)
+                    if pp_check.get("status") == "COMPLETED":
+                        raise AuthError(409, "ORDER_ALREADY_CAPTURED", "Đơn hàng đã được thanh toán trên PayPal.")
+                except PaypalError:
+                    pass
+
         order.status = "success"
         order.completed_at = now
         order.provider = "sandbox_simulated"
         order.provider_txn_id = f"SIM-CARD-{uuid4().hex[:12].upper()}"
         order.provider_response_code = "SUCCESS"
+        order.payment_url = None
         order.updated_at = now
 
         _activate_subscription(account.db, order, now)
@@ -770,7 +897,8 @@ def capture_subscription_order(
 
     paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
 
-    if order.provider == "paypal_sandbox":
+    if order.provider in ("paypal_sandbox", "unselected"):
+        order.provider = "paypal_sandbox"
         pp_order_id = (payload.paypal_order_id if payload else None) or order.provider_txn_id
         if not pp_order_id:
             raise AuthError(400, "MISSING_PAYPAL_ID", "Thiếu mã định danh giao dịch PayPal (PayPal Order ID).")

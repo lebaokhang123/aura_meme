@@ -596,7 +596,7 @@ class SubscriptionOrder(Base):
         Index("ix_subscription_orders_order_code", "order_code", unique=True),
         CheckConstraint("tier IN ('plus', 'prime')", name="ck_subscription_orders_tier"),
         CheckConstraint("status IN ('pending', 'success', 'failed', 'cancelled', 'expired')", name="ck_subscription_orders_status"),
-        CheckConstraint("provider IN ('sandbox_simulated', 'vnpay_sandbox', 'paypal_sandbox')", name="ck_subscription_orders_provider"),
+        CheckConstraint("provider IN ('sandbox_simulated', 'vnpay_sandbox', 'paypal_sandbox', 'unselected')", name="ck_subscription_orders_provider"),
     )
 
 

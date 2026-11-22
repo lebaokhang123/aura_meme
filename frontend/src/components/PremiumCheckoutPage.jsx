@@ -686,11 +686,24 @@ export default function PremiumCheckoutPage() {
                         type="button"
                         className="checkout-btn-paypal"
                         disabled={isSpinning}
-                        onClick={() => {
-                          if (order.payment_url && !order.payment_url.includes('token=MOCK-')) {
-                            sessionStorage.setItem('am_checkout_order', order.order_code);
-                            window.location.assign(order.payment_url);
-                          } else {
+                        onClick={async () => {
+                          try {
+                            let current = order;
+                            if (!current.payment_url || current.provider !== 'paypal_sandbox') {
+                              const initRes = await auth.write('POST', `/premium/orders/${current.order_code}/init-paypal`);
+                              if (initRes) {
+                                current = initRes;
+                                setOrder(initRes);
+                              }
+                            }
+                            if (current.payment_url && !current.payment_url.includes('token=MOCK-')) {
+                              sessionStorage.setItem('am_checkout_order', current.order_code);
+                              window.location.assign(current.payment_url);
+                            } else {
+                              executeCapture(null, current);
+                            }
+                          } catch (err) {
+                            console.error('[PremiumCheckoutPage] PayPal init failed:', err);
                             executeCapture();
                           }
                         }}
