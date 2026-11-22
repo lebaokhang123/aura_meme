@@ -225,20 +225,20 @@ export function generateReceiptPdfDoc(order, user) {
   doc.line(20, tableY + 7.5, 190, tableY + 7.5);
 
   doc.setFont('Roboto', 'bold');
-  doc.setFontSize(7.5);
+  doc.setFontSize(7.2);
   doc.setTextColor(75, 85, 99);
   doc.text('DỊCH VỤ / DESCRIPTION', 23, tableY + 5.2);
-  doc.text('THỜI HẠN / DURATION', 98, tableY + 5.2);
-  doc.text('SL / QTY', 135, tableY + 5.2, { align: 'center' });
-  doc.text('ĐƠN GIÁ / PRICE', 160, tableY + 5.2, { align: 'right' });
-  doc.text('THÀNH TIỀN / AMOUNT', 187, tableY + 5.2, { align: 'right' });
+  doc.text('THỜI HẠN / DURATION', 80, tableY + 5.2);
+  doc.text('SL / QTY', 120, tableY + 5.2, { align: 'center' });
+  doc.text('ĐƠN GIÁ / PRICE', 153, tableY + 5.2, { align: 'right' });
+  doc.text('THÀNH TIỀN / AMOUNT', 188, tableY + 5.2, { align: 'right' });
 
   // Data row
   const rowY = tableY + 7.5;
   doc.setFont('Roboto', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(17, 24, 39);
-  doc.text(`Gói hội viên ${tierTitle} / ${tierTitle} Subscription`, 23, rowY + 6);
+  doc.text(`Gói hội viên ${tierTitle}`, 23, rowY + 5.5);
 
   doc.setFont('Roboto', 'normal');
   doc.setFontSize(7.5);
@@ -246,23 +246,23 @@ export function generateReceiptPdfDoc(order, user) {
   const tierBenefit = isPrime
     ? 'Hội viên 365 ngày · Dấu ấn Aura Prime hoàng kim'
     : 'Hội viên 30 ngày · Dấu ấn Aura Plus xanh ngọc';
-  doc.text(tierBenefit, 23, rowY + 11);
+  doc.text(`${tierTitle} Subscription · ${tierBenefit}`, 23, rowY + 10.5);
 
   // Duration column (well-separated, never colliding with QTY)
   doc.setFont('Roboto', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(55, 65, 81);
-  doc.text(`${durationDays} ngày (${durationDays}d)`, 98, rowY + 7);
+  doc.text(`${durationDays} ngày (${durationDays}d)`, 80, rowY + 7);
 
   // Qty column
-  doc.text('1', 135, rowY + 7, { align: 'center' });
+  doc.text('1', 120, rowY + 7, { align: 'center' });
 
   // Unit Price column
-  doc.text(amountUsdFormatted, 160, rowY + 7, { align: 'right' });
+  doc.text(amountUsdFormatted, 153, rowY + 7, { align: 'right' });
 
   // Amount column
   doc.setFont('Roboto', 'bold');
-  doc.text(amountUsdFormatted, 187, rowY + 7, { align: 'right' });
+  doc.text(amountUsdFormatted, 188, rowY + 7, { align: 'right' });
 
   doc.setDrawColor(229, 231, 235);
   doc.line(20, rowY + 15, 190, rowY + 15);
@@ -310,13 +310,13 @@ export function generateReceiptPdfDoc(order, user) {
   doc.setFillColor(249, 250, 251);
   doc.rect(20, histY + 3, 170, 6, 'F');
   doc.setFont('Roboto', 'bold');
-  doc.setFontSize(7);
+  doc.setFontSize(6.8);
   doc.setTextColor(107, 114, 128);
   doc.text('PHƯƠNG THỨC / METHOD', 23, histY + 7.2);
-  doc.text('NGÀY / DATE', 78, histY + 7.2);
-  doc.text('SỐ TIỀN / AMOUNT', 124, histY + 7.2, { align: 'right' });
-  doc.text('TRẠNG THÁI / STATUS', 148, histY + 7.2, { align: 'center' });
-  doc.text('MÃ THAM CHIẾU / REF', 187, histY + 7.2, { align: 'right' });
+  doc.text('NGÀY / DATE', 58, histY + 7.2);
+  doc.text('SỐ TIỀN / AMOUNT', 113, histY + 7.2, { align: 'right' });
+  doc.text('TRẠNG THÁI / STATUS', 132, histY + 7.2, { align: 'center' });
+  doc.text('MÃ THAM CHIẾU / REF', 188, histY + 7.2, { align: 'right' });
 
   doc.setDrawColor(243, 244, 246);
   doc.line(20, histY + 9, 190, histY + 9);
@@ -327,25 +327,35 @@ export function generateReceiptPdfDoc(order, user) {
   doc.setFontSize(7.5);
   doc.setTextColor(55, 65, 81);
   doc.text(providerName, 23, histRowY);
-  doc.text(dateFormatted, 78, histRowY);
-  doc.text(amountUsdFormatted, 124, histRowY, { align: 'right' });
+  doc.text(dateFormatted, 58, histRowY);
+  doc.text(amountUsdFormatted, 113, histRowY, { align: 'right' });
 
   doc.setFont('Roboto', 'bold');
   doc.setTextColor(4, 120, 87);
-  doc.text('HOÀN TẤT', 148, histRowY, { align: 'center' });
+  doc.text('HOÀN TẤT', 132, histRowY, { align: 'center' });
 
   doc.setFont('Roboto', 'normal');
   doc.setTextColor(75, 85, 99);
-  // Scale reference text if long
-  if (txnRef.length > 26) {
-    doc.setFontSize(6.5);
+  doc.setFontSize(6.5);
+  const refWidth = doc.getTextWidth(txnRef);
+  if (refWidth > 37) {
+    doc.setFontSize(6.0);
+    const scaledW = doc.getTextWidth(txnRef);
+    if (scaledW > 37) {
+      // Long reference on secondary line
+      doc.text(txnRef, 188, histRowY + 4, { align: 'right' });
+      doc.setDrawColor(229, 231, 235);
+      doc.line(20, histRowY + 7.5, 190, histRowY + 7.5);
+    } else {
+      doc.text(txnRef, 188, histRowY, { align: 'right' });
+      doc.setDrawColor(229, 231, 235);
+      doc.line(20, histRowY + 4, 190, histRowY + 4);
+    }
   } else {
-    doc.setFontSize(7);
+    doc.text(txnRef, 188, histRowY, { align: 'right' });
+    doc.setDrawColor(229, 231, 235);
+    doc.line(20, histRowY + 4, 190, histRowY + 4);
   }
-  doc.text(txnRef, 187, histRowY, { align: 'right' });
-
-  doc.setDrawColor(229, 231, 235);
-  doc.line(20, histRowY + 4, 190, histRowY + 4);
 
   // 7. FOOTER SECTION (Y: 268 -> 282)
   doc.setDrawColor(229, 231, 235);
