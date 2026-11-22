@@ -609,7 +609,8 @@ def test_webhook_verification_mismatches_rejected():
     mock_paypal.webhook_id = "WH-123456"
     mock_paypal.verify_webhook_signature.return_value = True
     mock_paypal.merchant_id = "AURAMEME_MERCHANT"
-    mock_paypal.get_capture_details.return_value = None
+    order.provider_txn_id = "PP-order-mismatch"
+    mock_paypal.get_order_details.return_value = {"id": order.provider_txn_id}
 
     # Mismatch 1: Amount mismatch (1000 cents instead of 500)
     mock_paypal.verify_capture.return_value = (False, "Amount mismatch: expected 500 cents, got 1000 cents.")
@@ -679,11 +680,10 @@ def test_webhook_delayed_callback_reconciles_expired_order():
     mock_paypal.webhook_id = "WH-123456"
     mock_paypal.verify_webhook_signature.return_value = True
     mock_paypal.merchant_id = "AURAMEME_MERCHANT"
-    mock_paypal.get_capture_details.return_value = {
-        "id": "CAP-DELAYED-123",
-        "status": "COMPLETED",
-        "amount": {"currency_code": "USD", "value": "50.00"},
-        "custom_id": order_code,
+    order.provider_txn_id = "PP-order-delayed"
+    mock_paypal.get_order_details.return_value = {
+        "id": order.provider_txn_id,
+        "purchase_units": [{"payments": {"captures": [{"id": "CAP-DELAYED-123"}]}}],
     }
     mock_paypal.verify_capture.return_value = (True, "Capture verified successfully.")
 

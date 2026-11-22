@@ -963,6 +963,8 @@ def test_create_order_and_subscription_real_postgresql_integration():
 
     engine = create_db_engine(Settings(_env_file=None, database_url=url))
     with Session(engine) as db:
+        from sqlalchemy import text
+        assert db.execute(text("SELECT current_database(), current_schema()")).one() == ("aurameme_test", "public")
         inspector = inspect(db.connection())
         tables = set(inspector.get_table_names())
         assert "subscription_orders" in tables, "Migration 0014 table subscription_orders must exist in test database"
@@ -998,7 +1000,7 @@ def test_create_order_and_subscription_real_postgresql_integration():
                 account=mock_account,
             )
             assert order_dto_plus.tier == "plus"
-            assert order_dto_plus.amount_cents == 500
+            assert order_dto_plus.amount_usd_cents == 500
             assert order_dto_plus.amount_vnd == 130000
             assert order_dto_plus.status == "pending"
 
@@ -1006,6 +1008,11 @@ def test_create_order_and_subscription_real_postgresql_integration():
                 select(SubscriptionOrder).where(SubscriptionOrder.order_code == order_dto_plus.order_code)
             )
             assert persisted_plus is not None
+            from app.premium import get_subscription_order
+            assert get_subscription_order(persisted_plus.order_code, account=mock_account).id == persisted_plus.id
+            from app.premium import SimulateOrderInput, simulate_subscription_order
+            mock_request.app.state.auth.settings.auth_environment = "development"
+            mock_request.app.state.premium.premium_sandbox_enabled = True
             assert persisted_plus.user_id == test_user.id
             assert persisted_plus.tier == "plus"
             assert persisted_plus.amount_cents == 500
@@ -1020,13 +1027,17 @@ def test_create_order_and_subscription_real_postgresql_integration():
                 account=mock_account,
             )
             assert order_dto_prime.tier == "prime"
-            assert order_dto_prime.amount_cents == 5000
+            assert order_dto_prime.amount_usd_cents == 5000
             assert order_dto_prime.amount_vnd == 1250000
 
             persisted_prime = db.scalar(
                 select(SubscriptionOrder).where(SubscriptionOrder.order_code == order_dto_prime.order_code)
             )
             assert persisted_prime is not None
+            for _ in range(2):
+                simulate_subscription_order(persisted_plus.order_code, SimulateOrderInput(action="pay_success"), mock_request, mock_account)
+            sub = db.scalar(select(UserSubscription).where(UserSubscription.user_id == test_user.id))
+            assert sub.order_id == persisted_plus.id and sub.expires_at - sub.starts_at == timedelta(days=30)
             assert persisted_prime.user_id == test_user.id
             assert persisted_prime.tier == "prime"
 

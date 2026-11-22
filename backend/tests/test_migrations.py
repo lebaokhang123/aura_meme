@@ -26,7 +26,8 @@ P0_TABLES = {
 }
 AURA_TABLES = P0_TABLES | {"post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger"}
 TABLES = AURA_TABLES | {"aura_reward_events", "comment_reactions", "wallets", "wallet_transactions", "daily_checkins", "asset_items", "user_inventory", "user_equipment", "case_definitions", "case_loot_tables", "case_loot_rarities", "case_pool_items", "case_opens", "inventory_grants"}
-REVISION = "0012_aura_v1"
+TABLES |= {"notifications", "subscription_orders", "user_subscriptions"}
+REVISION = "0014_premium_sandbox"
 
 
 def config():
@@ -191,18 +192,17 @@ def test_schema_matches_dbml_and_metadata(migrated):
             assert inspector.get_pk_constraint(name)["constrained_columns"] == pk
             assert {tuple(c["column_names"]) for c in inspector.get_unique_constraints(name)} == unique
             expected_fk = set()
-            for source, target in re.findall(
-                r"^Ref: (\w+\.(?:\([^)]*\)|\w+)) > (\w+\.(?:\([^)]*\)|\w+)) \[delete: restrict\]", dbml, re.M
+            for source, target, action in re.findall(
+                r"^Ref: (\w+\.(?:\([^)]*\)|\w+)) > (\w+\.(?:\([^)]*\)|\w+)) \[delete: (restrict|cascade|set null|no action)\]", dbml, re.M
             ):
                 source_table, source_columns = source.split(".", 1)
                 target_table, target_columns = target.split(".", 1)
                 if source_table == name:
                     expected_fk.add((tuple(source_columns.strip("()").replace(" ", "").split(",")), target_table,
-                                     tuple(target_columns.strip("()").replace(" ", "").split(","))))
+                                     tuple(target_columns.strip("()").replace(" ", "").split(",")), action.upper()))
             actual_fk = set()
             for fk in inspector.get_foreign_keys(name):
-                assert fk["options"]["ondelete"] == "RESTRICT"
-                actual_fk.add((tuple(fk["constrained_columns"]), fk["referred_table"], tuple(fk["referred_columns"])))
+                actual_fk.add((tuple(fk["constrained_columns"]), fk["referred_table"], tuple(fk["referred_columns"]), fk["options"].get("ondelete", "NO ACTION")))
             assert actual_fk == expected_fk, name
         assert compare_metadata(MigrationContext.configure(connection, opts={"compare_server_default": True}), Base.metadata) == []
         assert connection.execute(text("SELECT count(*) FROM pg_constraint WHERE contype='f' AND connamespace='public'::regnamespace AND confmatchtype<>'s'")).scalar_one() == 0
@@ -446,10 +446,45 @@ def test_dbml_schema_contract_matches_current_models_without_database():
         actual = {column.name:(str(column.type.compile(dialect=dialect())),column.nullable) for column in table.c}
         assert actual == expected, name
         expected_fk = set()
-        for source,target in re.findall(r'^Ref: (\w+\.(?:\([^)]*\)|\w+)) > (\w+\.(?:\([^)]*\)|\w+)) \[delete: restrict\]',dbml,re.M):
+        for source,target,action in re.findall(r'^Ref: (\w+\.(?:\([^)]*\)|\w+)) > (\w+\.(?:\([^)]*\)|\w+)) \[delete: (restrict|cascade|set null|no action)\]',dbml,re.M):
             source_table,source_columns = source.split('.',1)
             target_table,target_columns = target.split('.',1)
             if source_table == name:
-                expected_fk.add((tuple(source_columns.strip('()').replace(' ','').split(',')),target_table,tuple(target_columns.strip('()').replace(' ','').split(','))))
-        actual_fk = {(tuple(c.name for c in fk.columns),fk.referred_table.name,tuple(e.column.name for e in fk.elements)) for fk in table.foreign_key_constraints}
+                expected_fk.add((tuple(source_columns.strip('()').replace(' ','').split(',')),target_table,tuple(target_columns.strip('()').replace(' ','').split(',')),action.upper()))
+        actual_fk = {(tuple(c.name for c in fk.columns),fk.referred_table.name,tuple(e.column.name for e in fk.elements),(fk.ondelete or "NO ACTION").upper()) for fk in table.foreign_key_constraints}
         assert actual_fk == expected_fk, name
+
+
+
+@pytest.mark.integration
+def test_announcement_inbox_isolation_and_lifecycle(data):
+    from types import SimpleNamespace
+    from sqlalchemy.orm import Session
+    from app.admin_posts import AnnouncementInput, create_admin_announcement, publish_admin_announcement, withdraw_admin_announcement
+    from app.models import User
+    from app.notifications import delete_notification, get_notifications, mark_read
+    from app.security import AuthError
+
+    connection, ids = data
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(auth=SimpleNamespace(now=lambda: ids["now"]))))
+    with Session(connection) as db:
+        sender = SimpleNamespace(db=db, user=db.get(User, ids["user"]))
+        recipient = SimpleNamespace(db=db, user=db.get(User, ids["other"]))
+        draft = create_admin_announcement(AnnouncementInput(title="QA", body="Test", is_draft=True), request, sender)
+        assert get_notifications(1, 10, False, recipient).items == []
+        with pytest.raises(AuthError) as hidden:
+            delete_notification(draft.id, request, sender)
+        assert hidden.value.status == 404
+        assert publish_admin_announcement(draft.id, request, sender).recipients_count == 2
+        with pytest.raises(AuthError) as repeat:
+            publish_admin_announcement(draft.id, request, sender)
+        assert repeat.value.status == 409
+        inbox = get_notifications(1, 1, True, recipient)
+        assert inbox.unread_count == 1 and inbox.items[0].actor.id == sender.user.id
+        with pytest.raises(AuthError) as forbidden:
+            mark_read(inbox.items[0].id, request, sender)
+        assert forbidden.value.status == 404
+        assert mark_read(inbox.items[0].id, request, recipient).is_read
+        assert get_notifications(1, 1, True, recipient).items == []
+        withdraw_admin_announcement(draft.id, request, sender)
+        assert get_notifications(1, 1, False, recipient).items[0].payload["status"] == "withdrawn"

@@ -7,6 +7,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from typing import Any
+from decimal import Decimal, InvalidOperation
 
 from app.premium_plans import PlanDefinition, get_plan
 
@@ -210,6 +211,7 @@ class PaypalAdapter:
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
+        headers["Prefer"] = "return=representation"
         if idempotency_key:
             headers["PayPal-Request-Id"] = f"capture_{idempotency_key}"
 
@@ -257,17 +259,17 @@ class PaypalAdapter:
         # Determine whether capture_data is an Order object with purchase_units or a direct Capture resource
         if "purchase_units" in capture_data:
             purchase_units = capture_data.get("purchase_units") or []
-            if not purchase_units:
+            if len(purchase_units) != 1:
                 return False, "Capture data contains no purchase units."
             unit = purchase_units[0]
             if expected_order_code:
                 ref_id = unit.get("reference_id") or unit.get("custom_id")
-                if ref_id and ref_id != expected_order_code:
+                if ref_id != expected_order_code:
                     return False, f"Order reference mismatch (expected '{expected_order_code}', got '{ref_id}')."
 
             payments = unit.get("payments", {})
             captures = payments.get("captures", [])
-            if not captures:
+            if len(captures) != 1:
                 return False, "No capture transaction records found in purchase unit."
             capture_obj = captures[0]
             cap_status = capture_obj.get("status")
@@ -282,29 +284,30 @@ class PaypalAdapter:
                 if not ref_id:
                     supp = capture_obj.get("supplementary_data", {})
                     ref_id = supp.get("related_ids", {}).get("order_id")
-                if ref_id and ref_id != expected_order_code:
+                if ref_id != expected_order_code:
                     return False, f"Order reference mismatch (expected '{expected_order_code}', got '{ref_id}')."
             amount_info = capture_obj.get("amount", {})
             payee = capture_obj.get("payee") or {}
+
+        if not capture_obj.get("id"):
+            return False, "Missing capture ID."
 
         currency = amount_info.get("currency_code")
         if currency != "USD":
             return False, f"Invalid currency: expected 'USD', got '{currency}'."
 
         try:
-            val_float = float(amount_info.get("value", "0"))
-            val_cents = round(val_float * 100)
-        except (ValueError, TypeError):
+            amount = Decimal(str(amount_info.get("value")))
+        except (InvalidOperation, ValueError, TypeError):
             return False, "Invalid amount value format in capture response."
 
-        if val_cents != expected_amount_cents:
-            return False, f"Amount mismatch: expected {expected_amount_cents} cents, got {val_cents} cents."
+        if not amount.is_finite() or amount != Decimal(expected_amount_cents).scaleb(-2):
+            return False, f"Amount mismatch: expected {expected_amount_cents} cents, got {amount} USD."
 
         target_merchant_id = expected_merchant_id or self.merchant_id
-        if target_merchant_id:
-            m_id = payee.get("merchant_id")
-            if m_id and m_id != target_merchant_id:
-                return False, f"Merchant mismatch: expected '{target_merchant_id}', got '{m_id}'."
+        m_id = payee.get("merchant_id")
+        if not target_merchant_id or m_id != target_merchant_id:
+            return False, f"Merchant mismatch: expected '{target_merchant_id}', got '{m_id}'."
 
         return True, "Capture verified successfully."
 
@@ -318,7 +321,6 @@ class PaypalAdapter:
             logger.warning("PayPal webhook verification skipped: webhook_id or credentials not configured.")
             return False
 
-        token = self.get_access_token()
         try:
             body_json = json.loads(raw_body.decode("utf-8"))
         except Exception:
@@ -338,12 +340,12 @@ class PaypalAdapter:
         if not all(payload.values()):
             return False
 
-        req_headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
         try:
+            req_headers = {
+                "Authorization": f"Bearer {self.get_access_token()}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            }
             data = self._http_request(
                 "POST",
                 "/v1/notifications/verify-webhook-signature",

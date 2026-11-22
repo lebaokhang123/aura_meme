@@ -661,7 +661,6 @@ test('Order creation error displays friendly message and never leaks INTERNAL_ER
 });
 
 test('Phase A Identity: swapped icons, avatar glow everywhere, profile badge, and selector panel glow', async ({ page, context }) => {
-  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
 
   // 1. Plus identity test
   const plusSub = {
@@ -682,7 +681,7 @@ test('Phase A Identity: swapped icons, avatar glow everywhere, profile badge, an
   await expect(perksPlusHeader.locator('.material-symbols-outlined')).toHaveText('workspace_premium');
   const perksPlusActive = page.locator('span:has-text("Đang kích hoạt")');
   await expect(perksPlusActive).toHaveClass(/border-cyan-300\/60/);
-  await page.screenshot({ path: `${artifactsDir}/task5_identity_home_plus.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_identity_home_plus.png') });
 
   // Check Profile with Plus
   await page.goto('/profile');
@@ -691,12 +690,12 @@ test('Phase A Identity: swapped icons, avatar glow everywhere, profile badge, an
   await expect(plusProfileBadge.locator('.profile-premium-badge-icon')).toHaveText('workspace_premium');
   await expect(plusProfileBadge).toContainText('Aura Plus');
   await expect(page.locator('.am-profile-avatar img')).toHaveClass(/aura-avatar--plus/);
-  await page.screenshot({ path: `${artifactsDir}/task5_identity_profile_plus.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_identity_profile_plus.png') });
 
   // Check Premium Page with Plus
   await page.goto('/premium');
   await expect(page.locator('.premium-selector-panel')).toHaveClass(/premium-selector-panel--plus/);
-  await page.screenshot({ path: `${artifactsDir}/task5_identity_premium_plus.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_identity_premium_plus.png') });
 
   // 2. Prime identity test (Gold/Amber + diamond)
   const primeSub = {
@@ -717,7 +716,7 @@ test('Phase A Identity: swapped icons, avatar glow everywhere, profile badge, an
   await expect(perksPrimeHeader.locator('.material-symbols-outlined')).toHaveText('diamond');
   const perksPrimeActive = page.locator('span:has-text("Đang kích hoạt")');
   await expect(perksPrimeActive).toHaveClass(/border-amber-300\/60/);
-  await page.screenshot({ path: `${artifactsDir}/task5_identity_home_prime.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_identity_home_prime.png') });
 
   // Check Profile with Prime
   await page.goto('/profile');
@@ -726,16 +725,15 @@ test('Phase A Identity: swapped icons, avatar glow everywhere, profile badge, an
   await expect(primeProfileBadge.locator('.profile-premium-badge-icon')).toHaveText('diamond');
   await expect(primeProfileBadge).toContainText('Aura Prime');
   await expect(page.locator('.am-profile-avatar img')).toHaveClass(/aura-avatar--prime/);
-  await page.screenshot({ path: `${artifactsDir}/task5_identity_profile_prime.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_identity_profile_prime.png') });
 
   // Check Premium Page with Prime
   await page.goto('/premium');
   await expect(page.locator('.premium-selector-panel')).toHaveClass(/premium-selector-panel--prime/);
-  await page.screenshot({ path: `${artifactsDir}/task5_identity_premium_prime.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_identity_premium_prime.png') });
 });
 
 test('Payment method selector switches between PayPal and Card inputs', async ({ page, context }) => {
-  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
   await setupMockApi(context, 0, null, false);
   await page.goto('/premium/checkout?order=AM-SUB-TEST-1234');
 
@@ -746,7 +744,7 @@ test('Payment method selector switches between PayPal and Card inputs', async ({
   await expect(cardMethod).not.toHaveClass(/active/);
   await expect(page.locator('.checkout-paypal-action-box')).toBeVisible();
   await expect(page.locator('.checkout-card-form-expand')).toHaveCount(0);
-  await page.screenshot({ path: `${artifactsDir}/task5_checkout_method_selector_paypal.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_checkout_method_selector_paypal.png') });
 
   // Switch to Card
   await cardMethod.click();
@@ -754,7 +752,7 @@ test('Payment method selector switches between PayPal and Card inputs', async ({
   await expect(paypalMethod).not.toHaveClass(/active/);
   await expect(page.locator('.checkout-card-form-expand')).toBeVisible();
   await expect(page.locator('#card-number')).toBeVisible();
-  await page.screenshot({ path: `${artifactsDir}/task5_checkout_method_selector_card.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_checkout_method_selector_card.png') });
 
   // Switch back to PayPal and capture receipt screenshot
   await paypalMethod.click();
@@ -768,7 +766,7 @@ test('Payment method selector switches between PayPal and Card inputs', async ({
   const receipt = page.locator('.u081-receipt');
   await expect(receipt).toBeVisible();
   await expect(receipt.locator('.checkout-btn-download-receipt')).toBeVisible();
-  await page.screenshot({ path: `${artifactsDir}/task5_checkout_paypal_receipt.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_checkout_paypal_receipt.png') });
 });
 
 test('Avatar halo renders for Plus and Prime users on Home and Explore', async ({ page, context }) => {
@@ -794,7 +792,6 @@ test('Avatar halo renders for Plus and Prime users on Home and Explore', async (
 });
 
 test('Admin page moderation section includes Tab 3 Giao dịch (orders)', async ({ page, context }) => {
-  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
   await setupMockApi(context, 0, null, false);
   // Give admin role
   await context.route('**/api/v1/users/me', async (route) => {
@@ -824,11 +821,10 @@ test('Admin page moderation section includes Tab 3 Giao dịch (orders)', async 
   await expect(page.locator('.workspace-rows')).toContainText('AM-PRIME-1700000000-A1B2C3D4');
   await expect(page.locator('.workspace-rows')).toContainText('Aura Prime');
   await expect(page.locator('.workspace-rows')).toContainText('1.250.000 đ');
-  await page.screenshot({ path: `${artifactsDir}/task5_admin_orders_tab.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_admin_orders_tab.png') });
 });
 
 test('Part A: Browser Back and Forward preserves clean checkout state and displays completed receipt', async ({ page, context }) => {
-  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
   await setupMockApi(context, 0, null, false);
 
   // 1. Visit /premium and click Mua gói Plus
@@ -885,7 +881,6 @@ test('Part A: Browser Back and Forward preserves clean checkout state and displa
 });
 
 test('Part C: Simulated card form is structured into 2 clean groups with complete billing fields', async ({ page, context }) => {
-  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
   const s = await setupMockApi(context, 0, null, false);
   await page.goto('/premium/checkout?order=AM-SUB-TEST-1234');
 
@@ -1045,8 +1040,7 @@ test('Part E: Payment History page (/premium/history) displays orders, opens det
   await expect(dropdown).not.toBeVisible();
   await expect(page.locator('.history-row')).toHaveCount(2);
 
-  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
-  await page.screenshot({ path: `${artifactsDir}/task5_payment_history_table.png`, fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('task5_payment_history_table.png'), fullPage: true });
 
   // Click "Xem chi tiết" on first row -> opens detail modal
   await rows.first().locator('.history-action-btn[title="Xem chi tiết"]').click();
@@ -1055,7 +1049,7 @@ test('Part E: Payment History page (/premium/history) displays orders, opens det
   await expect(detailModal.locator('#history-detail-title')).toHaveText('Chi tiết giao dịch');
   await expect(detailModal.locator('.history-detail-value code').first()).toHaveText('AM-PRIME-1795330988-XNSBYM98');
   await expect(detailModal.locator('.history-detail-note')).toBeVisible();
-  await page.screenshot({ path: `${artifactsDir}/task5_payment_history_modal.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_payment_history_modal.png') });
 
   // Close modal
   await detailModal.locator('.u081-close-btn').click();
@@ -1096,12 +1090,10 @@ test('Part F: Profile Edit enforces 25 char display name and 100 char bio limits
   await expect(counters.first()).toContainText('/25');
   await expect(counters.nth(1)).toContainText('/100');
 
-  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
-  await page.screenshot({ path: `${artifactsDir}/task5_profile_edit_25_100.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_profile_edit_25_100.png') });
 });
 
 test('Part G: Capture Task 5 Evidence Screenshots for Owner', async ({ page, context }) => {
-  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
   await setupMockApi(context, 0, null, false);
 
   // 1. Capture restored modal without method buttons
@@ -1112,23 +1104,23 @@ test('Part G: Capture Task 5 Evidence Screenshots for Owner', async ({ page, con
   const dialog = page.locator('.u081-dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.u081-summary-row:has-text("Phương thức")')).toHaveCount(0);
-  await page.screenshot({ path: `${artifactsDir}/task5_modal_restored.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_modal_restored.png') });
 
   // 2. Capture checkout with method selection
   await page.goto('/premium/checkout?order=AM-SUB-TEST-1234');
   await expect(page.locator('.checkout-method-selector')).toBeVisible();
-  await page.screenshot({ path: `${artifactsDir}/task5_checkout_methods.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_checkout_methods.png') });
 
   // 3. Capture history table with compact icon buttons and search toolbar
   await page.goto('/premium/history');
   await expect(page.locator('.history-table')).toBeVisible();
   await expect(page.locator('.history-action-btn[title="Xem chi tiết"]').first()).toBeVisible();
-  await page.screenshot({ path: `${artifactsDir}/task5_history_icon_buttons.png`, fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('task5_history_icon_buttons.png'), fullPage: true });
 
   // 4. Capture history with filter dropdown open
   await page.locator('.history-filter-btn').click();
   await expect(page.locator('.history-filter-dropdown')).toBeVisible();
-  await page.screenshot({ path: `${artifactsDir}/task5_history_filter_dropdown.png` });
+  await page.screenshot({ path: test.info().outputPath('task5_history_filter_dropdown.png') });
 });
 
 

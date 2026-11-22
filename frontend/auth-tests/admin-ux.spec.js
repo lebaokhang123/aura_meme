@@ -261,49 +261,47 @@ test.describe('Task 2 — Admin Workspace UX Refinement', () => {
 
   test('Capture Visual QA Screenshots across Desktop, Tablet, and Mobile', async ({ page, context }) => {
     await setupAdminMockApi(context);
-    const artifactDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
 
     // 1. Desktop Viewport (1440x900)
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/admin');
     await page.locator('.admin-sidebar').getByRole('button', { name: 'Nội dung' }).click();
     await expect(page.locator(`[data-admin-id="${id(10)}"]`)).toBeVisible();
-    await page.screenshot({ path: `${artifactDir}/admin_qa_task2_desktop.png`, fullPage: true });
+    await page.screenshot({ path: test.info().outputPath('admin_qa_task2_desktop.png'), fullPage: true });
 
     // 2. Desktop Content Preview Modal
     await page.locator(`[data-admin-id="${id(10)}"] .admin-action-icons`).getByRole('button', { name: 'Xem chi tiết bài viết' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
-    await page.screenshot({ path: `${artifactDir}/admin_qa_task2_content_preview.png` });
+    await page.screenshot({ path: test.info().outputPath('admin_qa_task2_content_preview.png') });
     await page.getByRole('dialog').locator('.workspace-dialog-actions').getByRole('button', { name: 'Đóng' }).click();
 
     // 3. Desktop Contact Management Modal
     await page.locator('.admin-sidebar').getByRole('button', { name: 'Liên hệ' }).click();
     await page.locator(`[data-admin-id="${id(40)}"]`).getByRole('button', { name: 'Xem và xử lý' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
-    await page.screenshot({ path: `${artifactDir}/admin_qa_task2_contact_modal.png` });
+    await page.screenshot({ path: test.info().outputPath('admin_qa_task2_contact_modal.png') });
     await page.getByRole('dialog').getByRole('button', { name: 'Hủy' }).click();
 
     // 4. Desktop Audit Activity Tab
     await page.locator('.admin-sidebar').getByRole('button', { name: 'Kiểm duyệt' }).click();
     await expect(page.locator('.admin-audit-entry').first()).toBeVisible();
     await page.locator('.admin-audit-entry').first().locator('summary').click();
-    await page.screenshot({ path: `${artifactDir}/admin_qa_task2_audit_activity.png` });
+    await page.screenshot({ path: test.info().outputPath('admin_qa_task2_audit_activity.png') });
 
     // 5. Tablet Viewport (768x1024)
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.locator('.admin-sidebar').getByRole('button', { name: 'Nội dung' }).click();
     await expect(page.locator(`[data-admin-id="${id(10)}"]`)).toBeVisible();
-    await page.screenshot({ path: `${artifactDir}/admin_qa_task2_tablet.png`, fullPage: true });
+    await page.screenshot({ path: test.info().outputPath('admin_qa_task2_tablet.png'), fullPage: true });
 
     // 6. Mobile Viewport (375x812)
     await page.setViewportSize({ width: 375, height: 812 });
     await expect(page.locator(`[data-admin-id="${id(10)}"]`)).toBeVisible();
-    await page.screenshot({ path: `${artifactDir}/admin_qa_task2_mobile.png`, fullPage: true });
+    await page.screenshot({ path: test.info().outputPath('admin_qa_task2_mobile.png'), fullPage: true });
   });
 
   test('Task 2 Final Polish: Personal notification card displays 4 distinct lines with ellipsis', async ({ page, context }) => {
     await setupAdminMockApi(context);
-    const artifactDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
     await page.goto('/admin');
     await page.locator('.notification-trigger').click();
     await expect(page.locator('.notifications-dropdown')).toBeVisible();
@@ -323,12 +321,11 @@ test.describe('Task 2 — Admin Workspace UX Refinement', () => {
     expect(snippetStyle.whiteSpace).toBe('nowrap');
     expect(snippetStyle.overflow).toBe('hidden');
 
-    await page.screenshot({ path: `${artifactDir}/notification_dropdown_4lines.png` });
+    await page.screenshot({ path: test.info().outputPath('notification_dropdown_4lines.png') });
   });
 
   test('Task 2 Final Polish: Announcement table uses snippet and normalized 40px action icon buttons', async ({ page, context }) => {
     await setupAdminMockApi(context);
-    const artifactDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
     await page.goto('/admin');
     await page.locator('.admin-sidebar').getByRole('button', { name: 'Thông báo' }).click();
 
@@ -363,7 +360,7 @@ test.describe('Task 2 — Admin Workspace UX Refinement', () => {
     await expect(withdrawnRow.locator('.admin-action-icons [aria-label="Xem chi tiết thông báo"]')).toBeVisible();
 
     // 6. Screenshot announcements table
-    await page.screenshot({ path: `${artifactDir}/admin_qa_task2_announcements.png` });
+    await page.screenshot({ path: test.info().outputPath('admin_qa_task2_announcements.png') });
 
     // 7. Click visibility on published announcement -> opens preview modal
     await publishedRow.locator('.admin-action-icons [aria-label="Xem chi tiết thông báo"]').click();
@@ -375,7 +372,7 @@ test.describe('Task 2 — Admin Workspace UX Refinement', () => {
     await expect(dialog.locator('.admin-content-preview-body')).toContainText('Hệ thống sẽ bảo trì vào 02:00 sáng mai.');
 
     // Screenshot announcement preview modal
-    await page.screenshot({ path: `${artifactDir}/admin_qa_task2_announcement_preview.png` });
+    await page.screenshot({ path: test.info().outputPath('admin_qa_task2_announcement_preview.png') });
     await dialog.locator('.workspace-dialog-actions').getByRole('button', { name: 'Đóng' }).click();
     await expect(dialog).toHaveCount(0);
   });

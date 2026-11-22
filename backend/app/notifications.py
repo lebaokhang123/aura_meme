@@ -175,7 +175,8 @@ def mark_read(
     notif = account.db.scalar(
         select(Notification).where(
             Notification.id == notification_id,
-            Notification.recipient_user_id == account.user.id
+            Notification.recipient_user_id == account.user.id,
+            or_(Notification.dedupe_key.is_(None), not_(Notification.dedupe_key.like("master:%"))),
         ).with_for_update()
     )
     if notif is None:
@@ -238,7 +239,8 @@ def delete_notification(
     notif = account.db.scalar(
         select(Notification).where(
             Notification.id == notification_id,
-            Notification.recipient_user_id == account.user.id
+            Notification.recipient_user_id == account.user.id,
+            or_(Notification.dedupe_key.is_(None), not_(Notification.dedupe_key.like("master:%"))),
         ).with_for_update()
     )
     if notif is None:
