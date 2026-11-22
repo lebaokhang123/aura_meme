@@ -1025,3 +1025,50 @@ Thực hiện chuẩn xác yêu cầu của Owner về bản sắc nhận diện
 - **Frontend Production Build:** `npm.cmd run build` thành công trong 8.99s.
 - **Playwright Test Suite:** **19/19 passed** (100%, 1.2m).
 - **Database & Git:** Cơ sở dữ liệu `aurameme_demo` an toàn 100%, không migration, không merge, không PR.
+
+---
+
+## 21. Bàn giao Vòng Tinh chỉnh: Khôi phục Chọn Phương thức tại Checkout & Tinh gọn Thao tác Lịch sử Giao dịch bằng Icon (Fix Payment Flow & History Action Icons)
+
+### 21.1. Khôi phục Modal Xác nhận Đơn hàng (`PaymentModal081.jsx`)
+- Khôi phục bố cục modal chuẩn theo đúng thiết kế đã được Owner duyệt:
+  - Loại bỏ hoàn toàn dòng `Phương thức` và 2 nút lựa chọn phương thức `[PayPal]` / `[Nhập thẻ]` khỏi modal.
+  - Modal tập trung đúng chức năng xác nhận thông tin gói: Gói hội viên, Số tiền thanh toán, Thời hạn sử dụng, Hệ số EXP, Dòng ghi chú 'Hệ thống thanh toán thử nghiệm', và nút duy nhất **Xác nhận thanh toán**.
+  - Modal tạo đơn hàng với `provider: "unselected"`, không áp đặt phương thức trước khi người dùng vào trang checkout.
+
+### 21.2. Chọn Phương thức Thanh toán tại Trang Checkout (`PremiumCheckoutPage.jsx`)
+- Người dùng chỉ lựa chọn phương thức thanh toán tại trang Checkout:
+  - Tùy chọn 1: **PayPal** (Cổng chính).
+  - Tùy chọn 2: **Nhập thẻ** (Mô phỏng tức thì).
+- Khởi tạo đơn PayPal chỉ khi người dùng bắt đầu thanh toán qua endpoint: `POST /api/v1/premium/orders/{order_code}/init-paypal`.
+- Khi người dùng chuyển đổi giữa PayPal và Thẻ trên checkout, tái sử dụng đơn hàng hiện tại, không tạo đơn rác trùng lặp.
+- Khóa bất biến `provider` một khi giao dịch đã thành công.
+
+### 21.3. Đồng bộ Provider và Báo cáo Giao dịch
+- Giao dịch thanh toán PayPal thực tế -> **PayPal** (EN: **PayPal**).
+- Giao dịch thẻ mô phỏng -> **Thẻ** (EN: **Card**).
+- Đơn hàng mới tạo chưa chọn phương thức -> **Chưa chọn** (EN: **Not selected**).
+- Giao dịch mock cũ mang mã mock -> **Mô phỏng** (EN: **Simulated**).
+- Đồng bộ nhất quán trên: `/premium/history` (Desktop & Mobile), Modal chi tiết giao dịch, Biên lai PDF (`receipt-pdf.js`), và Trang quản trị Admin (`AdminPage.jsx`).
+
+### 21.4. Tinh gọn Cột 'THAO TÁC' trong Lịch sử Giao dịch (`/premium/history`)
+- Thay thế các nút có chữ cồng kềnh bằng các **icon-only buttons** tinh tế:
+  - Icon 1: **Xem chi tiết** (icon mắt `visibility`, phong cách trung tính, có tooltip/title và `aria-label`: `Xem chi tiết` / `View details`).
+  - Icon 2: **Tải biên lai** (icon `download`, viền xanh cyan/blue, có tooltip/title và `aria-label`: `Tải biên lai` / `Download receipt`).
+- **Quy tắc hiển thị chuẩn xác:**
+  - Giao dịch thành công (`success` / `completed`): Hiển thị CẢ HAI icon (Xem chi tiết + Tải biên lai).
+  - Giao dịch khác (`pending`, `processing`, `failed`, `cancelled`, `expired`): CHỈ HIỆN icon Xem chi tiết (TUYỆT ĐỐI KHÔNG hiện icon Tải biên lai).
+- Responsive:
+  - Desktop: Kích thước 32x32px, căn giữa, hover nổi bật và focus ring rõ ràng.
+  - Mobile: Kích thước 38x38px đảm bảo chuẩn touch target trên màn hình cảm ứng.
+
+### 21.5. Kết quả Kiểm thử & Bằng chứng Nghiệm thu
+- **Frontend Unit Tests:** 81/81 passed (100%).
+- **Frontend Production Build:** `npm.cmd run build` thành công trong 8.15s, zero errors.
+- **Backend Tests:** 467 passed, 788 deselected (integration), 0 failed.
+- **Backend Order Security Suite:** 17/17 passed.
+- **Playwright Test Suite (`premium-sandbox.spec.js`):** 20/20 passed (100%).
+- **Bằng chứng hình ảnh:**
+  - `task5_modal_restored.png`: Modal xác nhận đơn hàng khôi phục chuẩn gọn, không còn nút chọn phương thức.
+  - `task5_checkout_methods.png`: Giao diện chọn phương thức PayPal / Nhập thẻ rõ ràng tại trang checkout.
+  - `task5_history_icon_buttons.png`: Cột Thao tác tinh gọn với icon-only buttons, ẩn hiện chuẩn xác theo trạng thái đơn hàng.

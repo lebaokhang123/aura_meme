@@ -227,8 +227,25 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
         order_code: orderCode,
         plan_tier: body.plan_tier,
         amount_usd_cents: body.plan_tier === 'plus' ? 500 : 5000,
-        provider: body.provider,
+        provider: body.provider || 'unselected',
         payment_url: paymentUrl,
+      });
+    }
+
+    if (
+      path.startsWith('/premium/orders/') &&
+      path.endsWith('/init-paypal') &&
+      method === 'POST'
+    ) {
+      if (request.headers()['x-csrf-token'] !== 'server-csrf-test-token') {
+        return fail(403, 'CSRF_INVALID');
+      }
+      return send(200, {
+        order_code: 'AM-SUB-TEST-1234',
+        plan_tier: 'plus',
+        amount_usd_cents: 500,
+        provider: 'paypal_sandbox',
+        payment_url: 'https://www.sandbox.paypal.com/checkoutnow?token=MOCK-PP-1234',
       });
     }
 
@@ -416,7 +433,7 @@ test('Logged in user can confirm order in modal, navigate to checkout, enter sim
   expect(orderReq).toBeDefined();
   expect(orderReq.csrf).toBe('server-csrf-test-token');
   expect(orderReq.body.plan_tier).toBe('plus');
-  expect(orderReq.body.provider).toMatch(/paypal_sandbox|sandbox_simulated/);
+  expect(orderReq.body.provider).toMatch(/unselected|paypal_sandbox|sandbox_simulated/);
 
   // Navigate back to /premium and verify active membership banner
   await page.goto('/premium');
@@ -984,8 +1001,8 @@ test('Part E: Payment History page (/premium/history) displays orders, opens det
   const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
   await page.screenshot({ path: `${artifactsDir}/task5_payment_history_table.png`, fullPage: true });
 
-  // Click "Chi tiết" on first row -> opens detail modal
-  await rows.first().locator('.history-action-btn:has-text("Chi tiết")').click();
+  // Click "Xem chi tiết" on first row -> opens detail modal
+  await rows.first().locator('.history-action-btn[title="Xem chi tiết"]').click();
   const detailModal = page.locator('.history-detail-modal');
   await expect(detailModal).toBeVisible();
   await expect(detailModal.locator('#history-detail-title')).toHaveText('Chi tiết giao dịch');
@@ -996,6 +1013,11 @@ test('Part E: Payment History page (/premium/history) displays orders, opens det
   // Close modal
   await detailModal.locator('.u081-close-btn').click();
   await expect(detailModal).not.toBeVisible();
+
+  // Pending row (row 2) must NOT have download button
+  await expect(rows.nth(1).locator('.history-action-btn--download')).toHaveCount(0);
+  // Successful row (row 1) MUST have download button
+  await expect(rows.first().locator('.history-action-btn--download')).toHaveCount(1);
 
   // Click "Tải biên lai" -> triggers download and displays toast
   await rows.first().locator('.history-action-btn--download').click();
@@ -1029,6 +1051,32 @@ test('Part F: Profile Edit enforces 25 char display name and 100 char bio limits
 
   const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
   await page.screenshot({ path: `${artifactsDir}/task5_profile_edit_25_100.png` });
+});
+
+test('Part G: Capture Task 5 Evidence Screenshots for Owner', async ({ page, context }) => {
+  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
+  await setupMockApi(context, 0, null, false);
+
+  // 1. Capture restored modal without method buttons
+  await page.goto('/premium');
+  const cta = page.locator('.u056-cta');
+  await expect(cta).toBeVisible();
+  await cta.click();
+  const dialog = page.locator('.u081-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.u081-summary-row:has-text("Phương thức")')).toHaveCount(0);
+  await page.screenshot({ path: `${artifactsDir}/task5_modal_restored.png` });
+
+  // 2. Capture checkout with method selection
+  await page.goto('/premium/checkout?order=AM-SUB-TEST-1234');
+  await expect(page.locator('.checkout-method-selector')).toBeVisible();
+  await page.screenshot({ path: `${artifactsDir}/task5_checkout_methods.png` });
+
+  // 3. Capture history table with compact icon buttons
+  await page.goto('/premium/history');
+  await expect(page.locator('.history-table')).toBeVisible();
+  await expect(page.locator('.history-action-btn[title="Xem chi tiết"]').first()).toBeVisible();
+  await page.screenshot({ path: `${artifactsDir}/task5_history_icon_buttons.png`, fullPage: true });
 });
 
 

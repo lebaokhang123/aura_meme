@@ -144,6 +144,9 @@ export default function PaymentHistoryPage() {
     const provider = typeof orderOrProvider === 'object' ? orderOrProvider?.provider : orderOrProvider;
     const txnId = typeof orderOrProvider === 'object' ? (orderOrProvider?.provider_txn_id || '') : '';
 
+    if (!provider || provider === 'unselected') {
+      return t('Chưa chọn', 'Not selected');
+    }
     if (provider === 'sandbox_simulated' || provider === 'simulated' || txnId.startsWith('SIM-CARD-')) {
       return t('Thẻ', 'Card');
     }
@@ -357,20 +360,20 @@ export default function PaymentHistoryPage() {
                             type="button"
                             className="history-action-btn"
                             onClick={() => handleOpenDetail(o)}
-                            title={t('Xem chi tiết đơn hàng', 'View order details')}
+                            title={t('Xem chi tiết', 'View details')}
+                            aria-label={t('Xem chi tiết', 'View details')}
                           >
                             <span className="material-symbols-outlined" aria-hidden="true">visibility</span>
-                            {t('Chi tiết', 'Details')}
                           </button>
                           {(o.status === 'success' || o.status === 'completed') && (
                             <button
                               type="button"
                               className="history-action-btn history-action-btn--download"
                               onClick={(e) => handleDownloadPdf(o, e)}
-                              title={t('Tải biên lai PDF chính thức', 'Download official PDF receipt')}
+                              title={t('Tải biên lai', 'Download receipt')}
+                              aria-label={t('Tải biên lai', 'Download receipt')}
                             >
                               <span className="material-symbols-outlined" aria-hidden="true">download</span>
-                              {t('Tải biên lai', 'Receipt')}
                             </button>
                           )}
                         </div>
@@ -413,18 +416,20 @@ export default function PaymentHistoryPage() {
                       type="button"
                       className="history-action-btn"
                       onClick={() => handleOpenDetail(o)}
+                      title={t('Xem chi tiết', 'View details')}
+                      aria-label={t('Xem chi tiết', 'View details')}
                     >
                       <span className="material-symbols-outlined" aria-hidden="true">visibility</span>
-                      {t('Xem chi tiết', 'Details')}
                     </button>
                     {(o.status === 'success' || o.status === 'completed') && (
                       <button
                         type="button"
                         className="history-action-btn history-action-btn--download"
                         onClick={(e) => handleDownloadPdf(o, e)}
+                        title={t('Tải biên lai', 'Download receipt')}
+                        aria-label={t('Tải biên lai', 'Download receipt')}
                       >
                         <span className="material-symbols-outlined" aria-hidden="true">download</span>
-                        {t('Tải biên lai PDF', 'PDF Receipt')}
                       </button>
                     )}
                   </div>
