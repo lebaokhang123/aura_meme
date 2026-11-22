@@ -722,3 +722,61 @@ test('Admin page moderation section includes Tab 3 Giao dịch (orders)', async 
   await page.screenshot({ path: `${artifactsDir}/task5_admin_orders_tab.png` });
 });
 
+test('Part A: Browser Back and Forward preserves clean checkout state and displays completed receipt', async ({ page, context }) => {
+  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
+  await setupMockApi(context, 0, null, false);
+
+  // 1. Visit /premium and click Mua gói Plus
+  await page.goto('/premium');
+  const plusCta = page.locator('.u056-cta');
+  await expect(plusCta).toBeVisible();
+  await plusCta.click();
+
+  // 2. Modal opens
+  const dialog = page.locator('.u081-dialog');
+  await expect(dialog).toBeVisible();
+
+  // 3. Confirm order in modal -> navigates to checkout
+  await page.locator('.u081-btn-confirm').click();
+  await page.waitForURL(/\/premium\/checkout\?order=/);
+
+  // 4. Hit browser Back to return to /premium
+  await page.goBack();
+  await page.waitForURL(/\/premium$/);
+
+  // Verify modal is NOT stuck open or spinning
+  await expect(dialog).not.toBeVisible();
+  await expect(plusCta).toBeEnabled();
+
+  // 5. Hit browser Forward to return to checkout
+  await page.goForward();
+  await page.waitForURL(/\/premium\/checkout\?order=/);
+
+  // 6. Complete payment via 2-step instant approval
+  const instantBtn = page.locator('.checkout-btn-instant');
+  await instantBtn.click();
+  await instantBtn.click();
+
+  // 7. Verify receipt view is shown
+  const receipt = page.locator('.u081-receipt');
+  await expect(receipt).toBeVisible();
+  await expect(page.locator('.checkout-success-alert')).toBeVisible();
+  await expect(receipt.locator('.checkout-btn-download-receipt').first()).toBeVisible();
+  await expect(receipt.locator('text=Về trang hội viên')).toBeVisible();
+
+  // 8. Revisit completed checkout URL directly
+  await page.goto('/premium/checkout?order=AM-SUB-TEST-1234');
+  await expect(receipt).toBeVisible();
+  await expect(page.locator('.checkout-success-alert')).toBeVisible();
+  // Ensure payment buttons are NOT rendered
+  await expect(page.locator('.checkout-method-selector')).toHaveCount(0);
+  await expect(page.locator('.checkout-btn-paypal')).toHaveCount(0);
+  await expect(page.locator('.checkout-btn-pay')).toHaveCount(0);
+
+  // 9. Click "Về trang hội viên"
+  await page.locator('text=Về trang hội viên').click();
+  await page.waitForURL(/\/premium$/);
+  await expect(dialog).not.toBeVisible();
+});
+
+

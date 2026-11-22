@@ -26,11 +26,26 @@ export default function PaymentModal081({
         dialog.showModal();
       }
     } else {
+      setBusy(false);
+      setError('');
       if (dialog.open) {
         dialog.close();
       }
     }
   }, [isOpen]);
+
+  // Clean up any lingering loading/submitting state when page is restored from bfcache
+  useEffect(() => {
+    const handlePageShow = () => {
+      setBusy(false);
+      setError('');
+      if (onClose) onClose();
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, [onClose]);
 
   function handleCancelClose(e) {
     if (busy) {
@@ -54,6 +69,10 @@ export default function PaymentModal081({
       if (!orderRes?.order_code) {
         throw new Error(t('Không thể tạo đơn hàng. Vui lòng thử lại.', 'Could not create order. Please try again.'));
       }
+
+      // Reset modal state cleanly before navigating so bfcache doesn't restore frozen state
+      setBusy(false);
+      if (onClose) onClose();
 
       // Navigate to dedicated checkout page with order code
       window.location.assign(`/premium/checkout?order=${encodeURIComponent(orderRes.order_code)}`);

@@ -56,6 +56,20 @@ export default function PremiumCheckoutPage() {
     };
   }, []);
 
+  // Handle bfcache restoration & reset any stuck transient state
+  useEffect(() => {
+    const handlePageShow = () => {
+      if (checkoutState === 'processing' || checkoutState === 'verifying') {
+        setCheckoutState('idle');
+        setStatusText('');
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, [checkoutState]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     let code = params.get('order');
@@ -91,7 +105,18 @@ export default function PremiumCheckoutPage() {
               ? new Date(data.completed_at).toLocaleString(language === 'en' ? 'en-US' : 'vi-VN')
               : new Date().toLocaleString(language === 'en' ? 'en-US' : 'vi-VN'),
             status: 'ACTIVE',
+            isExistingSuccess: true,
           });
+        } else if (data.status === 'cancelled' || data.status === 'failed') {
+          setCheckoutState('failed');
+          setCheckoutError(
+            data.status === 'cancelled'
+              ? t('Đơn hàng này đã bị hủy.', 'This order was cancelled.')
+              : t('Đơn hàng thanh toán không thành công.', 'Payment was not successful for this order.')
+          );
+        } else {
+          setCheckoutState('idle');
+          setCheckoutError('');
         }
         setLoading(false);
 
@@ -422,6 +447,35 @@ export default function PremiumCheckoutPage() {
                   <span className="material-symbols-outlined" aria-hidden="true">task_alt</span>
                   <span>{t('BIÊN NHẬN GIAO DỊCH HỘI VIÊN', 'MEMBERSHIP TRANSACTION RECEIPT')}</span>
                 </div>
+
+                <div
+                  className="checkout-success-alert"
+                  role="status"
+                  style={{
+                    padding: '10px 14px',
+                    background: 'rgba(34, 197, 94, 0.12)',
+                    border: '1px solid rgba(34, 197, 94, 0.35)',
+                    borderRadius: '8px',
+                    color: '#4ade80',
+                    fontSize: '13px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontWeight: 500,
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '18px' }} aria-hidden="true">
+                    check_circle
+                  </span>
+                  <span>
+                    {t(
+                      `Đơn hàng này đã được thanh toán thành công vào ${receipt.activatedAt}.`,
+                      `This order was successfully paid on ${receipt.activatedAt}.`
+                    )}
+                  </span>
+                </div>
+
                 <div className="u081-receipt-row">
                   <span>{t('Mã đơn hàng', 'Order code')}:</span>
                   <strong className="u081-receipt-code">{receipt.orderCode}</strong>
@@ -448,28 +502,61 @@ export default function PremiumCheckoutPage() {
                 </div>
                 <div className="u081-receipt-row u081-receipt-download-row">
                   <span>{t('Biên lai:', 'Receipt:')}</span>
-                  <button
-                    type="button"
-                    className="checkout-btn-download-receipt"
-                    onClick={() => {
-                      const activeUser = auth.snapshot()?.user || readDemoUser?.();
-                      downloadReceiptPdf(receipt || order, activeUser);
-                    }}
-                    title={t('Tải về biên lai PDF', 'Download PDF Receipt')}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-                      download
-                    </span>
-                    <span>{t('Tải về', 'Download')}</span>
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="checkout-btn-download-receipt"
+                      onClick={() => {
+                        const activeUser = auth.snapshot()?.user || readDemoUser?.();
+                        downloadReceiptPdf(receipt || order, activeUser);
+                      }}
+                      title={t('Tải về biên lai PDF', 'Download PDF Receipt')}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                        download
+                      </span>
+                      <span>{t('Tải PDF', 'Download PDF')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="checkout-btn-print-receipt"
+                      onClick={() => window.print()}
+                      title={t('In biên lai', 'Print Receipt')}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                        print
+                      </span>
+                      <span>{t('In biên lai', 'Print')}</span>
+                    </button>
+                  </div>
                 </div>
 
-                <a href="/" className="checkout-btn-home">
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    celebration
-                  </span>
-                  <span>{t('Trải nghiệm đặc quyền ngay', 'Experience Perks Now')}</span>
-                </a>
+                <div
+                  className="checkout-receipt-actions"
+                  style={{ display: 'flex', gap: '10px', marginTop: '18px' }}
+                >
+                  <a
+                    href="/premium"
+                    className="checkout-btn-home"
+                    style={{
+                      flex: 1,
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      color: 'var(--am-on-surface)',
+                    }}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      arrow_back
+                    </span>
+                    <span>{t('Về trang hội viên', 'Back to Plans')}</span>
+                  </a>
+                  <a href="/" className="checkout-btn-home" style={{ flex: 1.2 }}>
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      celebration
+                    </span>
+                    <span>{t('Trải nghiệm ngay', 'Experience Now')}</span>
+                  </a>
+                </div>
               </div>
             )}
 

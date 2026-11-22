@@ -118,6 +118,43 @@ export default function PremiumPage() {
     };
   }, [isAuthenticated, session.user?.id]);
 
+  // Handle bfcache restoration & browser back navigation cleanly
+  useEffect(() => {
+    const handleRestore = () => {
+      setDialogOpen(false);
+      refreshPremium?.();
+      auth
+        .read('/premium/status')
+        .then((res) => {
+          if (res?.plans && Array.isArray(res.plans) && res.plans.length > 0) {
+            setPricingReliable(true);
+            setPlans((prev) =>
+              prev.map((p) => {
+                const sp = res.plans.find((item) => item.tier === p.id);
+                if (!sp) return p;
+                const vndFormatted =
+                  sp.amount_vnd
+                    ? `${Number(sp.amount_vnd).toLocaleString('vi-VN')} VNĐ`
+                    : (sp.amount_vnd_formatted?.replace(' đ', ' VNĐ') || p.priceVndFormatted);
+                return {
+                  ...p,
+                  days: sp.duration_days ?? p.days,
+                  boost: sp.boost_multiplier ?? p.boost,
+                  priceFormatted: sp.amount_usd_formatted ?? p.priceFormatted,
+                  priceVndFormatted: vndFormatted,
+                };
+              })
+            );
+          }
+        })
+        .catch(() => {});
+    };
+    window.addEventListener('pageshow', handleRestore);
+    return () => {
+      window.removeEventListener('pageshow', handleRestore);
+    };
+  }, [refreshPremium]);
+
   // Handle return callback from VNPAY (HTTP redirect query parameters)
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -248,7 +285,7 @@ export default function PremiumPage() {
       window.location.href = '/login?next=%2Fpremium';
       return;
     }
-    if (!pricingReliable) return;
+    if (!pricingReliable || isCurrentPlanActive) return;
     openDialog();
   }
 
@@ -465,7 +502,7 @@ export default function PremiumPage() {
             <button
               className="u056-cta"
               type="button"
-              disabled={isAuthenticated && !pricingReliable}
+              disabled={isAuthenticated && (!pricingReliable || isCurrentPlanActive)}
               onClick={handleCtaClick}
             >
               <span className="material-symbols-outlined" aria-hidden="true">
