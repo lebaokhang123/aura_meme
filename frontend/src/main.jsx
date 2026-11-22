@@ -25,6 +25,7 @@ import { SocialProvider } from './SocialContext.jsx';
 import './social.css';
 import './realm-badges.css';
 import './cookie-consent.css';
+import './lucian-auth.css';
 import CookieConsent from './components/CookieConsent.jsx';
 import AdminPage from './components/AdminPage.jsx';
 import PremiumPage from './components/PremiumPage.jsx';

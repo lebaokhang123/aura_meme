@@ -1,0 +1,820 @@
+/* Lucian UX/UI Prompt #403 & #405 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/
+ * Ported for AuraMeme (Task 7 Polish).
+ */
+
+:root {
+  --ux-ease: cubic-bezier(.2, .8, .2, 1);
+  --ux-spring: cubic-bezier(.34, 1.45, .64, 1);
+  --ux-accent: var(--am-secondary, #d0bcff);
+  --ux-accent-soft: rgba(208, 188, 255, 0.15);
+  --ux-surface: var(--am-surface-container, #1e1f27);
+  --ux-surface-2: var(--am-surface-container-low, #1a1b23);
+  --ux-surface-3: var(--am-surface-container-high, #292932);
+  --ux-ink: var(--am-on-surface, #e3e1ed);
+  --ux-ink-2: var(--am-on-surface-variant, #cac4d0);
+  --ux-ink-3: var(--am-outline, #948f9a);
+  --ux-line: rgba(255, 255, 255, 0.08);
+  --ux-line-2: var(--am-outline-variant, #49454f);
+  --ux-danger: var(--am-error, #ffb4ab);
+  --ux-mint: #119C72;
+  --ux-shadow: rgba(0, 0, 0, 0.45);
+  --ux-shadow-strong: rgba(0, 0, 0, 0.72);
+}
+
+.u219[data-theme="light"] {
+  --ux-surface: #FFFFFF;
+  --ux-surface-2: var(--am-surface-container, #F5F3EF);
+  --ux-surface-3: var(--am-surface-container-high, #EAE7E1);
+  --ux-ink: var(--am-on-surface, #16151B);
+  --ux-ink-2: var(--am-outline, #57535F);
+  --ux-ink-3: #8E8A97;
+  --ux-line: rgba(22, 21, 27, 0.09);
+  --ux-line-2: rgba(22, 21, 27, 0.17);
+  --ux-accent: var(--am-secondary, #6A57F2);
+  --ux-accent-soft: rgba(106, 87, 242, 0.12);
+  --ux-danger: #D93A55;
+  --ux-mint: #119C72;
+  --ux-shadow: rgba(40, 30, 80, 0.14);
+  --ux-shadow-strong: rgba(40, 30, 80, 0.3);
+}
+
+/* ============================================================
+   FORGOT PASSWORD #405
+   ============================================================ */
+.u405 {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.u405-box {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  min-height: 290px;
+}
+
+.u405-a,
+.u405-b {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  transition: opacity .3s, transform .55s var(--ux-spring), visibility 0s .55s;
+}
+
+.u405-a {
+  justify-content: center;
+}
+
+.u405:not(.is-sent) .u405-a {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s, 0s, 0s;
+}
+
+.u405-b {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(.9);
+}
+
+.u405.is-sent .u405-a {
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(.94) translateY(-6px);
+  pointer-events: none;
+}
+
+.u405.is-sent .u405-b {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: .1s, .1s, 0s;
+  pointer-events: auto;
+}
+
+.u405-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--ux-ink);
+  text-align: center;
+  margin: 0 0 6px 0;
+  letter-spacing: -.02em;
+}
+
+.u405-sub {
+  font-size: 13px;
+  color: var(--ux-ink-3);
+  text-align: center;
+  margin: 0 0 20px 0;
+  line-height: 1.45;
+}
+
+.u405-f {
+  position: relative;
+  height: 52px;
+  border-radius: 12px;
+  background: var(--ux-surface);
+  box-shadow: inset 0 0 0 1px var(--ux-line-2);
+  transition: box-shadow .2s;
+}
+
+.u405-f:hover {
+  box-shadow: inset 0 0 0 1px var(--ux-ink-3);
+}
+
+.u405-f.is-f {
+  box-shadow: inset 0 0 0 1.5px var(--ux-accent), 0 0 0 4px var(--ux-accent-soft);
+}
+
+.u405-f.is-err {
+  box-shadow: inset 0 0 0 1px var(--ux-danger);
+}
+
+.u405-f::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ux-danger);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform .5s var(--ux-ease);
+}
+
+.u405-f.is-err::after {
+  transform: scaleX(1);
+}
+
+.u405-f.is-shake {
+  animation: u405-shake .45s cubic-bezier(.36,.07,.19,.97);
+}
+
+@keyframes u405-shake {
+  15% { transform: translateX(-7px); }
+  35% { transform: translateX(6px); }
+  55% { transform: translateX(-4px); }
+  75% { transform: translateX(2px); }
+}
+
+.u405-f label {
+  position: absolute;
+  left: 15px;
+  top: 17px;
+  font-size: 14px;
+  color: var(--ux-ink-3);
+  transform-origin: left top;
+  transition: transform .4s var(--ux-spring), color .2s;
+  pointer-events: none;
+}
+
+.u405-f.is-up label {
+  transform: translateY(-10px) scale(.76);
+  color: var(--ux-ink-2);
+}
+
+.u405-f.is-f label {
+  color: var(--ux-accent);
+}
+
+.u405-f.is-err label {
+  color: var(--ux-danger);
+}
+
+.u405-in {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 21px 15px 6px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  outline: none;
+  font-size: 14px;
+  color: var(--ux-ink);
+}
+
+.u405-in:focus-visible {
+  outline: none;
+}
+
+.u405-msg {
+  min-height: 20px;
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--ux-danger);
+  text-align: left;
+  padding: 0 4px;
+}
+
+.u405-send {
+  position: relative;
+  height: 48px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--ux-ink);
+  color: var(--ux-surface);
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .45s var(--ux-spring), opacity .2s;
+}
+
+.u405-send:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.u405-send:active:not(:disabled) {
+  transform: scale(.97, .93);
+}
+
+.u405-send:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.u405 button:focus-visible,
+.u405-back a:focus-visible {
+  outline: 2px solid var(--ux-accent);
+  outline-offset: 3px;
+}
+
+.u405-back {
+  margin-top: 18px;
+  text-align: center;
+}
+
+.u405-back a {
+  font-size: 13px;
+  color: var(--ux-accent);
+  text-decoration: none;
+}
+
+.u405-back a:hover {
+  text-decoration: underline;
+}
+
+.u405-plane {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.u405-plane svg {
+  width: 30px;
+  height: 30px;
+  overflow: visible;
+}
+
+.u405-plane .p1 {
+  fill: #FFFFFF;
+}
+
+.u405-plane .p2 {
+  fill: #DDD8F5;
+}
+
+.u405-plane path {
+  stroke: #16151B;
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+
+.u405-env {
+  width: 72px;
+  height: 60px;
+  overflow: visible;
+}
+
+.u405-env .bk {
+  fill: #DCD5FF;
+}
+
+.u405-env .lt {
+  fill: #FFFFFF;
+  stroke: #CFC8F3;
+  stroke-width: 1;
+}
+
+.u405-env .ln {
+  stroke: #B8AEF0;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.u405-env .fr {
+  fill: #EAE6FF;
+}
+
+.u405-env .fl {
+  fill: #CDC4FF;
+  transform-origin: 36px 16px;
+  transform: scaleY(-1);
+  transition: transform .5s var(--ux-spring) .45s;
+}
+
+.u405-env .letter {
+  transform: translateY(-14px);
+  transition: transform .5s var(--ux-ease) .1s;
+}
+
+.u405.is-sent .u405-env .letter {
+  transform: translateY(13px);
+}
+
+.u405.is-sent .u405-env .fl {
+  transform: none;
+}
+
+.u405.is-sent .u405-env {
+  animation: u405-bob .7s var(--ux-spring) .85s;
+}
+
+@keyframes u405-bob {
+  40% { transform: translateY(3px) scale(1.04,.96); }
+}
+
+.u405-b b {
+  margin-top: 14px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ux-ink);
+  letter-spacing: -.02em;
+}
+
+.u405-to {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--ux-ink-3);
+  max-width: 100%;
+}
+
+.u405-em {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ux-ink);
+  font-weight: 500;
+}
+
+.u405-chg {
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ux-accent);
+  cursor: pointer;
+}
+
+.u405-chg:hover {
+  background: var(--ux-accent-soft);
+}
+
+.u405-spam-note {
+  font-size: 12px;
+  color: var(--ux-ink-3);
+  margin: 6px 0 10px;
+  line-height: 1.4;
+}
+
+.u405-re {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  margin-top: 4px;
+  padding: 0 14px 0 6px;
+  border: 0;
+  border-radius: 19px;
+  background: var(--ux-surface);
+  box-shadow: inset 0 0 0 1px var(--ux-line-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ux-ink);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: transform .4s var(--ux-spring), background .2s, color .2s;
+}
+
+.u405-re:hover:not(:disabled) {
+  background: var(--ux-surface-2);
+  transform: translateY(-1px);
+}
+
+.u405-re:disabled {
+  color: var(--ux-ink-3);
+  cursor: default;
+  opacity: .75;
+}
+
+.u405-ring {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+
+.u405-ring svg {
+  width: 26px;
+  height: 26px;
+  transform: rotate(-90deg);
+}
+
+.u405-ring circle {
+  fill: none;
+  stroke-width: 2.4;
+}
+
+.u405-ring .tr {
+  stroke: var(--ux-line-2);
+}
+
+.u405-ring .pr {
+  stroke: var(--ux-accent);
+  stroke-linecap: round;
+  stroke-dasharray: 62.8;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear;
+}
+
+.u405-ring em {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ux-ink-2);
+}
+
+.u405-ring i {
+  position: absolute;
+  inset: 6px;
+  opacity: 0;
+  transition: opacity .2s;
+}
+
+.u405-ring i::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--ux-accent);
+  border-top-color: transparent;
+  transform: rotate(30deg);
+}
+
+.u405-ring i::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: -1px;
+  border: 4px solid transparent;
+  border-left-color: var(--ux-accent);
+  transform: rotate(-40deg);
+}
+
+.u405-re.is-ready .u405-ring em {
+  opacity: 0;
+}
+
+.u405-re.is-ready .u405-ring i {
+  opacity: 1;
+}
+
+/* ============================================================
+   LOGIN FORM #403
+   ============================================================ */
+.u403-form {
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+.u403-f {
+  position: relative;
+  height: 52px;
+  border-radius: 12px;
+  background: var(--ux-surface);
+  box-shadow: inset 0 0 0 1px var(--ux-line-2);
+  transition: box-shadow .2s;
+}
+
+.u403-f + .u403-f {
+  margin-top: 12px;
+}
+
+.u403-f:hover {
+  box-shadow: inset 0 0 0 1px var(--ux-ink-3);
+}
+
+.u403-f.is-f {
+  box-shadow: inset 0 0 0 1.5px var(--ux-accent), 0 0 0 4px var(--ux-accent-soft);
+}
+
+.u403-f.is-err {
+  box-shadow: inset 0 0 0 1px var(--ux-danger);
+}
+
+.u403-f::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ux-danger);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform .5s var(--ux-ease);
+}
+
+.u403-f.is-err::after {
+  transform: scaleX(1);
+}
+
+.u403-f.is-shake {
+  animation: u403-shake .45s cubic-bezier(.36,.07,.19,.97);
+}
+
+@keyframes u403-shake {
+  15% { transform: translateX(-7px); }
+  35% { transform: translateX(6px); }
+  55% { transform: translateX(-4px); }
+  75% { transform: translateX(2px); }
+}
+
+.u403-f label {
+  position: absolute;
+  left: 15px;
+  top: 17px;
+  font-size: 14px;
+  color: var(--ux-ink-3);
+  transform-origin: left top;
+  transition: transform .4s var(--ux-spring), color .2s;
+  pointer-events: none;
+}
+
+.u403-f.is-up label {
+  transform: translateY(-10px) scale(.76);
+  color: var(--ux-ink-2);
+}
+
+.u403-f.is-f label {
+  color: var(--ux-accent);
+}
+
+.u403-f.is-err label {
+  color: var(--ux-danger);
+}
+
+.u403-in {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 21px 15px 6px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  outline: none;
+  font-size: 14px;
+  color: var(--ux-ink);
+}
+
+.u403-in:focus-visible {
+  outline: none;
+}
+
+.u403-in[type="password"] {
+  letter-spacing: .14em;
+}
+
+.u403-pw .u403-in {
+  padding-right: 48px;
+}
+
+.u403-eye {
+  position: absolute;
+  right: 8px;
+  top: 9px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ux-ink-3);
+  cursor: pointer;
+  transition: color .2s, background .2s;
+}
+
+.u403-eye:hover {
+  color: var(--ux-ink);
+  background: var(--ux-surface-2);
+}
+
+.u403-eye:focus-visible {
+  outline: 2px solid var(--ux-accent);
+  outline-offset: -2px;
+}
+
+.u403-eye svg {
+  width: 20px;
+  height: 20px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.u403-eye .lid {
+  transform-origin: 10px 10px;
+  transform: scaleY(.1);
+  transition: transform .45s var(--ux-spring);
+}
+
+.u403-eye .lash {
+  opacity: 1;
+  transition: opacity .2s, transform .4s var(--ux-spring);
+  transform-origin: 10px 10px;
+}
+
+.u403-eye[aria-pressed="true"] .lid {
+  transform: none;
+}
+
+.u403-eye[aria-pressed="true"] .lash {
+  opacity: 0;
+  transform: translateY(-3px);
+}
+
+.u403-msg {
+  min-height: 22px;
+  margin: 4px 0 0;
+  padding: 2px 4px 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ux-danger);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity .2s, transform .35s var(--ux-spring);
+}
+
+.u403-msg.is-on {
+  opacity: 1;
+  transform: none;
+}
+
+.u403-go {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 48px;
+  margin: 10px auto 0;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: var(--ux-ink);
+  color: var(--ux-surface);
+  font-size: 14.5px;
+  font-weight: 600;
+  overflow: hidden;
+  cursor: pointer;
+  transition: width .55s var(--ux-spring), border-radius .45s var(--ux-ease), background .35s, color .35s, transform .4s var(--ux-spring);
+}
+
+.u403-go:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.u403-go:active:not(:disabled) {
+  transform: scale(.97, .94);
+}
+
+.u403-go:focus-visible {
+  outline: 2px solid var(--ux-accent);
+  outline-offset: 3px;
+}
+
+.u403-go > * {
+  grid-area: 1/1;
+  transition: opacity .2s, transform .4s var(--ux-spring);
+}
+
+.u403-go i {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  opacity: 0;
+  transform: scale(.5);
+  animation: u403-spin .7s linear infinite;
+}
+
+.u403-go svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transform: scale(.5);
+}
+
+.u403-go svg path {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  transition: stroke-dashoffset .4s var(--ux-ease) .1s;
+}
+
+@keyframes u403-spin {
+  to { rotate: 360deg; }
+}
+
+.u403-go.is-busy,
+.u403-go.is-ok {
+  width: 48px;
+  border-radius: 24px;
+  cursor: default;
+}
+
+.u403-go.is-busy span,
+.u403-go.is-ok span {
+  opacity: 0;
+  transform: scale(.8);
+}
+
+.u403-go.is-busy i {
+  opacity: 1;
+  transform: none;
+}
+
+.u403-go.is-ok {
+  background: var(--ux-mint, #119C72);
+  color: #FFFFFF;
+}
+
+.u403-go.is-ok svg {
+  opacity: 1;
+  transform: none;
+}
+
+.u403-go.is-ok svg path {
+  stroke-dashoffset: 0;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .u403-f.is-shake,
+  .u405-f.is-shake,
+  .u405.is-sent .u405-env {
+    animation: none !important;
+  }
+  .u403-go,
+  .u403-f,
+  .u403-msg,
+  .u405-a,
+  .u405-b,
+  .u405-f,
+  .u405-send,
+  .u403-eye .lid,
+  .u403-eye .lash {
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -81,8 +81,8 @@ test('Task 7: Forgot Password and Reset Password flows work securely with CSRF a
   // 1. Forgot password
   await page.goto('/forgot-password');
   await page.locator('#forgot-email').fill('alice@example.com');
-  await page.getByRole('button', { name: 'Gửi liên kết đặt lại mật khẩu' }).click();
-  await expect(page.getByRole('status')).toContainText('Nếu địa chỉ email tồn tại');
+  await page.getByRole('button', { name: 'Gửi liên kết' }).click();
+  await expect(page.getByRole('status')).toContainText('Kiểm tra email của bạn');
   expect(state.getLastForgotEmail()).toBe('alice@example.com');
   await page.screenshot({ path: `${ARTIFACTS_DIR}/task7_forgot_reset.png` });
 

@@ -52,6 +52,7 @@ export function attachNavigation(){
  function onSubmit(ev){
    if(!['/login','/register'].includes(location.pathname))return;
    if(ev.target.id!=='loginForm')return;
+   if(ev.target.dataset.lucianSubmit)return;
    ev.preventDefault();ev.stopPropagation();
    if(!MOCK_AUTH){submitApiForm(ev.target);return;}
    const id=document.getElementById('identifier')?.value||'';
@@ -76,6 +77,7 @@ const pendingForms=new WeakSet();
 export function prepareAuthForm(){
  if(MOCK_AUTH)return;
  const form=document.getElementById('loginForm');if(!form)return;
+ if(form.dataset.lucianSubmit)return;
  const lang=readPreferences().language;
  const isEn=lang==='en';
  const password=form.querySelector('#password');if(password)password.maxLength=128;

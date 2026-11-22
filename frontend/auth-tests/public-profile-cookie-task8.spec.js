@@ -145,8 +145,8 @@ test('Task 8: User B navigates from Home/Comment to User A Public Profile (read-
 
   // Dismiss cookie banner first so we can verify public profile cleanly
   await expect(page.locator('[data-cookie-banner]')).toBeVisible();
-  await page.locator('[data-cookie-reject]').click();
-  await expect(page.locator('[data-cookie-reopen]')).toBeVisible();
+  await page.locator('[data-cookie-ess]').click();
+  await expect(page.locator('[data-cookie-reopen]')).toBeVisible({ timeout: 6000 });
 
   // Verify author avatar & name are clickable links to /profile/khang_dev
   const card = page.locator('article[data-post-id]').first();
@@ -194,19 +194,16 @@ test('Task 8: Guest views Public Profile & Lucian #225 Cookie Consent (Settings,
   await expect(banner).toBeVisible();
   await expect(banner.locator('a[href="/privacy.html#cookies"]')).toBeVisible();
 
-  // Expand Settings -> Essential switch is always on & disabled; optional switch toggles
-  await page.locator('[data-cookie-toggle-settings]').click();
-  const settings = page.locator('[data-cookie-settings]');
-  await expect(settings).toBeVisible();
-  const essentialSwitch = settings.locator('button[role="switch"]').first();
-  await expect(essentialSwitch).toHaveAttribute('aria-checked', 'true');
-  await expect(essentialSwitch).toBeDisabled();
+  // Lucian #409: compact banner with golden cookie, links to privacy, buttons for Essential only & Got it
+  await expect(page.locator('.u409-ck svg')).toBeVisible();
+  await expect(page.locator('[data-cookie-ess]')).toBeVisible();
+  await expect(page.locator('[data-cookie-ok]')).toBeVisible();
 
   await page.screenshot({ path: `${ARTIFACTS_DIR}/task8_cookie_banner_settings.png`, fullPage: false });
 
-  // Save choices with optional=false -> banner closes, reopen button appears, persists after reload
-  await page.locator('[data-cookie-save]').click();
-  await expect(banner).toHaveCount(0);
+  // Click 'Đã hiểu' (Allow) -> cookie bite + crumb drop + thanks pill + closes banner
+  await page.locator('[data-cookie-ok]').click();
+  await expect(page.locator('[data-cookie-banner]')).toHaveCount(0, { timeout: 6000 });
   await expect(page.locator('[data-cookie-reopen]')).toBeVisible();
 
   await page.reload();
