@@ -54,6 +54,10 @@ export function createAuthClient({fetch=globalThis.fetch,notify=()=>{}}={}){
     async login(email,password){await mutation('login',{email,password});if(!await refresh())throw new AuthError(401,'SESSION_EXPIRED');notify();},
     async register({username,email,password,display_name}){return mutation('register',{username,email,password,display_name});},
     async logout(){await mutation('logout');generation++;publish({status:'guest',user:null,error:null});notify();},
+    async forgotPassword(email){return mutation('forgot-password',{email});},
+    async resetPassword(token,new_password){return mutation('reset-password',{token,new_password});},
+    async googleConfig(){return request('/auth/google/config');},
+    async googleLogin(id_token,nonce){await mutation('google/login',{id_token,...(nonce?{nonce}:{})});if(!await refresh())throw new AuthError(401,'SESSION_EXPIRED');notify();},
   };
 }
 export function authMessage(error,language='vi'){
@@ -65,6 +69,10 @@ export function authMessage(error,language='vi'){
     CONFLICT:['Tên đăng nhập hoặc email đã được sử dụng.','Username or email is already in use.'],
     VALIDATION_ERROR:['Thông tin chưa hợp lệ. Mật khẩu cần 12–128 ký tự; tên đăng nhập dùng chữ thường, số hoặc dấu gạch dưới.','Invalid details. Use a 12–128 character password and lowercase letters, numbers or underscores for the username.'],
     RATE_LIMITED:['Quá nhiều lần thử. Vui lòng thử lại sau.','Too many attempts. Please try again later.'],
+    ACCOUNT_LINK_REQUIRED:['Email này đã thuộc về tài khoản hiện có. Vui lòng đăng nhập bằng mật khẩu trước rồi liên kết Google.','This email belongs to an existing account. Sign in with your password first to link Google safely.'],
+    INVALID_RESET_TOKEN:['Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.','This password reset link is invalid or has expired.'],
+    GOOGLE_ONLY_ACCOUNT:['Tài khoản này đăng nhập bằng Google và không dùng mật khẩu cục bộ.','This account signs in with Google and does not have a local password.'],
+    GOOGLE_AUTH_NOT_CONFIGURED:['Đăng nhập Google chưa được cấu hình trên máy chủ.','Google sign-in is not configured on this server yet.'],
   };
   if(error?.code==='SESSION_EXPIRED')return messages.SESSION_EXPIRED[language==='en'?1:0];
   if(error?.status===401)return language==='en'?'Incorrect email or password.':'Email hoặc mật khẩu không đúng.';
