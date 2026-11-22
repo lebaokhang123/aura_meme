@@ -600,6 +600,88 @@
   gap: 14px;
 }
 
+@media (max-width: 640px) {
+  .checkout-form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.checkout-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  margin-top: 10px;
+}
+
+.checkout-form-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--am-on-surface, #e3e1ed);
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 8px;
+}
+
+.checkout-form-section-title .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--am-secondary, #d0bcff);
+}
+
+.checkout-select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--am-outline-variant, #49454f);
+  background: var(--am-surface-container-lowest, #0d0e15);
+  color: var(--am-on-surface, #e3e1ed);
+  font-size: 14px;
+  font-family: inherit;
+  box-sizing: border-box;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+
+.checkout-select:focus {
+  border-color: var(--am-secondary, #d0bcff);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--am-secondary, #d0bcff) 25%, transparent);
+}
+
+.checkout-phone-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkout-phone-prefix {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  height: 44px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--am-outline-variant, #49454f);
+  border-radius: 10px;
+  color: var(--am-on-surface-variant, #cac4d0);
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
 /* Demo test card helper pill */
 .checkout-demo-pill {
   display: flex;

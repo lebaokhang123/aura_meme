@@ -779,4 +779,72 @@ test('Part A: Browser Back and Forward preserves clean checkout state and displa
   await expect(dialog).not.toBeVisible();
 });
 
+test('Part C: Simulated card form is structured into 2 clean groups with complete billing fields', async ({ page, context }) => {
+  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
+  const s = await setupMockApi(context, 0, null, false);
+  await page.goto('/premium/checkout?order=AM-SUB-TEST-1234');
+
+  // Switch to simulated card method
+  await page.locator('.checkout-method-card[data-method="card"]').click();
+
+  // Verify Group 1: Thẻ thanh toán
+  const group1Title = page.locator('.checkout-form-section-title:has-text("Nhóm 1 — Thẻ thanh toán")');
+  await expect(group1Title).toBeVisible();
+  await expect(page.locator('label[for="card-number"]')).toHaveText('Số thẻ');
+  await expect(page.locator('#card-number')).toBeVisible();
+  await expect(page.locator('#card-expiry')).toBeVisible();
+  await expect(page.locator('#card-cvv')).toBeVisible();
+
+  // Verify Group 2: Thông tin thanh toán
+  const group2Title = page.locator('.checkout-form-section-title:has-text("Nhóm 2 — Thông tin thanh toán")');
+  await expect(group2Title).toBeVisible();
+  await expect(page.locator('label[for="cardholder-name"]')).toHaveText('Tên trên thẻ');
+  await expect(page.locator('#cardholder-name')).toBeVisible();
+  await expect(page.locator('#billing-country')).toBeVisible();
+  await expect(page.locator('#billing-address-1')).toBeVisible();
+  await expect(page.locator('#billing-address-2')).toBeVisible();
+  await expect(page.locator('#billing-city')).toBeVisible();
+  await expect(page.locator('#billing-postal')).toBeVisible();
+  await expect(page.locator('#billing-phone')).toBeVisible();
+
+  // Verify Country dropdown options
+  const countrySelect = page.locator('#billing-country');
+  await expect(countrySelect).toHaveValue('VN');
+  await expect(page.locator('.checkout-phone-prefix')).toHaveText('+84');
+
+  // Change country to US -> dial prefix updates to +1
+  await countrySelect.selectOption('US');
+  await expect(page.locator('.checkout-phone-prefix')).toHaveText('+1');
+
+  // Test autofill pill
+  const pill = page.locator('.checkout-demo-pill');
+  await pill.click();
+  await expect(page.locator('#cardholder-name')).toHaveValue('NGUYEN VAN A');
+  await expect(page.locator('#card-number')).toHaveValue('4242 4242 4242 4242');
+  await expect(page.locator('#billing-address-1')).toHaveValue('123 Đường Cyber');
+  await expect(page.locator('#billing-city')).toHaveValue('TP. Hồ Chí Minh');
+  await expect(page.locator('#billing-postal')).toHaveValue('700000');
+  await expect(page.locator('#billing-phone')).toHaveValue('0901234567');
+
+  // Verify state retention when switching between PayPal and Card
+  await page.locator('.checkout-method-card[data-method="paypal"]').click();
+  await expect(page.locator('.checkout-paypal-action-box')).toBeVisible();
+  await page.locator('.checkout-method-card[data-method="card"]').click();
+  await expect(page.locator('#card-number')).toHaveValue('4242 4242 4242 4242');
+  await expect(page.locator('#billing-address-1')).toHaveValue('123 Đường Cyber');
+
+  // Submit payment form
+  await page.locator('.checkout-btn-pay').click();
+  const receipt = page.locator('.u081-receipt');
+  await expect(receipt).toBeVisible();
+
+  // Verify NO card details or CVV was transmitted to server
+  const capReq = s.requests.find((r) => r.path.endsWith('/capture') || r.path.endsWith('/simulate'));
+  expect(capReq).toBeDefined();
+  expect(capReq.body?.card_number).toBeUndefined();
+  expect(capReq.body?.cvv).toBeUndefined();
+  expect(capReq.body?.cardNumber).toBeUndefined();
+});
+
+
 

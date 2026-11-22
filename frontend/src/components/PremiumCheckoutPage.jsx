@@ -8,6 +8,17 @@ import { readDemoUser } from '../demo.js';
 import { downloadReceiptPdf } from '../receipt-pdf.js';
 import '../payment-ring-081.css';
 
+const COUNTRIES = [
+  { code: 'VN', nameVi: 'Việt Nam', nameEn: 'Vietnam', dialCode: '+84' },
+  { code: 'US', nameVi: 'Hoa Kỳ (United States)', nameEn: 'United States', dialCode: '+1' },
+  { code: 'JP', nameVi: 'Nhật Bản (Japan)', nameEn: 'Japan', dialCode: '+81' },
+  { code: 'KR', nameVi: 'Hàn Quốc (South Korea)', nameEn: 'South Korea', dialCode: '+82' },
+  { code: 'SG', nameVi: 'Singapore', nameEn: 'Singapore', dialCode: '+65' },
+  { code: 'AU', nameVi: 'Úc (Australia)', nameEn: 'Australia', dialCode: '+61' },
+  { code: 'GB', nameVi: 'Vương quốc Anh (United Kingdom)', nameEn: 'United Kingdom', dialCode: '+44' },
+  { code: 'OTHER', nameVi: 'Khác (Other)', nameEn: 'Other', dialCode: '' },
+];
+
 export default function PremiumCheckoutPage() {
   const { language } = usePreferences();
   const t = (vi, en) => (language === 'en' ? en : vi);
@@ -20,10 +31,22 @@ export default function PremiumCheckoutPage() {
 
   // Form state - Form values exist strictly in memory for presentation and client formatting
   // NEVER transmitted to backend, logged, or saved to localStorage/database
-  const [cardholderName, setCardholderName] = useState('NGUYEN VAN A');
+  // Group 1: Card details
   const [cardNumber, setCardNumber] = useState('4242 4242 4242 4242');
   const [expiryDate, setExpiryDate] = useState('12/28');
   const [cvv, setCvv] = useState('123');
+
+  // Group 2: Billing information
+  const [cardholderName, setCardholderName] = useState('NGUYEN VAN A');
+  const [country, setCountry] = useState('VN');
+  const [address1, setAddress1] = useState('123 Đường Cyber');
+  const [address2, setAddress2] = useState('Tòa nhà Aura, Tầng 5');
+  const [city, setCity] = useState('TP. Hồ Chí Minh');
+  const [postalCode, setPostalCode] = useState('700000');
+  const [phone, setPhone] = useState('0901234567');
+
+  const selectedCountryObj = COUNTRIES.find((c) => c.code === country) || COUNTRIES[0];
+  const dialCode = selectedCountryObj.dialCode;
 
   const [errors, setErrors] = useState({});
   // Payment method selector: 'paypal' | 'card'
@@ -158,18 +181,21 @@ export default function PremiumCheckoutPage() {
   }
 
   function fillSampleCard() {
-    setCardholderName('NGUYEN VAN A');
     setCardNumber('4242 4242 4242 4242');
     setExpiryDate('12/28');
     setCvv('123');
+    setCardholderName('NGUYEN VAN A');
+    setCountry('VN');
+    setAddress1('123 Đường Cyber');
+    setAddress2('Tòa nhà Aura, Tầng 5');
+    setCity('TP. Hồ Chí Minh');
+    setPostalCode('700000');
+    setPhone('0901234567');
     setErrors({});
   }
 
   function validateForm() {
     const errs = {};
-    if (!cardholderName.trim()) {
-      errs.cardholderName = t('Vui lòng nhập tên trên thẻ.', 'Cardholder name is required.');
-    }
     const rawNumber = cardNumber.replace(/\s/g, '');
     if (!rawNumber || rawNumber.length !== 16) {
       errs.cardNumber = t('Số thẻ thử nghiệm cần đủ 16 chữ số.', 'Card number must be 16 digits.');
@@ -178,8 +204,23 @@ export default function PremiumCheckoutPage() {
     if (!expiryRegex.test(expiryDate)) {
       errs.expiryDate = t('Định dạng MM/YY không hợp lệ (ví dụ: 12/28).', 'Invalid MM/YY format (e.g. 12/28).');
     }
-    if (!cvv || cvv.length !== 3) {
-      errs.cvv = t('Mã CVV phải có 3 chữ số.', 'CVV must be 3 digits.');
+    if (!cvv || (cvv.length !== 3 && cvv.length !== 4)) {
+      errs.cvv = t('Mã CVV phải có 3 hoặc 4 chữ số.', 'CVV must be 3 or 4 digits.');
+    }
+    if (!cardholderName.trim()) {
+      errs.cardholderName = t('Vui lòng nhập tên trên thẻ.', 'Cardholder name is required.');
+    }
+    if (!address1.trim()) {
+      errs.address1 = t('Vui lòng nhập địa chỉ dòng 1.', 'Address line 1 is required.');
+    }
+    if (!city.trim()) {
+      errs.city = t('Vui lòng nhập thành phố.', 'City is required.');
+    }
+    if (!postalCode.trim()) {
+      errs.postalCode = t('Vui lòng nhập mã bưu chính.', 'Postal code is required.');
+    }
+    if (!phone.trim()) {
+      errs.phone = t('Vui lòng nhập số điện thoại.', 'Phone number is required.');
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -691,145 +732,302 @@ export default function PremiumCheckoutPage() {
             {!isConfirmed && paymentMethod === 'card' && (
               <div className="checkout-card-form-expand">
                 <form className="checkout-form" onSubmit={handlePaymentSubmit} noValidate>
-                {/* Test card autofill pill */}
-                <div
-                  className="checkout-demo-pill"
-                  onClick={fillSampleCard}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fillSampleCard()}
-                  title={t('Bấm để tự điền dữ liệu thẻ thử nghiệm', 'Click to autofill simulated test card')}
-                >
-                  <span className="checkout-demo-pill-title">
-                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
-                      auto_fix_high
-                    </span>
-                    <span>{t('Dùng thẻ thử nghiệm mẫu', 'Use Sample Test Card')}</span>
-                  </span>
-                  <span className="checkout-demo-pill-val">4242 · 12/28 · 123</span>
-                </div>
-
-                <div className="checkout-form-group">
-                  <label className="checkout-label" htmlFor="cardholder-name">
-                    {t('Tên trên thẻ (Thử nghiệm)', 'Cardholder Name (Simulated)')}
-                  </label>
-                  <input
-                    id="cardholder-name"
-                    name="cardholderName"
-                    type="text"
-                    className={`checkout-input ${errors.cardholderName ? 'error' : ''}`}
-                    placeholder="NGUYEN VAN A"
-                    value={cardholderName}
-                    disabled={isSpinning}
-                    onChange={(e) => {
-                      setCardholderName(e.target.value.toUpperCase());
-                      if (errors.cardholderName) setErrors({ ...errors, cardholderName: null });
-                    }}
-                    autoComplete="off"
-                  />
-                  {errors.cardholderName && (
-                    <span className="checkout-field-error" role="alert">
-                      {errors.cardholderName}
-                    </span>
-                  )}
-                </div>
-
-                <div className="checkout-form-group">
-                  <label className="checkout-label" htmlFor="card-number">
-                    {t('Số thẻ thử nghiệm', 'Simulated Card Number')}
-                  </label>
-                  <input
-                    id="card-number"
-                    name="cardNumber"
-                    type="text"
-                    inputMode="numeric"
-                    className={`checkout-input ${errors.cardNumber ? 'error' : ''}`}
-                    placeholder="4242 4242 4242 4242"
-                    value={cardNumber}
-                    disabled={isSpinning}
-                    onChange={(e) => {
-                      setCardNumber(formatCardNumber(e.target.value));
-                      if (errors.cardNumber) setErrors({ ...errors, cardNumber: null });
-                    }}
-                    autoComplete="off"
-                  />
-                  {errors.cardNumber && (
-                    <span className="checkout-field-error" role="alert">
-                      {errors.cardNumber}
-                    </span>
-                  )}
-                </div>
-
-                <div className="checkout-form-row">
-                  <div className="checkout-form-group">
-                    <label className="checkout-label" htmlFor="card-expiry">
-                      {t('Hết hạn (MM/YY)', 'Expiry (MM/YY)')}
-                    </label>
-                    <input
-                      id="card-expiry"
-                      name="expiryDate"
-                      type="text"
-                      inputMode="numeric"
-                      className={`checkout-input ${errors.expiryDate ? 'error' : ''}`}
-                      placeholder="12/28"
-                      value={expiryDate}
-                      disabled={isSpinning}
-                      onChange={(e) => {
-                        setExpiryDate(formatExpiry(e.target.value));
-                        if (errors.expiryDate) setErrors({ ...errors, expiryDate: null });
-                      }}
-                      autoComplete="off"
-                    />
-                    {errors.expiryDate && (
-                      <span className="checkout-field-error" role="alert">
-                        {errors.expiryDate}
+                  {/* Test card autofill pill */}
+                  <div
+                    className="checkout-demo-pill"
+                    onClick={fillSampleCard}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fillSampleCard()}
+                    title={t('Bấm để tự điền dữ liệu thẻ thử nghiệm', 'Click to autofill simulated test card')}
+                  >
+                    <span className="checkout-demo-pill-title">
+                      <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                        auto_fix_high
                       </span>
-                    )}
+                      <span>{t('Dùng thẻ thử nghiệm mẫu', 'Use Sample Test Card')}</span>
+                    </span>
+                    <span className="checkout-demo-pill-val">4242 · 12/28 · 123</span>
                   </div>
 
-                  <div className="checkout-form-group">
-                    <label className="checkout-label" htmlFor="card-cvv">
-                      {t('Mã CVV (3 số)', 'CVV (3 digits)')}
-                    </label>
-                    <input
-                      id="card-cvv"
-                      name="cvv"
-                      type="password"
-                      inputMode="numeric"
-                      className={`checkout-input ${errors.cvv ? 'error' : ''}`}
-                      placeholder="123"
-                      value={cvv}
-                      disabled={isSpinning}
-                      onChange={(e) => {
-                        setCvv(formatCvv(e.target.value));
-                        if (errors.cvv) setErrors({ ...errors, cvv: null });
-                      }}
-                      autoComplete="off"
-                    />
-                    {errors.cvv && (
-                      <span className="checkout-field-error" role="alert">
-                        {errors.cvv}
-                      </span>
-                    )}
+                  {/* Nhóm 1: Thẻ thanh toán (Card Details) */}
+                  <div className="checkout-form-section">
+                    <div className="checkout-form-section-title">
+                      <span className="material-symbols-outlined" aria-hidden="true">credit_card</span>
+                      <span>{t('Nhóm 1 — Thẻ thanh toán', 'Group 1 — Card Details')}</span>
+                    </div>
+
+                    <div className="checkout-form-group">
+                      <label className="checkout-label" htmlFor="card-number">
+                        {t('Số thẻ', 'Card Number')}
+                      </label>
+                      <input
+                        id="card-number"
+                        name="cardNumber"
+                        type="text"
+                        inputMode="numeric"
+                        className={`checkout-input ${errors.cardNumber ? 'error' : ''}`}
+                        placeholder="4242 4242 4242 4242"
+                        value={cardNumber}
+                        disabled={isSpinning}
+                        onChange={(e) => {
+                          setCardNumber(formatCardNumber(e.target.value));
+                          if (errors.cardNumber) setErrors({ ...errors, cardNumber: null });
+                        }}
+                        autoComplete="off"
+                      />
+                      {errors.cardNumber && (
+                        <span className="checkout-field-error" role="alert">
+                          {errors.cardNumber}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="checkout-form-row">
+                      <div className="checkout-form-group">
+                        <label className="checkout-label" htmlFor="card-expiry">
+                          {t('Ngày hết hạn (MM/YY)', 'Expiry (MM/YY)')}
+                        </label>
+                        <input
+                          id="card-expiry"
+                          name="expiryDate"
+                          type="text"
+                          inputMode="numeric"
+                          className={`checkout-input ${errors.expiryDate ? 'error' : ''}`}
+                          placeholder="12/28"
+                          value={expiryDate}
+                          disabled={isSpinning}
+                          onChange={(e) => {
+                            setExpiryDate(formatExpiry(e.target.value));
+                            if (errors.expiryDate) setErrors({ ...errors, expiryDate: null });
+                          }}
+                          autoComplete="off"
+                        />
+                        {errors.expiryDate && (
+                          <span className="checkout-field-error" role="alert">
+                            {errors.expiryDate}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="checkout-form-group">
+                        <label className="checkout-label" htmlFor="card-cvv">
+                          {t('Mã CVV', 'CVV')}
+                        </label>
+                        <input
+                          id="card-cvv"
+                          name="cvv"
+                          type="password"
+                          inputMode="numeric"
+                          className={`checkout-input ${errors.cvv ? 'error' : ''}`}
+                          placeholder="123"
+                          value={cvv}
+                          disabled={isSpinning}
+                          onChange={(e) => {
+                            setCvv(formatCvv(e.target.value));
+                            if (errors.cvv) setErrors({ ...errors, cvv: null });
+                          }}
+                          autoComplete="off"
+                        />
+                        {errors.cvv && (
+                          <span className="checkout-field-error" role="alert">
+                            {errors.cvv}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {/* Primary Pay Action */}
-                <button
-                  type="submit"
-                  className="checkout-btn-pay"
-                  disabled={isSpinning}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    {isSpinning ? 'sync' : 'lock'}
-                  </span>
-                  <span>
-                    {isSpinning
-                      ? t('Đang xử lý...', 'Processing...')
-                      : t('Thanh toán', 'Pay Now')}
-                  </span>
-                </button>
+                  {/* Nhóm 2: Thông tin thanh toán (Billing Information) */}
+                  <div className="checkout-form-section">
+                    <div className="checkout-form-section-title">
+                      <span className="material-symbols-outlined" aria-hidden="true">badge</span>
+                      <span>{t('Nhóm 2 — Thông tin thanh toán', 'Group 2 — Billing Information')}</span>
+                    </div>
 
+                    <div className="checkout-form-group">
+                      <label className="checkout-label" htmlFor="cardholder-name">
+                        {t('Tên trên thẻ', 'Cardholder Name')}
+                      </label>
+                      <input
+                        id="cardholder-name"
+                        name="cardholderName"
+                        type="text"
+                        className={`checkout-input ${errors.cardholderName ? 'error' : ''}`}
+                        placeholder="NGUYEN VAN A"
+                        value={cardholderName}
+                        disabled={isSpinning}
+                        onChange={(e) => {
+                          setCardholderName(e.target.value.toUpperCase());
+                          if (errors.cardholderName) setErrors({ ...errors, cardholderName: null });
+                        }}
+                        autoComplete="off"
+                      />
+                      {errors.cardholderName && (
+                        <span className="checkout-field-error" role="alert">
+                          {errors.cardholderName}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="checkout-form-group">
+                      <label className="checkout-label" htmlFor="billing-country">
+                        {t('Quốc gia / Vùng lãnh thổ', 'Country / Region')}
+                      </label>
+                      <select
+                        id="billing-country"
+                        name="country"
+                        className="checkout-select"
+                        value={country}
+                        disabled={isSpinning}
+                        onChange={(e) => setCountry(e.target.value)}
+                      >
+                        {COUNTRIES.map((c) => (
+                          <option key={c.code} value={c.code}>
+                            {language === 'en' ? c.nameEn : c.nameVi}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="checkout-form-group">
+                      <label className="checkout-label" htmlFor="billing-address-1">
+                        {t('Địa chỉ dòng 1', 'Address Line 1')}
+                      </label>
+                      <input
+                        id="billing-address-1"
+                        name="address1"
+                        type="text"
+                        className={`checkout-input ${errors.address1 ? 'error' : ''}`}
+                        placeholder={t('Số nhà, tên đường', 'Street address')}
+                        value={address1}
+                        disabled={isSpinning}
+                        onChange={(e) => {
+                          setAddress1(e.target.value);
+                          if (errors.address1) setErrors({ ...errors, address1: null });
+                        }}
+                        autoComplete="off"
+                      />
+                      {errors.address1 && (
+                        <span className="checkout-field-error" role="alert">
+                          {errors.address1}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="checkout-form-group">
+                      <label className="checkout-label" htmlFor="billing-address-2">
+                        {t('Địa chỉ dòng 2 (Không bắt buộc)', 'Address Line 2 (Optional)')}
+                      </label>
+                      <input
+                        id="billing-address-2"
+                        name="address2"
+                        type="text"
+                        className="checkout-input"
+                        placeholder={t('Căn hộ, tầng, tòa nhà...', 'Apartment, suite, unit...')}
+                        value={address2}
+                        disabled={isSpinning}
+                        onChange={(e) => setAddress2(e.target.value)}
+                        autoComplete="off"
+                      />
+                    </div>
+
+                    <div className="checkout-form-row">
+                      <div className="checkout-form-group">
+                        <label className="checkout-label" htmlFor="billing-city">
+                          {t('Thành phố', 'City')}
+                        </label>
+                        <input
+                          id="billing-city"
+                          name="city"
+                          type="text"
+                          className={`checkout-input ${errors.city ? 'error' : ''}`}
+                          placeholder={t('Ví dụ: Hà Nội, TP.HCM', 'e.g. San Francisco')}
+                          value={city}
+                          disabled={isSpinning}
+                          onChange={(e) => {
+                            setCity(e.target.value);
+                            if (errors.city) setErrors({ ...errors, city: null });
+                          }}
+                          autoComplete="off"
+                        />
+                        {errors.city && (
+                          <span className="checkout-field-error" role="alert">
+                            {errors.city}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="checkout-form-group">
+                        <label className="checkout-label" htmlFor="billing-postal">
+                          {t('Mã bưu chính', 'Postal Code')}
+                        </label>
+                        <input
+                          id="billing-postal"
+                          name="postalCode"
+                          type="text"
+                          className={`checkout-input ${errors.postalCode ? 'error' : ''}`}
+                          placeholder={t('Ví dụ: 700000', 'e.g. 94103')}
+                          value={postalCode}
+                          disabled={isSpinning}
+                          onChange={(e) => {
+                            setPostalCode(e.target.value);
+                            if (errors.postalCode) setErrors({ ...errors, postalCode: null });
+                          }}
+                          autoComplete="off"
+                        />
+                        {errors.postalCode && (
+                          <span className="checkout-field-error" role="alert">
+                            {errors.postalCode}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="checkout-form-group">
+                      <label className="checkout-label" htmlFor="billing-phone">
+                        {t('Số điện thoại', 'Phone Number')}
+                      </label>
+                      <div className="checkout-phone-input-wrap">
+                        {dialCode && <span className="checkout-phone-prefix">{dialCode}</span>}
+                        <input
+                          id="billing-phone"
+                          name="phone"
+                          type="tel"
+                          className={`checkout-input ${errors.phone ? 'error' : ''}`}
+                          placeholder={t('Ví dụ: 0901234567', 'e.g. 555-0199')}
+                          value={phone}
+                          disabled={isSpinning}
+                          onChange={(e) => {
+                            setPhone(e.target.value);
+                            if (errors.phone) setErrors({ ...errors, phone: null });
+                          }}
+                          autoComplete="off"
+                        />
+                      </div>
+                      {errors.phone && (
+                        <span className="checkout-field-error" role="alert">
+                          {errors.phone}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Primary Pay Action */}
+                  <button
+                    type="submit"
+                    className="checkout-btn-pay"
+                    disabled={isSpinning}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      {isSpinning ? 'sync' : 'lock'}
+                    </span>
+                    <span>
+                      {isSpinning
+                        ? t('Đang xử lý...', 'Processing...')
+                        : t('Thanh toán', 'Pay Now')}
+                    </span>
+                  </button>
                 </form>
               </div>
             )}
