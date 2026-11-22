@@ -136,6 +136,18 @@ Các tham số Aura/odds/payment còn mở đã nằm trong `03-database-design.
 ### 9.4. Hướng dẫn Owner cấu hình Credentials (khi bật Live)
 1. **Google Cloud Console:** Tạo OAuth 2.0 Web Client ID, thêm Authorized JavaScript origins (`http://localhost:5173`, domain production), gán `GOOGLE_CLIENT_ID` vào `backend/.env`.
 2. **SMTP / Email Provider:** Cấu hình `EMAIL_MODE=smtp`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM_ADDRESS`, `EMAIL_ADMIN_INBOX`, và chỉ bật `EMAIL_DOMAIN_VERIFIED=true` sau khi xác minh SPF/DKIM cho `aurameme.com`.
+
+## 10. Task 8 — Public Profile, Follower Count & Cookie Consent (`feat/public-profile-cookie-task8`)
+
+### 10.1. Public Profile & Follower Count
+- **Điều hướng tác giả:** Bọc Avatar, Tên hiển thị và `@username` thành liên kết tới `/profile/:username` trên Home, Explore (`stopPropagation` để không đè click mở bài) và Bình luận (`CommentSection`); hỗ trợ thêm alias `/u/:username` tại `main.jsx` & `ProfilePage.jsx`.
+- **Ranh giới quyền riêng tư:** Khi User B hoặc Guest xem hồ sơ User A (`mine === false`), ẩn hoàn toàn nút chỉnh sửa hồ sơ và bộ sưu tập riêng tư, không gọi `/inventory/me` hay `/aura/progress` của người khác, không rò rỉ email/SĐT/biên lai.
+- **Follower count trung thực:** Hiển thị số liệu thật nếu API trả về (`follower_count`), mặc định `0` (`Người theo dõi` / `Followers`) — không dựng số giả và chưa mở rộng Follow/Unfollow, Friends hay Chat.
+- **Hover preview:** Đánh dấu `DEFER` theo quyết định mặc định để tránh làm phình kiến trúc và phạm vi kiểm thử.
+
+### 10.2. Cookie Consent — Lucian UX/UI Prompt #225
+- Port nguyên tinh thần **Lucian #225 ("Cookie consent with a bite", MIT License)** sang React component (`CookieConsent.jsx`, `cookie-consent.css`, `cookie-consent.js`) trong namespace `.am-cookie-*`.
+- **Trung thực dữ liệu:** Cookie thiết yếu (`am_session` HttpOnly, CSRF, theme/language) luôn bật và không thể tắt; mục phân tích/tiếp thị công bố rõ ràng là chưa sử dụng tracker bên thứ ba và mặc định tắt. Lựa chọn lưu tại `aurameme-cookie-consent-v1` kèm `version` và `updatedAt`, liên kết trực tiếp tới `/privacy.html#cookies`, hỗ trợ mở lại từ nút cookie góc dưới trái, Dark/Light, VI/EN, Mobile 375px và `prefers-reduced-motion`.
 - [FastAPI — Behind a Proxy](https://fastapi.tiangolo.com/advanced/behind-a-proxy/).
 - [Docker — Networking in Compose](https://docs.docker.com/compose/how-tos/networking/).
 - [GitHub Docs — Configuring OpenID Connect in AWS](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws).
