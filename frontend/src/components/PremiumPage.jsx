@@ -15,7 +15,7 @@ const defaultPlans = [
     price: 5,
     priceFormatted: '$5',
     priceVndFormatted: '130.000 VNĐ',
-    icon: 'diamond',
+    icon: 'workspace_premium',
   },
   {
     id: 'prime',
@@ -25,7 +25,7 @@ const defaultPlans = [
     price: 50,
     priceFormatted: '$50',
     priceVndFormatted: '1.250.000 VNĐ',
-    icon: 'workspace_premium',
+    icon: 'diamond',
   },
 ];
 
@@ -64,13 +64,19 @@ export default function PremiumPage() {
 
   const [plans, setPlans] = useState(defaultPlans);
   const [pricingReliable, setPricingReliable] = useState(false);
-  const [selected, setSelected] = useState(0);
+  const activeTier = subscription?.is_active ? subscription.tier : null;
+  const [selected, setSelected] = useState(() => (activeTier === 'prime' ? 1 : 0));
   const [wiggle, setWiggle] = useState(false);
   const root = useRef(null);
   const group = useId();
   const plan = plans[selected] || defaultPlans[selected] || defaultPlans[0];
-  const activeTier = subscription?.is_active ? subscription.tier : null;
-  const displayedTier = activeTier || plan?.id || 'plus';
+  const displayedTier = plan?.id || 'plus';
+
+  useEffect(() => {
+    if (subscription?.is_active && subscription?.tier === 'prime') {
+      setSelected(1);
+    }
+  }, [subscription?.is_active, subscription?.tier]);
 
   const [vnpayConfigured, setVnpayConfigured] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -277,6 +283,11 @@ export default function PremiumPage() {
           className={`premium-selector-panel premium-selector-panel--${displayedTier}`}
           aria-labelledby="premium-selector-title"
         >
+          {/* Ambient smoke aura elements */}
+          <div className={`premium-smoke-glow premium-smoke-glow--top premium-smoke-glow--${displayedTier}`} aria-hidden="true" />
+          <div className={`premium-smoke-glow premium-smoke-glow--bottom premium-smoke-glow--${displayedTier}`} aria-hidden="true" />
+          <div className={`premium-smoke-glow premium-smoke-glow--center premium-smoke-glow--${displayedTier}`} aria-hidden="true" />
+
           <div className="premium-selector-heading">
             <span className="workspace-kicker">
               {t('CHỌN DẤU ẤN CỦA BẠN', 'FIND YOUR AURA')}
