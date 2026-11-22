@@ -48,14 +48,15 @@ function CommentRow({comment}) {
       setMenuOpen(false);setConfirm(null);setReason('');
     }catch(e){setError(e.message)}finally{pending.current=false;setBusy(false)}
   };
+  const commentProfileHref=comment.api&&comment.author?'/profile/'+encodeURIComponent(comment.author):null;
   return render(<div className="flex items-start gap-3 p-2.5 rounded-xl bg-surface-container/40 hover:bg-surface-container/70 transition-colors" data-comment-id={comment.id}>
-    <UserAvatar src={author.avatar} alt={author.displayName} tier={effectiveAuthorTier} size="sm"/>
+    {commentProfileHref?<a href={commentProfileHref} aria-label={`Hồ sơ ${author.displayName}`} className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-secondary"><UserAvatar src={author.avatar} alt={author.displayName} tier={effectiveAuthorTier} size="sm"/></a>:<UserAvatar src={author.avatar} alt={author.displayName} tier={effectiveAuthorTier} size="sm"/>}
     <div className="flex-1 flex flex-col gap-1 min-w-0">
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col min-w-0 gap-0.5">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-            <span translate={comment.api?'no':undefined} className="font-label-md text-[13px] font-bold text-on-surface hover:underline cursor-pointer break-all">{author.displayName}</span>
-            <span translate={comment.api?'no':undefined} className="text-[11px] text-outline font-normal">{profile.handle}</span>
+            {commentProfileHref?<a href={commentProfileHref} translate="no" className="font-label-md text-[13px] font-bold text-on-surface hover:underline cursor-pointer break-all">{author.displayName}</a>:<span translate={comment.api?'no':undefined} className="font-label-md text-[13px] font-bold text-on-surface hover:underline cursor-pointer break-all">{author.displayName}</span>}
+            {commentProfileHref?<a href={commentProfileHref} translate="no" className="text-[11px] text-outline font-normal hover:underline">{profile.handle}</a>:<span translate={comment.api?'no':undefined} className="text-[11px] text-outline font-normal">{profile.handle}</span>}
             <LevelPill level={profile.level} size="sm"/>
             <TitleBadge level={profile.level} realm={profile.realm} title={profile.nickname} size="sm"/>
           </div>

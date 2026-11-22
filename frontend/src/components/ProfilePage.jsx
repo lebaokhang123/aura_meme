@@ -16,7 +16,9 @@ function topOwned(items){return [...items].sort((a,b)=>(RARITY_PRIORITY[b.asset.
 function BackgroundMini({asset}){return <div className="am-profile-background-mini" data-effect={asset.effect_key||'violet-base'}>{asset.media_url?<img src={inventoryImage(asset.media_url)} alt=""/>:<span aria-hidden="true"/>}</div>}
 export function ProfilePage(){
  const t=useCopy(),user=useSyncExternalStore(auth.subscribe,auth.snapshot).user;
- const username=location.pathname.split('/')[2]||user?.username||'',valid=/^[a-z0-9_]{3,32}$/.test(username),mine=user?.username===username;
+ const pathParts=location.pathname.split('/');
+ const routeUser=(pathParts[1]==='profile'||pathParts[1]==='u')?(pathParts[2]||''):'';
+ const username=routeUser||user?.username||'',valid=/^[a-z0-9_]{3,32}$/.test(username),mine=Boolean(user?.username&&user.username===username);
  const editButton=useRef(null),restoreEditFocus=useRef(false);
  const closeEdit=()=>{restoreEditFocus.current=true;setEditing(false)};
  const [editing,setEditing]=useState(false);
@@ -35,7 +37,7 @@ export function ProfilePage(){
  <div className="am-profile-name"><h1 translate="no">{p.display_name}</h1><p translate="no">@{p.username}</p>{p.level&&p.title&&<div className="mt-1.5 flex justify-center"><TitleBadge level={p.level} realm={p.realm} title={p.title} size="lg"/></div>}{hasProfileAura && <div className="mt-2 flex justify-center"><div className={`profile-premium-badge profile-premium-badge--${profileTier}`} title={isProfilePrime ? t('Hội viên Aura Prime', 'Aura Prime Member') : t('Hội viên Aura Plus', 'Aura Plus Member')}><span className="material-symbols-outlined profile-premium-badge-icon" aria-hidden="true">{isProfilePrime ? 'diamond' : 'workspace_premium'}</span><span className="profile-premium-badge-text">{isProfilePrime ? 'Aura Prime' : 'Aura Plus'}</span></div></div>}</div>
  {mine&&(editing?<EditProfile profile={p} onSaved={values=>{profile.update({...p,...values});closeEdit();loadFeed().catch(()=>{})}} onCancel={closeEdit}/>:<button ref={editButton} className="am-profile-edit" onClick={()=>setEditing(true)}>{icon('edit',16)}{t('Chỉnh sửa hồ sơ','Edit profile')}</button>)}
  <p className="am-profile-bio" translate="no">{p.bio||t('Chưa có tiểu sử.','No bio yet.')}</p>
- <dl className="am-profile-stats"><div><dd>{pagination?.total??'—'}</dd><dt>{t('Bài viết','Posts')}</dt></div><div><dd>{comments.data?.pagination.total??'—'}</dd><dt>{t('Bình luận','Comments')}</dt></div><div><dd>—</dd><dt>Reaction</dt></div></dl>
+ <dl className="am-profile-stats"><div><dd>{pagination?.total??'—'}</dd><dt>{t('Bài viết','Posts')}</dt></div><div><dd>{comments.data?.pagination.total??'—'}</dd><dt>{t('Bình luận','Comments')}</dt></div><div><dd data-testid="profile-follower-count">{Number.isSafeInteger(p.follower_count)&&p.follower_count>=0?p.follower_count:0}</dd><dt>{t('Người theo dõi','Followers')}</dt></div></dl>
  <AuraProgress profileId={p.id} publicLevel={p.level} publicRealm={p.realm} publicTitle={p.title}/>
  </section>
  {mine&&<>
