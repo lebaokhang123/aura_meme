@@ -38,7 +38,7 @@ export function Composer() {
   };
   return render(<form onSubmit={publish} className="bg-surface-container-low rounded-xl p-4 shadow-sm flex flex-col gap-3" aria-label="Tạo bài viết">
     <div className="flex items-center gap-3">
-      {user?<div data-current-user-avatar className="shrink-0"><UserAvatar src={user.avatar} alt={user.displayName} tier={effectiveTier} size="md"/></div>:<span className="w-10 h-10 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center text-outline shrink-0">{icon('person')}</span>}
+      {user?<div className="shrink-0"><UserAvatar currentUserAvatar src={user.avatar} alt={user.displayName} tier={effectiveTier} size="md"/></div>:<span className="w-10 h-10 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center text-outline shrink-0">{icon('person')}</span>}
       <div className="flex-1 min-w-0 bg-surface-container rounded-lg px-3.5 py-2.5 flex items-center justify-between gap-2 hover:bg-surface-container-high transition-colors">
         <textarea aria-label="Nội dung bài mới" rows={1} style={{fieldSizing:'content',minHeight:0,maxHeight:180}} readOnly={!user} value={text} maxLength={5000} onChange={event=>setText(event.target.value)} className="w-full min-w-0 border-0 outline-none focus:ring-0 resize-none p-0 bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline" placeholder={user?'Bạn đang nghĩ gì thế? Chia sẻ một chiếc meme...':'Bạn đang nghĩ gì thế? Đăng nhập để chia sẻ một chiếc meme...'}/><span className="text-outline shrink-0">{icon('edit_square',18)}</span>
       </div>

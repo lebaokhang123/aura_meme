@@ -37,7 +37,7 @@ def runtime_enabled(request):
 
 
 def schema_ready(db):
-    return list(db.scalars(text('SELECT version_num FROM alembic_version'))) == ['0012_aura_v1']
+    return list(db.scalars(text('SELECT version_num FROM alembic_version'))) in (['0012_aura_v1'], ['0013_notifications'], ['0014_premium_sandbox'])
 
 
 def require_schema(db):

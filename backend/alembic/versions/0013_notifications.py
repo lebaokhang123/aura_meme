@@ -35,7 +35,12 @@ def upgrade():
 
 
 def downgrade():
-    op.execute("SET LOCAL lock_timeout = '5s'")
+    connection=op.get_bind()
+    connection.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
+    tables=sorted(sa.inspect(connection).get_table_names(schema="public"))
+    connection.exec_driver_sql("LOCK TABLE "+", ".join('public."'+name.replace('"','""')+'"' for name in tables)+" IN ACCESS EXCLUSIVE MODE")
+    if any(connection.exec_driver_sql('SELECT 1 FROM public."'+name.replace('"','""')+'" LIMIT 1').first() for name in tables if name!="alembic_version"):
+        raise RuntimeError("Refusing downgrade of nonempty Aura schema; preserve data and review first.")
     op.drop_index("ix_notifications_recipient_read", table_name="notifications")
     op.drop_index("ix_notifications_recipient_created", table_name="notifications")
     op.drop_table("notifications")

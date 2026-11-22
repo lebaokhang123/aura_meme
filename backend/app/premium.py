@@ -26,7 +26,7 @@ ORDER_EXPIRY_TIMEOUT = timedelta(hours=1)
 
 from app.auth import CSRF_HEADER, ERRORS, current_session, session_cookie
 from app.auth_schemas import ErrorResponse
-from app.models import SubscriptionOrder, User, UserSubscription
+from app.models import Role, SubscriptionOrder, User, UserRole, UserSubscription
 from app.permissions import require_account_csrf, require_authenticated_user
 from app.premium_plans import PLANS, PlanDefinition, get_plan, round_vnd_to_nearest_10k
 from app.security import AuthError
@@ -68,6 +68,10 @@ class OrderDto(BaseModel):
     payment_url: str | None = None
     created_at: datetime
     completed_at: datetime | None = None
+
+
+class OrderDetailDto(OrderDto):
+    owner_username: str
 
 
 class Pagination(BaseModel):
@@ -255,14 +259,16 @@ def create_subscription_order(
             amount_vnd = premium_settings.vnpay_price_prime_vnd
     amount_vnd = round_vnd_to_nearest_10k(amount_vnd)
 
-    # Prevent accidental multiple active orders for the same intent within 15 minutes
+    # Serialize different sessions and tabs for the same buyer.
+    account.db.execute(select(User.id).where(User.id == account.user.id).with_for_update())
+    # Reopening an order preserves its original lifetime.
     existing_active = account.db.scalar(
         select(SubscriptionOrder).where(
             SubscriptionOrder.user_id == account.user.id,
             SubscriptionOrder.tier == plan.tier,
             SubscriptionOrder.status == "pending",
-            SubscriptionOrder.created_at >= now - timedelta(minutes=15),
-        ).order_by(SubscriptionOrder.created_at.desc())
+            SubscriptionOrder.created_at > now - ORDER_EXPIRY_TIMEOUT,
+        ).order_by(SubscriptionOrder.created_at.desc(), SubscriptionOrder.id.desc()).with_for_update()
     )
     if existing_active and isinstance(existing_active, SubscriptionOrder):
         if payload.provider != "unselected" and existing_active.provider == "unselected":
@@ -310,8 +316,13 @@ def create_subscription_order(
     elif payload.provider == "paypal_sandbox":
         paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
         order_code = f"AM-{plan.tier.upper()}-{int(now.timestamp())}-{uuid4().hex[:8].upper()}"
-        return_url = f"http://localhost:5173/premium/checkout?order={order_code}"
-        cancel_url = f"http://localhost:5173/premium/checkout?order={order_code}&cancelled=true"
+        from urllib.parse import urlsplit, urlunsplit
+        origin = request.headers.get("origin")
+        if origin not in auth_runtime.settings.auth_allowed_origins:
+            raise AuthError(403, "FORBIDDEN", "Invalid checkout origin.")
+        parsed = urlsplit(origin)
+        return_url = urlunsplit((parsed.scheme, parsed.netloc, "/premium/checkout", f"order={order_code}", ""))
+        cancel_url = return_url + "&cancelled=true"
         if paypal and paypal.is_configured():
             try:
                 pp_order = paypal.create_order(
@@ -405,6 +416,7 @@ def init_paypal_order(
     if not order:
         raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại.")
 
+    _check_and_expire_order(order, account.db, now, getattr(request.app.state, "paypal", None), reconcile=True)
     plan = get_plan(order.tier)
     if order.status == "success":
         return OrderDto(
@@ -449,8 +461,11 @@ def init_paypal_order(
 
     order.provider = "paypal_sandbox"
     paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
-    return_url = f"http://localhost:5173/premium/checkout?order={order.order_code}"
-    cancel_url = f"http://localhost:5173/premium/checkout?order={order.order_code}&cancelled=true"
+    origin = request.headers.get("origin")
+    if origin not in request.app.state.auth.settings.auth_allowed_origins:
+        raise AuthError(403, "FORBIDDEN", "Invalid checkout origin.")
+    return_url = f"{origin}/premium/checkout?order={order.order_code}"
+    cancel_url = return_url + "&cancelled=true"
 
     if paypal and paypal.is_configured():
         try:
@@ -521,17 +536,22 @@ def _activate_subscription(db, order: SubscriptionOrder, now: datetime) -> UserS
     return sub
 
 
-def _check_and_expire_order(order: SubscriptionOrder, db, now: datetime, paypal: PaypalAdapter | None = None) -> bool:
+def _check_and_expire_order(order: SubscriptionOrder, db, now: datetime, paypal: PaypalAdapter | None = None, *, reconcile: bool = False) -> bool:
     """Checks a stale pending order. Reconciles if captured on PayPal; otherwise transitions to expired.
     Never grants subscription without verified capture confirmation."""
-    if order.status != "pending" or order.created_at >= now - ORDER_EXPIRY_TIMEOUT:
+    stale = order.created_at <= now - ORDER_EXPIRY_TIMEOUT
+    if order.status != "pending" or (not stale and not reconcile):
         return False
+    real_paypal = (order.provider == "paypal_sandbox" and order.provider_txn_id
+                   and not order.provider_txn_id.startswith(("SIM-", "MOCK-")))
+    if real_paypal and (paypal is None or not paypal.is_configured()):
+        raise AuthError(503, "PAYPAL_UNAVAILABLE", "Chưa thể đối soát đơn PayPal.")
 
     is_captured = False
     if order.provider == "paypal_sandbox" and paypal and paypal.is_configured() and order.provider_txn_id:
         try:
             pp_order = paypal.get_order_details(order.provider_txn_id)
-            if pp_order.get("status") == "COMPLETED":
+            if pp_order.get("status") == "COMPLETED" and pp_order.get("id") == order.provider_txn_id:
                 is_valid, _ = paypal.verify_capture(
                     pp_order,
                     expected_amount_cents=order.amount_cents,
@@ -545,10 +565,12 @@ def _check_and_expire_order(order: SubscriptionOrder, db, now: datetime, paypal:
                     _activate_subscription(db, order, now)
                     is_captured = True
                     logger.info("Stale pending order %s reconciled to success via PayPal verification.", order.order_code)
+                else:
+                    raise AuthError(503, "PAYPAL_UNAVAILABLE", "PayPal capture chưa thể xác minh.")
         except Exception as exc:
-            logger.warning("Could not check PayPal status for order %s: %s", order.order_code, exc)
+            raise AuthError(503, "PAYPAL_UNAVAILABLE", "Chưa thể đối soát đơn PayPal. Vui lòng thử lại.") from exc
 
-    if not is_captured and order.status == "pending":
+    if not is_captured and stale and order.status == "pending":
         order.status = "expired"
         order.updated_at = now
     db.flush()
@@ -579,7 +601,7 @@ def list_subscription_orders(
                 SubscriptionOrder.user_id == account.user.id,
                 SubscriptionOrder.status == "pending",
                 SubscriptionOrder.created_at < now - ORDER_EXPIRY_TIMEOUT,
-            )
+            ).order_by(SubscriptionOrder.id).with_for_update()
         )
         stale_orders = stale_res.all() if hasattr(stale_res, "all") else list(stale_res or [])
         for st in stale_orders:
@@ -698,7 +720,7 @@ def list_successful_orders(
 
 @router.get(
     "/orders/{order_code}",
-    response_model=OrderDto,
+    response_model=OrderDetailDto,
     operation_id="getSubscriptionOrder",
     responses={**ERRORS, 404: {"model": ErrorResponse}},
 )
@@ -710,21 +732,24 @@ def get_subscription_order(
     """Retrieve authoritative order status for authenticated user."""
     validate_order_code(order_code)
 
-    is_admin = bool(account.user.roles and "ADMIN" in account.user.roles)
-    stmt = select(SubscriptionOrder).where(SubscriptionOrder.order_code == order_code)
-    if not is_admin:
-        stmt = stmt.where(SubscriptionOrder.user_id == account.user.id)
-
-    order = account.db.scalar(stmt)
+    admin_role = select(UserRole.user_id).join(Role).where(
+        UserRole.user_id == account.user.id, Role.code == "ADMIN"
+    ).exists()
+    stmt = select(SubscriptionOrder).where(
+        SubscriptionOrder.order_code == order_code,
+        (SubscriptionOrder.user_id == account.user.id) | admin_role,
+    )
+    order = account.db.scalar(stmt.with_for_update())
     if not order:
         raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại.")
 
     now = datetime.now(timezone.utc)
     paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None) if (request and hasattr(request, "app")) else None
-    _check_and_expire_order(order, account.db, now, paypal)
+    _check_and_expire_order(order, account.db, now, paypal, reconcile=True)
 
     plan = get_plan(order.tier)
-    return OrderDto(
+    return OrderDetailDto(
+        owner_username=account.db.get(User, order.user_id).username,
         id=order.id,
         order_code=order.order_code,
         tier=order.tier,
@@ -778,6 +803,8 @@ def simulate_subscription_order(
 
     plan = get_plan(order.tier)
 
+    _check_and_expire_order(order, account.db, now, getattr(request.app.state, "paypal", None))
+
     # Idempotent response if order is already resolved
     if order.status == "success":
         return OrderDto(
@@ -806,10 +833,12 @@ def simulate_subscription_order(
             if paypal and paypal.is_configured():
                 try:
                     pp_check = paypal.get_order_details(order.provider_txn_id)
-                    if pp_check.get("status") == "COMPLETED":
+                    if pp_check.get("status") != "VOIDED":
                         raise AuthError(409, "ORDER_ALREADY_CAPTURED", "Đơn hàng đã được thanh toán trên PayPal.")
-                except PaypalError:
-                    pass
+                except PaypalError as exc:
+                    raise AuthError(503, "PAYPAL_UNAVAILABLE", "Chưa thể đối soát đơn PayPal.") from exc
+            else:
+                raise AuthError(503, "PAYPAL_NOT_CONFIGURED", "Chưa thể đối soát đơn PayPal.")
 
         order.status = "success"
         order.completed_at = now
@@ -876,6 +905,8 @@ def capture_subscription_order(
 
     plan = get_plan(order.tier)
 
+    _check_and_expire_order(order, account.db, now, getattr(request.app.state, "paypal", None))
+
     # Idempotent response if order is already resolved
     if order.status == "success":
         return OrderDto(
@@ -900,6 +931,7 @@ def capture_subscription_order(
     auth_runtime = getattr(request.app.state, "auth", None)
     auth_env = getattr(auth_runtime.settings, "auth_environment", "production") if auth_runtime and hasattr(auth_runtime, "settings") else "production"
 
+    sandbox_enabled = getattr(getattr(request.app.state, "premium", None), "premium_sandbox_enabled", False)
     paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
 
     if order.provider in ("paypal_sandbox", "unselected"):
@@ -909,6 +941,10 @@ def capture_subscription_order(
             raise AuthError(400, "MISSING_PAYPAL_ID", "Thiếu mã định danh giao dịch PayPal (PayPal Order ID).")
 
         if paypal and paypal.is_configured():
+            if not paypal.merchant_id:
+                raise AuthError(503, "PAYPAL_NOT_CONFIGURED", "Thiếu cấu hình merchant PayPal Sandbox.")
+            if pp_order_id != order.provider_txn_id:
+                raise AuthError(400, "PAYPAL_ORDER_MISMATCH", "Mã PayPal không khớp đơn hàng.")
             try:
                 capture_res = paypal.capture_order(pp_order_id, idempotency_key=order.order_code)
             except PaypalError as exc:
@@ -919,6 +955,8 @@ def capture_subscription_order(
                 account.db.flush()
                 raise AuthError(400, "CAPTURE_FAILED", f"Lỗi capture từ PayPal: {str(exc)}")
 
+            if capture_res.get("id") != pp_order_id:
+                raise AuthError(400, "PAYPAL_ORDER_MISMATCH", "Mã phản hồi PayPal không khớp đơn hàng.")
             is_valid, reason = paypal.verify_capture(
                 capture_res,
                 expected_amount_cents=order.amount_cents,
@@ -1177,29 +1215,19 @@ async def handle_paypal_webhook(request: Request):
     if event_type == "PAYMENT.CAPTURE.COMPLETED":
         order_code = resource.get("custom_id") or resource.get("invoice_id")
         capture_id = resource.get("id")
-        if not order_code:
-            order_code = resource.get("supplementary_data", {}).get("related_ids", {}).get("order_id")
-
-        if not order_code and not capture_id:
-            logger.warning("PayPal webhook missing order reference identifiers.")
-            return Response(
-                content=json.dumps({"status": "ignored", "reason": "missing_order_reference"}),
-                status_code=200,
-                media_type="application/json",
-            )
+        paypal_order_id = resource.get("supplementary_data", {}).get("related_ids", {}).get("order_id")
+        if not capture_id or not (order_code or paypal_order_id):
+            return Response(status_code=400)
 
         with request.app.state.auth_session_factory() as db, db.begin():
             stmt = select(SubscriptionOrder)
-            if order_code and capture_id:
-                stmt = stmt.where(
-                    (SubscriptionOrder.order_code == order_code)
-                    | (SubscriptionOrder.provider_txn_id == capture_id)
-                )
-            elif order_code:
+            if order_code:
                 stmt = stmt.where(SubscriptionOrder.order_code == order_code)
             else:
-                stmt = stmt.where(SubscriptionOrder.provider_txn_id == capture_id)
-
+                stmt = stmt.where(SubscriptionOrder.provider_txn_id.in_([paypal_order_id, capture_id]))
+            # Session-based checkout also locks the account before the order.
+            owner = stmt.with_only_columns(SubscriptionOrder.user_id).scalar_subquery()
+            db.execute(select(User.id).where(User.id == owner).with_for_update())
             order = db.scalar(stmt.with_for_update())
             if not order:
                 logger.warning("PayPal webhook received for unknown order: %s / %s", order_code, capture_id)
@@ -1227,23 +1255,19 @@ async def handle_paypal_webhook(request: Request):
                     media_type="application/json",
                 )
 
-            # Authoritative live capture verification from PayPal Payments API
-            capture_payload = resource
-            if capture_id:
-                try:
-                    live_details = paypal.get_capture_details(capture_id)
-                    if live_details and isinstance(live_details, dict) and live_details.get("status"):
-                        capture_payload = live_details
-                except Exception as exc:
-                    logger.warning("Could not fetch live capture %s from PayPal API, evaluating webhook resource: %s", capture_id, exc)
-
-            # Verify capture status, currency USD, exact amount, order reference, and merchant
+            if not order.provider_txn_id or (paypal_order_id and paypal_order_id != order.provider_txn_id):
+                return Response(status_code=400)
+            try:
+                capture_payload = paypal.get_order_details(order.provider_txn_id)
+            except PaypalError:
+                return Response(status_code=503)
+            if capture_payload.get("id") != order.provider_txn_id:
+                return Response(status_code=400)
             is_valid_capture, reason = paypal.verify_capture(
-                capture_payload,
-                expected_amount_cents=order.amount_cents,
-                expected_order_code=order.order_code,
-                expected_merchant_id=paypal.merchant_id,
+                capture_payload, order.amount_cents, order.order_code, paypal.merchant_id,
             )
+            if is_valid_capture and capture_payload["purchase_units"][0]["payments"]["captures"][0]["id"] != capture_id:
+                return Response(status_code=400)
             if not is_valid_capture:
                 logger.warning("PayPal webhook capture verification failed for order %s: %s", order.order_code, reason)
                 return Response(

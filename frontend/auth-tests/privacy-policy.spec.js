@@ -1,7 +1,5 @@
 import { test, expect } from '@playwright/test';
-import path from 'node:path';
 
-const ARTIFACTS_DIR = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
 const SECTIONS = ['about', 'data', 'purpose', 'visibility', 'cookies', 'rights'];
 
 test.describe('AuraMeme Privacy Policy V3 Suite (Task 3 Final)', () => {
@@ -231,11 +229,11 @@ test.describe('AuraMeme Privacy Policy V3 Suite (Task 3 Final)', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/privacy.html');
     await page.screenshot({
-      path: path.join(ARTIFACTS_DIR, 'privacy_policy_desktop_dark.png'),
+      path: test.info().outputPath('privacy_policy_desktop_dark.png'),
       fullPage: true
     });
     await page.screenshot({
-      path: path.join(ARTIFACTS_DIR, 'privacy_policy_v3_desktop_1440_dark.png'),
+      path: test.info().outputPath('privacy_policy_v3_desktop_1440_dark.png'),
       fullPage: true
     });
 
@@ -243,11 +241,11 @@ test.describe('AuraMeme Privacy Policy V3 Suite (Task 3 Final)', () => {
     const themeBtn = page.locator('#theme-toggle');
     await themeBtn.click();
     await page.screenshot({
-      path: path.join(ARTIFACTS_DIR, 'privacy_policy_desktop_light.png'),
+      path: test.info().outputPath('privacy_policy_desktop_light.png'),
       fullPage: true
     });
     await page.screenshot({
-      path: path.join(ARTIFACTS_DIR, 'privacy_policy_v3_desktop_1440_light.png'),
+      path: test.info().outputPath('privacy_policy_v3_desktop_1440_light.png'),
       fullPage: true
     });
 
@@ -256,7 +254,7 @@ test.describe('AuraMeme Privacy Policy V3 Suite (Task 3 Final)', () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.reload();
     await page.screenshot({
-      path: path.join(ARTIFACTS_DIR, 'privacy_policy_v3_desktop_1920_dark.png'),
+      path: test.info().outputPath('privacy_policy_v3_desktop_1920_dark.png'),
       fullPage: true
     });
 
@@ -264,18 +262,18 @@ test.describe('AuraMeme Privacy Policy V3 Suite (Task 3 Final)', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.reload();
     await page.screenshot({
-      path: path.join(ARTIFACTS_DIR, 'privacy_policy_mobile_dark.png'),
+      path: test.info().outputPath('privacy_policy_mobile_dark.png'),
       fullPage: true
     });
     await page.screenshot({
-      path: path.join(ARTIFACTS_DIR, 'privacy_policy_v3_mobile_dark.png'),
+      path: test.info().outputPath('privacy_policy_v3_mobile_dark.png'),
       fullPage: true
     });
 
     // 5. Mobile 375px Light
     await page.locator('#theme-toggle').click();
     await page.screenshot({
-      path: path.join(ARTIFACTS_DIR, 'privacy_policy_v3_mobile_light.png'),
+      path: test.info().outputPath('privacy_policy_v3_mobile_light.png'),
       fullPage: true
     });
   });

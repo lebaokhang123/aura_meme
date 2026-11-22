@@ -72,13 +72,14 @@ def test_paypal_adapter_create_order_payload():
 
 
 def test_paypal_adapter_verify_capture():
-    adapter = PaypalAdapter(client_id="test", client_secret="test")
+    adapter = PaypalAdapter(client_id="test", client_secret="test", merchant_id="merchant-test")
 
     valid_capture = {
         "status": "COMPLETED",
         "purchase_units": [
             {
                 "reference_id": "AM-PP-PRIME-TEST999",
+                "payee": {"merchant_id": "merchant-test"},
                 "payments": {
                     "captures": [
                         {
@@ -190,6 +191,10 @@ def test_paypal_adapter_verify_direct_capture_resource_and_merchant():
     )
     assert ok is True
     assert "Capture verified successfully" in msg
+
+    for missing in ("payee", "id", "custom_id"):
+        incomplete = {k: v for k, v in valid_direct_capture.items() if k != missing}
+        assert not adapter.verify_capture(incomplete, 500, valid_direct_capture["custom_id"])[0]
 
     # Merchant mismatch
     ok_bad_merchant, msg_bad = adapter.verify_capture(

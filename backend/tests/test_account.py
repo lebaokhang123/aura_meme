@@ -15,7 +15,7 @@ from test_auth import ACCOUNT, ORIGIN, PASSWORD, auth, csrf, login, migrated, po
 
 PRIVATE = {"id", "username", "email", "display_name", "roles", "status", "birth_year", "address",
            "phone", "bio", "avatar_media_id", "cover_media_id", "avatar_url", "cover_url"}
-PUBLIC = {"id", "username", "display_name", "bio", "avatar_url", "created_at"}
+PUBLIC = {"id", "username", "display_name", "bio", "avatar_url", "created_at", "membership_tier"}
 NEW_PASSWORD = "Replacement password for test!"
 
 
@@ -255,3 +255,27 @@ def test_cover_mutation_rejected_even_null(auth):
     signed_in(client)
     assert account_request(client, "PATCH", payload={"cover_media_id": None}).status_code == 422
     assert account_request(client, "PATCH", payload={"avatar_media_id": None}).status_code == 200
+
+
+
+@pytest.mark.integration
+def test_receipt_owner_and_admin_read_the_original_payer(auth):
+    client, db = auth
+    signed_in(client)
+    res = client.post("/api/v1/premium/orders", json={"plan_tier": "plus"},
+                      headers={"Origin": ORIGIN, "X-CSRF-Token": csrf(client)})
+    assert res.status_code == 201, res.text
+    path = "/api/v1/premium/orders/" + res.json()["order_code"]
+    assert client.get(path).json()["owner_username"] == ACCOUNT["username"]
+    client.cookies.clear()
+    assert client.get(path).status_code == 401
+    other = register(client, username="receipt_reviewer", email="reviewer@example.com")
+    assert other.status_code == 201, other.text
+    assert login(client, email="reviewer@example.com").status_code == 200
+    assert client.get(path).status_code == 404
+    role_id = uuid4()
+    db.execute(Role.__table__.insert().values(id=role_id, code="ADMIN", description="Test reviewer"))
+    db.execute(UserRole.__table__.insert().values(user_id=UUID(other.json()["id"]), role_id=role_id,
+                                                  granted_at=client.app.state.auth.now()))
+    detail = client.get(path)
+    assert detail.status_code == 200 and detail.json()["owner_username"] == ACCOUNT["username"]

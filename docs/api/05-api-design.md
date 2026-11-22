@@ -1,5 +1,26 @@
 # AuraMeme — API Contract & Data Flow
 
+## Hotfix nghiệm thu 23/11/2026
+
+Owner cho phép tích hợp Task 1–5 sau gate hotfix. Checkout dùng selector có phạm vi .checkout-page để thắng rule input của Tailwind Forms được nạp sau stylesheet. Computed style Chrome trước sửa cho input Dark là rgb(255,255,255), chữ rgb(227,225,237). Font kế thừa Inter. Sau sửa giữ token màu theo theme, placeholder, focus và autofill. Screenshot nằm tại thư mục local AuraMemeReview/87f2574/hotfix-evidence.
+
+Pending dùng cùng hạn một giờ ở create, GET, init PayPal, simulate và capture. Khóa hàng User cùng transaction trước khi tìm đơn chặn hai phiên tạo đồng thời. Tìm theo user và tier, sắp created_at DESC, id DESC; mở lại giữ created_at. Prime và Plus có đơn riêng. Đơn trùng lịch sử được giữ, đơn hợp lệ mới nhất được ưu tiên. Resume từ History đọc lại đơn trên server, kiểm quyền chủ đơn và thời hạn. Đối soát PayPal lỗi trả lỗi có thể thử lại, không tự capture từ nhánh catch init và không chuyển giao dịch chưa rõ sang thẻ. Return/cancel dùng origin đã được cho phép của request.
+
+Admin 87f2574 đã được tái hiện trên cùng DB QA có expired và trả 200 với tổng 0. Nguyên nhân DTO thiếu expired bị except Exception che thành bảng rỗng. DTO/parser mới nhận đủ năm trạng thái, join username theo chủ đơn, trả số tiền USD/VND, completed_at và mã provider. Query read-only có search mã đơn, filter, phân trang và sort created_at DESC, id DESC. Lỗi SQL và DTO trả 500. Guest 401, member 403.
+
+PDF của đơn được chọn đọc detail cùng endpoint successful riêng theo phiên, lấy tối đa 10 success theo completed_at mới nhất. History không còn fallback sang trang đang filter. Request history lỗi hiện thông báo thử lại. Bảng PDF có mã đơn cùng mã provider, xuống dòng tham chiếu dài. Header vẫn giữ đơn chọn dù nằm ngoài latest 10. Giá VND ghi rõ tham khảo. Dữ liệu mô phỏng được ghi nhãn Sandbox, không xác nhận PayPal thu tiền thật.
+
+Bằng chứng tập trung gồm 5/20/50 phút reuse, quá hạn một giờ bị chặn, hai phiên concurrent cùng mã pending, Plus/Prime/Plus/Prime, Admin hai chủ đơn và lỗi SQL/DTO. Sáu PDF tải qua UI từ fixture PostgreSQL cô lập tương ứng 1/5/10/11 success, 5 success cộng pending/failed/expired/cancelled, và người mua khác. Extract xác nhận số dòng 1/5/10/10/5/1, thứ tự, cách ly, đơn chọn và provider. Mỗi PDF một trang A4, render đã kiểm. Matrix Chrome gồm Dark/Light, VI/EN, 375/1440 và PayPal/thẻ, focus, validation, autofill ép pseudo-state bằng CDP. Real buyer PayPal Sandbox E2E vẫn NOT VERIFIED.
+
+Không đổi schema DB trong hotfix. DBML giữ schema 0014 đã nghiệm thu. Dữ liệu test tổng hợp được giữ trong DB QA, kể cả fixture từ các lượt thử chưa hoàn tất. Kết quả regression trên cây tích hợp và SHA dev được ghi tiếp sau khi có bằng chứng.
+
+
+## Contract đã triển khai trên nhánh nghiệm thu Task 1–5
+
+OpenAPI đi kèm bổ sung thao tác notifications, admin announcements, đơn hội viên, webhook và tra cứu giao dịch. Hộp thư truy vấn theo session; bản master quản trị chỉ sửa qua route admin có RBAC và CSRF. Phát lại thông báo đã published trả 409. Dữ liệu hồ sơ công khai có membership_tier và có thể có level, realm, title. ProfilePatch giới hạn display_name 25 và bio 100 ký tự.
+
+Checkout tạo đơn, chọn phương thức rồi init/capture PayPal hoặc gửi hành động thẻ mô phỏng. Backend đọc giá theo gói, khóa đơn và chỉ cộng thời hạn một lần sau đối soát. GET chi tiết giới hạn chủ đơn hoặc ADMIN trong DB. Lịch sử cá nhân hỗ trợ page, limit, status, q và sắp theo ngày tạo rồi id giảm dần. PDF được tạo trong trình duyệt từ dữ liệu đã được phép đọc. PayPal Sandbox E2E qua người mua ở trạng thái NOT VERIFIED.
+
 **Milestone:** M0.5 · **Backend:** FastAPI modular monolith · **Data:** PostgreSQL · **Trạng thái:** thiết kế mục tiêu, chưa triển khai.
 
 **Tài liệu cùng mốc:** [`05-openapi.yaml`](./05-openapi.yaml) là **hợp đồng machine-readable**; [`05-data-flows.drawio`](./05-data-flows.drawio) là **sơ đồ luồng** 6 tab (đen trắng). File Markdown này mô tả ranh giới, quyền truy cập, bất biến dữ liệu và điều kiện nghiệm thu, không lặp chi tiết mọi schema.

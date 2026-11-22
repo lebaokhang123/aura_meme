@@ -94,8 +94,7 @@ test('generateReceiptPdfDoc handles 0, 1, 5, 10 successful transactions cleanly 
 
   // 1. Zero successful history
   const doc0 = generateReceiptPdfDoc({ ...baseOrder, status: 'pending' }, { username: 'user_zero' }, []);
-  assert.ok(doc0);
-  assert.equal(doc0.internal.getNumberOfPages(), 1);
+  assert.equal(doc0, null, 'a pending order cannot produce a paid receipt');
 
   // 2. 1 transaction
   const doc1 = generateReceiptPdfDoc(baseOrder, { username: 'user_one' }, [baseOrder]);

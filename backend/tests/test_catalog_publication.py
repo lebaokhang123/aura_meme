@@ -26,9 +26,19 @@ def fixture_manifest():
     return CatalogManifest.model_validate({'version':1,'items':items})
 
 
+@pytest.fixture
+def catalog_auth(auth, monkeypatch):
+    # Catalog publication is explicitly restricted to the reviewed demo-era schema.
+    from test_social_reaction_migration import migrate
+    client, c = auth
+    migrate(c, "downgrade", "0012_aura_v1", monkeypatch)
+    return client, c
+
+
 @pytest.mark.integration
-def test_explicit_publication_is_idempotent_and_appends_new_immutable_versions(auth):
-    client,c=auth;owner=operator(client,c);manifest=fixture_manifest();now=client.app.state.auth.now()
+def test_explicit_publication_is_idempotent_and_appends_new_immutable_versions(catalog_auth):
+    client, c = catalog_auth
+    owner=operator(client,c);manifest=fixture_manifest();now=client.app.state.auth.now()
     with Session(bind=c,join_transaction_mode='create_savepoint') as db,db.begin():
         activate_catalog(db,manifest,'a'*64,'a'*64,now,actor_id=owner)
         cases=publish_cases(db,manifest,'a'*64,'a'*64,owner,now)
@@ -50,8 +60,8 @@ def test_explicit_publication_is_idempotent_and_appends_new_immutable_versions(a
 
 @pytest.mark.integration
 @pytest.mark.parametrize('failure',['unapproved','missing-rarity','wrong-effect','inactive-owner','wrong-digest','inactive-asset'])
-def test_publication_refuses_incomplete_or_unapproved_data_without_partial_cases(auth,failure):
-    client,c=auth;owner=operator(client,c);manifest=fixture_manifest();now=client.app.state.auth.now()
+def test_publication_refuses_incomplete_or_unapproved_data_without_partial_cases(catalog_auth,failure):
+    client,c=catalog_auth;owner=operator(client,c);manifest=fixture_manifest();now=client.app.state.auth.now()
     with Session(bind=c,join_transaction_mode='create_savepoint') as db,db.begin():
         if failure=='unapproved':manifest.items[0].name_review_status='pending'
         elif failure=='missing-rarity':manifest.items.pop()

@@ -36,7 +36,7 @@ def test_create_comment_text_and_public_whitelist(comments):
     dto = response.json()
     assert set(dto) == {"id", "post_id", "author", "body", "created_at"}
     assert dto["body"] == body and dto["post_id"] == str(post_id)
-    assert set(dto["author"]) == {"id", "username", "display_name", "created_at", "bio", "avatar_url"}
+    assert set(dto["author"]) == {"id", "username", "display_name", "created_at", "bio", "avatar_url", "membership_tier"}
     assert dto["author"]["id"] == str(owner)
     row = connection.execute(select(Comment.__table__)).mappings().one()
     assert row["status"] == "visible" and row["deleted_at"] is None
@@ -111,7 +111,8 @@ def test_pagination_visibility_stable_sort_and_no_n_plus_one(comments):
     event.listen(connection, "before_cursor_execute", record)
     try:
         first = listing(client, post_id).json()
-        assert len(queries) == 3  # One post lookup, one filtered count and one joined page, independent of size.
+        assert len(queries) == 4  # Post, count, joined page, and one batched membership lookup.
+        assert sum('FROM user_subscriptions' in query for query in queries) == 1
     finally:
         event.remove(connection, "before_cursor_execute", record)
     assert first["pagination"] == dict(page=1, page_size=20, total=23, total_pages=2)

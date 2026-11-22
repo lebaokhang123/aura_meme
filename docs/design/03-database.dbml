@@ -599,14 +599,14 @@ Table notifications {
   payload jsonb [not null]
   created_at timestamptz [not null]
   read_at timestamptz
-  dedupe_key text
+  dedupe_key text [unique]
 
   Note: 'P2 | Hệ thống thông báo cá nhân'
 }
 
 Table subscription_orders {
   id uuid [not null, pk]
-  order_code text [not null]
+  order_code text [not null, unique]
   user_id uuid [not null]
   tier text [not null]
   duration_days integer [not null]
@@ -628,7 +628,7 @@ Table subscription_orders {
 
 Table user_subscriptions {
   id uuid [not null, pk]
-  user_id uuid [not null]
+  user_id uuid [not null, unique]
   tier text [not null]
   status text [not null]
   starts_at timestamptz [not null]
@@ -864,8 +864,8 @@ Ref: aura_reward_events.comment_id > comments.id [delete: restrict]
 Ref: aura_reward_events.policy_id > reward_policy_versions.id [delete: restrict]
 Ref: post_reactions.(user_id, meme_asset_id) > user_inventory.(user_id, asset_id) [delete: restrict]
 Ref: comment_reactions.(user_id, meme_asset_id) > user_inventory.(user_id, asset_id) [delete: restrict]
-Ref: notifications.recipient_user_id > users.id [delete: restrict]
-Ref: notifications.actor_user_id > users.id [delete: restrict]
-Ref: subscription_orders.user_id > users.id [delete: restrict]
-Ref: user_subscriptions.user_id > users.id [delete: restrict]
-Ref: user_subscriptions.order_id > subscription_orders.id [delete: restrict]
+Ref: notifications.recipient_user_id > users.id [delete: cascade]
+Ref: notifications.actor_user_id > users.id [delete: set null]
+Ref: subscription_orders.user_id > users.id [delete: no action]
+Ref: user_subscriptions.user_id > users.id [delete: no action]
+Ref: user_subscriptions.order_id > subscription_orders.id [delete: no action]

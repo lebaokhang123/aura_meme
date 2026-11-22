@@ -1,5 +1,13 @@
 # AuraMeme — Database Design & Data Dictionary
 
+## Schema nghiệm thu 0013–0014
+
+`0013_notifications` thêm hộp thư, hai FK người nhận/tác nhân và unique dedupe_key. Khi xóa người nhận thì xóa hộp thư liên quan. Khi xóa tác nhân thì đặt actor_id của thông báo (cột `actor_user_id`) về NULL.
+
+`0014_premium_sandbox` thêm `subscription_orders` với mã đơn unique và `user_subscriptions` với unique user_id. Giá USD lưu bằng cent nguyên, VND và thời hạn lưu theo đơn. Thời hạn mới tính từ thời điểm lớn hơn giữa hiện tại và ngày hết hạn cũ. Xem tên FK và quy tắc xóa trong DBML.
+
+Trên PostgreSQL 17 biệt lập đã chạy upgrade, downgrade và upgrade lại, kiểm metadata, constraint và rollback dữ liệu trong bộ migration. Downgrade của hai revision khóa bảng và từ chối schema có dữ liệu. Với môi trường có dữ liệu, cần phương án phục hồi từ bản sao đã xác minh hoặc migration tiến. Demo cần phê duyệt riêng.
+
 **Mốc:** M0.3 · **Cơ sở dữ liệu:** PostgreSQL · **Kiến trúc:** một database, bảy phân hệ logic.
 
 Tài liệu này quy định cấu trúc dữ liệu dự kiến của AuraMeme, đồng bộ với `03-erd-aurameme.drawio`. Mọi bảng đều có khai báo kiểu, khóa và quan hệ. Đây là **đặc tả thiết kế**, không phải bằng chứng rằng migration hoặc hệ thống đã được triển khai.
@@ -788,3 +796,6 @@ Các điểm dưới đây là **tham số nghiệp vụ chưa phê duyệt chí
 ### Reaction bình luận — DRAFT0010 / REVIEW
 
 `comment_reactions`: comment_id UUID FK comments.id RESTRICT; user_id UUID FK users.id RESTRICT; reaction_type TEXT CHECK sáu loại; created_at/updated_at TIMESTAMPTZ NOT NULL. PK(comment_id,user_id), index(comment_id,reaction_type) cho counts và index(user_id) cho FK. Xóa mềm giữ nguyên các hàng reaction, public reads loại nội dung hidden/deleted và actor inactive. Không có cascade hoặc reward. Upgrade không đổi dữ liệu cũ; downgrade chỉ khi bảng mới rỗng và post_reactions không có loại mới. Chưa apply test/E2E/demo/development.
+
+
+Hotfix 23/11/2026 giữ schema 0014 và DBML. Khóa User trong transaction để serialize create-order, rồi khóa pending theo user+tier. Không có migration, thao tác sửa tier hay dọn giao dịch lịch sử.

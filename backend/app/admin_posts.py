@@ -135,6 +135,8 @@ def moderate_post(post_id: UUID, payload: AdminPostPatch, request: Request,
     for name, value in values.items():
         setattr(post, name, value)
     post.updated_at = request.app.state.auth.now()
+    if post.status == "deleted" and before["status"] != "deleted":
+        post.deleted_at = post.updated_at
     if before["status"] == "published" and (post.status != "published" or
             before["category_id"] != str(post.category_id) and category.status == "hidden"):
         from app.aura_runtime import reverse_post
@@ -160,7 +162,6 @@ def moderate_post(post_id: UUID, payload: AdminPostPatch, request: Request,
                 now=post.updated_at,
             )
     elif post.status == "deleted" and before["status"] != "deleted":
-        post.deleted_at = post.updated_at
         author_id = getattr(post, "author_id", None)
         if author_id is not None and author_id != account.user.id:
             from app.notifications import create_notification

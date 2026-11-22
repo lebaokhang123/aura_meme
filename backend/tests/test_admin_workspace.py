@@ -7,7 +7,7 @@ from app.models import AssetItem, Comment
 from test_auth import auth, migrated
 from test_blog import admin, blog, create_post, mutation
 
-@pytest.mark.parametrize('path',['/api/v1/admin/comments','/api/v1/admin/assets','/api/v1/admin/posts/00000000-0000-4000-8000-000000000001/media'])
+@pytest.mark.parametrize('path',['/api/v1/admin/orders','/api/v1/admin/comments','/api/v1/admin/assets','/api/v1/admin/posts/00000000-0000-4000-8000-000000000001/media'])
 def test_new_admin_reads_require_session_without_opening_database(monkeypatch,path):
     monkeypatch.setenv('DATABASE_URL','postgresql+psycopg://test:unused@127.0.0.1:1/test')
     monkeypatch.setenv('AUTH_SIGNING_KEY','synthetic-signing-key-at-least-thirty-two-bytes')
@@ -16,7 +16,7 @@ def test_new_admin_reads_require_session_without_opening_database(monkeypatch,pa
         assert client.app.state.engine.pool.checkedout()==0
 
 @pytest.mark.integration
-@pytest.mark.parametrize('path',['/admin/comments','/admin/assets','/admin/posts/00000000-0000-4000-8000-000000000001/media'])
+@pytest.mark.parametrize('path',['/admin/orders','/admin/comments','/admin/assets','/admin/posts/00000000-0000-4000-8000-000000000001/media'])
 def test_user_and_guest_cannot_read_admin_surfaces(blog,path):
     client,*_=blog
     assert client.get('/api/v1'+path).status_code==403

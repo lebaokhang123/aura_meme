@@ -169,19 +169,43 @@ export default function PaymentHistoryPage() {
 
   const handleDownloadPdf = async (order, e) => {
     if (e) e.stopPropagation();
-    let historyList = null;
     try {
-      historyList = await auth.read('/premium/orders/successful');
-    } catch {
-      // Fallback to orders in view
-      historyList = orders.filter(o => o.status === 'success' || o.status === 'completed');
-    }
-    const success = downloadReceiptPdf(order, auth.user, historyList);
-    if (success) {
+      const detail = await auth.read('/premium/orders/' + encodeURIComponent(order.order_code));
+      const historyList = await auth.read('/premium/orders/successful');
+      if (!Array.isArray(historyList)) throw new Error('Invalid payment history');
+      const success = downloadReceiptPdf(detail, auth.snapshot().user, historyList);
+      if (!success) throw new Error(t('Đơn chưa thanh toán thành công.', 'Order is not completed.'));
       setDownloadSuccess(order.order_code);
       setTimeout(() => setDownloadSuccess(null), 3000);
+    } catch {
+      setError(t('Không thể tải biên lai và lịch sử đầy đủ. Vui lòng thử lại.', 'Unable to load receipt and payment history. Please retry.'));
     }
   };
+
+  const canResume = order => order.status === 'pending' && Date.now() < new Date(order.created_at).getTime() + 3600000;
+  const resumePayment = async order => {
+    try {
+      const current = await auth.read('/premium/orders/' + encodeURIComponent(order.order_code));
+      if (canResume(current) && current.owner_username === auth.snapshot().user?.username) {
+        location.assign('/premium/checkout?order=' + encodeURIComponent(current.order_code));
+        return;
+      }
+      handleCloseDetail();
+      await loadData();
+      setError(t('Đơn không còn có thể thanh toán. Kiểm tra trạng thái hoặc chọn mua lại.', 'This order cannot be paid. Check its status or purchase again.'));
+    } catch {
+      handleCloseDetail();
+      setError(t('Chưa thể xác minh đơn hàng. Vui lòng thử lại.', 'Unable to verify order. Please retry.'));
+    }
+  };
+  const resumeButton = (order, iconOnly = true) => canResume(order) && (
+    <button type="button" className={iconOnly ? 'history-action-btn' : 'u081-btn-confirm'}
+      onClick={() => resumePayment(order)} title={t('Tiếp tục thanh toán', 'Continue payment')}
+      aria-label={t('Tiếp tục thanh toán', 'Continue payment')}>
+      <span className="material-symbols-outlined" aria-hidden="true">payment</span>
+      {!iconOnly && t('Tiếp tục thanh toán', 'Continue payment')}
+    </button>
+  );
 
   const formatDate = (val) => {
     if (!val) return '—';
@@ -511,6 +535,7 @@ export default function PaymentHistoryPage() {
                           >
                             <span className="material-symbols-outlined" aria-hidden="true">visibility</span>
                           </button>
+                          {resumeButton(o)}
                           {(o.status === 'success' || o.status === 'completed') && (
                             <button
                               type="button"
@@ -567,7 +592,8 @@ export default function PaymentHistoryPage() {
                     >
                       <span className="material-symbols-outlined" aria-hidden="true">visibility</span>
                     </button>
-                    {(o.status === 'success' || o.status === 'completed') && (
+                    {resumeButton(o)}
+                          {(o.status === 'success' || o.status === 'completed') && (
                       <button
                         type="button"
                         className="history-action-btn history-action-btn--download"
@@ -724,6 +750,7 @@ export default function PaymentHistoryPage() {
               >
                 {t('Đóng', 'Close')}
               </button>
+              {resumeButton(selectedOrder, false)}
               {(selectedOrder.status === 'success' || selectedOrder.status === 'completed') && (
                 <button
                   type="button"

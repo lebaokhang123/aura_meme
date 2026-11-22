@@ -1,5 +1,28 @@
 # TÀI LIỆU BÀN GIAO KỸ THUẬT — TASK 5: PREMIUM SANDBOX & VNPAY ADAPTER (FINAL POLISH)
 
+## Hotfix nghiệm thu 23/11/2026
+
+Owner cho phép tích hợp Task 1–5 sau gate hotfix. Checkout dùng selector có phạm vi .checkout-page để thắng rule input của Tailwind Forms được nạp sau stylesheet. Computed style Chrome trước sửa cho input Dark là rgb(255,255,255), chữ rgb(227,225,237). Font kế thừa Inter. Sau sửa giữ token màu theo theme, placeholder, focus và autofill. Screenshot nằm tại thư mục local AuraMemeReview/87f2574/hotfix-evidence.
+
+Pending dùng cùng hạn một giờ ở create, GET, init PayPal, simulate và capture. Khóa hàng User cùng transaction trước khi tìm đơn chặn hai phiên tạo đồng thời. Tìm theo user và tier, sắp created_at DESC, id DESC; mở lại giữ created_at. Prime và Plus có đơn riêng. Đơn trùng lịch sử được giữ, đơn hợp lệ mới nhất được ưu tiên. Resume từ History đọc lại đơn trên server, kiểm quyền chủ đơn và thời hạn. Đối soát PayPal lỗi trả lỗi có thể thử lại, không tự capture từ nhánh catch init và không chuyển giao dịch chưa rõ sang thẻ. Return/cancel dùng origin đã được cho phép của request.
+
+Admin 87f2574 đã được tái hiện trên cùng DB QA có expired và trả 200 với tổng 0. Nguyên nhân DTO thiếu expired bị except Exception che thành bảng rỗng. DTO/parser mới nhận đủ năm trạng thái, join username theo chủ đơn, trả số tiền USD/VND, completed_at và mã provider. Query read-only có search mã đơn, filter, phân trang và sort created_at DESC, id DESC. Lỗi SQL và DTO trả 500. Guest 401, member 403.
+
+PDF của đơn được chọn đọc detail cùng endpoint successful riêng theo phiên, lấy tối đa 10 success theo completed_at mới nhất. History không còn fallback sang trang đang filter. Request history lỗi hiện thông báo thử lại. Bảng PDF có mã đơn cùng mã provider, xuống dòng tham chiếu dài. Header vẫn giữ đơn chọn dù nằm ngoài latest 10. Giá VND ghi rõ tham khảo. Dữ liệu mô phỏng được ghi nhãn Sandbox, không xác nhận PayPal thu tiền thật.
+
+Bằng chứng tập trung gồm 5/20/50 phút reuse, quá hạn một giờ bị chặn, hai phiên concurrent cùng mã pending, Plus/Prime/Plus/Prime, Admin hai chủ đơn và lỗi SQL/DTO. Sáu PDF tải qua UI từ fixture PostgreSQL cô lập tương ứng 1/5/10/11 success, 5 success cộng pending/failed/expired/cancelled, và người mua khác. Extract xác nhận số dòng 1/5/10/10/5/1, thứ tự, cách ly, đơn chọn và provider. Mỗi PDF một trang A4, render đã kiểm. Matrix Chrome gồm Dark/Light, VI/EN, 375/1440 và PayPal/thẻ, focus, validation, autofill ép pseudo-state bằng CDP. Real buyer PayPal Sandbox E2E vẫn NOT VERIFIED.
+
+Không đổi schema DB trong hotfix. DBML giữ schema 0014 đã nghiệm thu. Dữ liệu test tổng hợp được giữ trong DB QA, kể cả fixture từ các lượt thử chưa hoàn tất. Kết quả regression trên cây tích hợp và SHA dev được ghi tiếp sau khi có bằng chứng.
+
+
+## Checkpoint kỹ thuật 22/11/2026
+
+Baseline Task 5 682d247. GET đơn kiểm quyền ADMIN từ user_roles và roles. PayPal yêu cầu merchant khi đối soát, ID của provider gắn với đơn trước capture, webhook đối chiếu capture từ Orders. DB test xác nhận cùng một đơn mô phỏng xử lý hai lần chỉ cấp 30 ngày. PDF đọc số tiền và thời điểm từ đơn đã lưu. Luồng người mua PayPal Sandbox CREATED → APPROVED → CAPTURE COMPLETED → DB success → hội viên active vẫn NOT VERIFIED; smoke tạo order và các HTTP stub chỉ chứng minh từng phần.
+
+Bằng chứng tại commit `c277cdf` (sau `80c2c04`). 348 ca thuộc các module backend chịu ảnh hưởng qua trên PostgreSQL 17 cô lập, kể cả HTTP chủ đơn/người khác/admin và xóa bài có audit. Unit frontend 81/81 và build production qua. Playwright mock 142/149 lượt đầu, 7/7 qua sau sửa. Playwright cấu hình API dùng HTTP fixture 153/156 lượt cuối toàn bộ, 3 ca chạy lại hai lần đều qua. Một bộ chạy riêng checkout/profile qua 28/29 trước khi sửa selector ảnh đại diện. Các số này là những lượt độc lập. Smoke PayPal yêu cầu cấu hình sandbox của merchant và thao tác approve của người mua.
+
+Lượt cuối backend ở c277cdf có 1.244 pass, 12 skip, 4 ca migration demo được loại chủ động, 1 deprecation warning. Hai container PostgreSQL 17 tạm đã đóng. Sau bản sửa PDF 6ae923f, build và 81 unit frontend qua, toàn bộ 20 ca Playwright Premium qua. Đã xuất, render và đọc lại PDF tổng hợp một trang bằng pypdf. Dòng lịch sử cũng khớp số tiền, và đơn pending/failed/cancelled/expired không sinh biên lai. Mã đơn, chủ đơn, số tiền 5,25 USD và 139.000 VNĐ, ngày, phương thức thẻ và mã giao dịch khớp dữ liệu đầu vào, dù người đang xem là admin. Migration 0013 và 0014 từ chối downgrade có dữ liệu nghiệp vụ. Quyết định rollback trên môi trường khác cần bản sao lưu đã xác minh và kế hoạch khôi phục.
+
 **Mã Task:** TASK-5-PREMIUM-SANDBOX-FINAL  
 **Nhánh Git:** `feat/premium-sandbox-task5`  
 **Base Commit Kế thừa:** `75a2a98` (Task 5 ban đầu) kết hợp cherry-pick Task 4 (`c72f8b2`, `27a3b7a`)  

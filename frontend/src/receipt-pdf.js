@@ -56,7 +56,7 @@ function formatDateObj(d) {
  * @returns {jsPDF|null} Configured jsPDF instance
  */
 export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null) {
-  if (!order) return null;
+  if (!['success', 'completed'].includes(order?.status)) return null;
 
   const orderCode = order.order_code || order.orderCode || 'AM-ORDER';
   const tier = (order.tier || order.tierName || 'plus').toLowerCase().replace('aura ', '');
@@ -65,9 +65,9 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
   const durationDays = order.duration_days || order.durationDays || (isPrime ? 365 : 30);
 
   // Exact USD and reference VND amounts
-  const amountUsdValue = isPrime ? '50.00' : '5.00';
+  const amountUsdValue = (order.amount_usd_cents / 100).toFixed(2);
   const amountUsdFormatted = `${amountUsdValue} USD`;
-  const amountVndFormatted = isPrime ? '1.250.000 VNĐ' : '130.000 VNĐ';
+  const amountVndFormatted = Number(order.amount_vnd).toLocaleString('vi-VN') + ' VNĐ';
 
   // Transaction reference (distinguish PayPal Order ID/Capture ID from AuraMeme order code)
   const txnRef = order.paypal_order_id || order.provider_txn_id || orderCode;
@@ -87,7 +87,7 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
   } else if (order.provider === 'vnpay_sandbox') {
     providerName = 'VNPAY';
   }
-  const username = user?.username || user?.displayName || 'khang_dev';
+  const username = order.owner_username || user?.username || user?.displayName || '—';
 
   const rawDate = order.completed_at || order.activatedAt || order.created_at;
   const dateFormatted = formatReceiptDate(rawDate);
@@ -307,7 +307,7 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
   doc.setFont('Roboto', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(31, 41, 55);
-  doc.text('LỊCH SỬ THANH TOÁN / PAYMENT HISTORY', 20, histY);
+  doc.text('LỊCH SỬ THANH TOÁN / PAYMENT HISTORY (10 GẦN NHẤT / LATEST 10)', 20, histY);
 
   doc.setDrawColor(209, 213, 219);
   doc.line(20, histY + 2.5, 190, histY + 2.5);
@@ -381,16 +381,16 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
         hProvider = 'VNPAY';
       }
       const hDate = formatReceiptDate(histItem.completed_at || histItem.created_at);
-      const isHistPrime = (histItem.tier || '').toLowerCase() === 'prime';
-      const hAmount = histItem.amount_usd_formatted || (isHistPrime ? '$50' : '$5');
-      const hRef = histItem.provider_txn_id || histItem.order_code || '—';
+      const hAmount = Number.isInteger(histItem.amount_usd_cents)
+        ? (histItem.amount_usd_cents / 100).toFixed(2) + ' USD'
+        : histItem.amount_usd_formatted || '—';
+      const hRef = [histItem.order_code, histItem.provider_txn_id].filter(Boolean).join(' / ') || '—';
 
       // Determine row height needed
       doc.setFont('Roboto', 'normal');
       doc.setFontSize(6.5);
-      const hRefWidth = doc.getTextWidth(hRef);
-      const isMultiLine = hRefWidth > 37;
-      const rowH = isMultiLine ? 8.5 : 5.8;
+      const referenceLines = doc.splitTextToSize(hRef, 37);
+      const rowH = Math.max(5.8, referenceLines.length * 2.7 + 3);
 
       // Page overflow check (footer is at 268)
       if (curY + rowH > 260) {
@@ -420,19 +420,12 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
 
       doc.setFont('Roboto', 'normal');
       doc.setTextColor(75, 85, 99);
-      if (isMultiLine) {
-        doc.setFontSize(6.0);
-        doc.text(hRef, 188, textY + 3.2, { align: 'right' });
-        doc.setDrawColor(229, 231, 235);
-        doc.line(20, textY + 5.2, 190, textY + 5.2);
-        curY += 8.5;
-      } else {
-        doc.setFontSize(6.5);
-        doc.text(hRef, 188, textY, { align: 'right' });
-        doc.setDrawColor(229, 231, 235);
-        doc.line(20, textY + 3.2, 190, textY + 3.2);
-        curY += 5.8;
-      }
+      doc.setFontSize(6.5);
+      doc.text(referenceLines, 188, textY, { align: 'right' });
+      doc.setDrawColor(229, 231, 235);
+      doc.line(20, curY + rowH, 190, curY + rowH);
+      curY += rowH;
+
     }
   }
 

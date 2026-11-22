@@ -3,8 +3,7 @@ info:
   title: AuraMeme API — Design Contract
   version: 0.5.0-design
   description: Thiết kế M0.5 cho một FastAPI modular monolith / PostgreSQL. P0 là blog học phần, P1 là AuraMeme;
-    P2 payment/generator chưa cấp hợp đồng vì nghiệp vụ chưa khóa. Chưa phải API đã triển khai. Mỗi operation
-    có x-phase.
+    Các route thông báo, quản trị thông báo và Premium Sandbox phản ánh implementation Task 1–5. Generator còn ở mức thiết kế.
 servers:
 - url: /
   description: Same-origin Nginx + /api/v1 (production); local Vite proxy cho /api/v1
@@ -28,6 +27,1433 @@ tags:
 - name: Vault
   description: Rương, inventory, trang bị
 paths:
+  /api/v1/admin/announcements:
+    get:
+      tags:
+        - Admin
+      summary: List Admin Announcements
+      operationId: adminListAnnouncements
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+            title: Page
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            minimum: 1
+            default: 20
+            title: Page Size
+        - name: status
+          in: query
+          required: false
+          schema:
+            title: Status
+            type: string
+            nullable: true
+        - name: search
+          in: query
+          required: false
+          schema:
+            title: Search
+            type: string
+            maxLength: 100
+            nullable: true
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnouncementPage"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+    post:
+      tags:
+        - Admin
+      summary: Create Admin Announcement
+      operationId: adminCreateAnnouncement
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnnouncementInput"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnouncementResponse"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+  /api/v1/admin/announcements/{announcement_id}:
+    patch:
+      tags:
+        - Admin
+      summary: Update Admin Announcement
+      operationId: adminUpdateAnnouncement
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: announcement_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Announcement Id
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnnouncementUpdateInput"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnouncementItem"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+    delete:
+      tags:
+        - Admin
+      summary: Delete Admin Announcement
+      operationId: adminDeleteAnnouncement
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: announcement_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Announcement Id
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Successful Response
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/admin/announcements/{announcement_id}/publish:
+    post:
+      tags:
+        - Admin
+      summary: Publish Admin Announcement
+      operationId: adminPublishAnnouncement
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: announcement_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Announcement Id
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnouncementItem"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/admin/announcements/{announcement_id}/withdraw:
+    post:
+      tags:
+        - Admin
+      summary: Withdraw Admin Announcement
+      operationId: adminWithdrawAnnouncement
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: announcement_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Announcement Id
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnouncementItem"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/admin/orders:
+    get:
+      tags:
+        - Admin
+      summary: Orders
+      operationId: adminListOrders
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+            title: Page
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            minimum: 1
+            default: 20
+            title: Page Size
+        - name: status
+          in: query
+          required: false
+          schema:
+            title: Status
+            enum:
+              - pending
+              - success
+              - failed
+              - cancelled
+              - expired
+            type: string
+            nullable: true
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+            nullable: true
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOrderPage"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/notifications:
+    get:
+      tags:
+        - Notifications
+      summary: Get Notifications
+      operationId: getNotifications
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+            title: Page
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            minimum: 1
+            default: 20
+            title: Page Size
+        - name: unread_only
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            title: Unread Only
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPage"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/notifications/unread-count:
+    get:
+      tags:
+        - Notifications
+      summary: Get Unread Count
+      operationId: getUnreadCount
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnreadCountResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - sessionCookie: []
+  /api/v1/notifications/{notification_id}/read:
+    patch:
+      tags:
+        - Notifications
+      summary: Mark Read
+      operationId: markNotificationRead
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: notification_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Notification Id
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationItem"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/notifications/read-all:
+    post:
+      tags:
+        - Notifications
+      summary: Mark All Read
+      operationId: markAllNotificationsRead
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkReadAllResponse"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+  /api/v1/notifications/{notification_id}:
+    delete:
+      tags:
+        - Notifications
+      summary: Delete Notification
+      operationId: deleteNotification
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: notification_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Notification Id
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Successful Response
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/premium/status:
+    get:
+      tags:
+        - Premium Sandbox
+      summary: Get Premium Status
+      operationId: getPremiumStatus
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PremiumStatusResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - sessionCookie: []
+  /api/v1/premium/orders:
+    post:
+      tags:
+        - Premium Sandbox
+      summary: Create Subscription Order
+      operationId: createSubscriptionOrder
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderInput"
+      responses:
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDto"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+    get:
+      tags:
+        - Premium Sandbox
+      summary: List Subscription Orders
+      description: List subscription orders for the current user with pagination, optional status filter, and order_code search.
+      operationId: listSubscriptionOrders
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+            title: Page
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            minimum: 1
+            default: 10
+            title: Limit
+        - name: status
+          in: query
+          required: false
+          schema:
+            title: Status
+            type: string
+            nullable: true
+        - name: q
+          in: query
+          required: false
+          schema:
+            title: Q
+            type: string
+            maxLength: 64
+            nullable: true
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderPage"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/premium/orders/{order_code}/init-paypal:
+    post:
+      tags:
+        - Premium Sandbox
+      summary: Init Paypal Order
+      description: Authoritative PayPal order initialization when user starts PayPal payment at checkout.
+      operationId: initPaypalOrder
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: order_code
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Order Code
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDto"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/premium/orders/successful:
+    get:
+      tags:
+        - Premium Sandbox
+      summary: List Successful Orders
+      description: Retrieve up to 10 most recent successful orders of the authenticated user for receipt summary.
+      operationId: listSuccessfulOrders
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 10
+            minimum: 1
+            default: 10
+            title: Limit
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrderDto"
+                title: Response Listsuccessfulorders
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/premium/orders/{order_code}:
+    get:
+      tags:
+        - Premium Sandbox
+      summary: Get Subscription Order
+      description: Retrieve authoritative order status for authenticated user.
+      operationId: getSubscriptionOrder
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: order_code
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Order Code
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetailDto"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/premium/orders/{order_code}/simulate:
+    post:
+      tags:
+        - Premium Sandbox
+      summary: Simulate Subscription Order
+      operationId: simulateSubscriptionOrder
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: order_code
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Order Code
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimulateOrderInput"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDto"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/premium/orders/{order_code}/capture:
+    post:
+      tags:
+        - Premium Sandbox
+      summary: Capture Subscription Order
+      operationId: captureSubscriptionOrder
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: order_code
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Order Code
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: Payload
+              $ref: "#/components/schemas/CaptureOrderInput"
+              nullable: true
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDto"
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Conflict
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Too Many Requests
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+  /api/v1/premium/vnpay-return:
+    get:
+      tags:
+        - Premium Sandbox
+      summary: Handle Vnpay Return
+      description: |-
+        Handle VNPAY browser return callback.
+
+        IMPORTANT: This endpoint strictly performs signature verification and user redirection.
+        It DOES NOT mutate order status, and DOES NOT grant subscription entitlements.
+        Authoritative state mutation is performed exclusively by handle_vnpay_ipn.
+      operationId: handleVnpayReturn
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /api/v1/premium/vnpay-ipn:
+    get:
+      tags:
+        - Premium Sandbox
+      summary: Handle Vnpay Ipn
+      description: |-
+        Handle VNPAY server-to-server IPN callback.
+
+        This is the sole authoritative webhook endpoint that validates transactions,
+        updates order status, and activates user subscription entitlements.
+      operationId: handleVnpayIpn
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /api/v1/premium/paypal/webhook:
+    post:
+      tags:
+        - Premium Sandbox
+      summary: Handle Paypal Webhook
+      description: Handle PayPal webhook events (e.g. PAYMENT.CAPTURE.COMPLETED) with strict fail-closed security.
+      operationId: handlePaypalWebhook
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
   /api/v1/vault/opens/by-request:
     get:
       tags: ["Vault"]
@@ -2734,6 +4160,587 @@ paths:
     }
 components:
   schemas:
+    AnnouncementPage:
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/AnnouncementItem"
+          type: array
+          title: Items
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      type: object
+      required:
+        - items
+        - pagination
+      title: AnnouncementPage
+    AnnouncementItem:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        title:
+          type: string
+          title: Title
+        body:
+          type: string
+          title: Body
+        status:
+          type: string
+          enum:
+            - draft
+            - published
+            - withdrawn
+          title: Status
+        actor_id:
+          type: string
+          format: uuid
+          title: Actor Id
+        actor_username:
+          title: Actor Username
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        published_at:
+          title: Published At
+          type: string
+          format: date-time
+          nullable: true
+        recipients_count:
+          type: integer
+          title: Recipients Count
+          default: 0
+      type: object
+      required:
+        - id
+        - title
+        - body
+        - status
+        - actor_id
+        - created_at
+      title: AnnouncementItem
+    ErrorResponse:
+      properties:
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+      type: object
+      required:
+        - error
+      title: ErrorResponse
+    ErrorDetail:
+      properties:
+        code:
+          type: string
+          title: Code
+        message:
+          type: string
+          title: Message
+        request_id:
+          type: string
+          title: Request Id
+        details:
+          $ref: "#/components/schemas/CooldownDetails"
+          nullable: true
+      type: object
+      required:
+        - code
+        - message
+        - request_id
+      title: ErrorDetail
+    AnnouncementInput:
+      properties:
+        title:
+          type: string
+          maxLength: 150
+          minLength: 1
+          title: Title
+        body:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Body
+        is_draft:
+          type: boolean
+          title: Is Draft
+          default: false
+      type: object
+      required:
+        - title
+        - body
+      title: AnnouncementInput
+    AnnouncementResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+        recipients_count:
+          type: integer
+          title: Recipients Count
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        id:
+          title: Id
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          title: Status
+          default: published
+      type: object
+      required:
+        - success
+        - recipients_count
+        - created_at
+      title: AnnouncementResponse
+    AnnouncementUpdateInput:
+      properties:
+        title:
+          title: Title
+          type: string
+          maxLength: 150
+          minLength: 1
+          nullable: true
+        body:
+          title: Body
+          type: string
+          maxLength: 2000
+          minLength: 1
+          nullable: true
+      type: object
+      title: AnnouncementUpdateInput
+    AdminOrderPage:
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/AdminOrder"
+          type: array
+          title: Items
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      type: object
+      required:
+        - items
+        - pagination
+      title: AdminOrderPage
+    AdminOrder:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        order_code:
+          type: string
+          title: Order Code
+        tier:
+          type: string
+          enum:
+            - plus
+            - prime
+          title: Tier
+        provider:
+          type: string
+          title: Provider
+        amount_vnd:
+          type: integer
+          title: Amount Vnd
+        amount_vnd_formatted:
+          title: Amount Vnd Formatted
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum:
+            - pending
+            - success
+            - failed
+            - cancelled
+            - expired
+          title: Status
+        provider_txn_id:
+          title: Provider Txn Id
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        owner_username:
+          type: string
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        amount_usd_cents:
+          type: integer
+          nullable: true
+        currency:
+          type: string
+          default: USD
+      type: object
+      required:
+        - id
+        - order_code
+        - tier
+        - provider
+        - amount_vnd
+        - status
+        - created_at
+      title: AdminOrder
+    NotificationPage:
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/NotificationItem"
+          type: array
+          title: Items
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        unread_count:
+          type: integer
+          title: Unread Count
+      type: object
+      required:
+        - items
+        - pagination
+        - unread_count
+      title: NotificationPage
+    NotificationItem:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        type:
+          type: string
+          title: Type
+        target_type:
+          type: string
+          title: Target Type
+        target_id:
+          title: Target Id
+          type: string
+          format: uuid
+          nullable: true
+        actor:
+          $ref: "#/components/schemas/ActorSummary"
+          nullable: true
+        payload:
+          additionalProperties: true
+          type: object
+          title: Payload
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        read_at:
+          title: Read At
+          type: string
+          format: date-time
+          nullable: true
+        is_read:
+          type: boolean
+          title: Is Read
+      type: object
+      required:
+        - id
+        - type
+        - target_type
+        - created_at
+        - is_read
+      title: NotificationItem
+    ActorSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        username:
+          type: string
+          title: Username
+        display_name:
+          type: string
+          title: Display Name
+        avatar_url:
+          title: Avatar Url
+          type: string
+          nullable: true
+      type: object
+      required:
+        - id
+        - username
+        - display_name
+      title: ActorSummary
+    UnreadCountResponse:
+      properties:
+        unread_count:
+          type: integer
+          title: Unread Count
+      type: object
+      required:
+        - unread_count
+      title: UnreadCountResponse
+    MarkReadAllResponse:
+      properties:
+        marked_read:
+          type: integer
+          title: Marked Read
+      type: object
+      required:
+        - marked_read
+      title: MarkReadAllResponse
+    PremiumStatusResponse:
+      properties:
+        subscription:
+          $ref: "#/components/schemas/SubscriptionDto"
+        plans:
+          items:
+            $ref: "#/components/schemas/PlanInfoDto"
+          type: array
+          title: Plans
+        vnpay_configured:
+          type: boolean
+          title: Vnpay Configured
+        vnpay_pricing_approved:
+          type: boolean
+          title: Vnpay Pricing Approved
+        paypal_configured:
+          type: boolean
+          title: Paypal Configured
+          default: false
+        paypal_client_id:
+          title: Paypal Client Id
+          type: string
+          nullable: true
+        paypal_mode:
+          type: string
+          title: Paypal Mode
+          default: sandbox
+        sandbox_notice:
+          type: string
+          title: Sandbox Notice
+      type: object
+      required:
+        - subscription
+        - plans
+        - vnpay_configured
+        - vnpay_pricing_approved
+        - sandbox_notice
+      title: PremiumStatusResponse
+    SubscriptionDto:
+      properties:
+        tier:
+          type: string
+          title: Tier
+        is_active:
+          type: boolean
+          title: Is Active
+        starts_at:
+          title: Starts At
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          title: Expires At
+          type: string
+          format: date-time
+          nullable: true
+        days_remaining:
+          type: integer
+          title: Days Remaining
+          default: 0
+        boost_multiplier:
+          type: integer
+          title: Boost Multiplier
+          default: 1
+        sandbox_mode:
+          type: boolean
+          title: Sandbox Mode
+          default: true
+        order_code:
+          title: Order Code
+          type: string
+          nullable: true
+      type: object
+      required:
+        - tier
+        - is_active
+      title: SubscriptionDto
+    PlanInfoDto:
+      properties:
+        tier:
+          type: string
+          title: Tier
+        name:
+          type: string
+          title: Name
+        duration_days:
+          type: integer
+          title: Duration Days
+        boost_multiplier:
+          type: integer
+          title: Boost Multiplier
+        amount_usd_formatted:
+          type: string
+          title: Amount Usd Formatted
+        amount_vnd:
+          type: integer
+          title: Amount Vnd
+        amount_vnd_formatted:
+          type: string
+          title: Amount Vnd Formatted
+      type: object
+      required:
+        - tier
+        - name
+        - duration_days
+        - boost_multiplier
+        - amount_usd_formatted
+        - amount_vnd
+        - amount_vnd_formatted
+      title: PlanInfoDto
+    CreateOrderInput:
+      properties:
+        plan_tier:
+          type: string
+          enum:
+            - plus
+            - prime
+          title: Plan Tier
+        provider:
+          type: string
+          enum:
+            - sandbox_simulated
+            - vnpay_sandbox
+            - paypal_sandbox
+            - unselected
+          title: Provider
+          default: unselected
+      type: object
+      required:
+        - plan_tier
+      title: CreateOrderInput
+    OrderDetailDto:
+      allOf:
+        - $ref: '#/components/schemas/OrderDto'
+        - type: object
+          properties:
+            owner_username: {type: string}
+          required: [owner_username]
+    OrderDto:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        order_code:
+          type: string
+          title: Order Code
+        tier:
+          type: string
+          title: Tier
+        duration_days:
+          type: integer
+          title: Duration Days
+        amount_usd_cents:
+          type: integer
+          title: Amount Usd Cents
+        amount_usd_formatted:
+          type: string
+          title: Amount Usd Formatted
+        amount_vnd:
+          type: integer
+          title: Amount Vnd
+        amount_vnd_formatted:
+          title: Amount Vnd Formatted
+          type: string
+          nullable: true
+        currency:
+          type: string
+          title: Currency
+        status:
+          type: string
+          title: Status
+        provider:
+          type: string
+          title: Provider
+        provider_txn_id:
+          title: Provider Txn Id
+          type: string
+          nullable: true
+        payment_url:
+          title: Payment Url
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        completed_at:
+          title: Completed At
+          type: string
+          format: date-time
+          nullable: true
+      type: object
+      required:
+        - id
+        - order_code
+        - tier
+        - duration_days
+        - amount_usd_cents
+        - amount_usd_formatted
+        - amount_vnd
+        - currency
+        - status
+        - provider
+        - created_at
+      title: OrderDto
+    OrderPage:
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/OrderDto"
+          type: array
+          title: Items
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      type: object
+      required:
+        - items
+        - pagination
+      title: OrderPage
+    SimulateOrderInput:
+      properties:
+        action:
+          type: string
+          enum:
+            - pay_success
+            - pay_fail
+            - cancel
+          title: Action
+      type: object
+      required:
+        - action
+      title: SimulateOrderInput
+    CaptureOrderInput:
+      properties:
+        paypal_order_id:
+          title: Paypal Order Id
+          type: string
+          nullable: true
+        mock_fail:
+          type: boolean
+          title: Mock Fail
+          default: false
+      type: object
+      title: CaptureOrderInput
     CatalogPage:
       properties:
         items:
@@ -2867,6 +4874,10 @@ components:
         created_at:
           type: string
           format: date-time
+        level: {type: integer, minimum: 1, maximum: 100, nullable: true}
+        realm: {type: string, nullable: true}
+        title: {type: string, nullable: true}
+        membership_tier: {type: string, enum: [free, plus, prime], default: free}
       required:
       - id
       - username
@@ -3273,10 +5284,10 @@ components:
         display_name:
           type: string
           minLength: 1
-          maxLength: 80
+          maxLength: 25
         bio:
           type: string
-          maxLength: 1000
+          maxLength: 100
           nullable: true
         birth_year:
           type: integer

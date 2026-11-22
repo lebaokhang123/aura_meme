@@ -3,7 +3,7 @@ from typing import Literal
 from uuid import UUID
 from datetime import datetime
 from fastapi import APIRouter, Depends, Query, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy import case, select
 from app.auth import ERRORS
 from app.auth_schemas import ErrorResponse
@@ -45,9 +45,13 @@ class AdminOrder(BaseModel):
     provider: str
     amount_vnd: int
     amount_vnd_formatted: str | None = None
-    status: Literal['pending', 'success', 'failed', 'cancelled']
+    status: Literal['pending', 'success', 'failed', 'cancelled', 'expired']
     provider_txn_id: str | None = None
     created_at: datetime
+    owner_username: str | None = None
+    completed_at: datetime | None = None
+    amount_usd_cents: int | None = None
+    currency: str = 'USD'
 
 class AdminOrderPage(BaseModel):
     items: list[AdminOrder]
@@ -93,27 +97,26 @@ def post_image(post_id:UUID,still:bool=False,account=Depends(require_role('ADMIN
 
 @router.get('/orders', response_model=AdminOrderPage, operation_id='adminListOrders', responses={s: ERRORS[s] for s in (401, 403, 422, 429, 500)})
 def orders(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
-           status: Literal['pending', 'success', 'failed', 'cancelled'] | None = None,
+           status: Literal['pending', 'success', 'failed', 'cancelled', 'expired'] | None = None,
+           search: str | None = Query(None, max_length=100),
            account = Depends(require_role('ADMIN'))):
+    if search is not None and "\x00" in search:
+        raise AuthError(422, 'VALIDATION_ERROR', 'Invalid query text.')
+    statement = select(SubscriptionOrder, User.username).join(User, User.id == SubscriptionOrder.user_id)
+    if status is not None:
+        statement = statement.where(SubscriptionOrder.status == status)
+    if search:
+        statement = statement.where(SubscriptionOrder.order_code.icontains(search, autoescape=True))
+    rows, pagination = page_rows(account.db, statement.order_by(
+        SubscriptionOrder.created_at.desc(), SubscriptionOrder.id.desc()), page, page_size)
     try:
-        statement = select(SubscriptionOrder)
-        if status is not None:
-            statement = statement.where(SubscriptionOrder.status == status)
-        rows, pagination = page_rows(account.db, statement.order_by(SubscriptionOrder.created_at.desc()), page, page_size)
-        items = [
-            AdminOrder(
-                id=o.id,
-                order_code=o.order_code,
-                tier=o.tier,
-                provider=o.provider,
-                amount_vnd=o.amount_vnd,
-                amount_vnd_formatted=f"{o.amount_vnd:,} đ".replace(",", "."),
-                status=o.status,
-                provider_txn_id=o.provider_txn_id,
-                created_at=o.created_at
-            )
-            for o in rows
-        ]
-        return AdminOrderPage(items=items, pagination=pagination)
-    except Exception:
-        return AdminOrderPage(items=[], pagination=Pagination(page=page, page_size=page_size, total=0, total_pages=0))
+        return AdminOrderPage(items=[
+            AdminOrder(id=o.id, order_code=o.order_code, tier=o.tier, provider=o.provider,
+                       amount_vnd=o.amount_vnd, amount_vnd_formatted=f"{o.amount_vnd:,} đ".replace(",", "."),
+                       amount_usd_cents=o.amount_cents, currency=o.currency, owner_username=username,
+                       status=o.status, provider_txn_id=o.provider_txn_id,
+                       created_at=o.created_at, completed_at=o.completed_at)
+            for o, username in rows
+        ], pagination=pagination)
+    except ValidationError as exc:
+        raise AuthError(500, 'INTERNAL_ERROR', 'Invalid transaction data.') from exc

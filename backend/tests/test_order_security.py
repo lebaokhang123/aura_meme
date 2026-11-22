@@ -122,9 +122,11 @@ def test_idor_order_authorization():
     admin_account.db = MagicMock()
     admin_account.db.scalar.return_value = order
 
+    admin_account.db.get.return_value.username = "order_owner"
     admin_dto = get_subscription_order(order_code, account=admin_account)
     assert admin_dto.order_code == order_code
     assert admin_dto.tier == "plus"
+    assert admin_dto.owner_username == "order_owner"
 
 
 def test_idempotency_prevent_double_capture():
@@ -250,7 +252,7 @@ def test_production_boundary_guard():
         currency="USD",
         status="pending",
         provider="paypal_sandbox",
-        created_at=datetime(2026, 11, 22, 10, 0, 0, tzinfo=timezone.utc),
+        created_at=datetime.now(timezone.utc),
     )
 
     account = MagicMock()
@@ -362,6 +364,7 @@ def test_pending_order_auto_expiration_after_1_hour():
     account.db = MagicMock()
     account.db.scalar.return_value = order
 
+    account.db.get.return_value.username = "order_owner"
     dto = get_subscription_order(order_code, account=account)
     assert dto.status == "expired"
     assert order.status == "expired"
@@ -609,7 +612,8 @@ def test_webhook_verification_mismatches_rejected():
     mock_paypal.webhook_id = "WH-123456"
     mock_paypal.verify_webhook_signature.return_value = True
     mock_paypal.merchant_id = "AURAMEME_MERCHANT"
-    mock_paypal.get_capture_details.return_value = None
+    order.provider_txn_id = "PP-order-mismatch"
+    mock_paypal.get_order_details.return_value = {"id": order.provider_txn_id}
 
     # Mismatch 1: Amount mismatch (1000 cents instead of 500)
     mock_paypal.verify_capture.return_value = (False, "Amount mismatch: expected 500 cents, got 1000 cents.")
@@ -679,11 +683,10 @@ def test_webhook_delayed_callback_reconciles_expired_order():
     mock_paypal.webhook_id = "WH-123456"
     mock_paypal.verify_webhook_signature.return_value = True
     mock_paypal.merchant_id = "AURAMEME_MERCHANT"
-    mock_paypal.get_capture_details.return_value = {
-        "id": "CAP-DELAYED-123",
-        "status": "COMPLETED",
-        "amount": {"currency_code": "USD", "value": "50.00"},
-        "custom_id": order_code,
+    order.provider_txn_id = "PP-order-delayed"
+    mock_paypal.get_order_details.return_value = {
+        "id": order.provider_txn_id,
+        "purchase_units": [{"payments": {"captures": [{"id": "CAP-DELAYED-123"}]}}],
     }
     mock_paypal.verify_capture.return_value = (True, "Capture verified successfully.")
 
@@ -753,6 +756,7 @@ def test_pending_order_expiry_checks_paypal_capture_first():
     req1 = MagicMock()
     req1.app.state.paypal = mock_paypal
 
+    account1.db.get.return_value.username = "order_owner"
     dto1 = get_subscription_order("AM-PLUS-1795330000-CAPTURED1", request=req1, account=account1)
     assert dto1.status == "success"
     assert captured_order.status == "success"
@@ -786,6 +790,7 @@ def test_pending_order_expiry_checks_paypal_capture_first():
         "status": "CREATED",
     }
 
+    account2.db.get.return_value.username = "order_owner"
     dto2 = get_subscription_order("AM-PLUS-1795330000-ABANDONED", request=req1, account=account2)
     assert dto2.status == "expired"
     assert uncaptured_order.status == "expired"
@@ -842,6 +847,12 @@ def test_production_blocks_simulated_order_creation_and_capture():
         )
     assert exc_info.value.status == 403
     assert exc_info.value.code == "FORBIDDEN"
+
+    req.app.state.auth.settings.auth_environment = "development"
+    with pytest.raises(AuthError) as disabled:
+        capture_subscription_order(sim_order.order_code, payload=CaptureOrderInput(), request=req, account=account)
+    assert disabled.value.status == 403
+    req.app.state.auth.settings.auth_environment = "production"
 
     # 3. Block unconfigured PayPal capture fallback in production
     pp_order = SubscriptionOrder(
@@ -957,3 +968,25 @@ def test_card_simulation_records_sandbox_simulated_and_sim_card_txn():
     assert order.provider_response_code == "SUCCESS"
 
 
+
+
+def test_paypal_return_uses_the_authorized_checkout_origin():
+    from app.config import PremiumSettings
+    request = MagicMock()
+    request.headers = {"origin": "http://127.0.0.1:5189"}
+    request.app.state.auth.settings.auth_environment = "development"
+    request.app.state.auth.settings.auth_allowed_origins = ["http://127.0.0.1:5189"]
+    request.app.state.auth.now.return_value = datetime.now(timezone.utc)
+    request.app.state.auth.limiter = None
+    request.app.state.premium = PremiumSettings(_env_file=None)
+    request.app.state.paypal = MagicMock()
+    request.app.state.paypal.is_configured.return_value = True
+    request.app.state.paypal.create_order.return_value = {"id":"PP-TEST", "approve_url":"https://www.sandbox.paypal.com/checkoutnow?token=PP-TEST"}
+    request.app.state.vnpay = None
+    account = MagicMock()
+    account.user.id = uuid4()
+    account.db.scalar.return_value = None
+    order = create_subscription_order(CreateOrderInput(plan_tier="plus", provider="paypal_sandbox"), request, account)
+    callback = request.app.state.paypal.create_order.call_args.kwargs
+    assert callback["return_url"] == "http://127.0.0.1:5189/premium/checkout?order=" + order.order_code
+    assert callback["cancel_url"] == callback["return_url"] + "&cancelled=true"
