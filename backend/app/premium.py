@@ -228,7 +228,7 @@ def create_subscription_order(
                 "VNPAY_NOT_AVAILABLE",
                 "Cổng VNPAY Sandbox chưa được cấu hình credentials hoặc giá VND chưa được duyệt bởi Owner.",
             )
-        order_code = f"AM-{plan.tier.upper()}-{uuid4().hex[:10].upper()}"
+        order_code = f"AM-{plan.tier.upper()}-{int(now.timestamp())}-{uuid4().hex[:8].upper()}"
         payment_url = vnpay.create_payment_url(
             order_code=order_code,
             amount_vnd=amount_vnd,
@@ -238,7 +238,7 @@ def create_subscription_order(
         )
     elif payload.provider == "paypal_sandbox":
         paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
-        order_code = f"AM-PP-{plan.tier.upper()}-{uuid4().hex[:10].upper()}"
+        order_code = f"AM-{plan.tier.upper()}-{int(now.timestamp())}-{uuid4().hex[:8].upper()}"
         return_url = f"http://localhost:5173/premium/checkout?order={order_code}"
         cancel_url = f"http://localhost:5173/premium/checkout?order={order_code}&cancelled=true"
         if paypal and paypal.is_configured():
@@ -262,7 +262,7 @@ def create_subscription_order(
             payment_url = f"https://www.sandbox.paypal.com/checkoutnow?token={mock_id}"
             provider_payload = {"mock": True, "id": mock_id}
     else:
-        order_code = f"AM-SIM-{plan.tier.upper()}-{uuid4().hex[:10].upper()}"
+        order_code = f"AM-{plan.tier.upper()}-{int(now.timestamp())}-{uuid4().hex[:8].upper()}"
 
     order = SubscriptionOrder(
         id=uuid4(),
@@ -308,6 +308,40 @@ def create_subscription_order(
         created_at=order.created_at,
         completed_at=order.completed_at,
     )
+
+
+@router.get(
+    "/orders",
+    operation_id="listSubscriptionOrders",
+    responses={**ERRORS},
+)
+def list_subscription_orders(
+    account=Depends(require_authenticated_user),
+):
+    """List subscription orders for the current user."""
+    try:
+        orders = account.db.scalars(
+            select(SubscriptionOrder)
+            .where(SubscriptionOrder.user_id == account.user.id)
+            .order_by(SubscriptionOrder.created_at.desc())
+        ).all()
+        return [
+            {
+                "id": str(o.id),
+                "order_code": o.order_code,
+                "tier": o.tier,
+                "provider": o.provider,
+                "amount_vnd": o.amount_vnd,
+                "duration_days": o.duration_days,
+                "status": o.status,
+                "provider_txn_id": o.provider_txn_id,
+                "created_at": o.created_at.isoformat() if o.created_at else None,
+                "completed_at": o.completed_at.isoformat() if o.completed_at else None,
+            }
+            for o in orders
+        ]
+    except Exception:
+        return []
 
 
 @router.get(

@@ -1,6 +1,7 @@
 """Read-only Admin lists; no catalog publishing or new permission system."""
 from typing import Literal
 from uuid import UUID
+from datetime import datetime
 from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import case, select
@@ -9,7 +10,7 @@ from app.auth_schemas import ErrorResponse
 from app.blog import page_rows
 from app.blog_schemas import Pagination
 from app.comments import CommentResponse, comment_dto
-from app.models import AssetItem, Comment, MediaUpload, Post, Profile, User
+from app.models import AssetItem, Comment, MediaUpload, Post, Profile, SubscriptionOrder, User
 from app.media import image_response
 from app.permissions import require_role
 from app.security import AuthError
@@ -36,6 +37,21 @@ class AdminAsset(BaseModel):
 class AdminAssetPage(BaseModel):
     items:list[AdminAsset]
     pagination:Pagination
+
+class AdminOrder(BaseModel):
+    id: UUID
+    order_code: str
+    tier: Literal['plus', 'prime']
+    provider: str
+    amount_vnd: int
+    amount_vnd_formatted: str | None = None
+    status: Literal['pending', 'success', 'failed', 'cancelled']
+    provider_txn_id: str | None = None
+    created_at: datetime
+
+class AdminOrderPage(BaseModel):
+    items: list[AdminOrder]
+    pagination: Pagination
 
 @router.get('/comments',response_model=AdminCommentPage,operation_id='adminListComments',responses={s:ERRORS[s] for s in (401,403,422,429,500)})
 def comments(page:int=Query(1,ge=1),page_size:int=Query(20,ge=1,le=100),
@@ -74,3 +90,30 @@ def post_image(post_id:UUID,still:bool=False,account=Depends(require_role('ADMIN
     media=account.db.scalar(select(MediaUpload).where(MediaUpload.id==post.media_id,MediaUpload.owner_id==post.author_id,MediaUpload.status=='ready').with_for_update(read=True))
     if media is None:raise AuthError(404,'NOT_FOUND','Image not available.')
     return image_response(media,still=still)
+
+@router.get('/orders', response_model=AdminOrderPage, operation_id='adminListOrders', responses={s: ERRORS[s] for s in (401, 403, 422, 429, 500)})
+def orders(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+           status: Literal['pending', 'success', 'failed', 'cancelled'] | None = None,
+           account = Depends(require_role('ADMIN'))):
+    try:
+        statement = select(SubscriptionOrder)
+        if status is not None:
+            statement = statement.where(SubscriptionOrder.status == status)
+        rows, pagination = page_rows(account.db, statement.order_by(SubscriptionOrder.created_at.desc()), page, page_size)
+        items = [
+            AdminOrder(
+                id=o.id,
+                order_code=o.order_code,
+                tier=o.tier,
+                provider=o.provider,
+                amount_vnd=o.amount_vnd,
+                amount_vnd_formatted=f"{o.amount_vnd:,} đ".replace(",", "."),
+                status=o.status,
+                provider_txn_id=o.provider_txn_id,
+                created_at=o.created_at
+            )
+            for o in rows
+        ]
+        return AdminOrderPage(items=items, pagination=pagination)
+    except Exception:
+        return AdminOrderPage(items=[], pagination=Pagination(page=page, page_size=page_size, total=0, total_pages=0))
