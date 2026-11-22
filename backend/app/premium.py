@@ -239,11 +239,15 @@ def create_subscription_order(
     elif payload.provider == "paypal_sandbox":
         paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
         order_code = f"AM-PP-{plan.tier.upper()}-{uuid4().hex[:10].upper()}"
+        return_url = f"http://localhost:5173/premium/checkout?order={order_code}"
+        cancel_url = f"http://localhost:5173/premium/checkout?order={order_code}&cancelled=true"
         if paypal and paypal.is_configured():
             try:
                 pp_order = paypal.create_order(
                     order_code=order_code,
                     plan_tier=plan.tier,
+                    return_url=return_url,
+                    cancel_url=cancel_url,
                 )
                 payment_url = pp_order.get("approve_url")
                 provider_txn_id = pp_order.get("id")
