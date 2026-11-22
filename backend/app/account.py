@@ -16,10 +16,12 @@ PROFILE_FIELDS = ("birth_year", "address", "phone", "bio", "avatar_media_id", "c
 
 
 def private_profile(account):
+    from app.aura_v1 import special_title_for_username
     basic = user_private(account.db, account.user)
     profile = account.db.get(Profile, account.user.id)
     return AccountPrivate(**basic.model_dump(), **{name: getattr(profile, name) for name in PROFILE_FIELDS},
-                          avatar_url=profile.avatar_url, cover_url=media_url(profile.cover_media_id))
+                          avatar_url=profile.avatar_url, cover_url=media_url(profile.cover_media_id),
+                          title=special_title_for_username(account.user.username))
 
 
 @router.get("/me", response_model=AccountPrivate, operation_id="getMe",

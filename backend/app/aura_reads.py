@@ -77,9 +77,10 @@ def leaderboard(request: Request, page: int = Query(1, ge=1), page_size: int = Q
         ranked = select(User.id.label("user_id"), scores.c.score,
             func.row_number().over(order_by=(scores.c.score.desc(), User.id)).label("rank")).join(
                 scores, scores.c.user_id == User.id).join(Profile, Profile.user_id == User.id).where(User.status == "active").subquery()
-        query = select(User, Profile, ranked.c.rank, ranked.c.score).join(Profile, Profile.user_id == User.id).join(
+        from app.aura_runtime import public_level_column
+        query = select(User, Profile, ranked.c.rank, ranked.c.score, public_level_column(now)).join(Profile, Profile.user_id == User.id).join(
             ranked, ranked.c.user_id == User.id).order_by(ranked.c.rank)
         rows, pagination = page_rows(db, query, page, page_size)
         return LeaderboardPage(items=[LeaderboardEntry(rank=rank, earned_xp=score,
             user=UserPublic(id=user.id, username=user.username, display_name=profile.display_name,
-                created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url)) for user, profile, rank, score in rows], pagination=pagination)
+                created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url, level=level)) for user, profile, rank, score, level in rows], pagination=pagination)
