@@ -552,9 +552,13 @@ export default function PremiumCheckoutPage() {
                     <button
                       type="button"
                       className="checkout-btn-download-receipt"
-                      onClick={() => {
+                      onClick={async () => {
                         const activeUser = auth.snapshot()?.user || readDemoUser?.();
-                        downloadReceiptPdf(receipt || order, activeUser);
+                        let historyList = null;
+                        try {
+                          historyList = await auth.read('/premium/orders/successful');
+                        } catch {}
+                        downloadReceiptPdf(receipt || order, activeUser, historyList);
                       }}
                       title={t('Tải về biên lai PDF', 'Download PDF Receipt')}
                     >

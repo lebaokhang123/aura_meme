@@ -55,7 +55,7 @@ function formatDateObj(d) {
  * @param {Object} [user] - Active authenticated user details
  * @returns {jsPDF|null} Configured jsPDF instance
  */
-export function generateReceiptPdfDoc(order, user) {
+export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null) {
   if (!order) return null;
 
   const orderCode = order.order_code || order.orderCode || 'AM-ORDER';
@@ -296,7 +296,7 @@ export function generateReceiptPdfDoc(order, user) {
   doc.setTextColor(156, 163, 175);
   doc.text(`Giá tham khảo: ~${amountVndFormatted}`, 187, totalStartY + 19, { align: 'right' });
 
-  // 6. PAYMENT HISTORY SECTION (Y: 180 -> 215)
+  // 6. PAYMENT HISTORY SECTION (up to 10 recent successful orders)
   const histY = totalStartY + 27;
   doc.setFont('Roboto', 'bold');
   doc.setFontSize(8.5);
@@ -306,68 +306,135 @@ export function generateReceiptPdfDoc(order, user) {
   doc.setDrawColor(209, 213, 219);
   doc.line(20, histY + 2.5, 190, histY + 2.5);
 
-  // History Table Header
-  doc.setFillColor(249, 250, 251);
-  doc.rect(20, histY + 3, 170, 6, 'F');
-  doc.setFont('Roboto', 'bold');
-  doc.setFontSize(6.8);
-  doc.setTextColor(107, 114, 128);
-  doc.text('PHƯƠNG THỨC / METHOD', 23, histY + 7.2);
-  doc.text('NGÀY / DATE', 58, histY + 7.2);
-  doc.text('SỐ TIỀN / AMOUNT', 113, histY + 7.2, { align: 'right' });
-  doc.text('TRẠNG THÁI / STATUS', 132, histY + 7.2, { align: 'center' });
-  doc.text('MÃ THAM CHIẾU / REF', 188, histY + 7.2, { align: 'right' });
+  const drawHistHeader = (startY) => {
+    doc.setFillColor(249, 250, 251);
+    doc.rect(20, startY + 3, 170, 6, 'F');
+    doc.setFont('Roboto', 'bold');
+    doc.setFontSize(6.8);
+    doc.setTextColor(107, 114, 128);
+    doc.text('PHƯƠNG THỨC / METHOD', 23, startY + 7.2);
+    doc.text('NGÀY / DATE', 58, startY + 7.2);
+    doc.text('SỐ TIỀN / AMOUNT', 113, startY + 7.2, { align: 'right' });
+    doc.text('TRẠNG THÁI / STATUS', 132, startY + 7.2, { align: 'center' });
+    doc.text('MÃ THAM CHIẾU / REF', 188, startY + 7.2, { align: 'right' });
+    doc.setDrawColor(243, 244, 246);
+    doc.line(20, startY + 9, 190, startY + 9);
+  };
 
-  doc.setDrawColor(243, 244, 246);
-  doc.line(20, histY + 9, 190, histY + 9);
+  drawHistHeader(histY);
 
-  // History Row (Render current transaction details)
-  const histRowY = histY + 14;
-  doc.setFont('Roboto', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(55, 65, 81);
-  doc.text(providerName, 23, histRowY);
-  doc.text(dateFormatted, 58, histRowY);
-  doc.text(amountUsdFormatted, 113, histRowY, { align: 'right' });
-
-  doc.setFont('Roboto', 'bold');
-  doc.setTextColor(4, 120, 87);
-  doc.text('HOÀN TẤT', 132, histRowY, { align: 'center' });
-
-  doc.setFont('Roboto', 'normal');
-  doc.setTextColor(75, 85, 99);
-  doc.setFontSize(6.5);
-  const refWidth = doc.getTextWidth(txnRef);
-  if (refWidth > 37) {
-    doc.setFontSize(6.0);
-    const scaledW = doc.getTextWidth(txnRef);
-    if (scaledW > 37) {
-      // Long reference on secondary line
-      doc.text(txnRef, 188, histRowY + 4, { align: 'right' });
-      doc.setDrawColor(229, 231, 235);
-      doc.line(20, histRowY + 7.5, 190, histRowY + 7.5);
-    } else {
-      doc.text(txnRef, 188, histRowY, { align: 'right' });
-      doc.setDrawColor(229, 231, 235);
-      doc.line(20, histRowY + 4, 190, histRowY + 4);
+  // Normalize list of recent successful orders
+  let historyList = [];
+  if (Array.isArray(recentSuccessfulOrders) && recentSuccessfulOrders.length > 0) {
+    const seenCodes = new Set();
+    for (const item of recentSuccessfulOrders) {
+      if (!item) continue;
+      const st = String(item.status || '').toLowerCase();
+      if (st !== 'success' && st !== 'completed') continue;
+      const code = item.order_code || item.orderCode || item.id;
+      if (code && !seenCodes.has(code)) {
+        seenCodes.add(code);
+        historyList.push(item);
+      }
     }
-  } else {
-    doc.text(txnRef, 188, histRowY, { align: 'right' });
-    doc.setDrawColor(229, 231, 235);
-    doc.line(20, histRowY + 4, 190, histRowY + 4);
   }
 
-  // 7. FOOTER SECTION (Y: 268 -> 282)
-  doc.setDrawColor(229, 231, 235);
-  doc.setLineWidth(0.2);
-  doc.line(20, 268, 190, 268);
+  // If no external history list was passed, include current order if successful
+  if (historyList.length === 0 && (order.status === 'success' || order.status === 'completed')) {
+    historyList.push(order);
+  }
 
-  doc.setFont('Roboto', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(156, 163, 175);
-  doc.text('Biên lai giao dịch thử nghiệm — Không phát sinh thanh toán tiền thật.', 20, 273.5);
-  doc.text('Sandbox transaction receipt — For development and verification purposes only.', 20, 277.5);
-  doc.text('Trang 1 / 1  (Page 1 of 1)', 190, 273.5, { align: 'right' });
+  // Cap at maximum 10 items
+  historyList = historyList.slice(0, 10);
+
+  let curY = histY + 9;
+
+  if (historyList.length === 0) {
+    curY += 5;
+    doc.setFont('Roboto', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(156, 163, 175);
+    doc.text('Chưa có lịch sử giao dịch thành công nào / No completed transactions.', 23, curY);
+    curY += 2;
+  } else {
+    for (let idx = 0; idx < historyList.length; idx++) {
+      const histItem = historyList[idx];
+      const hProvider = histItem.provider === 'paypal_sandbox'
+        ? 'PayPal Sandbox'
+        : histItem.provider === 'vnpay_sandbox'
+          ? 'VNPAY Sandbox'
+          : 'Thẻ thử nghiệm';
+      const hDate = formatReceiptDate(histItem.completed_at || histItem.created_at);
+      const isHistPrime = (histItem.tier || '').toLowerCase() === 'prime';
+      const hAmount = histItem.amount_usd_formatted || (isHistPrime ? '$50' : '$5');
+      const hRef = histItem.provider_txn_id || histItem.order_code || '—';
+
+      // Determine row height needed
+      doc.setFont('Roboto', 'normal');
+      doc.setFontSize(6.5);
+      const hRefWidth = doc.getTextWidth(hRef);
+      const isMultiLine = hRefWidth > 37;
+      const rowH = isMultiLine ? 8.5 : 5.8;
+
+      // Page overflow check (footer is at 268)
+      if (curY + rowH > 260) {
+        doc.addPage();
+        curY = 20;
+        doc.setFont('Roboto', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(31, 41, 55);
+        doc.text('LỊCH SỬ THANH TOÁN / PAYMENT HISTORY (Tiếp theo / Continued)', 20, curY);
+        doc.setDrawColor(209, 213, 219);
+        doc.line(20, curY + 2.5, 190, curY + 2.5);
+        drawHistHeader(curY);
+        curY += 9;
+      }
+
+      const textY = curY + 4.2;
+      doc.setFont('Roboto', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(55, 65, 81);
+      doc.text(hProvider, 23, textY);
+      doc.text(hDate, 58, textY);
+      doc.text(hAmount, 113, textY, { align: 'right' });
+
+      doc.setFont('Roboto', 'bold');
+      doc.setTextColor(4, 120, 87);
+      doc.text('HOÀN TẤT', 132, textY, { align: 'center' });
+
+      doc.setFont('Roboto', 'normal');
+      doc.setTextColor(75, 85, 99);
+      if (isMultiLine) {
+        doc.setFontSize(6.0);
+        doc.text(hRef, 188, textY + 3.2, { align: 'right' });
+        doc.setDrawColor(229, 231, 235);
+        doc.line(20, textY + 5.2, 190, textY + 5.2);
+        curY += 8.5;
+      } else {
+        doc.setFontSize(6.5);
+        doc.text(hRef, 188, textY, { align: 'right' });
+        doc.setDrawColor(229, 231, 235);
+        doc.line(20, textY + 3.2, 190, textY + 3.2);
+        curY += 5.8;
+      }
+    }
+  }
+
+  // 7. FOOTER SECTION ON ALL PAGES (Y: 268 -> 282)
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.2);
+    doc.line(20, 268, 190, 268);
+
+    doc.setFont('Roboto', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(156, 163, 175);
+    doc.text('Biên lai giao dịch thử nghiệm — Không phát sinh thanh toán tiền thật.', 20, 273.5);
+    doc.text('Sandbox transaction receipt — For development and verification purposes only.', 20, 277.5);
+    doc.text(`Trang ${p} / ${totalPages}  (Page ${p} of ${totalPages})`, 190, 273.5, { align: 'right' });
+  }
 
   return doc;
 }
@@ -377,10 +444,11 @@ export function generateReceiptPdfDoc(order, user) {
  *
  * @param {Object} order - Order details
  * @param {Object} [user] - User details
+ * @param {Array} [recentSuccessfulOrders] - Optional list of recent completed orders
  * @returns {boolean} True if saved
  */
-export function downloadReceiptPdf(order, user) {
-  const doc = generateReceiptPdfDoc(order, user);
+export function downloadReceiptPdf(order, user, recentSuccessfulOrders = null) {
+  const doc = generateReceiptPdfDoc(order, user, recentSuccessfulOrders);
   if (!doc) return false;
   const orderCode = order.order_code || order.orderCode || 'AM-ORDER';
   doc.save(`aurameme-receipt-${orderCode}.pdf`);
