@@ -410,6 +410,59 @@ def test_list_orders_pagination_and_filter():
     assert result.pagination.total_pages == 2
 
 
+def test_list_orders_search_and_sort():
+    """Verify list_subscription_orders handles q search parameter and stable newest-first sort order."""
+    user_id = uuid4()
+    now = datetime(2026, 11, 22, 12, 0, 0, tzinfo=timezone.utc)
+    mock_orders = [
+        SubscriptionOrder(
+            id=uuid4(),
+            order_code=f"AM-PRIME-1795330000-NEW{i:02d}",
+            user_id=user_id,
+            tier="prime",
+            duration_days=365,
+            amount_cents=5000,
+            amount_vnd=1250000,
+            currency="USD",
+            status="success",
+            provider="paypal_sandbox",
+            created_at=now - timedelta(minutes=i),
+        )
+        for i in range(15)
+    ]
+    # mock_orders is ordered newest first: index 0 is newest (now), index 14 is oldest (now - 14m)
+    account = MagicMock()
+    account.user.id = user_id
+    account.user.roles = ["USER"]
+    account.db = MagicMock()
+
+    # Test page 1 with search q="NEW"
+    account.db.scalar.return_value = 15
+    account.db.scalars.return_value = mock_orders[:10]
+    p1 = list_subscription_orders(page=1, limit=10, q="NEW", account=account)
+    assert len(p1.items) == 10
+    assert p1.pagination.page == 1
+    assert p1.pagination.total == 15
+    assert p1.pagination.total_pages == 2
+    assert p1.items[0].order_code == "AM-PRIME-1795330000-NEW00"
+    assert p1.items[9].order_code == "AM-PRIME-1795330000-NEW09"
+
+    # Test page 2 (older 5 orders)
+    account.db.scalar.return_value = 15
+    account.db.scalars.return_value = mock_orders[10:15]
+    p2 = list_subscription_orders(page=2, limit=10, q="NEW", account=account)
+    assert len(p2.items) == 5
+    assert p2.pagination.page == 2
+    assert p2.items[0].order_code == "AM-PRIME-1795330000-NEW10"
+    assert p2.items[4].order_code == "AM-PRIME-1795330000-NEW14"
+
+    # Ensure no overlap between page 1 and page 2
+    p1_codes = {o.order_code for o in p1.items}
+    p2_codes = {o.order_code for o in p2.items}
+    assert len(p1_codes.intersection(p2_codes)) == 0
+    assert len(p1_codes.union(p2_codes)) == 15
+
+
 def test_webhook_duplicate_idempotent():
     """Verify PayPal webhook PAYMENT.CAPTURE.COMPLETED does not double-extend subscription."""
     import asyncio

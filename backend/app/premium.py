@@ -565,10 +565,11 @@ def list_subscription_orders(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
     status: str | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=64),
     request: Request = None,
     account=Depends(require_authenticated_user),
 ):
-    """List subscription orders for the current user with pagination and optional status filter."""
+    """List subscription orders for the current user with pagination, optional status filter, and order_code search."""
     try:
         now = datetime.now(timezone.utc)
         paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None) if (request and hasattr(request, "app")) else None
@@ -585,8 +586,12 @@ def list_subscription_orders(
             _check_and_expire_order(st, account.db, now, paypal)
 
         stmt = select(SubscriptionOrder).where(SubscriptionOrder.user_id == account.user.id)
-        if status:
+        if isinstance(status, str) and status and status != "all":
             stmt = stmt.where(SubscriptionOrder.status == status)
+        if isinstance(q, str) and q.strip():
+            clean_q = q.strip()[:64]
+            escaped_q = clean_q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            stmt = stmt.where(SubscriptionOrder.order_code.ilike(f"%{escaped_q}%"))
 
         total = account.db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
         total_pages = max(1, (total + limit - 1) // limit) if total > 0 else 1
