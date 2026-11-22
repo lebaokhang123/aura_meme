@@ -738,3 +738,169 @@ def test_pending_order_expiry_checks_paypal_capture_first():
     assert uncaptured_order.status == "expired"
 
 
+def test_production_blocks_simulated_order_creation_and_capture():
+    """Verify that all simulated and mock paths are strictly rejected in production."""
+    user_id = uuid4()
+    now = datetime.now(timezone.utc)
+
+    # 1. Block create_subscription_order with sandbox_simulated in production
+    req = MagicMock()
+    req.app.state.auth.now.return_value = now
+    req.app.state.auth.settings.auth_environment = "production"
+    req.app.state.premium.premium_sandbox_enabled = False
+    req.app.state.auth.limiter = None
+    req.app.state.vnpay = None
+
+    account = MagicMock()
+    account.user.id = user_id
+    account.db = MagicMock()
+
+    with pytest.raises(AuthError) as exc_info:
+        create_subscription_order(
+            CreateOrderInput(plan_tier="plus", provider="sandbox_simulated"),
+            request=req,
+            account=account,
+        )
+    assert exc_info.value.status == 403
+    assert exc_info.value.code == "FORBIDDEN"
+
+    # 2. Block capture_subscription_order with sandbox_simulated in production
+    sim_order = SubscriptionOrder(
+        id=uuid4(),
+        order_code="AM-PLUS-1795330000-SIMPROD",
+        user_id=user_id,
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",
+        provider="sandbox_simulated",
+        created_at=now,
+    )
+    account.db.scalar.return_value = sim_order
+
+    with pytest.raises(AuthError) as exc_info:
+        capture_subscription_order(
+            "AM-PLUS-1795330000-SIMPROD",
+            payload=CaptureOrderInput(),
+            request=req,
+            account=account,
+        )
+    assert exc_info.value.status == 403
+    assert exc_info.value.code == "FORBIDDEN"
+
+    # 3. Block unconfigured PayPal capture fallback in production
+    pp_order = SubscriptionOrder(
+        id=uuid4(),
+        order_code="AM-PLUS-1795330000-PPPROD",
+        user_id=user_id,
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",
+        provider="paypal_sandbox",
+        provider_txn_id="PP-TXN-123",
+        created_at=now,
+    )
+    account.db.scalar.return_value = pp_order
+    req.app.state.paypal = None
+
+    with pytest.raises(AuthError) as exc_info:
+        capture_subscription_order(
+            "AM-PLUS-1795330000-PPPROD",
+            payload=CaptureOrderInput(paypal_order_id="PP-TXN-123"),
+            request=req,
+            account=account,
+        )
+    assert exc_info.value.status == 503
+    assert exc_info.value.code == "PAYPAL_NOT_CONFIGURED"
+
+
+def test_rate_limit_order_creation():
+    """Verify rate limiter blocks spamming of order creation (>10 requests/minute)."""
+    from app.security import RateLimiter
+    user_id = uuid4()
+    now = datetime.now(timezone.utc)
+
+    req = MagicMock()
+    req.app.state.auth.now.return_value = now
+    req.app.state.auth.settings.auth_environment = "development"
+    req.app.state.premium.premium_sandbox_enabled = True
+    req.app.state.auth.limiter = RateLimiter()
+    req.app.state.vnpay = None
+    req.app.state.paypal = None
+
+    account = MagicMock()
+    account.user.id = user_id
+    mock_db = MagicMock()
+    mock_db.scalar.return_value = None  # Always simulate fresh orders
+    account.db = mock_db
+
+    # First 10 requests succeed
+    for i in range(10):
+        dto = create_subscription_order(
+            CreateOrderInput(plan_tier="plus", provider="sandbox_simulated"),
+            request=req,
+            account=account,
+        )
+        assert dto.status == "pending"
+
+    # 11th request must be rate limited (HTTP 429)
+    with pytest.raises(AuthError) as exc_info:
+        create_subscription_order(
+            CreateOrderInput(plan_tier="plus", provider="sandbox_simulated"),
+            request=req,
+            account=account,
+        )
+    assert exc_info.value.status == 429
+    assert exc_info.value.code == "RATE_LIMITED"
+
+
+def test_card_simulation_records_sandbox_simulated_and_sim_card_txn():
+    """Verify that simulating card payment explicitly sets provider to sandbox_simulated and SIM-CARD- prefix."""
+    user_id = uuid4()
+    now = datetime.now(timezone.utc)
+
+    order = SubscriptionOrder(
+        id=uuid4(),
+        order_code="AM-PLUS-1795330000-CARDPAY",
+        user_id=user_id,
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",
+        provider="paypal_sandbox",  # Created initially before method choice
+        created_at=now,
+    )
+
+    mock_db = MagicMock()
+    mock_db.scalar.side_effect = [order, None]  # order lookup, then sub lookup
+
+    account = MagicMock()
+    account.user.id = user_id
+    account.db = mock_db
+
+    req = MagicMock()
+    req.app.state.auth.now.return_value = now
+    req.app.state.auth.settings.auth_environment = "development"
+    req.app.state.premium.premium_sandbox_enabled = True
+
+    dto = simulate_subscription_order(
+        "AM-PLUS-1795330000-CARDPAY",
+        payload=SimulateOrderInput(action="pay_success"),
+        request=req,
+        account=account,
+    )
+
+    assert dto.status == "success"
+    assert order.status == "success"
+    assert order.provider == "sandbox_simulated"
+    assert order.provider_txn_id.startswith("SIM-CARD-")
+    assert order.provider_response_code == "SUCCESS"
+
+

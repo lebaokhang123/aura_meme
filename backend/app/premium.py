@@ -233,6 +233,18 @@ def create_subscription_order(
     now = request.app.state.auth.now()
     premium_settings = getattr(request.app.state, "premium", None)
     vnpay: VnpayAdapter | None = getattr(request.app.state, "vnpay", None)
+    auth_runtime = getattr(request.app.state, "auth", None)
+    auth_env = getattr(auth_runtime.settings, "auth_environment", "production") if auth_runtime and hasattr(auth_runtime, "settings") else "production"
+    sandbox_enabled = getattr(premium_settings, "premium_sandbox_enabled", False) if premium_settings else False
+
+    # Rate limiting: maximum 10 order creations per minute per user
+    if auth_runtime and getattr(auth_runtime, "limiter", None):
+        auth_runtime.limiter.check(f"order_create:{account.user.id}", limit=10, window=60)
+
+    # Production boundary guard: block simulated sandbox orders in production
+    if payload.provider == "sandbox_simulated":
+        if auth_env == "production" or not sandbox_enabled:
+            raise AuthError(403, "FORBIDDEN", "Phương thức thanh toán mô phỏng bị vô hiệu hóa trên môi trường production.")
 
     # Resolve configured VND price and enforce 10,000 VND rounding policy
     amount_vnd = plan.default_amount_vnd
@@ -670,33 +682,12 @@ def simulate_subscription_order(
     if payload.action == "pay_success":
         order.status = "success"
         order.completed_at = now
-        order.provider_txn_id = f"SIM-{uuid4().hex[:12].upper()}"
+        order.provider = "sandbox_simulated"
+        order.provider_txn_id = f"SIM-CARD-{uuid4().hex[:12].upper()}"
+        order.provider_response_code = "SUCCESS"
         order.updated_at = now
 
-        # Activate or extend membership idempotently without losing remaining days
-        sub = account.db.scalar(select(UserSubscription).where(UserSubscription.user_id == account.user.id))
-        if sub:
-            sub.tier = order.tier
-            sub.status = "active"
-            base_time = sub.expires_at if (sub.expires_at and sub.expires_at > now) else now
-            sub.expires_at = base_time + timedelta(days=order.duration_days)
-            if not sub.starts_at or sub.starts_at > now:
-                sub.starts_at = now
-            sub.order_id = order.id
-            sub.updated_at = now
-        else:
-            sub = UserSubscription(
-                id=uuid4(),
-                user_id=account.user.id,
-                tier=order.tier,
-                status="active",
-                starts_at=now,
-                expires_at=now + timedelta(days=order.duration_days),
-                order_id=order.id,
-                created_at=now,
-                updated_at=now,
-            )
-            account.db.add(sub)
+        _activate_subscription(account.db, order, now)
 
     elif payload.action == "pay_fail":
         order.status = "failed"
@@ -823,6 +814,8 @@ def capture_subscription_order(
             # Production boundary guard: Never allow mock simulation fallback in production environment
             if auth_env == "production":
                 raise AuthError(503, "PAYPAL_NOT_CONFIGURED", "Cổng thanh toán PayPal chưa được cấu hình cho môi trường production.")
+            if not sandbox_enabled:
+                raise AuthError(403, "FORBIDDEN", "Mô phỏng thanh toán bị vô hiệu hóa.")
             # Mock sandbox simulation mode
             if payload and payload.mock_fail:
                 order.status = "failed"
@@ -835,7 +828,10 @@ def capture_subscription_order(
             order.provider_response_code = "COMPLETED"
 
     elif order.provider == "sandbox_simulated":
-        order.provider_txn_id = f"SIM-{uuid4().hex[:12].upper()}"
+        # Production boundary guard: Never allow simulated capture in production environment
+        if auth_env == "production" or not sandbox_enabled:
+            raise AuthError(403, "FORBIDDEN", "Phương thức thanh toán mô phỏng bị vô hiệu hóa trên môi trường production.")
+        order.provider_txn_id = f"SIM-CARD-{uuid4().hex[:12].upper()}"
         order.provider_response_code = "SUCCESS"
     else:
         raise AuthError(400, "INVALID_PROVIDER", f"Không hỗ trợ capture cho nhà cung cấp '{order.provider}'.")

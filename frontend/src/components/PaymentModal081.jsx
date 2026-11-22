@@ -15,6 +15,7 @@ export default function PaymentModal081({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [selectedMethod, setSelectedMethod] = useState('paypal');
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -22,6 +23,7 @@ export default function PaymentModal081({
     if (isOpen) {
       setBusy(false);
       setError('');
+      setSelectedMethod('paypal');
       if (!dialog.open) {
         dialog.showModal();
       }
@@ -61,9 +63,10 @@ export default function PaymentModal081({
     setError('');
 
     try {
+      const chosenProvider = selectedMethod === 'card' ? 'sandbox_simulated' : 'paypal_sandbox';
       const orderRes = await auth.write('POST', '/premium/orders', {
         plan_tier: plan.id,
-        provider: 'paypal_sandbox',
+        provider: chosenProvider,
       });
 
       if (!orderRes?.order_code) {
@@ -134,6 +137,53 @@ export default function PaymentModal081({
           <div className="u081-summary-row">
             <span className="u081-row-label">{t('Đặc quyền hệ số EXP', 'EXP Multiplier')}</span>
             <strong className="u081-row-val u081-exp-badge">×{plan.boost} Level EXP</strong>
+          </div>
+          <div className="u081-summary-row">
+            <span className="u081-row-label">{t('Phương thức', 'Payment Method')}</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                type="button"
+                className={`u081-method-pill ${selectedMethod === 'paypal' ? 'active' : ''}`}
+                onClick={() => setSelectedMethod('paypal')}
+                disabled={busy}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: '6px',
+                  border: selectedMethod === 'paypal' ? '1px solid var(--am-secondary, #38bdf8)' : '1px solid rgba(255, 255, 255, 0.15)',
+                  background: selectedMethod === 'paypal' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                  color: selectedMethod === 'paypal' ? 'var(--am-secondary, #38bdf8)' : 'var(--am-on-surface-variant)',
+                  fontSize: '12px',
+                  fontWeight: selectedMethod === 'paypal' ? 600 : 400,
+                  cursor: busy ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <span>PayPal</span>
+              </button>
+              <button
+                type="button"
+                className={`u081-method-pill ${selectedMethod === 'card' ? 'active' : ''}`}
+                onClick={() => setSelectedMethod('card')}
+                disabled={busy}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: '6px',
+                  border: selectedMethod === 'card' ? '1px solid var(--am-secondary, #38bdf8)' : '1px solid rgba(255, 255, 255, 0.15)',
+                  background: selectedMethod === 'card' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                  color: selectedMethod === 'card' ? 'var(--am-secondary, #38bdf8)' : 'var(--am-on-surface-variant)',
+                  fontSize: '12px',
+                  fontWeight: selectedMethod === 'card' ? 600 : 400,
+                  cursor: busy ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <span>{t('Nhập thẻ', 'Card')}</span>
+              </button>
+            </div>
           </div>
         </div>
 

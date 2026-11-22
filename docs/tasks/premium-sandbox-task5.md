@@ -977,3 +977,51 @@ Thực hiện chuẩn xác yêu cầu của Owner về bản sắc nhận diện
   - **Frontend Unit Tests:** **81/81 passed** (100%).
   - **Playwright Test Suite (`premium-sandbox.spec.js`):** **19/19 passed** (100%, 1.4m).
 - **Cơ sở dữ liệu:** Bảo toàn nguyên vẹn 100% `aurameme_demo`, không sửa đổi, không migration.
+
+---
+
+## 20. Bàn giao Vòng Tinh chỉnh: Nguồn Dữ liệu Phương thức Thanh toán & Khóa An toàn Production (Fix Payment Method & Final Security)
+
+### 20.1. Xử lý Đúng Nguồn Dữ liệu Phương thức Thanh toán (Bước 1)
+- **Modal xác nhận (`PaymentModal081.jsx`):**
+  - Bổ sung bộ chọn phương thức ngay tại modal: **PayPal** (`paypal_sandbox`) hoặc **Nhập thẻ** (`sandbox_simulated`).
+  - Khi người dùng xác nhận, đơn hàng được tạo với đúng `provider` đã chọn, loại bỏ hoàn toàn việc hardcode `paypal_sandbox` trước khi người dùng ra quyết định.
+- **Trang Checkout (`PremiumCheckoutPage.jsx`):**
+  - Tự động nhận diện `order.provider` để hiển thị phương thức mặc định tương ứng (`paypal` hoặc `card`).
+  - Trong `executeCapture`:
+    - Khi người dùng thanh toán qua form thẻ (`paymentMethod === 'card'`), gọi endpoint `/simulate` với `{ action: 'pay_success' }`.
+    - Khi người dùng thanh toán qua PayPal (`paymentMethod === 'paypal'`), gọi endpoint `/capture` với `{ paypal_order_id: ... }`.
+  - Không cho frontend tự quyết định trạng thái `success`: Luôn đối soát qua cả hai truy vấn `GET /premium/orders/{code}` và `GET /premium/status` trước khi hiển thị biên nhận.
+- **Backend `simulate_subscription_order` (`backend/app/premium.py`):**
+  - Khi hoàn tất thanh toán mô phỏng thành công, cập nhật chính thức `order.provider = "sandbox_simulated"` và gán mã giao dịch nội bộ mang tiền tố `SIM-CARD-...`.
+  - Nhờ vậy, lịch sử giao dịch `/premium/history` nhận diện chính xác phương thức thanh toán là **Thẻ**, không bị nhầm lẫn với PayPal.
+
+### 20.2. Đồng bộ Thuật ngữ Giao diện Người dùng (Bước 2)
+- Toàn bộ giao diện người dùng được đồng bộ chuẩn hóa:
+  - `PayPal Sandbox` → **PayPal**
+  - `Nhập thẻ thử nghiệm` → **Nhập thẻ**
+  - Phương thức giao dịch PayPal → **PayPal**
+  - Phương thức giao dịch form thẻ mô phỏng → **Thẻ**
+- Áp dụng nhất quán tại: Checkout, `/premium/history` (desktop & mobile), modal chi tiết giao dịch, biên lai PDF (`receipt-pdf.js`), và tab quản trị giao dịch (`AdminPage.jsx`).
+- Giữ nguyên thông báo tinh tế `Hệ thống thanh toán thử nghiệm` (Sandbox Payment System) để tránh hiểu nhầm với cổng thanh toán tiền thật.
+- **Quy tắc phân loại giao dịch cũ:**
+  - Giao dịch thẻ: `provider == 'sandbox_simulated'` hoặc `SIM-CARD-` → Hiển thị **Thẻ**.
+  - Giao dịch PayPal thật (có PayPal Capture ID, không có tiền tố mock) → Hiển thị **PayPal**.
+  - Giao dịch mock cũ mang `paypal_sandbox` với tiền tố `SIM-` / `MOCK-` → Hiển thị **Mô phỏng** (không sửa gán tùy tiện thành Thẻ).
+  - Không xác định được → Hiển thị **Chưa xác định**.
+
+### 20.3. Khóa Toàn bộ Đường Mock/Simulate trong Môi trường Production & Rate Limiting (Bước 3)
+- **Bảo vệ `capture_subscription_order` và `create_subscription_order`:**
+  - Tuyệt đối từ chối phương thức `sandbox_simulated` trong môi trường production (`auth_env == "production"` hoặc khi tắt sandbox), trả về ngay **HTTP 403 (`FORBIDDEN`)**.
+  - Trong nhánh `paypal_sandbox` của `capture_subscription_order`, nếu cổng PayPal chưa cấu hình, từ chối ngay lập tức với **HTTP 503 (`PAYPAL_NOT_CONFIGURED`)** khi ở production và **HTTP 403 (`FORBIDDEN`)** khi tắt sandbox. Không còn bất kỳ đường bypass hay mock fallback nào tại endpoint capture.
+- **Rate Limiting cho API tạo đơn:**
+  - Tích hợp `auth_runtime.limiter.check(f"order_create:{account.user.id}", limit=10, window=60)` vào `create_subscription_order`.
+  - Giới hạn tối đa 10 đơn/phút cho mỗi người dùng, trả về **HTTP 429 (`RATE_LIMITED`)** khi bị spam mà không cần CAPTCHA.
+
+### 20.4. Kết quả Xác minh & Kiểm thử (Bước 4)
+- **Backend Tests:** **466 passed**, 788 deselected, 0 failed.
+- **Order Security Suite (`test_order_security.py`):** **17/17 passed** (Bổ sung test production guard, rate limit 429, card simulation provider).
+- **Frontend Unit Tests:** **81/81 passed** (100%).
+- **Frontend Production Build:** `npm.cmd run build` thành công trong 8.99s.
+- **Playwright Test Suite:** **19/19 passed** (100%, 1.2m).
+- **Database & Git:** Cơ sở dữ liệu `aurameme_demo` an toàn 100%, không migration, không merge, không PR.

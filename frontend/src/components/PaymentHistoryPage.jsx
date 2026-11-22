@@ -140,11 +140,23 @@ export default function PaymentHistoryPage() {
     return language === 'en' ? `${usd} (~${vnd})` : `${vnd} (~${usd})`;
   };
 
-  const formatProvider = (provider) => {
-    if (provider === 'paypal_sandbox') return 'PayPal Sandbox';
-    if (provider === 'vnpay_sandbox') return 'VNPAY Sandbox';
-    if (provider === 'sandbox_simulated' || provider === 'simulated') return t('Thẻ thử nghiệm', 'Simulated Card');
-    return provider || t('Thanh toán thử nghiệm', 'Sandbox Payment');
+  const formatProvider = (orderOrProvider) => {
+    const provider = typeof orderOrProvider === 'object' ? orderOrProvider?.provider : orderOrProvider;
+    const txnId = typeof orderOrProvider === 'object' ? (orderOrProvider?.provider_txn_id || '') : '';
+
+    if (provider === 'sandbox_simulated' || provider === 'simulated' || txnId.startsWith('SIM-CARD-')) {
+      return t('Thẻ', 'Card');
+    }
+    if (provider === 'paypal_sandbox') {
+      if (txnId.startsWith('SIM-') || txnId.startsWith('MOCK-')) {
+        return t('Mô phỏng', 'Simulated');
+      }
+      return 'PayPal';
+    }
+    if (provider === 'vnpay_sandbox') {
+      return 'VNPAY';
+    }
+    return provider ? String(provider) : t('Chưa xác định', 'Unknown');
   };
 
   const getStatusBadge = (status) => {
@@ -337,7 +349,7 @@ export default function PaymentHistoryPage() {
                       <td className="history-td-amount">
                         <strong>{formatAmount(o)}</strong>
                       </td>
-                      <td className="history-td-provider">{formatProvider(o.provider)}</td>
+                      <td className="history-td-provider">{formatProvider(o)}</td>
                       <td>{getStatusBadge(o.status)}</td>
                       <td style={{ textAlign: 'right' }}>
                         <div className="history-actions-cell">
@@ -392,7 +404,7 @@ export default function PaymentHistoryPage() {
                     </div>
                     <div className="history-card-field">
                       <span>{t('Phương thức:', 'Method:')}</span>
-                      <span>{formatProvider(o.provider)}</span>
+                      <span>{formatProvider(o)}</span>
                     </div>
                   </div>
 
@@ -506,8 +518,8 @@ export default function PaymentHistoryPage() {
                 </strong>
               </div>
               <div className="u081-summary-row">
-                <span className="u081-row-label">{t('Cổng thanh toán', 'Provider')}</span>
-                <span className="u081-row-val">{formatProvider(selectedOrder.provider)}</span>
+                <span className="u081-row-label">{t('Phương thức', 'Payment Method')}</span>
+                <span className="u081-row-val">{formatProvider(selectedOrder)}</span>
               </div>
               {selectedOrder.provider_txn_id && (
                 <div className="u081-summary-row">

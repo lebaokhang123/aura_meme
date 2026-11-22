@@ -120,6 +120,11 @@ export default function PremiumCheckoutPage() {
           throw new Error(t('Không tìm thấy thông tin đơn hàng.', 'Order not found.'));
         }
         setOrder(data);
+        if (data.provider === 'sandbox_simulated') {
+          setPaymentMethod('card');
+        } else {
+          setPaymentMethod('paypal');
+        }
         if (data.status === 'success') {
           // Order was already paid
           setCheckoutState('success');
@@ -133,6 +138,8 @@ export default function PremiumCheckoutPage() {
               ? new Date(data.completed_at).toLocaleString(language === 'en' ? 'en-US' : 'vi-VN')
               : new Date().toLocaleString(language === 'en' ? 'en-US' : 'vi-VN'),
             status: 'ACTIVE',
+            provider: data.provider,
+            provider_txn_id: data.provider_txn_id,
             isExistingSuccess: true,
           });
         } else if (data.status === 'cancelled' || data.status === 'failed') {
@@ -238,17 +245,21 @@ export default function PremiumCheckoutPage() {
 
     setCheckoutState('processing');
     setCheckoutError('');
-    setStatusText(t('Đang xử lý thanh toán PayPal Sandbox...', 'Processing PayPal Sandbox payment...'));
+    setStatusText(
+      paymentMethod === 'card'
+        ? t('Đang xử lý thanh toán bằng Thẻ...', 'Processing Card payment...')
+        : t('Đang xử lý thanh toán PayPal...', 'Processing PayPal payment...')
+    );
 
     try {
       let captureRes;
-      if (currentOrder.provider === 'paypal_sandbox') {
-        captureRes = await auth.write('POST', `/premium/orders/${currentOrder.order_code}/capture`, {
-          paypal_order_id: paypalToken || currentOrder.provider_txn_id || 'MOCK_SANDBOX_TOKEN',
-        });
-      } else {
+      if (paymentMethod === 'card') {
         captureRes = await auth.write('POST', `/premium/orders/${currentOrder.order_code}/simulate`, {
           action: 'pay_success',
+        });
+      } else {
+        captureRes = await auth.write('POST', `/premium/orders/${currentOrder.order_code}/capture`, {
+          paypal_order_id: paypalToken || currentOrder.provider_txn_id || 'MOCK_SANDBOX_TOKEN',
         });
       }
 
@@ -275,6 +286,8 @@ export default function PremiumCheckoutPage() {
           durationDays: currentOrder.duration_days,
           activatedAt: new Date().toLocaleString(language === 'en' ? 'en-US' : 'vi-VN'),
           status: 'ACTIVE',
+          provider: orderStatus?.provider || (paymentMethod === 'card' ? 'sandbox_simulated' : 'paypal_sandbox'),
+          provider_txn_id: orderStatus?.provider_txn_id || captureRes?.provider_txn_id,
         });
       } else {
         throw new Error(t('Máy chủ chưa thể xác nhận kích hoạt gói.', 'Server could not confirm activation.'));
@@ -629,7 +642,7 @@ export default function PremiumCheckoutPage() {
                           PayPal
                           <span className="checkout-method-badge">{t('Cổng chính', 'Primary')}</span>
                         </h3>
-                        <p>{t('Thanh toán an toàn qua cổng PayPal Sandbox v2', 'Secure payment via PayPal Sandbox v2')}</p>
+                        <p>{t('Thanh toán an toàn qua cổng PayPal v2', 'Secure payment via PayPal v2')}</p>
                       </div>
                     </div>
                     <div className="checkout-method-radio">

@@ -69,18 +69,22 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
   const amountUsdFormatted = `${amountUsdValue} USD`;
   const amountVndFormatted = isPrime ? '1.250.000 VNĐ' : '130.000 VNĐ';
 
-  // Payment provider name
-  let providerName = 'Thanh toán thử nghiệm';
-  if (order.provider === 'paypal_sandbox') {
-    providerName = 'PayPal Sandbox';
-  } else if (order.provider === 'vnpay_sandbox') {
-    providerName = 'VNPAY Sandbox';
-  } else if (order.provider === 'simulated' || order.payment_method === 'card') {
-    providerName = 'Thẻ thử nghiệm';
-  }
-
   // Transaction reference (distinguish PayPal Order ID/Capture ID from AuraMeme order code)
   const txnRef = order.paypal_order_id || order.provider_txn_id || orderCode;
+
+  // Payment provider name
+  let providerName = 'Chưa xác định';
+  if (order.provider === 'sandbox_simulated' || order.payment_method === 'card' || txnRef.startsWith('SIM-CARD-')) {
+    providerName = 'Thẻ';
+  } else if (order.provider === 'paypal_sandbox') {
+    if (txnRef.startsWith('SIM-') || txnRef.startsWith('MOCK-')) {
+      providerName = 'Mô phỏng';
+    } else {
+      providerName = 'PayPal';
+    }
+  } else if (order.provider === 'vnpay_sandbox') {
+    providerName = 'VNPAY';
+  }
   const username = user?.username || user?.displayName || 'khang_dev';
 
   const rawDate = order.completed_at || order.activatedAt || order.created_at;
@@ -359,11 +363,19 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
   } else {
     for (let idx = 0; idx < historyList.length; idx++) {
       const histItem = historyList[idx];
-      const hProvider = histItem.provider === 'paypal_sandbox'
-        ? 'PayPal Sandbox'
-        : histItem.provider === 'vnpay_sandbox'
-          ? 'VNPAY Sandbox'
-          : 'Thẻ thử nghiệm';
+      const hTxn = histItem.provider_txn_id || histItem.order_code || '';
+      let hProvider = 'Chưa xác định';
+      if (histItem.provider === 'sandbox_simulated' || histItem.payment_method === 'card' || hTxn.startsWith('SIM-CARD-')) {
+        hProvider = 'Thẻ';
+      } else if (histItem.provider === 'paypal_sandbox') {
+        if (hTxn.startsWith('SIM-') || hTxn.startsWith('MOCK-')) {
+          hProvider = 'Mô phỏng';
+        } else {
+          hProvider = 'PayPal';
+        }
+      } else if (histItem.provider === 'vnpay_sandbox') {
+        hProvider = 'VNPAY';
+      }
       const hDate = formatReceiptDate(histItem.completed_at || histItem.created_at);
       const isHistPrime = (histItem.tier || '').toLowerCase() === 'prime';
       const hAmount = histItem.amount_usd_formatted || (isHistPrime ? '$50' : '$5');
