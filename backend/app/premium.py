@@ -16,11 +16,13 @@ def validate_order_code(order_code: str) -> str:
         raise AuthError(422, "INVALID_ORDER_CODE", "Mã đơn hàng không đúng định dạng.")
     return order_code
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
+
+ORDER_EXPIRY_TIMEOUT = timedelta(hours=1)
 
 from app.auth import CSRF_HEADER, ERRORS, current_session, session_cookie
 from app.auth_schemas import ErrorResponse
@@ -66,6 +68,18 @@ class OrderDto(BaseModel):
     payment_url: str | None = None
     created_at: datetime
     completed_at: datetime | None = None
+
+
+class Pagination(BaseModel):
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
+class OrderPage(BaseModel):
+    items: list[OrderDto]
+    pagination: Pagination
 
 
 class SubscriptionDto(BaseModel):
@@ -229,6 +243,36 @@ def create_subscription_order(
             amount_vnd = premium_settings.vnpay_price_prime_vnd
     amount_vnd = round_vnd_to_nearest_10k(amount_vnd)
 
+    # Prevent accidental multiple active orders for the same intent within 15 minutes
+    existing_active = account.db.scalar(
+        select(SubscriptionOrder).where(
+            SubscriptionOrder.user_id == account.user.id,
+            SubscriptionOrder.tier == plan.tier,
+            SubscriptionOrder.provider == payload.provider,
+            SubscriptionOrder.status == "pending",
+            SubscriptionOrder.created_at >= now - timedelta(minutes=15),
+        ).order_by(SubscriptionOrder.created_at.desc())
+    )
+    if existing_active and isinstance(existing_active, SubscriptionOrder):
+        plan_active = get_plan(existing_active.tier)
+        return OrderDto(
+            id=existing_active.id,
+            order_code=existing_active.order_code,
+            tier=existing_active.tier,
+            duration_days=existing_active.duration_days,
+            amount_usd_cents=existing_active.amount_cents,
+            amount_usd_formatted=plan_active.amount_usd_formatted,
+            amount_vnd=existing_active.amount_vnd,
+            amount_vnd_formatted=f"{existing_active.amount_vnd:,} VNĐ".replace(",", "."),
+            currency=existing_active.currency,
+            status=existing_active.status,
+            provider=existing_active.provider,
+            provider_txn_id=existing_active.provider_txn_id,
+            payment_url=existing_active.payment_url,
+            created_at=existing_active.created_at,
+            completed_at=existing_active.completed_at,
+        )
+
     payment_url = None
     provider_txn_id = None
     provider_payload = {}
@@ -325,19 +369,113 @@ def create_subscription_order(
 @router.get(
     "/orders",
     operation_id="listSubscriptionOrders",
-    response_model=list[OrderDto],
+    response_model=OrderPage,
     responses={**ERRORS},
 )
 def list_subscription_orders(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=100),
+    status: str | None = Query(default=None),
+    request: Request = None,
     account=Depends(require_authenticated_user),
 ):
-    """List subscription orders for the current user."""
+    """List subscription orders for the current user with pagination and optional status filter."""
     try:
-        orders = account.db.scalars(
+        now = datetime.now(timezone.utc)
+        # Auto-expire stale pending orders older than ORDER_EXPIRY_TIMEOUT
+        stale_res = account.db.scalars(
+            select(SubscriptionOrder).where(
+                SubscriptionOrder.user_id == account.user.id,
+                SubscriptionOrder.status == "pending",
+                SubscriptionOrder.created_at < now - ORDER_EXPIRY_TIMEOUT,
+            )
+        )
+        stale_orders = stale_res.all() if hasattr(stale_res, "all") else list(stale_res or [])
+        for st in stale_orders:
+            st.status = "expired"
+            st.updated_at = now
+        if stale_orders:
+            account.db.flush()
+
+        stmt = select(SubscriptionOrder).where(SubscriptionOrder.user_id == account.user.id)
+        if status:
+            stmt = stmt.where(SubscriptionOrder.status == status)
+
+        total = account.db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+        total_pages = max(1, (total + limit - 1) // limit) if total > 0 else 1
+
+        # Stable sort: newest created_at first, tie-break by id desc
+        stmt = stmt.order_by(SubscriptionOrder.created_at.desc(), SubscriptionOrder.id.desc())
+        offset = (page - 1) * limit
+        if offset < total:
+            orders_res = account.db.scalars(stmt.offset(offset).limit(limit))
+            orders = orders_res.all() if hasattr(orders_res, "all") else list(orders_res or [])
+        else:
+            orders = []
+
+        result = []
+        for o in orders:
+            plan = get_plan(o.tier)
+            result.append(
+                OrderDto(
+                    id=o.id,
+                    order_code=o.order_code,
+                    tier=o.tier,
+                    duration_days=o.duration_days,
+                    amount_usd_cents=o.amount_cents,
+                    amount_usd_formatted=plan.amount_usd_formatted if plan else f"${o.amount_cents / 100:.2f}",
+                    amount_vnd=o.amount_vnd,
+                    amount_vnd_formatted=f"{o.amount_vnd:,} VNĐ".replace(",", "."),
+                    currency=o.currency,
+                    status=o.status,
+                    provider=o.provider,
+                    provider_txn_id=o.provider_txn_id,
+                    payment_url=o.payment_url,
+                    created_at=o.created_at,
+                    completed_at=o.completed_at,
+                )
+            )
+        return OrderPage(
+            items=result,
+            pagination=Pagination(
+                page=page,
+                page_size=limit,
+                total=total,
+                total_pages=total_pages,
+            ),
+        )
+    except Exception as exc:
+        logger.error("Failed to list subscription orders for user %s: %s", account.user.id, exc, exc_info=True)
+        raise AuthError(500, "INTERNAL_ERROR", "Không thể lấy danh sách đơn hàng.")
+
+
+@router.get(
+    "/orders/successful",
+    operation_id="listSuccessfulOrders",
+    response_model=list[OrderDto],
+    responses={**ERRORS},
+)
+def list_successful_orders(
+    limit: int = Query(default=10, ge=1, le=10),
+    account=Depends(require_authenticated_user),
+):
+    """Retrieve up to 10 most recent successful orders of the authenticated user for receipt summary."""
+    try:
+        stmt = (
             select(SubscriptionOrder)
-            .where(SubscriptionOrder.user_id == account.user.id)
-            .order_by(SubscriptionOrder.created_at.desc())
-        ).all()
+            .where(
+                SubscriptionOrder.user_id == account.user.id,
+                SubscriptionOrder.status == "success",
+            )
+            .order_by(
+                SubscriptionOrder.completed_at.desc().nullslast(),
+                SubscriptionOrder.created_at.desc(),
+                SubscriptionOrder.id.desc(),
+            )
+            .limit(limit)
+        )
+        res = account.db.scalars(stmt)
+        orders = res.all() if hasattr(res, "all") else list(res or [])
         result = []
         for o in orders:
             plan = get_plan(o.tier)
@@ -362,8 +500,8 @@ def list_subscription_orders(
             )
         return result
     except Exception as exc:
-        logger.error("Failed to list subscription orders for user %s: %s", account.user.id, exc, exc_info=True)
-        raise AuthError(500, "INTERNAL_ERROR", "Không thể lấy danh sách đơn hàng.")
+        logger.error("Failed to retrieve successful orders for user %s: %s", account.user.id, exc, exc_info=True)
+        raise AuthError(500, "INTERNAL_ERROR", "Không thể lấy lịch sử đơn hàng thành công.")
 
 
 @router.get(
@@ -388,6 +526,12 @@ def get_subscription_order(
     if not order:
         raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại.")
 
+    now = datetime.now(timezone.utc)
+    if order.status == "pending" and order.created_at < now - ORDER_EXPIRY_TIMEOUT:
+        order.status = "expired"
+        order.updated_at = now
+        account.db.flush()
+
     plan = get_plan(order.tier)
     return OrderDto(
         id=order.id,
@@ -397,9 +541,11 @@ def get_subscription_order(
         amount_usd_cents=order.amount_cents,
         amount_usd_formatted=plan.amount_usd_formatted,
         amount_vnd=order.amount_vnd,
+        amount_vnd_formatted=f"{order.amount_vnd:,} VNĐ".replace(",", "."),
         currency=order.currency,
         status=order.status,
         provider=order.provider,
+        provider_txn_id=order.provider_txn_id,
         payment_url=order.payment_url,
         created_at=order.created_at,
         completed_at=order.completed_at,

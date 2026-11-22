@@ -1532,6 +1532,101 @@
   border: 1px solid rgba(148, 163, 184, 0.3);
 }
 
+.badge-status-processing {
+  background: rgba(14, 165, 233, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+}
+
+.badge-status-expired {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+/* Pagination & Filters */
+.history-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.history-filter-chip {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--am-on-surface-variant, #94a3b8);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.history-filter-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--am-on-surface, #ffffff);
+}
+
+.history-filter-chip.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+}
+
+.history-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  margin-top: 14px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.history-pagination-info {
+  font-size: 13px;
+  color: var(--am-on-surface-variant, #94a3b8);
+}
+
+.history-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-page-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--am-on-surface, #e2e8f0);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.history-page-btn:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+}
+
+.history-page-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 /* Action Buttons */
 .history-actions-cell {
   display: flex;

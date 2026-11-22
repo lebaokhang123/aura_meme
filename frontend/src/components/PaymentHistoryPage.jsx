@@ -6,6 +6,11 @@ import '../payment-ring-081.css';
 
 export default function PaymentHistoryPage() {
   const [orders, setOrders] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -17,18 +22,48 @@ export default function PaymentHistoryPage() {
   const language = prefs.language || 'vi';
   const t = (vi, en) => (language === 'en' ? en : vi);
 
+  const filterOptions = [
+    { id: '', vi: 'Tất cả', en: 'All' },
+    { id: 'success', vi: 'Thành công', en: 'Completed' },
+    { id: 'pending', vi: 'Chờ thanh toán', en: 'Pending' },
+    { id: 'processing', vi: 'Đang xác nhận', en: 'Confirming' },
+    { id: 'failed', vi: 'Thất bại', en: 'Failed' },
+    { id: 'cancelled', vi: 'Đã hủy', en: 'Cancelled' },
+    { id: 'expired', vi: 'Hết hạn', en: 'Expired' },
+  ];
+
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
+      const queryParams = new URLSearchParams({
+        page: String(page),
+        limit: String(pageSize),
+      });
+      if (statusFilter) {
+        queryParams.set('status', statusFilter);
+      }
+
       const [ordersRes, statusRes] = await Promise.all([
-        auth.read('/premium/orders').catch(err => {
+        auth.read(`/premium/orders?${queryParams.toString()}`).catch(err => {
           console.error('Failed to fetch orders:', err);
           throw err;
         }),
         auth.read('/premium/status').catch(() => null),
       ]);
-      setOrders(Array.isArray(ordersRes) ? ordersRes : []);
+
+      const items = Array.isArray(ordersRes) ? ordersRes : (ordersRes.items || []);
+      const pagination = ordersRes.pagination || {
+        page: page,
+        page_size: pageSize,
+        total: items.length,
+        total_pages: Math.max(1, Math.ceil(items.length / pageSize)),
+      };
+
+      setOrders(items);
+      setTotalPages(pagination.total_pages || 1);
+      setTotalItems(pagination.total || items.length);
+
       if (statusRes && statusRes.subscription) {
         setSubscription(statusRes.subscription);
       }
@@ -41,7 +76,12 @@ export default function PaymentHistoryPage() {
 
   useEffect(() => {
     loadData();
-  }, [language]);
+  }, [page, statusFilter, language]);
+
+  const handleFilterChange = (filterId) => {
+    setStatusFilter(filterId);
+    setPage(1);
+  };
 
   const handleOpenDetail = (order) => {
     setSelectedOrder(order);
@@ -65,9 +105,16 @@ export default function PaymentHistoryPage() {
     }
   };
 
-  const handleDownloadPdf = (order, e) => {
+  const handleDownloadPdf = async (order, e) => {
     if (e) e.stopPropagation();
-    const success = downloadReceiptPdf(order, auth.user);
+    let historyList = null;
+    try {
+      historyList = await auth.read('/premium/orders/successful');
+    } catch {
+      // Fallback to orders in view
+      historyList = orders.filter(o => o.status === 'success' || o.status === 'completed');
+    }
+    const success = downloadReceiptPdf(order, auth.user, historyList);
     if (success) {
       setDownloadSuccess(order.order_code);
       setTimeout(() => setDownloadSuccess(null), 3000);
@@ -103,15 +150,40 @@ export default function PaymentHistoryPage() {
   const getStatusBadge = (status) => {
     switch (status) {
       case 'success':
+      case 'completed':
         return <span className="history-badge badge-status-success">{t('Thành công', 'Completed')}</span>;
+      case 'processing':
+        return <span className="history-badge badge-status-processing">{t('Đang xác nhận', 'Confirming')}</span>;
       case 'pending':
-        return <span className="history-badge badge-status-pending">{t('Đang xử lý', 'Pending')}</span>;
+        return <span className="history-badge badge-status-pending">{t('Chờ thanh toán', 'Pending')}</span>;
       case 'failed':
         return <span className="history-badge badge-status-failed">{t('Thất bại', 'Failed')}</span>;
       case 'cancelled':
         return <span className="history-badge badge-status-cancelled">{t('Đã hủy', 'Cancelled')}</span>;
+      case 'expired':
+        return <span className="history-badge badge-status-expired">{t('Hết hạn', 'Expired')}</span>;
       default:
         return <span className="history-badge badge-status-cancelled">{status || '—'}</span>;
+    }
+  };
+
+  const getStatusDetailText = (status) => {
+    switch (status) {
+      case 'pending':
+        return t('Đang chờ bạn hoàn tất thanh toán.', 'Waiting for you to complete payment.');
+      case 'processing':
+        return t('Đang chờ PayPal xác nhận giao dịch.', 'Waiting for PayPal to confirm transaction.');
+      case 'success':
+      case 'completed':
+        return t('Giao dịch đã hoàn tất và quyền lợi hội viên đã được kích hoạt.', 'Transaction completed and membership activated.');
+      case 'failed':
+        return t('Giao dịch không thành công hoặc bị cổng thanh toán từ chối.', 'Transaction failed or was declined.');
+      case 'cancelled':
+        return t('Đơn hàng đã được hủy bởi người dùng.', 'Order was cancelled by user.');
+      case 'expired':
+        return t('Đơn hàng đã quá hạn thanh toán.', 'Order has expired.');
+      default:
+        return '';
     }
   };
 
@@ -183,6 +255,20 @@ export default function PaymentHistoryPage() {
           </div>
         )}
 
+        {/* Status Filter Bar */}
+        <div className="history-filter-bar" role="toolbar" aria-label={t('Lọc theo trạng thái', 'Filter by status')}>
+          {filterOptions.map(opt => (
+            <button
+              key={opt.id}
+              type="button"
+              className={`history-filter-chip ${statusFilter === opt.id ? 'active' : ''}`}
+              onClick={() => handleFilterChange(opt.id)}
+            >
+              {language === 'en' ? opt.en : opt.vi}
+            </button>
+          ))}
+        </div>
+
         {/* Content States */}
         {loading ? (
           <div className="history-loading">
@@ -204,15 +290,25 @@ export default function PaymentHistoryPage() {
             </div>
             <h3>{t('Chưa có giao dịch nào', 'No transactions found')}</h3>
             <p>
-              {t(
-                'Bạn chưa thực hiện giao dịch mua gói hội viên nào trên hệ thống thử nghiệm.',
-                'You have not completed any membership purchases on the sandbox system yet.'
-              )}
+              {statusFilter
+                ? t('Không có giao dịch nào phù hợp với bộ lọc trạng thái đã chọn.', 'No transactions matched the selected status filter.')
+                : t('Bạn chưa thực hiện giao dịch mua gói hội viên nào trên hệ thống thử nghiệm.', 'You have not completed any membership purchases on the sandbox system yet.')}
             </p>
-            <a href="/premium" className="history-empty-cta">
-              <span className="material-symbols-outlined" aria-hidden="true">workspace_premium</span>
-              {t('Khám phá gói hội viên', 'Explore memberships')}
-            </a>
+            {statusFilter ? (
+              <button
+                type="button"
+                className="history-filter-chip active"
+                style={{ marginTop: '10px' }}
+                onClick={() => handleFilterChange('')}
+              >
+                {t('Xem tất cả giao dịch', 'View all transactions')}
+              </button>
+            ) : (
+              <a href="/premium" className="history-empty-cta">
+                <span className="material-symbols-outlined" aria-hidden="true">workspace_premium</span>
+                {t('Khám phá gói hội viên', 'Explore memberships')}
+              </a>
+            )}
           </div>
         ) : (
           <div className="history-content">
@@ -254,7 +350,7 @@ export default function PaymentHistoryPage() {
                             <span className="material-symbols-outlined" aria-hidden="true">visibility</span>
                             {t('Chi tiết', 'Details')}
                           </button>
-                          {o.status === 'success' && (
+                          {(o.status === 'success' || o.status === 'completed') && (
                             <button
                               type="button"
                               className="history-action-btn history-action-btn--download"
@@ -309,7 +405,7 @@ export default function PaymentHistoryPage() {
                       <span className="material-symbols-outlined" aria-hidden="true">visibility</span>
                       {t('Xem chi tiết', 'Details')}
                     </button>
-                    {o.status === 'success' && (
+                    {(o.status === 'success' || o.status === 'completed') && (
                       <button
                         type="button"
                         className="history-action-btn history-action-btn--download"
@@ -322,6 +418,41 @@ export default function PaymentHistoryPage() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="history-pagination-bar">
+              <div className="history-pagination-info">
+                {t(
+                  `Trang ${page} / ${totalPages} · Tổng cộng ${totalItems} giao dịch`,
+                  `Page ${page} of ${totalPages} · Total ${totalItems} transactions`
+                )}
+              </div>
+              <div className="history-pagination-controls">
+                <button
+                  type="button"
+                  className="history-page-btn"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  aria-label={t('Trang trước', 'Previous page')}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }} aria-hidden="true">chevron_left</span>
+                  {t('Trước', 'Prev')}
+                </button>
+                <span style={{ fontSize: '12px', fontFamily: "'JetBrains Mono', monospace", padding: '0 6px' }}>
+                  {page} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="history-page-btn"
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  aria-label={t('Trang sau', 'Next page')}
+                >
+                  {t('Sau', 'Next')}
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }} aria-hidden="true">chevron_right</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -398,6 +529,28 @@ export default function PaymentHistoryPage() {
                 <span className="u081-row-label">{t('Trạng thái', 'Status')}</span>
                 <span className="u081-row-val">{getStatusBadge(selectedOrder.status)}</span>
               </div>
+              {getStatusDetailText(selectedOrder.status) && (
+                <div
+                  className="u081-summary-row history-detail-note"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.035)',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '4px',
+                  }}
+                >
+                  <span className="u081-row-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {t('Ghi chú trạng thái', 'Status Explanation')}
+                  </span>
+                  <span style={{ fontSize: '12px', color: 'var(--am-on-surface-variant, #94a3b8)', lineHeight: '1.4' }}>
+                    {getStatusDetailText(selectedOrder.status)}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="u081-actions" style={{ marginTop: '16px' }}>
@@ -408,7 +561,7 @@ export default function PaymentHistoryPage() {
               >
                 {t('Đóng', 'Close')}
               </button>
-              {selectedOrder.status === 'success' && (
+              {(selectedOrder.status === 'success' || selectedOrder.status === 'completed') && (
                 <button
                   type="button"
                   className="u081-btn-confirm"
