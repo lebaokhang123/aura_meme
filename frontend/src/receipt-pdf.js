@@ -74,7 +74,9 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
 
   // Payment provider name
   let providerName = 'Chưa xác định';
-  if (order.provider === 'sandbox_simulated' || order.payment_method === 'card' || txnRef.startsWith('SIM-CARD-')) {
+  if (!order.provider || order.provider === 'unselected') {
+    providerName = 'Chưa chọn';
+  } else if (order.provider === 'sandbox_simulated' || order.payment_method === 'card' || txnRef.startsWith('SIM-CARD-')) {
     providerName = 'Thẻ';
   } else if (order.provider === 'paypal_sandbox') {
     if (txnRef.startsWith('SIM-') || txnRef.startsWith('MOCK-')) {
@@ -365,7 +367,9 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
       const histItem = historyList[idx];
       const hTxn = histItem.provider_txn_id || histItem.order_code || '';
       let hProvider = 'Chưa xác định';
-      if (histItem.provider === 'sandbox_simulated' || histItem.payment_method === 'card' || hTxn.startsWith('SIM-CARD-')) {
+      if (!histItem.provider || histItem.provider === 'unselected') {
+        hProvider = 'Chưa chọn';
+      } else if (histItem.provider === 'sandbox_simulated' || histItem.payment_method === 'card' || hTxn.startsWith('SIM-CARD-')) {
         hProvider = 'Thẻ';
       } else if (histItem.provider === 'paypal_sandbox') {
         if (hTxn.startsWith('SIM-') || hTxn.startsWith('MOCK-')) {

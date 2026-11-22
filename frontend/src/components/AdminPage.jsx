@@ -147,7 +147,7 @@ export default function AdminPage(){
       <p className="workspace-meta">
         <span>{row.amount_vnd_formatted||(row.amount_vnd?.toLocaleString('vi-VN')+' đ')}</span>
         <span>·</span>
-        <span>{row.provider==='paypal_sandbox'?'PayPal':row.provider==='sandbox_simulated'?'Thẻ':row.provider}</span>
+        <span>{row.provider==='paypal_sandbox'?'PayPal':row.provider==='sandbox_simulated'?'Thẻ':(row.provider==='unselected'||!row.provider?t('Chưa chọn','Not selected'):row.provider)}</span>
         <span>·</span>
         <span>{row.created_at?stamp(row.created_at):''}</span>
         {row.provider_txn_id&&<span>· Txn: <code className="text-outline">{row.provider_txn_id}</code></span>}
