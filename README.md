@@ -93,7 +93,7 @@ Owner đã chốt 10 cảnh giới ×10 Level; XP lên cấp ` 10 + Level ` từ
 
 ### Hiện trạng dữ liệu & Đồng bộ với dev
 - **Code Vault:** Đầy đủ trên `dev@8b22c29` (Frontend `VaultPage.jsx`, backend `app.vault`, `app.vault_runtime`, `app.vault_open`, `app.vault_exp_award`).
-- **Bản vá quyền private demo (`app/catalog_rights.py`):** Khôi phục điều kiện `owner_private_demo` (vốn được tạo trong `aura_meme_mvp` ngày 16/11 nhưng chưa commit vào `dev`), cho phép duyệt 70 meme sưu tầm khi cờ `AURAMEME_OWNER_MEME_DEMO=1` chạy trên database demo.
+- **Bản vá quyền private demo (`app/catalog_rights.py`):** Khôi phục điều kiện `owner_private_demo` với cơ chế fail-closed nghiêm ngặt: chỉ kích hoạt khi có đồng thời `AURAMEME_OWNER_MEME_DEMO=1`, `AUTH_ENVIRONMENT` thuộc `{'development', 'test', 'local'}`, `ENVIRONMENT` không phải `production`/`staging`, database host là loopback (`localhost`, `127.0.0.1`, `::1`), và tên database thuộc danh sách kiểm duyệt (`aurameme_demo`, `aurameme_vault_verify`, `aurameme_test`). Đã có suite kiểm thử negative (`test_vault_security_negative.py`) bảo đảm fail-closed 100%.
 - **Dữ liệu Database:** 75 asset items, 2 case definitions, 2 published loot tables tồn tại đầy đủ, nguyên vẹn trong PostgreSQL `aurameme_demo` (schema `0012_aura_v1`).
 - **Media Catalog:** Đủ 75/75 file ảnh tại `backend/demo.local/catalog`, khớp 100% mã hash SHA-256 với database.
 - **Môi trường Codex QA 5189:** Sử dụng database test cô lập (`aurameme_test` trên Docker `aurameme-hotfix-test-15`), tuân thủ nghiêm ngặt quy tắc an toàn không can thiệp/seed vào `aurameme_demo`, do đó không tự có sẵn catalog demo nếu không nối cấu hình.

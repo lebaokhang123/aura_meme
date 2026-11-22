@@ -14,7 +14,23 @@ DEMO_PREFIX = 'aurameme://private-demo/owner-statement/'
 DEMO_NOTICE = 'Unidentified original meme creators; no rights verification'
 
 def _owner_private_demo_enabled():
-    return os.environ.get('AURAMEME_OWNER_MEME_DEMO') == '1'
+    """Fail-closed guard: only permitted on verified local demo or isolated clone test environments."""
+    if os.environ.get('AURAMEME_OWNER_MEME_DEMO') not in {'1', 'true'}:
+        return False
+    auth_env = os.environ.get('AUTH_ENVIRONMENT', '').lower()
+    if auth_env not in {'development', 'test', 'local'}:
+        return False
+    # Never allow on production or staging
+    if os.environ.get('ENVIRONMENT', '').lower() in {'production', 'staging'}:
+        return False
+    db_url = os.environ.get('DATABASE_URL') or os.environ.get('TEST_DATABASE_URL') or ''
+    # Database must be dedicated demo or isolated verification clone
+    if not any(authorized_db in db_url for authorized_db in ('aurameme_demo', 'aurameme_vault_verify', 'aurameme_test')):
+        return False
+    # Database host must be strictly loopback
+    if not any(h in db_url for h in ('localhost', '127.0.0.1', '::1')):
+        return False
+    return True
 
 def _owner_private_demo_sql(rights):
     # Only a SELECT against the dedicated demo database (or verified isolated test clone) may see these items.
