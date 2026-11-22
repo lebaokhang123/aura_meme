@@ -500,7 +500,7 @@ export default function PremiumPage() {
             </ul>
 
             <button
-              className="u056-cta"
+              className={`u056-cta u056-cta--${plan.id}`}
               type="button"
               disabled={isAuthenticated && (!pricingReliable || isCurrentPlanActive)}
               onClick={handleCtaClick}

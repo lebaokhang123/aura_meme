@@ -162,8 +162,69 @@
 .u056 button.u056-cta{display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;flex-shrink:0;background:color-mix(in srgb,var(--am-secondary) 85%,#4a044e);color:#ffffff!important;border:1px solid color-mix(in srgb,var(--am-secondary) 60%,var(--am-outline-variant));border-radius:17px;font-size:13.5px;font-weight:700!important;cursor:pointer;transition:transform .18s,background .18s,box-shadow .18s}
 .u056 .u056-cta:hover:not(:disabled){background:color-mix(in srgb,var(--am-secondary) 95%,#ffffff 12%);color:#ffffff!important;box-shadow:0 6px 20px color-mix(in srgb,var(--am-secondary) 35%,transparent)}
 .u056 .u056-cta:active:not(:disabled){transform:scale(.98);color:#ffffff!important}
-.u056 .u056-cta:disabled{opacity:.55;cursor:not-allowed;color:#ffffff!important}
+.u056 .u056-cta:disabled{opacity:.55;cursor:not-allowed;color:#ffffff!important;animation:none!important;box-shadow:none!important}
 .u056 .u056-cta .material-symbols-outlined{font-size:19px;color:#ffffff!important}
+
+/* Tier-specific styling for Plus and Prime CTAs */
+.u056 .u056-cta--plus {
+  background: linear-gradient(135deg, #0284c7 0%, #06b6d4 50%, #38bdf8 100%) !important;
+  background-size: 200% 200% !important;
+  animation: u056-plus-shimmer 4s ease infinite;
+  border: 1px solid rgba(56, 189, 248, 0.6) !important;
+  box-shadow: 0 4px 18px rgba(6, 182, 212, 0.35);
+}
+.u056 .u056-cta--plus:hover:not(:disabled) {
+  background-position: right center !important;
+  box-shadow: 0 6px 24px rgba(6, 182, 212, 0.55), 0 0 12px rgba(56, 189, 248, 0.4);
+}
+.u056 .u056-cta--plus:active:not(:disabled) {
+  transform: scale(0.98);
+  box-shadow: 0 2px 10px rgba(6, 182, 212, 0.4);
+}
+.u056 .u056-cta--plus:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 3px;
+}
+
+.u056 .u056-cta--prime {
+  background: linear-gradient(135deg, #b45309 0%, #d97706 35%, #f59e0b 70%, #fbbf24 100%) !important;
+  background-size: 200% 200% !important;
+  animation: u056-prime-shimmer 4s ease infinite;
+  border: 1px solid rgba(251, 191, 36, 0.65) !important;
+  box-shadow: 0 4px 20px rgba(217, 119, 6, 0.4), 0 0 10px rgba(245, 158, 11, 0.25);
+}
+.u056 .u056-cta--prime:hover:not(:disabled) {
+  background-position: right center !important;
+  box-shadow: 0 6px 26px rgba(245, 158, 11, 0.6), 0 0 16px rgba(251, 191, 36, 0.45);
+}
+.u056 .u056-cta--prime:active:not(:disabled) {
+  transform: scale(0.98);
+  box-shadow: 0 2px 12px rgba(217, 119, 6, 0.45);
+}
+.u056 .u056-cta--prime:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 3px;
+}
+
+@keyframes u056-plus-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes u056-prime-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u056 .u056-cta--plus,
+  .u056 .u056-cta--prime {
+    animation: none !important;
+    background-position: 0% 0% !important;
+  }
+}
 .u056-price-note{margin:0;text-align:center;font-size:11px;color:var(--ux-ink-2);line-height:1.8}
 
 .premium-active-banner { display:flex; align-items:center; gap:10px; padding:10px 14px; margin-top:14px; border-radius:12px; background:color-mix(in srgb,var(--am-secondary) 12%,var(--am-surface-container)); border:1px solid var(--am-secondary); font-size:12px; color:var(--am-on-surface); }
