@@ -928,3 +928,52 @@ Thực hiện chuẩn xác yêu cầu của Owner về bản sắc nhận diện
   - `task5_payment_history_table.png` (Trang lịch sử phân trang và bộ lọc)
   - `task5_payment_history_modal.png` (Hộp thoại chi tiết với ghi chú trạng thái)
   - `task5_profile_edit_25_100.png` (Giao diện sửa hồ sơ với bộ đếm 25 và 100)
+
+
+---
+
+## 19. Kiểm soát An toàn Thanh toán Cuối cùng (Final Payment Safety Check)
+
+### 19.1. PayPal Webhook Fail-Closed Tuyệt đối (Mục 1)
+- **Khắc phục lỗ hổng Fail-Open cũ:** Trước đây, khi `paypal` hoặc `webhook_id` không được cấu hình, hệ thống bỏ qua bước xác thực chữ ký và vẫn xử lý sự kiện. Đã sửa triệt để sang nguyên tắc **Fail-Closed**:
+  - Khi thiếu `paypal` adapter, thiếu credentials, hoặc thiếu `webhook_id`: Lập tức từ chối xử lý, trả về HTTP 503 `status: rejected`, `reason: webhook_not_configured`.
+  - Khi chữ ký truyền tin không hợp lệ (`is_valid_sig == False`): Lập tức từ chối xử lý, trả về HTTP 400 `status: rejected`, `reason: invalid_signature`.
+  - Tuyệt đối không cấp quyền hội viên (Premium) dưới bất kỳ tình huống nào nếu chữ ký hoặc cấu hình không đạt chuẩn.
+
+### 19.2. Xác minh Capture Thực tế & Đối chiếu Đa tầng (Mục 2)
+- **Nâng cấp `PaypalAdapter` (`backend/app/paypal_adapter.py`):**
+  - Bổ sung `get_capture_details(capture_id)`: Truy vấn trực tiếp trạng thái và thông tin giao dịch thẩm quyền từ endpoint PayPal Payments API `/v2/payments/captures/{id}`.
+  - Mở rộng `verify_capture`: Hỗ trợ xác thực đa năng cho cả đối tượng Order (chứa `purchase_units`) và đối tượng Capture trực tiếp (từ Webhook/Capture API).
+  - Đối chiếu đa tầng nghiêm ngặt:
+    1. **Trạng thái:** Bắt buộc `status == "COMPLETED"`.
+    2. **Đơn vị tiền tệ:** Bắt buộc `currency_code == "USD"`.
+    3. **Số tiền thanh toán:** Bắt buộc số cents (`val_cents`) khớp chính xác 100% với `order.amount_cents` ($5.00 cho Plus, $50.00 cho Prime).
+    4. **Định danh đơn hàng:** Đối chiếu `custom_id` / `invoice_id` / `order_id` phải khớp chính xác với `order.order_code`.
+    5. **Định danh Merchant:** Đối chiếu `payee.merchant_id` với `paypal.merchant_id` (nếu cấu hình).
+    6. **Nhà cung cấp:** Kiểm tra `order.provider == "paypal_sandbox"`. Từ chối ngay nếu sai lệch cổng thanh toán.
+- **Bảo toàn tính Idempotency:**
+  - Nếu đơn hàng đã ở trạng thái `success`, webhook lập tức trả về `{"status": "already_processed"}` mà không thực hiện gia hạn lần hai hoặc cập nhật cơ sở dữ liệu.
+
+### 19.3. Cơ chế Hết hạn Pending 1 Giờ & Bảo vệ Giao dịch Callback Chậm (Mục 3)
+- **Kiểm tra trạng thái PayPal trước khi đánh dấu hết hạn:**
+  - Trong `_check_and_expire_order` (được gọi bởi `get_subscription_order` và `list_subscription_orders`), khi một đơn `pending` đã quá 1 giờ (`created_at < now - ORDER_EXPIRY_TIMEOUT`):
+    - Nếu đơn là `paypal_sandbox` và có `provider_txn_id`, hệ thống sẽ truy vấn PayPal API `get_order_details`.
+    - Nếu PayPal xác nhận giao dịch đã `COMPLETED` và xác thực capture thành công: **Tuyệt đối không đánh dấu hết hạn hay thất bại**, mà tự động hòa giải (reconcile) sang `success` và kích hoạt gói hội viên.
+    - Nếu PayPal xác nhận chưa hoàn tất (hoặc không capture được): Chuyển trạng thái sang `expired` mà **tuyệt đối không tự cấp quyền**.
+- **Hòa giải Callback Chậm (Late Webhook Reconciliation):**
+  - Trong trường hợp webhook từ PayPal bị trễ và đơn hàng đã tạm chuyển sang `expired`, khi webhook `PAYMENT.CAPTURE.COMPLETED` được xác thực hợp lệ gửi tới:
+    - Hệ thống tự động chuyển đơn sang `success` và kích hoạt quyền hội viên cho người dùng, đảm bảo quyền lợi khi người dùng đã thực chi tiền trên PayPal.
+
+### 19.4. Kết quả Kiểm thử & Bằng chứng PayPal Sandbox Thực tế (Mục 4)
+- **Bằng chứng Live PayPal Sandbox API:**
+  - Kiểm thử `test_live_paypal_sandbox_api_smoke` chạy trực tiếp với bộ thông tin PayPal Sandbox trong `backend/.env`:
+    - Lấy thành công live OAuth2 bearer token từ `https://api-m.sandbox.paypal.com/v1/oauth2/token`.
+    - Tạo thành công đơn hàng thật trên PayPal Sandbox với `intent=CAPTURE`, nhận về PayPal Order ID và liên kết phê duyệt `https://www.sandbox.paypal.com/checkoutnow?token=...`.
+    - Truy vấn trực tiếp thông tin đơn hàng từ `GET /v2/checkout/orders/{id}` của PayPal, xác nhận `status: CREATED` và `amount: 5.00 USD`.
+    - Kết quả: **PASS (3.03s)**.
+- **Bộ kiểm thử Tự động Toàn diện:**
+  - **Backend Tests:** **463 passed**, 788 deselected (integration), 0 failed (42.71s).
+  - **Order Security Suite (`test_order_security.py`):** **14/14 passed** (Bao gồm test fail-closed, capture verification, late webhook reconciliation, và pending expiry checks).
+  - **Frontend Unit Tests:** **81/81 passed** (100%).
+  - **Playwright Test Suite (`premium-sandbox.spec.js`):** **19/19 passed** (100%, 1.4m).
+- **Cơ sở dữ liệu:** Bảo toàn nguyên vẹn 100% `aurameme_demo`, không sửa đổi, không migration.

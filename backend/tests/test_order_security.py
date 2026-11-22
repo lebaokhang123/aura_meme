@@ -444,9 +444,14 @@ def test_webhook_duplicate_idempotent():
 
     mock_factory = MagicMock(return_value=MockContextManager())
 
+    mock_paypal = MagicMock()
+    mock_paypal.is_configured.return_value = True
+    mock_paypal.webhook_id = "WH-123456"
+    mock_paypal.verify_webhook_signature.return_value = True
+
     mock_request = MagicMock()
     mock_request.app.state.auth.now.return_value = now
-    mock_request.app.state.paypal = None
+    mock_request.app.state.paypal = mock_paypal
     mock_request.app.state.auth_session_factory = mock_factory
     mock_request.headers = {}
 
@@ -464,7 +469,272 @@ def test_webhook_duplicate_idempotent():
     mock_request.body = get_body
 
     res = asyncio.run(handle_paypal_webhook(mock_request))
-    assert res == {"status": "received"}
+    assert res.status_code == 200
+    res_json = json.loads(res.body.decode())
+    assert res_json["status"] == "already_processed"
     # Because order was already "success", sub was NOT modified/added
     mock_db.add.assert_not_called()
+
+
+def test_webhook_fail_closed_unconfigured():
+    """Verify PayPal webhook rejects with 503 if adapter or webhook_id is not configured."""
+    import asyncio
+
+    # Case A: paypal adapter is None
+    req1 = MagicMock()
+    req1.app.state.paypal = None
+    req1.body = lambda: asyncio.sleep(0, result=b"{}")
+    req1.headers = {}
+    res1 = asyncio.run(handle_paypal_webhook(req1))
+    assert res1.status_code == 503
+    assert json.loads(res1.body.decode())["reason"] == "webhook_not_configured"
+
+    # Case B: paypal adapter has no webhook_id
+    mock_paypal = MagicMock()
+    mock_paypal.is_configured.return_value = True
+    mock_paypal.webhook_id = None
+    req2 = MagicMock()
+    req2.app.state.paypal = mock_paypal
+    req2.body = lambda: asyncio.sleep(0, result=b"{}")
+    req2.headers = {}
+    res2 = asyncio.run(handle_paypal_webhook(req2))
+    assert res2.status_code == 503
+    assert json.loads(res2.body.decode())["reason"] == "webhook_not_configured"
+
+
+def test_webhook_fail_closed_invalid_signature():
+    """Verify PayPal webhook rejects with 400 if signature verification fails."""
+    import asyncio
+
+    mock_paypal = MagicMock()
+    mock_paypal.is_configured.return_value = True
+    mock_paypal.webhook_id = "WH-123456"
+    mock_paypal.verify_webhook_signature.return_value = False
+
+    req = MagicMock()
+    req.app.state.paypal = mock_paypal
+    req.body = lambda: asyncio.sleep(0, result=b"{}")
+    req.headers = {"paypal-transmission-sig": "forged_sig"}
+
+    res = asyncio.run(handle_paypal_webhook(req))
+    assert res.status_code == 400
+    assert json.loads(res.body.decode())["reason"] == "invalid_signature"
+
+
+def test_webhook_verification_mismatches_rejected():
+    """Verify webhook rejects mismatched currency, amount, merchant, or provider."""
+    import asyncio
+    user_id = uuid4()
+    now = datetime(2026, 11, 22, 10, 0, 0, tzinfo=timezone.utc)
+    order_code = "AM-PLUS-1795330000-VERIF1"
+
+    order = SubscriptionOrder(
+        id=uuid4(),
+        order_code=order_code,
+        user_id=user_id,
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",
+        provider="paypal_sandbox",
+        created_at=now - timedelta(minutes=5),
+    )
+
+    mock_db = MagicMock()
+    mock_db.scalar.return_value = order
+
+    class MockContextManager:
+        def __enter__(self):
+            return mock_db
+        def __exit__(self, *args):
+            pass
+
+    mock_paypal = MagicMock()
+    mock_paypal.is_configured.return_value = True
+    mock_paypal.webhook_id = "WH-123456"
+    mock_paypal.verify_webhook_signature.return_value = True
+    mock_paypal.merchant_id = "AURAMEME_MERCHANT"
+    mock_paypal.get_capture_details.return_value = None
+
+    # Mismatch 1: Amount mismatch (1000 cents instead of 500)
+    mock_paypal.verify_capture.return_value = (False, "Amount mismatch: expected 500 cents, got 1000 cents.")
+    req = MagicMock()
+    req.app.state.auth.now.return_value = now
+    req.app.state.paypal = mock_paypal
+    req.app.state.auth_session_factory = MagicMock(return_value=MockContextManager())
+    req.headers = {}
+
+    payload = json.dumps({
+        "event_type": "PAYMENT.CAPTURE.COMPLETED",
+        "resource": {
+            "id": "CAP-MISMATCH",
+            "custom_id": order_code,
+            "status": "COMPLETED",
+            "amount": {"currency_code": "USD", "value": "10.00"},
+        }
+    }).encode("utf-8")
+    req.body = lambda: asyncio.sleep(0, result=payload)
+
+    res = asyncio.run(handle_paypal_webhook(req))
+    assert res.status_code == 400
+    assert "Amount mismatch" in json.loads(res.body.decode())["reason"]
+    # Subscription was NOT granted
+    mock_db.add.assert_not_called()
+
+    # Mismatch 2: Provider mismatch (order was created with vnpay_sandbox, not paypal_sandbox)
+    order.provider = "vnpay_sandbox"
+    res_prov = asyncio.run(handle_paypal_webhook(req))
+    assert res_prov.status_code == 400
+    assert json.loads(res_prov.body.decode())["reason"] == "invalid_provider"
+    mock_db.add.assert_not_called()
+
+
+def test_webhook_delayed_callback_reconciles_expired_order():
+    """Verify delayed callback for an order marked 'expired' successfully reconciles to 'success' upon verified capture."""
+    import asyncio
+    user_id = uuid4()
+    now = datetime(2026, 11, 22, 10, 0, 0, tzinfo=timezone.utc)
+    order_code = "AM-PRIME-1795330000-DELAYED"
+
+    order = SubscriptionOrder(
+        id=uuid4(),
+        order_code=order_code,
+        user_id=user_id,
+        tier="prime",
+        duration_days=365,
+        amount_cents=5000,
+        amount_vnd=1250000,
+        currency="USD",
+        status="expired",  # Had transitioned to expired because callback was delayed > 1 hour
+        provider="paypal_sandbox",
+        created_at=now - timedelta(hours=2),
+    )
+
+    mock_db = MagicMock()
+    mock_db.scalar.side_effect = [order, None]  # 1st call for order, 2nd call for existing subscription (None)
+
+    class MockContextManager:
+        def __enter__(self):
+            return mock_db
+        def __exit__(self, *args):
+            pass
+
+    mock_paypal = MagicMock()
+    mock_paypal.is_configured.return_value = True
+    mock_paypal.webhook_id = "WH-123456"
+    mock_paypal.verify_webhook_signature.return_value = True
+    mock_paypal.merchant_id = "AURAMEME_MERCHANT"
+    mock_paypal.get_capture_details.return_value = {
+        "id": "CAP-DELAYED-123",
+        "status": "COMPLETED",
+        "amount": {"currency_code": "USD", "value": "50.00"},
+        "custom_id": order_code,
+    }
+    mock_paypal.verify_capture.return_value = (True, "Capture verified successfully.")
+
+    req = MagicMock()
+    req.app.state.auth.now.return_value = now
+    req.app.state.paypal = mock_paypal
+    req.app.state.auth_session_factory = MagicMock(return_value=MockContextManager())
+    req.headers = {}
+
+    payload = json.dumps({
+        "event_type": "PAYMENT.CAPTURE.COMPLETED",
+        "resource": {
+            "id": "CAP-DELAYED-123",
+            "custom_id": order_code,
+        }
+    }).encode("utf-8")
+    req.body = lambda: asyncio.sleep(0, result=payload)
+
+    res = asyncio.run(handle_paypal_webhook(req))
+    assert res.status_code == 200
+    assert json.loads(res.body.decode())["status"] == "success"
+    # Order was reconciled to success
+    assert order.status == "success"
+    # Subscription was granted
+    mock_db.add.assert_called_once()
+
+
+def test_pending_order_expiry_checks_paypal_capture_first():
+    """Verify pending order > 1h does not expire if PayPal capture is verified; expires if not captured."""
+    user_id = uuid4()
+    now = datetime(2026, 11, 22, 10, 0, 0, tzinfo=timezone.utc)
+    old_time = now - timedelta(hours=2)
+
+    # Sub-case 1: Stale order WAS captured on PayPal -> Reconciled to success, NOT expired!
+    captured_order = SubscriptionOrder(
+        id=uuid4(),
+        order_code="AM-PLUS-1795330000-CAPTURED1",
+        user_id=user_id,
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",
+        provider="paypal_sandbox",
+        provider_txn_id="PP-ORD-CAPTURED",
+        created_at=old_time,
+    )
+
+    mock_db1 = MagicMock()
+    mock_db1.scalar.side_effect = [captured_order, None]
+
+    account1 = MagicMock()
+    account1.user.id = user_id
+    account1.user.roles = ["USER"]
+    account1.db = mock_db1
+
+    mock_paypal = MagicMock()
+    mock_paypal.is_configured.return_value = True
+    mock_paypal.merchant_id = None
+    mock_paypal.get_order_details.return_value = {
+        "id": "PP-ORD-CAPTURED",
+        "status": "COMPLETED",
+    }
+    mock_paypal.verify_capture.return_value = (True, "Capture verified successfully.")
+
+    req1 = MagicMock()
+    req1.app.state.paypal = mock_paypal
+
+    dto1 = get_subscription_order("AM-PLUS-1795330000-CAPTURED1", request=req1, account=account1)
+    assert dto1.status == "success"
+    assert captured_order.status == "success"
+
+    # Sub-case 2: Stale order was NOT captured on PayPal (e.g. status CREATED/ABANDONED) -> Transitions to expired!
+    uncaptured_order = SubscriptionOrder(
+        id=uuid4(),
+        order_code="AM-PLUS-1795330000-ABANDONED",
+        user_id=user_id,
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",
+        provider="paypal_sandbox",
+        provider_txn_id="PP-ORD-ABANDONED",
+        created_at=old_time,
+    )
+
+    mock_db2 = MagicMock()
+    mock_db2.scalar.return_value = uncaptured_order
+
+    account2 = MagicMock()
+    account2.user.id = user_id
+    account2.user.roles = ["USER"]
+    account2.db = mock_db2
+
+    mock_paypal.get_order_details.return_value = {
+        "id": "PP-ORD-ABANDONED",
+        "status": "CREATED",
+    }
+
+    dto2 = get_subscription_order("AM-PLUS-1795330000-ABANDONED", request=req1, account=account2)
+    assert dto2.status == "expired"
+    assert uncaptured_order.status == "expired"
+
 

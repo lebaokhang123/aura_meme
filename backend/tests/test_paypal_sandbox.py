@@ -159,3 +159,81 @@ def test_paypal_status_and_schema_contract(monkeypatch):
         assert "paypal_mode" in status_data
         assert status_data["paypal_mode"] == "sandbox"
 
+
+def test_paypal_adapter_verify_direct_capture_resource_and_merchant():
+    """Verify capture verification against direct Capture resource (webhook/capture API) and merchant ID."""
+    adapter = PaypalAdapter(
+        client_id="test",
+        client_secret="test",
+        merchant_id="MERCHANT_AURA_123",
+    )
+
+    valid_direct_capture = {
+        "id": "CAP-DIRECT-789",
+        "status": "COMPLETED",
+        "amount": {
+            "currency_code": "USD",
+            "value": "5.00",
+        },
+        "custom_id": "AM-PLUS-1795330000-DIRECT",
+        "payee": {
+            "merchant_id": "MERCHANT_AURA_123",
+            "email_address": "merchant@aurameme.com",
+        },
+    }
+
+    # Successful direct capture verification
+    ok, msg = adapter.verify_capture(
+        valid_direct_capture,
+        expected_amount_cents=500,
+        expected_order_code="AM-PLUS-1795330000-DIRECT",
+    )
+    assert ok is True
+    assert "Capture verified successfully" in msg
+
+    # Merchant mismatch
+    ok_bad_merchant, msg_bad = adapter.verify_capture(
+        valid_direct_capture,
+        expected_amount_cents=500,
+        expected_order_code="AM-PLUS-1795330000-DIRECT",
+        expected_merchant_id="DIFFERENT_MERCHANT",
+    )
+    assert ok_bad_merchant is False
+    assert "Merchant mismatch" in msg_bad
+
+
+def test_live_paypal_sandbox_api_smoke():
+    """Live verification against real PayPal Sandbox API if credentials exist in environment."""
+    from app.config import PremiumSettings
+    cfg = PremiumSettings()
+    if not cfg.paypal_client_id or not cfg.paypal_client_secret:
+        pytest.skip("PayPal Sandbox credentials not configured in environment.")
+
+    secret = cfg.paypal_client_secret.get_secret_value()
+    adapter = PaypalAdapter(
+        client_id=cfg.paypal_client_id,
+        client_secret=secret,
+        mode=cfg.paypal_mode,
+        webhook_id=cfg.paypal_webhook_id,
+    )
+
+    # 1. Fetch live OAuth2 token
+    token = adapter.get_access_token()
+    assert token and len(token) > 20
+
+    # 2. Create authoritative live test order on PayPal Sandbox
+    test_code = f"AM-PLUS-{int(datetime.now(timezone.utc).timestamp())}-LIVE01"
+    order_res = adapter.create_order(order_code=test_code, plan_tier="plus")
+    assert order_res["id"] is not None
+    assert order_res["status"] == "CREATED"
+    assert "sandbox.paypal.com" in order_res["approve_url"]
+
+    # 3. Retrieve live order details directly from PayPal Orders v2
+    details = adapter.get_order_details(order_res["id"])
+    assert details["id"] == order_res["id"]
+    assert details["status"] == "CREATED"
+    assert details["purchase_units"][0]["amount"]["currency_code"] == "USD"
+    assert details["purchase_units"][0]["amount"]["value"] == "5.00"
+    assert details["purchase_units"][0]["custom_id"] == test_code
+
+

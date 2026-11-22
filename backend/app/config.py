@@ -60,6 +60,7 @@ class PremiumSettings(BaseSettings):
     paypal_mode: Literal["sandbox", "live"] = "sandbox"
     paypal_client_id: str | None = None
     paypal_client_secret: SecretStr | None = None
+    paypal_merchant_id: str | None = None
     paypal_webhook_id: str | None = None
     paypal_return_url: str = "http://localhost:5173/premium/checkout"
     paypal_cancel_url: str = "http://localhost:5173/premium"

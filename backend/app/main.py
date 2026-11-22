@@ -63,6 +63,7 @@ async def lifespan(app: FastAPI):
             client_id=app.state.premium.paypal_client_id,
             client_secret=paypal_secret,
             mode=app.state.premium.paypal_mode,
+            merchant_id=app.state.premium.paypal_merchant_id,
             webhook_id=app.state.premium.paypal_webhook_id,
             return_url=app.state.premium.paypal_return_url,
             cancel_url=app.state.premium.paypal_cancel_url,

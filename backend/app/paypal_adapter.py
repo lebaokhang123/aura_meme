@@ -42,6 +42,7 @@ class PaypalAdapter:
         client_id: str | None = None,
         client_secret: str | None = None,
         mode: str = "sandbox",
+        merchant_id: str | None = None,
         webhook_id: str | None = None,
         return_url: str = "http://localhost:5173/premium/checkout",
         cancel_url: str = "http://localhost:5173/premium",
@@ -49,6 +50,7 @@ class PaypalAdapter:
         self.client_id = client_id.strip() if client_id else None
         self.client_secret = client_secret.strip() if client_secret else None
         self.mode = mode.lower() if mode else "sandbox"
+        self.merchant_id = merchant_id.strip() if merchant_id else None
         self.webhook_id = webhook_id.strip() if webhook_id else None
         self.return_url = return_url
         self.cancel_url = cancel_url
@@ -226,38 +228,65 @@ class PaypalAdapter:
         path = f"/v2/checkout/orders/{urllib.parse.quote(paypal_order_id)}"
         return self._http_request("GET", path, headers=headers)
 
+    def get_capture_details(self, capture_id: str) -> dict[str, Any]:
+        """Fetches live capture details directly from PayPal Payments v2."""
+        token = self.get_access_token()
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        path = f"/v2/payments/captures/{urllib.parse.quote(capture_id)}"
+        return self._http_request("GET", path, headers=headers)
+
     def verify_capture(
         self,
         capture_data: dict[str, Any],
         expected_amount_cents: int,
         expected_order_code: str | None = None,
+        expected_merchant_id: str | None = None,
     ) -> tuple[bool, str]:
-        """Strict verification of a capture payload against expected amount, currency (USD), and status."""
+        """Strict verification of a capture payload against expected amount, currency (USD), status, and merchant."""
+        if not capture_data:
+            return False, "Capture data is empty."
+
         status = capture_data.get("status")
         if status != "COMPLETED":
             return False, f"Capture status is not COMPLETED (got '{status}')."
 
-        purchase_units = capture_data.get("purchase_units") or []
-        if not purchase_units:
-            return False, "Capture data contains no purchase units."
+        # Determine whether capture_data is an Order object with purchase_units or a direct Capture resource
+        if "purchase_units" in capture_data:
+            purchase_units = capture_data.get("purchase_units") or []
+            if not purchase_units:
+                return False, "Capture data contains no purchase units."
+            unit = purchase_units[0]
+            if expected_order_code:
+                ref_id = unit.get("reference_id") or unit.get("custom_id")
+                if ref_id and ref_id != expected_order_code:
+                    return False, f"Order reference mismatch (expected '{expected_order_code}', got '{ref_id}')."
 
-        unit = purchase_units[0]
-        if expected_order_code:
-            ref_id = unit.get("reference_id") or unit.get("custom_id")
-            if ref_id and ref_id != expected_order_code:
-                return False, f"Order reference mismatch (expected '{expected_order_code}', got '{ref_id}')."
+            payments = unit.get("payments", {})
+            captures = payments.get("captures", [])
+            if not captures:
+                return False, "No capture transaction records found in purchase unit."
+            capture_obj = captures[0]
+            cap_status = capture_obj.get("status")
+            if cap_status != "COMPLETED":
+                return False, f"Inner capture status is not COMPLETED (got '{cap_status}')."
+            amount_info = capture_obj.get("amount", {})
+            payee = unit.get("payee") or capture_obj.get("payee") or {}
+        else:
+            capture_obj = capture_data
+            if expected_order_code:
+                ref_id = capture_obj.get("custom_id") or capture_obj.get("invoice_id")
+                if not ref_id:
+                    supp = capture_obj.get("supplementary_data", {})
+                    ref_id = supp.get("related_ids", {}).get("order_id")
+                if ref_id and ref_id != expected_order_code:
+                    return False, f"Order reference mismatch (expected '{expected_order_code}', got '{ref_id}')."
+            amount_info = capture_obj.get("amount", {})
+            payee = capture_obj.get("payee") or {}
 
-        payments = unit.get("payments", {})
-        captures = payments.get("captures", [])
-        if not captures:
-            return False, "No capture transaction records found in purchase unit."
-
-        capture_obj = captures[0]
-        cap_status = capture_obj.get("status")
-        if cap_status != "COMPLETED":
-            return False, f"Inner capture status is not COMPLETED (got '{cap_status}')."
-
-        amount_info = capture_obj.get("amount", {})
         currency = amount_info.get("currency_code")
         if currency != "USD":
             return False, f"Invalid currency: expected 'USD', got '{currency}'."
@@ -270,6 +299,12 @@ class PaypalAdapter:
 
         if val_cents != expected_amount_cents:
             return False, f"Amount mismatch: expected {expected_amount_cents} cents, got {val_cents} cents."
+
+        target_merchant_id = expected_merchant_id or self.merchant_id
+        if target_merchant_id:
+            m_id = payee.get("merchant_id")
+            if m_id and m_id != target_merchant_id:
+                return False, f"Merchant mismatch: expected '{target_merchant_id}', got '{m_id}'."
 
         return True, "Capture verified successfully."
 

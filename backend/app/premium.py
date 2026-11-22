@@ -366,6 +366,68 @@ def create_subscription_order(
     )
 
 
+def _activate_subscription(db, order: SubscriptionOrder, now: datetime) -> UserSubscription:
+    """Authoritative idempotent subscription activation / extension."""
+    sub = db.scalar(select(UserSubscription).where(UserSubscription.user_id == order.user_id))
+    if sub and isinstance(sub, UserSubscription):
+        sub.tier = order.tier
+        sub.status = "active"
+        base_time = sub.expires_at if (sub.expires_at and sub.expires_at > now) else now
+        sub.expires_at = base_time + timedelta(days=order.duration_days)
+        if not sub.starts_at or sub.starts_at > now:
+            sub.starts_at = now
+        sub.order_id = order.id
+        sub.updated_at = now
+    else:
+        sub = UserSubscription(
+            id=uuid4(),
+            user_id=order.user_id,
+            tier=order.tier,
+            status="active",
+            starts_at=now,
+            expires_at=now + timedelta(days=order.duration_days),
+            order_id=order.id,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(sub)
+    return sub
+
+
+def _check_and_expire_order(order: SubscriptionOrder, db, now: datetime, paypal: PaypalAdapter | None = None) -> bool:
+    """Checks a stale pending order. Reconciles if captured on PayPal; otherwise transitions to expired.
+    Never grants subscription without verified capture confirmation."""
+    if order.status != "pending" or order.created_at >= now - ORDER_EXPIRY_TIMEOUT:
+        return False
+
+    is_captured = False
+    if order.provider == "paypal_sandbox" and paypal and paypal.is_configured() and order.provider_txn_id:
+        try:
+            pp_order = paypal.get_order_details(order.provider_txn_id)
+            if pp_order.get("status") == "COMPLETED":
+                is_valid, _ = paypal.verify_capture(
+                    pp_order,
+                    expected_amount_cents=order.amount_cents,
+                    expected_order_code=order.order_code,
+                    expected_merchant_id=paypal.merchant_id,
+                )
+                if is_valid:
+                    order.status = "success"
+                    order.completed_at = now
+                    order.updated_at = now
+                    _activate_subscription(db, order, now)
+                    is_captured = True
+                    logger.info("Stale pending order %s reconciled to success via PayPal verification.", order.order_code)
+        except Exception as exc:
+            logger.warning("Could not check PayPal status for order %s: %s", order.order_code, exc)
+
+    if not is_captured and order.status == "pending":
+        order.status = "expired"
+        order.updated_at = now
+    db.flush()
+    return True
+
+
 @router.get(
     "/orders",
     operation_id="listSubscriptionOrders",
@@ -382,7 +444,8 @@ def list_subscription_orders(
     """List subscription orders for the current user with pagination and optional status filter."""
     try:
         now = datetime.now(timezone.utc)
-        # Auto-expire stale pending orders older than ORDER_EXPIRY_TIMEOUT
+        paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None) if (request and hasattr(request, "app")) else None
+        # Auto-expire stale pending orders older than ORDER_EXPIRY_TIMEOUT (checking PayPal capture first)
         stale_res = account.db.scalars(
             select(SubscriptionOrder).where(
                 SubscriptionOrder.user_id == account.user.id,
@@ -392,10 +455,7 @@ def list_subscription_orders(
         )
         stale_orders = stale_res.all() if hasattr(stale_res, "all") else list(stale_res or [])
         for st in stale_orders:
-            st.status = "expired"
-            st.updated_at = now
-        if stale_orders:
-            account.db.flush()
+            _check_and_expire_order(st, account.db, now, paypal)
 
         stmt = select(SubscriptionOrder).where(SubscriptionOrder.user_id == account.user.id)
         if status:
@@ -512,6 +572,7 @@ def list_successful_orders(
 )
 def get_subscription_order(
     order_code: str,
+    request: Request = None,
     account=Depends(require_authenticated_user),
 ):
     """Retrieve authoritative order status for authenticated user."""
@@ -527,10 +588,8 @@ def get_subscription_order(
         raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại.")
 
     now = datetime.now(timezone.utc)
-    if order.status == "pending" and order.created_at < now - ORDER_EXPIRY_TIMEOUT:
-        order.status = "expired"
-        order.updated_at = now
-        account.db.flush()
+    paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None) if (request and hasattr(request, "app")) else None
+    _check_and_expire_order(order, account.db, now, paypal)
 
     plan = get_plan(order.tier)
     return OrderDto(
@@ -786,29 +845,8 @@ def capture_subscription_order(
     order.completed_at = now
     order.updated_at = now
 
-    sub = account.db.scalar(select(UserSubscription).where(UserSubscription.user_id == account.user.id))
-    if sub:
-        sub.tier = order.tier
-        sub.status = "active"
-        base_time = sub.expires_at if (sub.expires_at and sub.expires_at > now) else now
-        sub.expires_at = base_time + timedelta(days=order.duration_days)
-        if not sub.starts_at or sub.starts_at > now:
-            sub.starts_at = now
-        sub.order_id = order.id
-        sub.updated_at = now
-    else:
-        sub = UserSubscription(
-            id=uuid4(),
-            user_id=account.user.id,
-            tier=order.tier,
-            status="active",
-            starts_at=now,
-            expires_at=now + timedelta(days=order.duration_days),
-            order_id=order.id,
-            created_at=now,
-            updated_at=now,
-        )
-        account.db.add(sub)
+    _activate_subscription(account.db, order, now)
+    account.db.flush()
 
     account.db.flush()
 
@@ -970,71 +1008,141 @@ def handle_vnpay_ipn(request: Request):
 
 @router.post("/paypal/webhook", operation_id="handlePaypalWebhook")
 async def handle_paypal_webhook(request: Request):
-    """Handle PayPal webhook events (e.g. PAYMENT.CAPTURE.COMPLETED)."""
+    """Handle PayPal webhook events (e.g. PAYMENT.CAPTURE.COMPLETED) with strict fail-closed security."""
     now = request.app.state.auth.now()
     paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
     raw_body = await request.body()
     headers = dict(request.headers)
 
-    if paypal and paypal.is_configured() and paypal.webhook_id:
-        is_valid = paypal.verify_webhook_signature(headers, raw_body)
-        if not is_valid:
-            logger.warning("PayPal webhook signature verification failed.")
-            return {"status": "ignored", "reason": "invalid_signature"}
+    # 1. Fail-closed: missing adapter, missing credentials, or missing webhook_id must reject
+    if not paypal or not paypal.is_configured() or not paypal.webhook_id:
+        logger.warning("PayPal webhook rejected: adapter or webhook_id is not configured (fail-closed).")
+        return Response(
+            content=json.dumps({"status": "rejected", "reason": "webhook_not_configured"}),
+            status_code=503,
+            media_type="application/json",
+        )
+
+    # 2. Fail-closed: invalid signature must reject immediately
+    is_valid_sig = paypal.verify_webhook_signature(headers, raw_body)
+    if not is_valid_sig:
+        logger.warning("PayPal webhook rejected: signature verification failed (fail-closed).")
+        return Response(
+            content=json.dumps({"status": "rejected", "reason": "invalid_signature"}),
+            status_code=400,
+            media_type="application/json",
+        )
 
     try:
         event = json.loads(raw_body.decode("utf-8"))
     except Exception:
-        return {"status": "error", "reason": "invalid_json"}
+        return Response(
+            content=json.dumps({"status": "error", "reason": "invalid_json"}),
+            status_code=400,
+            media_type="application/json",
+        )
 
     event_type = event.get("event_type")
     resource = event.get("resource", {})
 
     if event_type == "PAYMENT.CAPTURE.COMPLETED":
         order_code = resource.get("custom_id") or resource.get("invoice_id")
+        capture_id = resource.get("id")
         if not order_code:
             order_code = resource.get("supplementary_data", {}).get("related_ids", {}).get("order_id")
 
-        if order_code:
-            with request.app.state.auth_session_factory() as db, db.begin():
-                order = db.scalar(
-                    select(SubscriptionOrder)
-                    .where(
-                        (SubscriptionOrder.order_code == order_code)
-                        | (SubscriptionOrder.provider_txn_id == resource.get("id"))
-                    )
-                    .with_for_update()
+        if not order_code and not capture_id:
+            logger.warning("PayPal webhook missing order reference identifiers.")
+            return Response(
+                content=json.dumps({"status": "ignored", "reason": "missing_order_reference"}),
+                status_code=200,
+                media_type="application/json",
+            )
+
+        with request.app.state.auth_session_factory() as db, db.begin():
+            stmt = select(SubscriptionOrder)
+            if order_code and capture_id:
+                stmt = stmt.where(
+                    (SubscriptionOrder.order_code == order_code)
+                    | (SubscriptionOrder.provider_txn_id == capture_id)
                 )
-                if order and order.status != "success":
-                    order.status = "success"
-                    order.completed_at = now
-                    order.provider_txn_id = resource.get("id")
-                    order.provider_payload = resource
-                    order.updated_at = now
+            elif order_code:
+                stmt = stmt.where(SubscriptionOrder.order_code == order_code)
+            else:
+                stmt = stmt.where(SubscriptionOrder.provider_txn_id == capture_id)
 
-                    sub = db.scalar(select(UserSubscription).where(UserSubscription.user_id == order.user_id))
-                    if sub:
-                        sub.tier = order.tier
-                        sub.status = "active"
-                        base_time = sub.expires_at if (sub.expires_at and sub.expires_at > now) else now
-                        sub.expires_at = base_time + timedelta(days=order.duration_days)
-                        if not sub.starts_at or sub.starts_at > now:
-                            sub.starts_at = now
-                        sub.order_id = order.id
-                        sub.updated_at = now
-                    else:
-                        sub = UserSubscription(
-                            id=uuid4(),
-                            user_id=order.user_id,
-                            tier=order.tier,
-                            status="active",
-                            starts_at=now,
-                            expires_at=now + timedelta(days=order.duration_days),
-                            order_id=order.id,
-                            created_at=now,
-                            updated_at=now,
-                        )
-                        db.add(sub)
+            order = db.scalar(stmt.with_for_update())
+            if not order:
+                logger.warning("PayPal webhook received for unknown order: %s / %s", order_code, capture_id)
+                return Response(
+                    content=json.dumps({"status": "ignored", "reason": "order_not_found"}),
+                    status_code=200,
+                    media_type="application/json",
+                )
 
-    return {"status": "received"}
+            # Strict provider check
+            if order.provider != "paypal_sandbox":
+                logger.warning("PayPal webhook rejected: order %s provider is '%s', expected 'paypal_sandbox'.", order.order_code, order.provider)
+                return Response(
+                    content=json.dumps({"status": "rejected", "reason": "invalid_provider"}),
+                    status_code=400,
+                    media_type="application/json",
+                )
+
+            # Idempotency check: if order is already successful, do not re-activate
+            if order.status == "success":
+                logger.info("PayPal webhook idempotent skip: order %s already marked success.", order.order_code)
+                return Response(
+                    content=json.dumps({"status": "already_processed", "order_code": order.order_code}),
+                    status_code=200,
+                    media_type="application/json",
+                )
+
+            # Authoritative live capture verification from PayPal Payments API
+            capture_payload = resource
+            if capture_id:
+                try:
+                    live_details = paypal.get_capture_details(capture_id)
+                    if live_details and isinstance(live_details, dict) and live_details.get("status"):
+                        capture_payload = live_details
+                except Exception as exc:
+                    logger.warning("Could not fetch live capture %s from PayPal API, evaluating webhook resource: %s", capture_id, exc)
+
+            # Verify capture status, currency USD, exact amount, order reference, and merchant
+            is_valid_capture, reason = paypal.verify_capture(
+                capture_payload,
+                expected_amount_cents=order.amount_cents,
+                expected_order_code=order.order_code,
+                expected_merchant_id=paypal.merchant_id,
+            )
+            if not is_valid_capture:
+                logger.warning("PayPal webhook capture verification failed for order %s: %s", order.order_code, reason)
+                return Response(
+                    content=json.dumps({"status": "rejected", "reason": reason}),
+                    status_code=400,
+                    media_type="application/json",
+                )
+
+            # Reconcile order to success (even if callback was delayed and order was pending or expired)
+            order.status = "success"
+            order.completed_at = now
+            order.provider_txn_id = capture_id or resource.get("id")
+            order.provider_payload = capture_payload
+            order.provider_response_code = "COMPLETED"
+            order.updated_at = now
+
+            _activate_subscription(db, order, now)
+            logger.info("PayPal webhook successfully completed and activated subscription for order %s.", order.order_code)
+
+        return Response(
+            content=json.dumps({"status": "success", "order_code": order_code}),
+            status_code=200,
+            media_type="application/json",
+        )
+
+    return Response(
+        content=json.dumps({"status": "received", "event_type": event_type}),
+        status_code=200,
+        media_type="application/json",
+    )
 
