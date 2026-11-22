@@ -836,3 +836,95 @@ Thực hiện chuẩn xác yêu cầu của Owner về bản sắc nhận diện
 
 
 
+
+
+---
+
+## 18. Chuẩn hóa Lịch sử Thanh toán Mở rộng, Trạng thái Giao dịch, Biên lai PDF & Giới hạn Hồ sơ (25/100)
+
+### 18.1. Phân trang Lịch sử Thanh toán & Chuẩn hóa Trạng thái Đơn hàng (Phần A & B)
+- **Backend API Pagination (`backend/app/premium.py`):**
+  - Cập nhật endpoint `GET /api/v1/premium/orders`: Hỗ trợ tham số `page` (mặc định 1), `limit` (mặc định 10), và `status` filter.
+  - Trả về cấu trúc phân trang chuẩn: `OrderPage(items=[...], pagination=Pagination(page, page_size, total, total_pages))`.
+  - Sắp xếp ổn định (deterministic sort): Đơn mới nhất lên đầu `created_at.desc(), id.desc()`.
+  - Không giới hạn số lượng đơn lưu trữ, cho phép tải lại toàn bộ biên lai của các đơn thành công theo nhu cầu.
+  - Xử lý lỗi API: Trả về 500 có cấu trúc với log chi tiết thay vì nuốt ngoại lệ thành danh sách rỗng.
+- **Tự động Hết hạn Đơn hàng (Auto-expiry & Configurable Timeout):**
+  - Cấu hình `ORDER_EXPIRY_TIMEOUT = timedelta(hours=1)`.
+  - Tự động chuyển đổi các đơn hàng ở trạng thái `pending` đã tạo quá 1 giờ thành `expired` ngay khi truy vấn `get_subscription_order` hoặc `list_subscription_orders`.
+  - Ngăn chặn triệt để tình trạng treo đơn vô thời hạn.
+- **Chuẩn hóa Trạng thái Nghiệp vụ & Giao diện:**
+  - Phân định rõ ràng giữa các trạng thái kỹ thuật và nhãn hiển thị:
+    - `pending`: "Chờ thanh toán" (Badge màu vàng hổ phách).
+    - `processing`: "Đang xác nhận" (Badge màu xanh lơ cyan / pulsing).
+    - `success`: "Thành công" (Badge màu xanh ngọc lục bảo).
+    - `failed`: "Thất bại" (Badge màu đỏ).
+    - `cancelled`: "Đã hủy" (Badge màu xám ghi).
+    - `expired`: "Hết hạn" (Badge màu xám tro).
+  - Loại bỏ hoàn toàn nhãn "Đang xử lý" mơ hồ.
+  - Bổ sung thanh lọc (Filter Toolbar) với các chip chọn nhanh (`Tất cả`, `Thành công`, `Chờ thanh toán`, `Đang xác nhận`, `Thất bại`, `Đã hủy`, `Hết hạn`).
+  - Hộp thoại Chi tiết Giao dịch (Modal Details): Bổ sung dòng giải thích ngữ nghĩa trạng thái chi tiết (`history-detail-note`) giúp người dùng hiểu rõ nguyên nhân và hướng xử lý.
+  - Khi API xảy ra lỗi: Hiển thị trạng thái lỗi có nút "Thử lại" ("Retry"), tuyệt đối không hiển thị danh sách trống gây hiểu nhầm.
+
+### 18.2. Lịch sử 10 Giao dịch Thành công Gần nhất trên Biên lai PDF (Phần C)
+- **Authoritative Backend Endpoint (`GET /api/v1/premium/orders/successful`):**
+  - Endpoint bảo mật cấp backend, chỉ trả về tối đa 10 đơn hàng có trạng thái `success` của chính người dùng đã xác thực.
+  - Sắp xếp theo `completed_at.desc().nullslast(), created_at.desc(), id.desc()`.
+- **Cải tiến Layout & Bố cục PDF (`frontend/src/receipt-pdf.js`):**
+  - Khu vực **LỊCH SỬ THANH TOÁN / PAYMENT HISTORY** hiển thị chính xác danh sách các giao dịch thành công (từ 0 đến 10 dòng).
+  - Khi có 0 giao dịch: Hiển thị 1 dòng thông báo trang nhã *"Chưa có lịch sử giao dịch trước đây / No prior successful transactions"*.
+  - Định dạng bảng rõ ràng: Cổng thanh toán, Ngày hoàn tất, Số tiền, Trạng thái (`HOÀN TẤT` màu xanh lục), và Mã tham chiếu giao dịch.
+  - Cơ chế tự ngắt dòng phụ (`secondary subline`) cho mã tham chiếu dài (`> 37mm`) đảm bảo không bao giờ dính chữ hoặc đè cột.
+  - Cơ chế phân trang tự động (Auto-pagination): Khi số lượng giao dịch đẩy vị trí con trỏ vượt quá `Y = 260mm`, hàm tự động tách sang trang 2, lặp lại tiêu đề bảng và in số trang động ở chân trang: `Trang ${p} / ${totalPages} (Page ${p} of ${totalPages})`.
+  - Đã xuất và kiểm tra thực tế 4 mẫu artifact PDF tại 150 DPI:
+    - `task5_receipt_0_history.png`: 0 dòng lịch sử, vừa vặn 1 trang A4.
+    - `task5_receipt_1_history.png`: 1 dòng lịch sử, vừa vặn 1 trang A4.
+    - `task5_receipt_5_history.png`: 5 dòng lịch sử, vừa vặn 1 trang A4.
+    - `task5_receipt_10_history.png`: Đầy đủ 10 dòng lịch sử, không tràn trang, không đè lấn lề dưới hoặc tiêu đề chân trang.
+
+### 18.3. Chuẩn hóa Giới hạn Hồ sơ theo Quyết định Mới (Phần D)
+- **Giới hạn ký tự chính thức:**
+  - **Tên hiển thị (`display_name`):** Tối đa **25 ký tự** (thay thế mức cũ 50/80).
+  - **Tiểu sử (`bio`):** Tối đa **100 ký tự** (thay thế mức cũ 300/1000).
+- **Cập nhật Giao diện Người dùng (`frontend/src/components/profile-edit.jsx`):**
+  - `maxLength={25}` trên input tên hiển thị, bộ đếm `{name.length}/25`.
+  - `maxLength={100}` trên textarea tiểu sử, bộ đếm `{bio.length}/100`.
+  - Bộ đếm đặt ngoài `<label>`, sử dụng font monospace, đánh dấu `aria-hidden="true"` để bảo vệ khả năng truy cập (Accessibility).
+  - Client-side validation: Chặn submit rỗng/khoảng trắng, thông báo lỗi song ngữ VI/EN rõ ràng khi vượt quá 25 hoặc 100 ký tự.
+- **Cập nhật Backend Schema Guard (`backend/app/account_schemas.py`):**
+  - Cập nhật `ProfilePatch`: `display_name: str = Field(default=None, min_length=1, max_length=25)`.
+  - Cập nhật `ProfilePatch`: `bio: str | None = Field(default=None, max_length=100)`.
+  - Cập nhật `@field_validator("display_name")`: Ném lỗi `Tên hiển thị không được vượt quá 25 ký tự.`
+  - Cập nhật `@field_validator("bio")`: Ném lỗi `Tiểu sử không được vượt quá 100 ký tự.`
+  - Giữ nguyên `UserPublic` và `AccountPrivate` không ép `max_length`, đảm bảo các tài khoản cũ trong DB có tên/tiểu sử dài hơn mức mới không bị lỗi khi đọc dữ liệu.
+
+### 18.4. Rà soát Rủi ro Mua Nhiều Lần & Ghi chú Blocker Nâng cấp Gói (Phần E)
+- **Rà soát & Chặn Nguy cơ Thanh toán Lặp:**
+  1. *Double-click nút thanh toán:* Phía Client đặt `disabled={isSpinning}` và hiển thị spinner ngay khi kích hoạt. Phía Server khóa dòng đơn hàng `with_for_update()`, kiểm tra trạng thái `order.status == "success"` để trả về ngay DTO hiện hữu (Idempotent), tuyệt đối không cộng dồn thời hạn hoặc tạo bản ghi gia hạn thứ hai.
+  2. *Idempotency:* Gọi lại capture hoặc simulate nhiều lần với cùng một mã đơn hàng đều trả về kết quả nhất quán và không thay đổi thời hạn gói.
+  3. *Webhook lặp lại:* Endpoint `POST /api/v1/premium/paypal/webhook` xử lý sự kiện `PAYMENT.CAPTURE.COMPLETED` có điều kiện `if order and order.status != "success":`. Khi webhook gửi lại lần 2, hệ thống bỏ qua bước cộng ngày và trả về `{"status": "received"}` ngay lập tức.
+  4. *Nhiều đơn pending cùng lúc:* Hàm `create_subscription_order` kiểm tra nếu người dùng đã có đơn hàng `pending` cùng gói và nhà cung cấp tạo trong vòng 15 phút, hệ thống sẽ tái sử dụng lại đơn đó thay vì tạo rác đơn mới trong cơ sở dữ liệu.
+  5. *Bảo vệ môi trường Production:* Khóa hoàn toàn các hành vi mô phỏng và yêu cầu cấu hình PayPal thực tế khi `auth_environment == "production"`.
+- **Ghi chú Blocker cho Owner — Vấn đề Chuyển đổi Gói (Plus ↔ Prime):**
+  - *Hiện trạng:* Khi người dùng có gói Plus đang hoạt động mà mua tiếp Prime (hoặc ngược lại), hệ thống hiện cập nhật `tier` của gói đăng ký sang gói mới và cộng dồn ngày bắt đầu từ mốc `expires_at` hiện tại hoặc thời điểm hiện tại.
+  - *Câu hỏi nghiệp vụ cần Owner chốt trước khi ra mắt thật:*
+    1. **Nâng cấp từ Plus lên Prime:** Có tính bù trừ số tiền dựa trên số ngày Plus còn lại không? Hay người dùng phải thanh toán đủ $50 và được chuyển thẳng lên Prime ngay lập tức?
+    2. **Hạ cấp từ Prime xuống Plus:** Có cho phép mua gói thấp hơn khi gói cao cấp hơn còn hạn không? Số ngày Prime còn lại sẽ được bảo lưu hay chuyển đổi tương đương thế nào?
+    3. **Chính sách hoàn tiền:** Có cơ chế Refund tự động qua cổng thanh toán không hay chỉ hỗ trợ thủ công qua kênh hỗ trợ?
+  - *Quyết định kỹ thuật hiện tại:* Giữ nguyên logic an toàn, không tự ý suy đoán quy tắc tài chính, sẵn sàng bổ sung quy tắc chuyển đổi ngay khi Owner có quyết định chính thức.
+
+### 18.5. Tổng hợp Kết quả Kiểm thử Toàn diện
+- **Frontend Unit Tests (`node --test frontend/tests/*.test.mjs`):** **81/81 passed** (100%).
+- **PDF History Unit Tests (`frontend/tests/receipt-pdf.test.mjs`):** 3/3 suites passed (xác nhận 0, 1, 5, 10 dòng không tràn trang).
+- **Backend Non-Integration Pytest Suite:** **456 passed**, 788 deselected (integration), 0 failed.
+- **Backend Order Security & Idempotency Suite (`tests/test_order_security.py`):** **9/9 passed** (bao gồm IDOR, double capture, auto-expiry 1h, webhook duplicate idempotent, order reuse <15 min, pagination).
+- **Frontend Production Build (`npm run build`):** Hoàn thành thành công không lỗi trong 7.44s.
+- **Playwright E2E Suite (`premium-sandbox.spec.js` + `profile-*.spec.js`):** **55/55 passed** (19 tests sandbox + 36 tests profile).
+- **Artifacts thị giác mới:**
+  - `task5_receipt_0_history.png` (Biên lai với 0 đơn lịch sử)
+  - `task5_receipt_1_history.png` (Biên lai với 1 đơn lịch sử)
+  - `task5_receipt_5_history.png` (Biên lai với 5 đơn lịch sử)
+  - `task5_receipt_10_history.png` (Biên lai với 10 đơn lịch sử đầy đủ)
+  - `task5_payment_history_table.png` (Trang lịch sử phân trang và bộ lọc)
+  - `task5_payment_history_modal.png` (Hộp thoại chi tiết với ghi chú trạng thái)
+  - `task5_profile_edit_25_100.png` (Giao diện sửa hồ sơ với bộ đếm 25 và 100)
