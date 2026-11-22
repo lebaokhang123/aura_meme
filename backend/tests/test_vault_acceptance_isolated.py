@@ -25,29 +25,40 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+pytestmark = pytest.mark.integration
+
 # Configure isolated environment
 ISOLATED_DB_URL = "postgresql+psycopg://aurameme_demo:not-a-real-test-password@127.0.0.1:5432/aurameme_vault_verify"
 CATALOG_ROOT = r"D:\Big\du_an_lon\aura_meme_mvp\backend\demo.local\catalog"
 MEDIA_ROOT = r"D:\Big\du_an_lon\aura_meme_mvp\backend\demo.local\media"
 
-os.environ["DATABASE_URL"] = ISOLATED_DB_URL
-os.environ["CATALOG_STORAGE_ROOT"] = CATALOG_ROOT
-os.environ["MEDIA_STORAGE_ROOT"] = MEDIA_ROOT
-os.environ["VAULT_RUNTIME_ENABLED"] = "true"
-os.environ["AURAMEME_OWNER_MEME_DEMO"] = "1"
-os.environ["AUTH_ENVIRONMENT"] = "development"
-os.environ["AUTH_ALLOWED_ORIGINS"] = '["http://localhost:5173"]'
-os.environ["AUTH_SIGNING_KEY"] = "not-a-real-archived-signing-key"
-
-from app.main import app
-from app.models import AuraLedger, UserProgress
-
 
 @pytest.fixture(scope="module")
 def isolated_client():
+    old_env = dict(os.environ)
+    os.environ["DATABASE_URL"] = ISOLATED_DB_URL
+    os.environ["CATALOG_STORAGE_ROOT"] = CATALOG_ROOT
+    os.environ["MEDIA_STORAGE_ROOT"] = MEDIA_ROOT
+    os.environ["VAULT_RUNTIME_ENABLED"] = "true"
+    os.environ["AURAMEME_OWNER_MEME_DEMO"] = "1"
+    os.environ["AUTH_ENVIRONMENT"] = "development"
+    os.environ["AUTH_ALLOWED_ORIGINS"] = '["http://localhost:5173"]'
+    os.environ["AUTH_SIGNING_KEY"] = "not-a-real-archived-signing-key"
+
+    from app.main import app
+    from app.models import AuraLedger, UserProgress
+
     test_username = f"user_{secrets.token_hex(4)}"
     password_clear = "TestPass123!Secure"
     email = f"{test_username}@example.com"
+
+    try:
+        with TestClient(app, base_url="http://localhost:5173") as client:
+            client.headers.update({"Origin": "http://localhost:5173"})
+            yield client
+    finally:
+        os.environ.clear()
+        os.environ.update(old_env)
 
     with TestClient(app, base_url="http://localhost:5173") as client:
         client.headers.update({"Origin": "http://localhost:5173"})
