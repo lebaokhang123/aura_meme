@@ -178,6 +178,7 @@ export default function PaymentHistoryPage() {
       setDownloadSuccess(order.order_code);
       setTimeout(() => setDownloadSuccess(null), 3000);
     } catch {
+      handleCloseDetail();
       setError(t('Không thể tải biên lai và lịch sử đầy đủ. Vui lòng thử lại.', 'Unable to load receipt and payment history. Please retry.'));
     }
   };

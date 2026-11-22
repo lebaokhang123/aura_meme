@@ -1151,7 +1151,9 @@ test('history download surfaces a server history failure without downloading a p
   let downloads=0;
   page.on('download',()=>downloads++);
   await page.goto('/premium/history');
-  await page.getByRole('button',{name:'Tải biên lai',exact:true}).first().click();
+  await page.getByRole('button',{name:'Xem chi tiết',exact:true}).first().click();
+  await page.getByRole('button',{name:'Tải biên lai PDF',exact:true}).click();
+  await expect(page.locator('.history-detail-modal')).not.toBeVisible();
   await expect(page.getByText('Không thể tải biên lai và lịch sử đầy đủ. Vui lòng thử lại.',{exact:true})).toBeVisible();
   expect(downloads).toBe(0);
 });
