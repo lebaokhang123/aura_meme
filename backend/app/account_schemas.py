@@ -57,8 +57,8 @@ class PublicProfile(UserPublic):
 class ProfilePatch(BaseModel):
     model_config = ConfigDict(extra="forbid", json_schema_extra={"minProperties": 1})
     # Omission is allowed; explicit null still fails the non-nullable string type.
-    display_name: str = Field(default=None, min_length=1, max_length=80)
-    bio: str | None = Field(default=None, max_length=1000)
+    display_name: str = Field(default=None, min_length=1, max_length=50)
+    bio: str | None = Field(default=None, max_length=300)
     birth_year: StrictInt | None = Field(default=None, ge=1900, le=9999)
     address: str | None = Field(default=None, max_length=255)
     phone: str | None = Field(default=None, max_length=30)
@@ -77,7 +77,24 @@ class ProfilePatch(BaseModel):
     @field_validator("display_name")
     @classmethod
     def nonempty_name(cls, value):
-        return RegisterInput.nonempty_name(value)
+        if value is not None:
+            stripped = value.strip()
+            if not stripped:
+                raise ValueError("Tên hiển thị không được để trống hoặc chỉ có khoảng trắng.")
+            if len(stripped) > 50:
+                raise ValueError("Tên hiển thị không được vượt quá 50 ký tự.")
+            return stripped
+        return value
+
+    @field_validator("bio")
+    @classmethod
+    def valid_bio(cls, value):
+        if value is not None:
+            stripped = value.strip()
+            if len(stripped) > 300:
+                raise ValueError("Tiểu sử không được vượt quá 300 ký tự.")
+            return stripped or None
+        return value
 
     @model_validator(mode="after")
     def nonempty_patch(self):
