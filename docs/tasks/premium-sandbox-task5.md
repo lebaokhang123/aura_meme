@@ -1,5 +1,18 @@
 # TÀI LIỆU BÀN GIAO KỸ THUẬT — TASK 5: PREMIUM SANDBOX & VNPAY ADAPTER (FINAL POLISH)
 
+## Gate tích hợp 23/11/2026
+
+Hotfix chính 242586a; bản sửa hiển thị lỗi PDF từ dialog b0eb10b được đưa vào integration bằng e541138. Hai merge commit 6e9400b và dd541dd giữ lịch sử 1→4, Task 5 rồi review/hotfix. Cây integration e541138 trùng nội dung nhánh review b0eb10b.
+
+Regression backend đầy đủ trên dd541dd có 1203 PASS, 1 FAIL, 48 ERROR, 12 SKIPPED, 4 DESELECTED. Một FAIL và 48 ERROR cùng cần DATABASE_URL đối chứng có thể đọc; cấu hình ban đầu trỏ endpoint cố ý không khả dụng. Sau tạo aurameme_guard_control rỗng trong container test riêng và sửa riêng cấu hình chạy, đúng 49 ca này PASS. Có bằng chứng PASS cho 1252 ca backend duy nhất, không sửa hoặc nới guard DB. 4 ca migration demo được loại chủ động. Cảnh báo deprecation Starlette/httpx còn tồn tại.
+
+Frontend build và 81 unit PASS. Toàn bộ mock 149/149 PASS. Toàn bộ API browser 156 PASS, 2 timeout ở đồng bộ tab Auth/Background; chạy riêng mỗi ca ba lần có 6/6 PASS với assertion và code giữ nguyên. Premium focused 22/22 PASS trước sửa hiển thị lỗi modal; hai ca History/receipt, build và 81 unit PASS trên e541138 sau bản sửa này. Không chạy lại toàn bộ bộ local khi chỉ đổi nhánh hiển thị lỗi. CI trên commit được push là gate tiếp theo.
+
+Smoke frontend/backend integration ở 5190/8192 dùng DB QA riêng: guest Admin 401, member 403, Admin thấy expired, Home/Privacy 200. Hai request từ hai session cùng user nhận cùng mã pending; đổi Plus/Prime/Plus/Prime giữ hai mã riêng. Tám trạng thái computed autofill/focus/font Dark/Light, VI/EN, 375/1440 PASS sau animation. Sáu PDF UI đã render/extract có số hàng success 1/5/10/10/5/1, đúng người mua và thứ tự. Fixture tổng hợp từ các lượt thử được giữ trong QA DB.
+
+Hotfix không thêm migration hoặc thay đổi DBML. Sandbox real buyer E2E vẫn NOT VERIFIED. Báo cáo này ghi kết quả local; CI và SHA remote được cập nhật vào handoff/nhật ký sau khi xác minh.
+
+
 ## Hotfix nghiệm thu 23/11/2026
 
 Owner cho phép tích hợp Task 1–5 sau gate hotfix. Checkout dùng selector có phạm vi .checkout-page để thắng rule input của Tailwind Forms được nạp sau stylesheet. Computed style Chrome trước sửa cho input Dark là rgb(255,255,255), chữ rgb(227,225,237). Font kế thừa Inter. Sau sửa giữ token màu theo theme, placeholder, focus và autofill. Screenshot nằm tại thư mục local AuraMemeReview/87f2574/hotfix-evidence.

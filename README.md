@@ -1,5 +1,7 @@
 # AuraMeme
 
+Gate local Task 1–5 và hotfix thanh toán đã được kiểm chứng trên cây tích hợp e541138. Xem docs/tasks/premium-sandbox-task5.md để phân biệt lượt full, retry, PostgreSQL cô lập và phần PayPal còn NOT VERIFIED.
+
 ## Hotfix 23/11/2026
 
 Owner cho phép tích hợp sau khi checkout, pending recovery, Admin transactions và PDF đạt gate. Bằng chứng và quyết định kỹ thuật tại docs/tasks/premium-sandbox-task5.md. Quy tắc cập nhật tài liệu hiện có áp dụng khi tích hợp Task 6–8 sau này.
