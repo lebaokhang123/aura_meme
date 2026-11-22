@@ -571,7 +571,10 @@ export default function PremiumCheckoutPage() {
                         let historyList = null;
                         try {
                           if (receipt?.owner_username === activeUser?.username) historyList = await auth.read('/premium/orders/successful');
-                        } catch {}
+                        } catch {
+                          setCheckoutError(t('Không thể tải lịch sử thanh toán. Vui lòng thử lại.', 'Unable to load payment history. Please retry.'));
+                          return;
+                        }
                         downloadReceiptPdf(receipt || order, activeUser, historyList);
                       }}
                       title={t('Tải về biên lai PDF', 'Download PDF Receipt')}
@@ -704,8 +707,7 @@ export default function PremiumCheckoutPage() {
                               executeCapture(null, current);
                             }
                           } catch (err) {
-                            console.error('[PremiumCheckoutPage] PayPal init failed:', err);
-                            executeCapture();
+                            setCheckoutError(t('Chưa thể khởi tạo hoặc đối soát PayPal. Vui lòng thử lại.', 'Unable to initialize or verify PayPal. Please retry.'));
                           }
                         }}
                       >

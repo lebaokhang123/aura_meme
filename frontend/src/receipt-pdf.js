@@ -307,7 +307,7 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
   doc.setFont('Roboto', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(31, 41, 55);
-  doc.text('LỊCH SỬ THANH TOÁN / PAYMENT HISTORY', 20, histY);
+  doc.text('LỊCH SỬ THANH TOÁN / PAYMENT HISTORY (10 GẦN NHẤT / LATEST 10)', 20, histY);
 
   doc.setDrawColor(209, 213, 219);
   doc.line(20, histY + 2.5, 190, histY + 2.5);
@@ -384,14 +384,13 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
       const hAmount = Number.isInteger(histItem.amount_usd_cents)
         ? (histItem.amount_usd_cents / 100).toFixed(2) + ' USD'
         : histItem.amount_usd_formatted || '—';
-      const hRef = histItem.provider_txn_id || histItem.order_code || '—';
+      const hRef = [histItem.order_code, histItem.provider_txn_id].filter(Boolean).join(' / ') || '—';
 
       // Determine row height needed
       doc.setFont('Roboto', 'normal');
       doc.setFontSize(6.5);
-      const hRefWidth = doc.getTextWidth(hRef);
-      const isMultiLine = hRefWidth > 37;
-      const rowH = isMultiLine ? 8.5 : 5.8;
+      const referenceLines = doc.splitTextToSize(hRef, 37);
+      const rowH = Math.max(5.8, referenceLines.length * 2.7 + 3);
 
       // Page overflow check (footer is at 268)
       if (curY + rowH > 260) {
@@ -421,19 +420,12 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
 
       doc.setFont('Roboto', 'normal');
       doc.setTextColor(75, 85, 99);
-      if (isMultiLine) {
-        doc.setFontSize(6.0);
-        doc.text(hRef, 188, textY + 3.2, { align: 'right' });
-        doc.setDrawColor(229, 231, 235);
-        doc.line(20, textY + 5.2, 190, textY + 5.2);
-        curY += 8.5;
-      } else {
-        doc.setFontSize(6.5);
-        doc.text(hRef, 188, textY, { align: 'right' });
-        doc.setDrawColor(229, 231, 235);
-        doc.line(20, textY + 3.2, 190, textY + 3.2);
-        curY += 5.8;
-      }
+      doc.setFontSize(6.5);
+      doc.text(referenceLines, 188, textY, { align: 'right' });
+      doc.setDrawColor(229, 231, 235);
+      doc.line(20, curY + rowH, 190, curY + rowH);
+      curY += rowH;
+
     }
   }
 

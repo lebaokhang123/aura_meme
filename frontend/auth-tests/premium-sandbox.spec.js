@@ -216,7 +216,7 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
         amount_usd_cents: currentSubscription?.tier === 'prime' ? 5000 : 500,
         amount_usd_formatted: currentSubscription?.tier === 'prime' ? '$50' : '$5',
         amount_vnd: currentSubscription?.tier === 'prime' ? 1250000 : 130000,
-        status: currentSubscription ? 'success' : 'pending',
+        status: currentSubscription || code === 'AM-PRIME-1795330988-XNSBYM98' ? 'success' : 'pending',
         provider: 'paypal_sandbox',
       });
     }
@@ -1127,3 +1127,31 @@ test('Part G: Capture Task 5 Evidence Screenshots for Owner', async ({ page, con
 
 
 
+
+test('history resumes an owned pending order and rechecks expiry before navigation', async ({page,context}) => {
+  await setupMockApi(context);
+  const order={id:id(90),order_code:'AM-PLUS-1795330000-RESUME90',tier:'plus',status:'pending',provider:'unselected',created_at:new Date().toISOString(),amount_usd_cents:500,amount_vnd:130000,owner_username:'khang_dev'};
+  let authoritative='pending';
+  await context.route('**/api/v1/premium/orders?*',route=>route.fulfill({json:{items:[order],pagination:{page:1,page_size:10,total:1,total_pages:1}}}));
+  await context.route('**/api/v1/premium/orders/'+order.order_code,route=>route.fulfill({json:{...order,status:authoritative}}));
+  await page.goto('/premium/history');
+  await expect(page.getByRole('button',{name:'Tải biên lai',exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Tiếp tục thanh toán',exact:true}).first().click();
+  await expect(page).toHaveURL('/premium/checkout?order='+order.order_code);
+  await page.goto('/premium/history');
+  authoritative='expired';
+  await page.getByRole('button',{name:'Tiếp tục thanh toán',exact:true}).first().click();
+  await expect(page.getByText('Đơn không còn có thể thanh toán. Kiểm tra trạng thái hoặc chọn mua lại.',{exact:true})).toBeVisible();
+  await expect(page).toHaveURL('/premium/history');
+});
+
+test('history download surfaces a server history failure without downloading a partial PDF', async ({page,context}) => {
+  await setupMockApi(context);
+  await context.route('**/api/v1/premium/orders/successful',route=>route.fulfill({status:503,json:{error:{code:'INTERNAL_ERROR'}}}));
+  let downloads=0;
+  page.on('download',()=>downloads++);
+  await page.goto('/premium/history');
+  await page.getByRole('button',{name:'Tải biên lai',exact:true}).first().click();
+  await expect(page.getByText('Không thể tải biên lai và lịch sử đầy đủ. Vui lòng thử lại.',{exact:true})).toBeVisible();
+  expect(downloads).toBe(0);
+});

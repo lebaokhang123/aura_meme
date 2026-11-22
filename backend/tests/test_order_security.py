@@ -252,7 +252,7 @@ def test_production_boundary_guard():
         currency="USD",
         status="pending",
         provider="paypal_sandbox",
-        created_at=datetime(2026, 11, 22, 10, 0, 0, tzinfo=timezone.utc),
+        created_at=datetime.now(timezone.utc),
     )
 
     account = MagicMock()
@@ -968,3 +968,25 @@ def test_card_simulation_records_sandbox_simulated_and_sim_card_txn():
     assert order.provider_response_code == "SUCCESS"
 
 
+
+
+def test_paypal_return_uses_the_authorized_checkout_origin():
+    from app.config import PremiumSettings
+    request = MagicMock()
+    request.headers = {"origin": "http://127.0.0.1:5189"}
+    request.app.state.auth.settings.auth_environment = "development"
+    request.app.state.auth.settings.auth_allowed_origins = ["http://127.0.0.1:5189"]
+    request.app.state.auth.now.return_value = datetime.now(timezone.utc)
+    request.app.state.auth.limiter = None
+    request.app.state.premium = PremiumSettings(_env_file=None)
+    request.app.state.paypal = MagicMock()
+    request.app.state.paypal.is_configured.return_value = True
+    request.app.state.paypal.create_order.return_value = {"id":"PP-TEST", "approve_url":"https://www.sandbox.paypal.com/checkoutnow?token=PP-TEST"}
+    request.app.state.vnpay = None
+    account = MagicMock()
+    account.user.id = uuid4()
+    account.db.scalar.return_value = None
+    order = create_subscription_order(CreateOrderInput(plan_tier="plus", provider="paypal_sandbox"), request, account)
+    callback = request.app.state.paypal.create_order.call_args.kwargs
+    assert callback["return_url"] == "http://127.0.0.1:5189/premium/checkout?order=" + order.order_code
+    assert callback["cancel_url"] == callback["return_url"] + "&cancelled=true"

@@ -10,7 +10,7 @@ const labels={users:['Người dùng','Users'],posts:['Bài viết','Posts'],com
 const sectionIcons={users:'group',content:'article',contacts:'inbox',moderation:'shield',notifications:'campaign'};
 const resourceNotes={users:['Quản lý trạng thái và quyền truy cập của thành viên.','Manage member status and access.'],posts:['Xem nội dung và kiểm soát những bài xuất hiện trong cộng đồng.','Review posts and control their visibility in the community.'],comments:['Xem và xử lý bình luận, kể cả nội dung đã ẩn.','Review comments, including hidden content.'],categories:['Sắp xếp nội dung bằng các danh mục dùng chung.','Organize community content with shared categories.'],contacts:['Đọc và phân loại tin nhắn gửi đến AuraMeme.','Read and triage messages sent to AuraMeme.'],'audit-logs':['Ghi lại các thay đổi do quản trị viên thực hiện: ai đã làm gì và khi nào.','Log of administrative actions: who did what and when.'],assets:['Kiểm tra trạng thái hoạt động và duyệt của danh mục vật phẩm.','Inspect catalog availability and review status.'],orders:['Xem danh sách và lịch sử các giao dịch thanh toán gói hội viên.','View member subscription orders and payment history.'],announcements:['Soạn thảo, quản lý và phát thông báo tới các thành viên.','Draft, manage, and broadcast announcements to community members.']};
 const Icon=({name,...props})=><span className="material-symbols-outlined" aria-hidden="true" {...props}>{name}</span>;
-const states={users:['active','locked','deleted'],posts:['draft','published','hidden','deleted'],comments:['visible','hidden','deleted'],categories:['active','hidden'],contacts:['new','in_review','resolved'],assets:['pending','approved','rejected','unknown'],orders:['pending','success','failed','cancelled'],announcements:['draft','published','withdrawn']};
+const states={users:['active','locked','deleted'],posts:['draft','published','hidden','deleted'],comments:['visible','hidden','deleted'],categories:['active','hidden'],contacts:['new','in_review','resolved'],assets:['pending','approved','rejected','unknown'],orders:['pending','success','failed','cancelled','expired'],announcements:['draft','published','withdrawn']};
 const auditActionLabels={
   'contact.update':['Cập nhật trạng thái liên hệ','Updated contact status'],
   'post.update':['Cập nhật bài viết','Updated post'],
@@ -145,17 +145,17 @@ export default function AdminPage(){
         </span>
       </h3>
       <p className="workspace-meta">
-        <span>{row.amount_vnd_formatted||(row.amount_vnd?.toLocaleString('vi-VN')+' đ')}</span>
+        <span>{row.owner_username&&('@'+row.owner_username+' · ')}{row.amount_usd_cents!=null&&((row.amount_usd_cents/100).toFixed(2)+' '+row.currency+' · ')}{row.amount_vnd_formatted||(row.amount_vnd?.toLocaleString('vi-VN')+' đ')}</span>
         <span>·</span>
         <span>{row.provider==='paypal_sandbox'?'PayPal':row.provider==='sandbox_simulated'?'Thẻ':(row.provider==='unselected'||!row.provider?t('Chưa chọn','Not selected'):row.provider)}</span>
         <span>·</span>
         <span>{row.created_at?stamp(row.created_at):''}</span>
-        {row.provider_txn_id&&<span>· Txn: <code className="text-outline">{row.provider_txn_id}</code></span>}
+        {row.completed_at&&<span>· {t('Hoàn tất','Completed')}: {stamp(row.completed_at)}</span>}{row.provider_txn_id&&<span>· Txn: <code className="text-outline">{row.provider_txn_id}</code></span>}
       </p>
     </div>}
    </div><div className="admin-row-status">
     {resource==='audit-logs'&&<time className="workspace-meta" dateTime={row.created_at}>{stamp(row.created_at)}</time>}
-    {resource==='orders'&&<span className="workspace-badge" data-status={row.status} style={{fontWeight:600}}>{row.status==='success'?t('Thành công','Success'):row.status==='pending'?t('Chờ xử lý','Pending'):row.status==='failed'?t('Thất bại','Failed'):row.status}</span>}
+    {resource==='orders'&&<span className="workspace-badge" data-status={row.status} style={{fontWeight:600}}>{row.status==='success'?t('Thành công','Success'):row.status==='pending'?t('Chờ xử lý','Pending'):row.status==='failed'?t('Thất bại','Failed'):row.status==='expired'?t('Hết hạn','Expired'):row.status==='cancelled'?t('Đã hủy','Cancelled'):row.status}</span>}
     {row.status&&resource!=='orders'&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='assets'&&<span className="workspace-badge">{row.active?t('Đang bật','Active'):t('Đang tắt','Inactive')}</span>}
     </div><div className="workspace-row-actions">{resource==='users'&&row.status!=='deleted'&&<><button type="button" disabled={busy} onClick={()=>confirm(row,{status:row.status==='active'?'locked':'active'},row.status==='active'?t('Khóa tài khoản','Lock account'):t('Mở khóa tài khoản','Unlock account'))}>{row.status==='active'?t('Khóa','Lock'):t('Mở khóa','Unlock')}</button><button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'roles',row,roles:[...row.roles]})}}>{t('Sửa vai trò','Edit roles')}</button></>}
     {(resource==='posts'||resource==='comments')&&<div className="admin-action-icons">
