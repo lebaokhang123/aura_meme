@@ -118,6 +118,24 @@ Các tham số Aura/odds/payment còn mở đã nằm trong `03-database-design.
 - `AURA_MEME_MASTER_PLAN_V3.md` — mục tiêu và milestone.
 - `docs/design/03-database.dbml` + `docs/design/03-database-design.md` — thiết kế database và quan hệ.
 - `docs/design/01-sitemap-*` và `02-usecase-*` — luồng nghiệp vụ.
+
+## 9. Task 7 — Google Login, Forgot Password & Transactional Email (`feat/google-email-task7`)
+
+### 9.1. Google Identity / OIDC (`backend/app/google_auth.py`)
+- **Xác minh phía server:** Kiểm tra `aud`, `iss`, `exp`, `sub`, `email_verified=true` và `nonce` chống replay/login CSRF. Không lưu Google token trong `localStorage`.
+- **Định danh ổn định & Chống chiếm đoạt tài khoản:** Bảng `user_oauth_identities` gắn `UNIQUE(provider, provider_sub)`. Nếu email Google trùng với tài khoản cục bộ chưa liên kết, backend trả `409 ACCOUNT_LINK_REQUIRED` (tuyệt đối không tự gộp theo email). Việc liên kết (`POST /api/v1/auth/google/link`) yêu cầu phiên đăng nhập + CSRF + xác minh lại mật khẩu hiện tại. Tài khoản mới từ Google chỉ nhận role `USER` và đặt mật khẩu sentinel `!google:...` không thể đăng nhập bằng password.
+
+### 9.2. Quên mật khẩu (`backend/app/password_reset.py`)
+- **Neutral Response & Token Một lần:** `POST /api/v1/auth/forgot-password` luôn trả thông báo trung tính giống hệt nhau (không lộ email có tồn tại hay không), rate-limit theo IP và email hash. Token ngẫu nhiên 32-byte chỉ lưu dạng SHA-256 (`password_reset_tokens.token_hash`), hạn dùng 30 phút.
+- **Session Revocation:** `POST /api/v1/auth/reset-password` bắt buộc chính sách mật khẩu 12–128 ký tự, đánh dấu `used_at`, thu hồi toàn bộ `auth_sessions` cũ, không tự động đăng nhập; tài khoản Google-only bị từ chối rõ ràng (`400 GOOGLE_ONLY_ACCOUNT`). Frontend `ResetPasswordPage` xóa `?token=` khỏi URL bar ngay khi nạp bằng `history.replaceState`.
+
+### 9.3. Hệ thống Email giao dịch (`backend/app/email_service.py`)
+- Dùng chung cho 3 luồng: Quên mật khẩu, Tiếp nhận Contact/Feedback (có rate-limit chống spam), và Biên nhận Premium (chỉ gửi khi đơn `success`, chống gửi trùng theo `dedupe_key=premium:receipt:{order_code}`, lỗi gửi mail không rollback PayPal capture).
+- **Chống giả mạo sender:** Chặn `no-reply@aurameme.com` khi `EMAIL_DOMAIN_VERIFIED=false` (`EMAIL_DOMAIN_UNVERIFIED`). Hỗ trợ 3 chế độ: `disabled`, `sandbox` (in-memory test capture), và `smtp` (TLS/SSL, tối đa 2 lần thử, không log secret).
+
+### 9.4. Hướng dẫn Owner cấu hình Credentials (khi bật Live)
+1. **Google Cloud Console:** Tạo OAuth 2.0 Web Client ID, thêm Authorized JavaScript origins (`http://localhost:5173`, domain production), gán `GOOGLE_CLIENT_ID` vào `backend/.env`.
+2. **SMTP / Email Provider:** Cấu hình `EMAIL_MODE=smtp`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM_ADDRESS`, `EMAIL_ADMIN_INBOX`, và chỉ bật `EMAIL_DOMAIN_VERIFIED=true` sau khi xác minh SPF/DKIM cho `aurameme.com`.
 - [FastAPI — Behind a Proxy](https://fastapi.tiangolo.com/advanced/behind-a-proxy/).
 - [Docker — Networking in Compose](https://docs.docker.com/compose/how-tos/networking/).
 - [GitHub Docs — Configuring OpenID Connect in AWS](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws).

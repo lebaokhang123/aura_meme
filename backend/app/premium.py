@@ -521,6 +521,35 @@ def _activate_subscription(db, order: SubscriptionOrder, now: datetime) -> UserS
     return sub
 
 
+def _dispatch_receipt_email_safe(request: Request | None, db, order: SubscriptionOrder, now: datetime) -> None:
+    """Send idempotent receipt email ONLY for confirmed successful orders; never roll back payment."""
+    if request is None or order.status != "success":
+        return
+    email_service = getattr(request.app.state, "email_service", None)
+    if email_service is None:
+        return
+    try:
+        user = db.get(User, order.user_id)
+        if user is None or not getattr(user, "email", None):
+            return
+        profile = db.get(Profile, order.user_id)
+        display_name = (profile.display_name if profile and getattr(profile, "display_name", None) else user.username)
+        amount_vnd_fmt = f"{order.amount_vnd:,} VNĐ".replace(",", ".")
+        amount_usd_fmt = "$50" if order.tier == "prime" else "$5"
+        email_service.send_premium_receipt_email(
+            to_email=user.email,
+            display_name=display_name,
+            order_code=order.order_code,
+            tier=order.tier,
+            amount_vnd_formatted=amount_vnd_fmt,
+            amount_usd_formatted=amount_usd_fmt,
+            provider=order.provider,
+            completed_at_iso=(order.completed_at or now).isoformat(),
+        )
+    except Exception:
+        pass
+
+
 def _check_and_expire_order(order: SubscriptionOrder, db, now: datetime, paypal: PaypalAdapter | None = None) -> bool:
     """Checks a stale pending order. Reconciles if captured on PayPal; otherwise transitions to expired.
     Never grants subscription without verified capture confirmation."""
@@ -820,6 +849,7 @@ def simulate_subscription_order(
         order.updated_at = now
 
         _activate_subscription(account.db, order, now)
+        _dispatch_receipt_email_safe(request, account.db, order, now)
 
     elif payload.action == "pay_fail":
         order.status = "failed"
@@ -976,8 +1006,7 @@ def capture_subscription_order(
 
     _activate_subscription(account.db, order, now)
     account.db.flush()
-
-    account.db.flush()
+    _dispatch_receipt_email_safe(request, account.db, order, now)
 
     return OrderDto(
         id=order.id,
@@ -1261,6 +1290,7 @@ async def handle_paypal_webhook(request: Request):
             order.updated_at = now
 
             _activate_subscription(db, order, now)
+            _dispatch_receipt_email_safe(request, db, order, now)
             logger.info("PayPal webhook successfully completed and activated subscription for order %s.", order.order_code)
 
         return Response(

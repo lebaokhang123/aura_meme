@@ -59,9 +59,22 @@ class AdminContactPatch(StrictInput):
     responses={code:ERRORS[code] for code in (401,403,409,422,429,500)},openapi_extra=CSRF_HEADER)
 def send_contact(payload:ContactInput,request:Request,account=Depends(require_account_csrf)):
     db,user_id=account.db,account.user.id
+    request.app.state.auth.limiter.check(f"contact:{user_id}", 5, 600)
     now=request.app.state.auth.now()
     row=ContactMessage(id=uuid4(),user_id=user_id,**payload.model_dump(),status="new",created_at=now,updated_at=now)
     db.add(row);db.flush()
+    email_service = getattr(request.app.state, "email_service", None)
+    if email_service is not None:
+        try:
+            email_service.send_contact_emails(
+                contact_id=str(row.id),
+                sender_name=payload.name,
+                sender_email=str(payload.email),
+                subject_line=payload.subject,
+                message_body=payload.body,
+            )
+        except Exception:
+            pass
     return ContactCreated(id=row.id,status="new")
 
 
