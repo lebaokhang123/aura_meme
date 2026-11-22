@@ -24,6 +24,8 @@ export default function PremiumCheckoutPage() {
   const [cvv, setCvv] = useState('123');
 
   const [errors, setErrors] = useState({});
+  // Payment method selector: 'paypal' | 'card'
+  const [paymentMethod, setPaymentMethod] = useState('paypal');
   // States: 'idle' | 'processing' | 'verifying' | 'success' | 'failed'
   const [checkoutState, setCheckoutState] = useState('idle');
   const [statusText, setStatusText] = useState('');
@@ -32,7 +34,10 @@ export default function PremiumCheckoutPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const code = params.get('order');
+    let code = params.get('order');
+    if (!code) {
+      code = sessionStorage.getItem('am_checkout_order');
+    }
     if (!code) {
       setLoadError(t('Không tìm thấy mã đơn hàng trong liên kết.', 'No order code found in URL.'));
       setLoading(false);
@@ -338,7 +343,7 @@ export default function PremiumCheckoutPage() {
               <span className="material-symbols-outlined checkout-card-icon" aria-hidden="true">
                 payments
               </span>
-              <h2 id="card-form-title">{t('Thanh toán PayPal Sandbox', 'PayPal Sandbox Payment')}</h2>
+              <h2 id="card-form-title">{t('Phương thức thanh toán', 'Payment Method')}</h2>
             </div>
 
             {/* Stage indicator for Lucian #081 Ring and Checkmark */}
@@ -427,58 +432,86 @@ export default function PremiumCheckoutPage() {
               </div>
             )}
 
-            {/* PayPal Sandbox Primary Action and Card Input Form */}
+            {/* Payment Method Selector & Actions (Shown when not confirmed) */}
             {!isConfirmed && (
               <>
                 <div
-                  className="paypal-action-card"
-                  style={{
-                    background: 'rgba(0, 112, 186, 0.08)',
-                    border: '1px solid rgba(0, 112, 186, 0.35)',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    marginBottom: '20px',
-                  }}
+                  className="checkout-method-selector"
+                  role="radiogroup"
+                  aria-label={t('Phương thức thanh toán', 'Payment method')}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className="material-symbols-outlined" style={{ color: '#0070ba', fontSize: '24px' }}>
+                  <div
+                    className={`checkout-method-card ${paymentMethod === 'paypal' ? 'active' : ''}`}
+                    role="radio"
+                    aria-checked={paymentMethod === 'paypal'}
+                    tabIndex={0}
+                    data-method="paypal"
+                    onClick={() => setPaymentMethod('paypal')}
+                    onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setPaymentMethod('paypal')}
+                  >
+                    <div className="checkout-method-info">
+                      <span className="material-symbols-outlined checkout-method-icon">
                         account_balance_wallet
                       </span>
-                      <strong style={{ color: 'var(--am-on-surface)', fontSize: '16px' }}>PayPal Sandbox</strong>
+                      <div className="checkout-method-text">
+                        <h3>
+                          PayPal Sandbox
+                          <span className="checkout-method-badge">{t('Cổng chính', 'Primary')}</span>
+                        </h3>
+                        <p>{t('Thanh toán an toàn qua cổng PayPal Sandbox v2', 'Secure payment via PayPal Sandbox v2')}</p>
+                      </div>
                     </div>
-                    <span style={{ fontSize: '11px', background: 'rgba(0, 112, 186, 0.2)', color: '#38bdf8', padding: '2px 8px', borderRadius: '999px', fontWeight: '600' }}>
-                      SANDBOX
-                    </span>
+                    <div className="checkout-method-radio">
+                      <div className="checkout-method-radio-dot" />
+                    </div>
                   </div>
-                  <p style={{ fontSize: '13px', color: 'var(--am-on-surface-variant)', marginBottom: '14px', lineHeight: '1.4' }}>
-                    {t(
-                      'Thanh toán an toàn không dùng tiền thật qua PayPal Sandbox v2. Đăng nhập tài khoản cá nhân thử nghiệm để duyệt thanh toán.',
-                      'Secure checkout using PayPal Sandbox v2 without real charges. Log in with your sandbox buyer account to approve.'
-                    )}
-                  </p>
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+
+                  <div
+                    className={`checkout-method-card ${paymentMethod === 'card' ? 'active' : ''}`}
+                    role="radio"
+                    aria-checked={paymentMethod === 'card'}
+                    tabIndex={0}
+                    data-method="card"
+                    onClick={() => setPaymentMethod('card')}
+                    onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setPaymentMethod('card')}
+                  >
+                    <div className="checkout-method-info">
+                      <span className="material-symbols-outlined checkout-method-icon">
+                        credit_card
+                      </span>
+                      <div className="checkout-method-text">
+                        <h3>{t('Nhập thẻ thử nghiệm', 'Simulated Card Input')}</h3>
+                        <p>{t('Mô phỏng tức thì trên trình duyệt', 'Instant browser simulation')}</p>
+                      </div>
+                    </div>
+                    <div className="checkout-method-radio">
+                      <div className="checkout-method-radio-dot" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Option 1: PayPal Sandbox Action Box */}
+                {paymentMethod === 'paypal' && (
+                  <div className="checkout-paypal-action-box paypal-action-card">
+                    <div className="checkout-paypal-desc">
+                      <span className="material-symbols-outlined" aria-hidden="true">
+                        open_in_new
+                      </span>
+                      <span>
+                        {t(
+                          'Bạn sẽ được chuyển sang PayPal Sandbox để xác nhận thanh toán an toàn không dùng tiền thật.',
+                          'You will be redirected to PayPal Sandbox to authorize payment securely without real charges.'
+                        )}
+                      </span>
+                    </div>
+
                     <button
                       type="button"
                       className="checkout-btn-paypal"
-                      style={{
-                        flex: 1,
-                        background: 'linear-gradient(135deg, #0070ba 0%, #003087 100%)',
-                        color: '#ffffff',
-                        border: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        fontWeight: '700',
-                        padding: '12px 18px',
-                        borderRadius: '10px',
-                        cursor: isSpinning ? 'not-allowed' : 'pointer',
-                        opacity: isSpinning ? 0.7 : 1,
-                      }}
                       disabled={isSpinning}
                       onClick={() => {
                         if (order.payment_url && !order.payment_url.includes('token=MOCK-')) {
+                          sessionStorage.setItem('am_checkout_order', order.order_code);
                           window.location.assign(order.payment_url);
                         } else {
                           executeCapture();
@@ -488,23 +521,10 @@ export default function PremiumCheckoutPage() {
                       <span className="material-symbols-outlined">shopping_cart_checkout</span>
                       <span>{t('Thanh toán với PayPal', 'Pay with PayPal')}</span>
                     </button>
+
                     <button
                       type="button"
                       className="checkout-btn-secondary"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid var(--am-outline)',
-                        color: 'var(--am-on-surface)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        fontWeight: '600',
-                        fontSize: '13px',
-                        padding: '12px 16px',
-                        borderRadius: '10px',
-                        cursor: isSpinning ? 'not-allowed' : 'pointer',
-                      }}
                       disabled={isSpinning}
                       onClick={() => executeCapture()}
                       title={t('Mô phỏng duyệt và capture đơn ngay lập tức', 'Simulate instant approval and capture')}
@@ -512,24 +532,17 @@ export default function PremiumCheckoutPage() {
                       <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
                         bolt
                       </span>
-                      <span>{t('Duyệt Sandbox nhanh', 'Quick Sandbox Capture')}</span>
+                      <span>{t('Mô phỏng duyệt Sandbox tức thì', 'Quick Sandbox Capture')}</span>
                     </button>
                   </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '16px 0 16px' }}>
-                  <div style={{ flex: 1, height: '1px', background: 'var(--am-outline)' }} />
-                  <span style={{ fontSize: '12px', color: 'var(--am-on-surface-variant)' }}>
-                    {t('Hoặc điền thẻ thử nghiệm', 'Or use simulated test card')}
-                  </span>
-                  <div style={{ flex: 1, height: '1px', background: 'var(--am-outline)' }} />
-                </div>
+                )}
               </>
             )}
 
-            {/* Card Input Form (Shown when idle or failed) */}
-            {!isConfirmed && (
-              <form className="checkout-form" onSubmit={handlePaymentSubmit} noValidate>
+            {/* Card Input Form (Shown only when paymentMethod is 'card') */}
+            {!isConfirmed && paymentMethod === 'card' && (
+              <div className="checkout-card-form-expand">
+                <form className="checkout-form" onSubmit={handlePaymentSubmit} noValidate>
                 {/* Test card autofill pill */}
                 <div
                   className="checkout-demo-pill"
@@ -669,23 +682,25 @@ export default function PremiumCheckoutPage() {
                   </span>
                 </button>
 
-                {isFailed && (
-                  <button
-                    type="button"
-                    className="checkout-btn-retry"
-                    onClick={() => {
-                      setCheckoutState('idle');
-                      setCheckoutError('');
-                      setStatusText('');
-                    }}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      refresh
-                    </span>
-                    <span>{t('Thử lại', 'Try Again')}</span>
-                  </button>
-                )}
-              </form>
+                </form>
+              </div>
+            )}
+
+            {!isConfirmed && isFailed && (
+              <button
+                type="button"
+                className="checkout-btn-retry"
+                onClick={() => {
+                  setCheckoutState('idle');
+                  setCheckoutError('');
+                  setStatusText('');
+                }}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  refresh
+                </span>
+                <span>{t('Thử lại', 'Try Again')}</span>
+              </button>
             )}
           </section>
         </div>
