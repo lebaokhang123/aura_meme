@@ -769,4 +769,70 @@ Thực hiện chuẩn xác yêu cầu của Owner về bản sắc nhận diện
   - **Backend Tests:** 33/33 passed (100%).
   - **PDF Verification:** Đạt chuẩn 1 trang A4, 100% font tiếng Việt có dấu, text selectable, layout cân đối.
 
+---
+
+## 17. Nghiệm thu hoàn thiện: Căn chỉnh Biên lai, Hiệu ứng CTA, Lịch sử Giao dịch & Giới hạn Profile (Final Acceptance Polish)
+
+### 17.1. Căn chỉnh dứt điểm va chạm cột trong biên lai PDF (Phần A)
+- **Khắc phục dính cột bảng dịch vụ:**
+  - Đo lường chính xác độ rộng ký tự bằng `doc.getTextWidth()` và thiết lập lại hệ tọa độ cột chuẩn mực: Cột Mô tả (`X: 23`), Cột Thời hạn (`X: 80`), Cột SL (`X: 120` center), Cột Đơn giá (`X: 153` right), Cột Thành tiền (`X: 188` right).
+  - Khoảng cách an toàn giữa mọi mép chữ tối thiểu từ `7.24mm` đến `28.8mm`, hoàn toàn triệt tiêu tình trạng dính giữa `SL / QTY`, `ĐƠN GIÁ / PRICE` và `THÀNH TIỀN / AMOUNT`.
+- **Khắc phục dính cột bảng lịch sử thanh toán:**
+  - Thiết lập lại hệ tọa độ: Cột Phương thức (`X: 23`), Cột Ngày (`X: 58`), Cột Số tiền (`X: 113` right), Cột Trạng thái (`X: 132` center), Cột Mã tham chiếu (`X: 188` right).
+  - Khoảng cách an toàn giữa cột Trạng thái và Mã tham chiếu đạt từ `6.06mm` đến `28.16mm`.
+  - Bổ sung cơ chế tự ngắt dòng phụ (`secondary subline`) tại `Y + 4mm` cho các mã giao dịch dài (`> 37mm` ví dụ PayPal Capture ID hoặc Simulated Card Reference) để đảm bảo không bao giờ tràn lấn sang cột trạng thái.
+- **Tiêu chuẩn bảo toàn:** Giữ vững 1 trang A4 duy nhất, vector font Unicode tiếng Việt 100%, văn bản selectable/searchable.
+
+### 17.2. Tinh chỉnh nhận diện thị giác nút CTA theo gói tại `/premium` (Phần B)
+- **Phân tách nhận diện gói:**
+  - Bổ sung class động `.u056-cta--${plan.id}` (`.u056-cta--plus` và `.u056-cta--prime`) trong `PremiumPage.jsx`.
+- **Hiệu ứng thị giác tương ứng:**
+  - **Aura Plus (`.u056-cta--plus`):** Dải gradient chuyển động mềm mại giữa sắc xanh lam và sky-blue cyan (`#00e5ff`, `#0284c7`, `#0369a1`), kèm vệt sáng shimmer êm dịu và quầng phát sáng xanh neon.
+  - **Aura Prime (`.u056-cta--prime`):** Dải gradient chuyển động kim loại sang trọng giữa sắc hổ phách và vàng kim rực rỡ (`#f59e0b`, `#d97706`, `#b45309`), kèm vệt sáng hoàng kim và quầng glow vàng ánh kim quý phái.
+- **Tiêu chuẩn công thái học:** Giữ màu chữ `#ffffff` đạt độ tương phản chuẩn WCAG AAA trên cả nền Dark và Light, hỗ trợ đầy đủ `@media (prefers-reduced-motion: reduce)`.
+
+### 17.3. Nâng cấp API và Trang Lịch sử giao dịch `/premium/history` (Phần C)
+- **Nâng cấp Backend Endpoint `GET /api/v1/premium/orders` (`backend/app/premium.py`):**
+  - Bổ sung các trường đầy đủ vào `OrderDto`: `amount_vnd_formatted`, `provider_txn_id`.
+  - Loại bỏ hoàn toàn khối bắt lỗi nuốt ngoại lệ `except Exception: return []`. Bổ sung logging chi tiết và trả về mã lỗi có cấu trúc chuẩn 500 `INTERNAL_ERROR` khi có sự cố hệ thống.
+- **Xây dựng Trang `/premium/history` (`frontend/src/components/PaymentHistoryPage.jsx`):**
+  - Giao diện đáp ứng 100% (Responsive): Hiển thị dạng bảng (Desktop) và dạng danh thiếp Cyber Cards (Mobile).
+  - Hiển thị badge trạng thái trực quan: `Đã thanh toán` (xanh ngọc), `Chờ thanh toán` (vàng hổ phách), `Đã hủy` (xám), `Thất bại` (đỏ).
+  - Modal "Xem chi tiết": Tái sử dụng cấu trúc `PaymentModal081` và `.u081-container` hiển thị toàn bộ chi tiết đơn hàng, mã giao dịch, số tiền USD/VND, thời hạn và ngày tạo.
+  - Nút "Tải biên lai": Tích hợp trực tiếp gọi hàm `downloadReceiptPdf(order, user)` từ `receipt-pdf.js`, cho phép người dùng tải lại biên lai PDF chính thức bất kỳ lúc nào.
+- **Đăng ký Route & Điều hướng:**
+  - Đăng ký tuyến `/premium/history` trong `main.jsx` và `runtime.js`.
+  - Bổ sung nút liên kết thuận tiện *"Xem lịch sử thanh toán & biên lai"* dưới bảng so sánh gói tại `/premium`.
+
+### 17.4. Giới hạn ký tự và bộ đếm trực quan tại `/profile` (Phần D)
+- **Thu gọn giới hạn ký tự form Profile:**
+  - Tên hiển thị (`display_name`): Giới hạn tối đa **50 ký tự** (giảm từ 80).
+  - Tiểu sử (`bio`): Giới hạn tối đa **300 ký tự** (giảm từ 1000).
+- **Trải nghiệm người dùng & Trợ năng (UX & Accessibility):**
+  - Tích hợp bộ đếm ký tự thời gian thực dạng monospaced (`{name.length}/50`, `{bio.length}/300`).
+  - Gắn nhãn `aria-hidden="true"` trên bộ đếm và phân tách khỏi `<label htmlFor="...">`, đảm bảo giữ nguyên tên truy cập (accessible name) của các trường cho các công cụ đọc màn hình và bộ test tự động.
+  - Xác thực phía client: Chặn submit tên rỗng hoặc toàn khoảng trắng, hiển thị thông báo lỗi song ngữ VI/EN thân thiện, tự động `.trim()` dữ liệu khi lưu.
+- **Backend Schema Guard (`backend/app/account_schemas.py`):**
+  - Cập nhật schema `ProfilePatch`: `Field(min_length=1, max_length=50)` cho `display_name` và `Field(max_length=300)` cho `bio`.
+  - Bổ sung `@field_validator` chuẩn Pydantic v2 xác thực chuỗi sau khi strip khoảng trắng.
+  - Giữ nguyên các schema đọc (`UserPublic`, `AccountPrivate`) để đảm bảo tính tương thích ngược tuyệt đối với các tài khoản đã tồn tại trong cơ sở dữ liệu.
+
+### 17.5. Tổng hợp Commit và Kết quả kiểm thử toàn diện (Phần E)
+- **Chuỗi Commit Conventional tiếng Việt:**
+  1. `76ad885`: `fix(receipt): căn chỉnh cột biên lai và lịch sử thanh toán`
+  2. `8aad1e0`: `style(premium): cải thiện hiệu ứng nút mua theo gói`
+  3. `ab4d873`: `feat(premium): bổ sung lịch sử giao dịch và tải lại biên lai`
+  4. `4e5e7fc`: `fix(profile): giới hạn tên hiển thị và tiểu sử`
+- **Kết quả kiểm thử toàn diện:**
+  - **Frontend Unit Tests:** **80/80 passed** (100%, 0 failed).
+  - **Frontend Production Build (Vite 7):** Hoàn thành trong **18.21s**, 0 errors, chunks được đóng gói tối ưu.
+  - **Backend Non-Integration Pytest:** **452 passed**, 788 deselected (integration), 0 failed (54.26s).
+  - **Playwright Full Regression E2E Suite:** **65/65 passed** (100%, 5.2m):
+    - `admin-premium.spec.js`: 11/11 passed.
+    - `premium-sandbox.spec.js`: 18/18 passed (bao gồm test mới Part E cho `/premium/history`).
+    - `profile-contact.spec.js`: 27/27 passed.
+    - `profile-fidelity.spec.js`: 9/9 passed.
+  - **Database aurameme_demo:** Bảo toàn nguyên vẹn 100%, không chạy migration, không reset, không seed dữ liệu mới.
+
+
 
