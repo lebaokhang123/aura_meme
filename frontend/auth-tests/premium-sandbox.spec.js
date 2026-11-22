@@ -121,8 +121,34 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
       });
     }
 
-    if (path === '/premium/orders' && method === 'GET') {
+    if (path === '/premium/orders/successful' && method === 'GET') {
       return send(200, [
+        {
+          id: '00000000-0000-4000-8000-000000000001',
+          order_code: 'AM-PRIME-1795330988-XNSBYM98',
+          tier: 'prime',
+          duration_days: 365,
+          amount_usd_cents: 5000,
+          amount_usd_formatted: '$50',
+          amount_vnd: 1250000,
+          amount_vnd_formatted: '1.250.000 VNĐ',
+          currency: 'USD',
+          status: 'success',
+          provider: 'paypal_sandbox',
+          provider_txn_id: '78B98765ABC12345',
+          created_at: now,
+          completed_at: now,
+        },
+      ]);
+    }
+
+    if (path === '/premium/orders' && method === 'GET') {
+      const url = new URL(request.url());
+      const pageNum = parseInt(url.searchParams.get('page') || '1', 10);
+      const limit = parseInt(url.searchParams.get('limit') || '10', 10);
+      const statusFilter = url.searchParams.get('status');
+
+      let allOrders = [
         {
           id: '00000000-0000-4000-8000-000000000001',
           order_code: 'AM-PRIME-1795330988-XNSBYM98',
@@ -153,7 +179,19 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
           provider: 'paypal_sandbox',
           created_at: now,
         },
-      ]);
+      ];
+      if (statusFilter) {
+        allOrders = allOrders.filter((o) => o.status === statusFilter);
+      }
+      return send(200, {
+        items: allOrders,
+        pagination: {
+          page: pageNum,
+          page_size: limit,
+          total: allOrders.length,
+          total_pages: Math.max(1, Math.ceil(allOrders.length / limit)),
+        },
+      });
     }
 
     if (path.startsWith('/premium/orders/') && method === 'GET') {
@@ -928,6 +966,21 @@ test('Part E: Payment History page (/premium/history) displays orders, opens det
   await expect(rows.first().locator('.badge-tier-prime')).toBeVisible();
   await expect(rows.first().locator('.badge-status-success')).toBeVisible();
 
+  // Check filter chips and pagination
+  await expect(page.locator('.history-filter-chip.active')).toContainText('Tất cả');
+  await expect(page.locator('.history-pagination-bar')).toBeVisible();
+  await expect(page.locator('.history-pagination-info')).toContainText('Trang 1 / 1');
+  await expect(page.locator('.history-pagination-info')).toContainText('2 giao dịch');
+
+  // Filter to pending
+  await page.locator('.history-filter-chip:has-text("Chờ thanh toán")').click();
+  await expect(page.locator('.history-row')).toHaveCount(1);
+  await expect(page.locator('.history-row').first().locator('.badge-status-pending')).toBeVisible();
+
+  // Reset filter to all
+  await page.locator('.history-filter-chip:has-text("Tất cả")').click();
+  await expect(page.locator('.history-row')).toHaveCount(2);
+
   const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
   await page.screenshot({ path: `${artifactsDir}/task5_payment_history_table.png`, fullPage: true });
 
@@ -937,6 +990,7 @@ test('Part E: Payment History page (/premium/history) displays orders, opens det
   await expect(detailModal).toBeVisible();
   await expect(detailModal.locator('#history-detail-title')).toHaveText('Chi tiết giao dịch');
   await expect(detailModal.locator('.history-detail-value code').first()).toHaveText('AM-PRIME-1795330988-XNSBYM98');
+  await expect(detailModal.locator('.history-detail-note')).toBeVisible();
   await page.screenshot({ path: `${artifactsDir}/task5_payment_history_modal.png` });
 
   // Close modal
@@ -948,6 +1002,35 @@ test('Part E: Payment History page (/premium/history) displays orders, opens det
   await expect(page.locator('.history-toast')).toBeVisible();
   await expect(page.locator('.history-toast')).toContainText('Đã tải biên lai cho đơn hàng AM-PRIME-1795330988-XNSBYM98');
 });
+
+test('Part F: Profile Edit enforces 25 char display name and 100 char bio limits with counters', async ({ page, context }) => {
+  await setupMockApi(context, 0, null);
+  await page.goto('/profile');
+
+  // Open edit form via .am-profile-edit
+  const editBtn = page.locator('.am-profile-edit');
+  await expect(editBtn).toBeVisible();
+  await editBtn.click();
+
+  const nameInput = page.locator('#profile-display-name');
+  const bioInput = page.locator('#profile-bio');
+
+  await expect(nameInput).toBeVisible();
+  await expect(bioInput).toBeVisible();
+
+  // Verify maxLength attributes
+  await expect(nameInput).toHaveAttribute('maxLength', '25');
+  await expect(bioInput).toHaveAttribute('maxLength', '100');
+
+  // Verify character counters
+  const counters = page.locator('.profile-char-counter');
+  await expect(counters.first()).toContainText('/25');
+  await expect(counters.nth(1)).toContainText('/100');
+
+  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
+  await page.screenshot({ path: `${artifactsDir}/task5_profile_edit_25_100.png` });
+});
+
 
 
 

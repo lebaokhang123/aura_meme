@@ -1,16 +1,23 @@
-"""Unit tests for Order Code validation, IDOR authorization, idempotency, and production guards (Part D)."""
-from datetime import datetime, timezone
+"""Unit tests for Order Code validation, IDOR authorization, idempotency, and production guards (Part D & E)."""
+import json
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
 
-from app.models import SubscriptionOrder
+from app.models import SubscriptionOrder, UserSubscription
 from app.premium import (
     CaptureOrderInput,
+    CreateOrderInput,
+    ORDER_EXPIRY_TIMEOUT,
+    OrderPage,
     SimulateOrderInput,
     capture_subscription_order,
+    create_subscription_order,
     get_subscription_order,
+    handle_paypal_webhook,
+    list_subscription_orders,
     simulate_subscription_order,
     validate_order_code,
 )
@@ -290,3 +297,174 @@ def test_production_boundary_guard():
         )
     assert exc_cap.value.status == 503
     assert exc_cap.value.code == "PAYPAL_NOT_CONFIGURED"
+
+
+def test_active_pending_order_reuse_for_same_intent():
+    """Verify create_subscription_order reuses recent pending order (<15 min) for same tier and provider."""
+    user_id = uuid4()
+    now = datetime(2026, 11, 22, 10, 0, 0, tzinfo=timezone.utc)
+    recent_pending = SubscriptionOrder(
+        id=uuid4(),
+        order_code="AM-PLUS-1795330000-EXISTING1",
+        user_id=user_id,
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",
+        provider="paypal_sandbox",
+        created_at=now - timedelta(minutes=5),
+    )
+
+    account = MagicMock()
+    account.user.id = user_id
+    account.db = MagicMock()
+    account.db.scalar.return_value = recent_pending
+
+    mock_request = MagicMock()
+    mock_request.app.state.auth.now.return_value = now
+    mock_request.app.state.premium = None
+    mock_request.app.state.vnpay = None
+
+    payload = CreateOrderInput(plan_tier="plus", provider="paypal_sandbox")
+    dto = create_subscription_order(payload=payload, request=mock_request, account=account)
+
+    assert dto.order_code == "AM-PLUS-1795330000-EXISTING1"
+    assert dto.status == "pending"
+    # No new order inserted to db
+    account.db.add.assert_not_called()
+
+
+def test_pending_order_auto_expiration_after_1_hour():
+    """Verify pending orders older than 1 hour automatically transition to 'expired'."""
+    user_id = uuid4()
+    order_code = "AM-PLUS-1795330000-STALEORDER"
+    old_time = datetime.now(timezone.utc) - timedelta(hours=2)
+
+    order = SubscriptionOrder(
+        id=uuid4(),
+        order_code=order_code,
+        user_id=user_id,
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="pending",
+        provider="paypal_sandbox",
+        created_at=old_time,
+    )
+
+    account = MagicMock()
+    account.user.id = user_id
+    account.user.roles = ["USER"]
+    account.db = MagicMock()
+    account.db.scalar.return_value = order
+
+    dto = get_subscription_order(order_code, account=account)
+    assert dto.status == "expired"
+    assert order.status == "expired"
+    account.db.flush.assert_called_once()
+
+
+def test_list_orders_pagination_and_filter():
+    """Verify list_subscription_orders paginates and filters correctly."""
+    user_id = uuid4()
+    now = datetime.now(timezone.utc)
+
+    # 15 orders
+    mock_orders = [
+        SubscriptionOrder(
+            id=uuid4(),
+            order_code=f"AM-PLUS-1795330000-ORD{i:02d}",
+            user_id=user_id,
+            tier="plus" if i % 2 == 0 else "prime",
+            duration_days=30,
+            amount_cents=500,
+            amount_vnd=130000,
+            currency="USD",
+            status="success" if i < 10 else "pending",
+            provider="paypal_sandbox",
+            created_at=now - timedelta(minutes=i),
+        )
+        for i in range(15)
+    ]
+
+    account = MagicMock()
+    account.user.id = user_id
+    account.user.roles = ["USER"]
+    account.db = MagicMock()
+
+    # When querying total count, return 15
+    # When querying page items (limit=10), return first 10
+    account.db.scalar.return_value = 15
+    account.db.scalars.return_value = mock_orders[:10]
+
+    result = list_subscription_orders(page=1, limit=10, account=account)
+    assert isinstance(result, OrderPage)
+    assert len(result.items) == 10
+    assert result.pagination.total == 15
+    assert result.pagination.page == 1
+    assert result.pagination.page_size == 10
+    assert result.pagination.total_pages == 2
+
+
+def test_webhook_duplicate_idempotent():
+    """Verify PayPal webhook PAYMENT.CAPTURE.COMPLETED does not double-extend subscription."""
+    import asyncio
+    user_id = uuid4()
+    order_id = uuid4()
+    now = datetime(2026, 11, 22, 10, 0, 0, tzinfo=timezone.utc)
+    order_code = "AM-PLUS-1795330000-WEBHOOK1"
+
+    order = SubscriptionOrder(
+        id=order_id,
+        order_code=order_code,
+        user_id=user_id,
+        tier="plus",
+        duration_days=30,
+        amount_cents=500,
+        amount_vnd=130000,
+        currency="USD",
+        status="success",  # Already succeeded
+        provider="paypal_sandbox",
+        completed_at=now,
+        created_at=now - timedelta(minutes=10),
+    )
+
+    mock_db = MagicMock()
+    mock_db.scalar.return_value = order
+
+    class MockContextManager:
+        def __enter__(self):
+            return mock_db
+        def __exit__(self, *args):
+            pass
+
+    mock_factory = MagicMock(return_value=MockContextManager())
+
+    mock_request = MagicMock()
+    mock_request.app.state.auth.now.return_value = now
+    mock_request.app.state.paypal = None
+    mock_request.app.state.auth_session_factory = mock_factory
+    mock_request.headers = {}
+
+    webhook_payload = json.dumps({
+        "event_type": "PAYMENT.CAPTURE.COMPLETED",
+        "resource": {
+            "id": "CAPTURE-12345",
+            "custom_id": order_code,
+        }
+    }).encode("utf-8")
+
+    async def get_body():
+        return webhook_payload
+
+    mock_request.body = get_body
+
+    res = asyncio.run(handle_paypal_webhook(mock_request))
+    assert res == {"status": "received"}
+    # Because order was already "success", sub was NOT modified/added
+    mock_db.add.assert_not_called()
+
