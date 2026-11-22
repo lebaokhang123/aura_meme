@@ -7,7 +7,7 @@ import { auth } from '../auth.js';
 import { authMessage } from '../auth-client.js';
 import { usePreferences } from '../PreferencesContext.jsx';
 
-const COOL_SECONDS = 30;
+const COOL_SECONDS = (typeof window !== 'undefined' && window.__FORGOT_COOL_SECONDS) || 30;
 
 export default function ForgotPasswordPage() {
   const { language } = usePreferences();
@@ -22,6 +22,7 @@ export default function ForgotPasswordPage() {
   const [busy, setBusy] = useState(false);
   const [isSent, setIsSent] = useState(false);
   const [cooldownLeft, setCooldownLeft] = useState(0);
+  const [resendStatus, setResendStatus] = useState(null);
 
   const boxRef = useRef(null);
   const sendBtnRef = useRef(null);
@@ -86,6 +87,7 @@ export default function ForgotPasswordPage() {
     setBusy(true);
     setHasError(false);
     setErrorMsg('');
+    setResendStatus(null);
     fly(sendBtnRef.current);
 
     const rm = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -109,12 +111,27 @@ export default function ForgotPasswordPage() {
   async function handleResend() {
     if (cooldownLeft > 0 || busy) return;
     setBusy(true);
+    setResendStatus(null);
     fly(reBtnRef.current);
     try {
       await auth.forgotPassword(email.trim());
       startCooldown();
+      setResendStatus({
+        type: 'success',
+        text: t('Đã gửi lại liên kết qua email.', 'A new link has been sent to your email.'),
+      });
     } catch (err) {
-      // Keep state safe
+      if (err?.status === 429 || err?.code === 'RATE_LIMITED') {
+        setResendStatus({
+          type: 'error',
+          text: t('Bạn thao tác quá nhanh. Vui lòng đợi trước khi gửi lại.', 'Too many attempts. Please wait before retrying.'),
+        });
+      } else {
+        setResendStatus({
+          type: 'error',
+          text: t('Không thể gửi lại. Vui lòng thử lại sau.', 'Could not resend. Please try again later.'),
+        });
+      }
     } finally {
       setBusy(false);
     }
@@ -125,6 +142,7 @@ export default function ForgotPasswordPage() {
     setIsSent(false);
     setHasError(false);
     setErrorMsg('');
+    setResendStatus(null);
     setTimeout(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
@@ -202,6 +220,15 @@ export default function ForgotPasswordPage() {
             </span>
 
             <p className="u405-spam-note">{t('Vui lòng kiểm tra hộp thư đến hoặc thư rác.', 'Please check your inbox or spam folder.')}</p>
+
+            {resendStatus && (
+              <p
+                className={`u405-resend-feedback ${resendStatus.type === 'error' ? 'is-error' : 'is-success'}`}
+                role={resendStatus.type === 'error' ? 'alert' : 'status'}
+              >
+                {resendStatus.text}
+              </p>
+            )}
 
             <button
               type="button"

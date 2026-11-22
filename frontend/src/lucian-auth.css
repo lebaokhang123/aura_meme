@@ -434,6 +434,25 @@ input.u405-in {
   line-height: 1.4;
 }
 
+.u405-resend-feedback {
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 0 0 10px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: opacity .2s;
+}
+
+.u405-resend-feedback.is-success {
+  color: #4cd7f6;
+  background: rgba(76, 215, 246, 0.1);
+}
+
+.u405-resend-feedback.is-error {
+  color: #ff5449;
+  background: rgba(255, 84, 73, 0.1);
+}
+
 .u405-re {
   display: inline-flex;
   align-items: center;

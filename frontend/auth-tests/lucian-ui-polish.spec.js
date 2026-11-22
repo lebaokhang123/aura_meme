@@ -207,3 +207,62 @@ test('Lucian #405: Password Reset with paper plane flight, letter entering envel
   await expect(emailInp).toBeFocused();
   await page.screenshot({ path: `${ARTIFACTS_DIR}/lucian_forgot_change_email.png` });
 });
+
+test('Lucian #405: Resend link shows success feedback, 429 rate limit message, and avoids rapid multi-click', async ({ page, context }) => {
+  await setupAuthMocks(context);
+  let forgotCount = 0;
+  let return429 = false;
+
+  await context.route('**/api/v1/auth/forgot-password', async (route) => {
+    forgotCount++;
+    if (return429) {
+      return route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'RATE_LIMITED' }),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true }),
+    });
+  });
+
+  await context.addInitScript(() => {
+    window.__FORGOT_COOL_SECONDS = 1;
+    localStorage.setItem('aurameme-cookie-consent-v1', JSON.stringify({ version: 1, essential: true, optional: false, updatedAt: new Date().toISOString() }));
+    localStorage.setItem('aurameme-ui-preferences', JSON.stringify({ theme: 'dark', language: 'vi' }));
+  });
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/forgot-password');
+
+  const emailInp = page.locator('#forgot-email');
+  await emailInp.fill('resend-test@example.com');
+  await page.locator('.u405-send').click();
+
+  await expect(page.locator('.u405')).toHaveClass(/is-sent/);
+  const reBtn = page.locator('.u405-re');
+  await expect(reBtn).toBeDisabled();
+
+  // Wait 1.1s for the 1s cooldown to expire
+  await page.waitForTimeout(1100);
+  await expect(reBtn).toBeEnabled();
+
+  // 1. Test 429 rate limit
+  return429 = true;
+  await reBtn.click();
+  const feedback = page.locator('.u405-resend-feedback');
+  await expect(feedback).toBeVisible();
+  await expect(feedback).toContainText('Bạn thao tác quá nhanh');
+  await expect(feedback).toHaveClass(/is-error/);
+
+  // 2. Test successful resend
+  return429 = false;
+  await page.waitForTimeout(1100);
+  await expect(reBtn).toBeEnabled();
+  await reBtn.click();
+  await expect(feedback).toContainText('Đã gửi lại liên kết');
+  await expect(feedback).toHaveClass(/is-success/);
+});
