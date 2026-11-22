@@ -8,6 +8,7 @@ function sessionUser(value){
   const user={id:value.id,username:value.username,display_name:value.display_name,roles:Object.freeze([...value.roles]),status:value.status};
   if(typeof value.email==='string')user.email=value.email;
   if(typeof value.avatar_url==='string'&&/^\/api\/v1\/(?:media|catalog\/assets)\/[0-9a-f-]{36}$/i.test(value.avatar_url))user.avatar_url=value.avatar_url;
+  if(typeof value.title==='string'&&value.title.trim())user.title=value.title.trim();
   return Object.freeze(user);
 }
 export function createAuthClient({fetch=globalThis.fetch,notify=()=>{}}={}){

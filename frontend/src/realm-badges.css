@@ -1,0 +1,413 @@
+/* AuraMeme Task 6 — 10-Realm Cultivation Rank & Special Cosmetic Title System
+ * - Cohesive dark-first progression (Slate -> Jade -> Emerald -> Azure -> Indigo -> Violet -> Amethyst -> Crimson -> Lightning Ember -> Celestial Prismatic)
+ * - Full Light Mode (.u219[data-theme="light"]) contrast compliance (>= 4.5:1 text)
+ * - Compositor-only (transform/opacity) sheen opted-in via @media (prefers-reduced-motion: no-preference)
+ * - Zero continuous animation on compact feed/comment cards for 60fps scroll performance
+ * - Forced Colors Mode fallback (@media (forced-colors: active))
+ */
+
+.am-lvl-pill,
+.am-title-badge {
+  --am-tier-bg: rgba(148, 163, 184, 0.12);
+  --am-tier-bg-end: rgba(148, 163, 184, 0.06);
+  --am-tier-border: rgba(148, 163, 184, 0.34);
+  --am-tier-text: #cbd5e1;
+  --am-tier-glow: none;
+  --am-tier-ring: transparent;
+  --am-tier-sheen: rgba(255, 255, 255, 0.24);
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  vertical-align: middle;
+  border-radius: 6px;
+  border: 1px solid var(--am-tier-border);
+  background: linear-gradient(135deg, var(--am-tier-bg), var(--am-tier-bg-end));
+  color: var(--am-tier-text);
+  box-shadow: var(--am-tier-glow);
+  overflow: hidden;
+  isolation: isolate;
+  user-select: none;
+  transition: border-color 160ms ease, filter 160ms ease;
+}
+
+.am-lvl-pill {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.am-title-badge {
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.am-title-badge-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.am-title-badge-glyph svg {
+  width: 11px;
+  height: 11px;
+  display: block;
+}
+
+/* Sizes: sm (comments), md (PostCard / Rank), lg (Profile hero / AuraProgress) */
+.am-lvl-pill--sm {
+  font-size: 9.5px;
+  line-height: 14px;
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+.am-title-badge--sm {
+  font-size: 10px;
+  line-height: 14px;
+  padding: 1px 6px;
+  border-radius: 5px;
+}
+
+.am-title-badge--sm .am-title-badge-glyph svg {
+  width: 10px;
+  height: 10px;
+}
+
+.am-lvl-pill--md {
+  font-size: 10.5px;
+  line-height: 16px;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.am-title-badge--md {
+  font-size: 11px;
+  line-height: 16px;
+  padding: 1px 7px;
+  border-radius: 6px;
+}
+
+.am-lvl-pill--lg {
+  font-size: 11.5px;
+  line-height: 18px;
+  padding: 2px 10px;
+  border-radius: 9999px;
+}
+
+.am-title-badge--lg {
+  font-size: 12px;
+  line-height: 18px;
+  padding: 2px 11px;
+  border-radius: 9999px;
+  font-weight: 700;
+}
+
+.am-title-badge--lg .am-title-badge-glyph svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ==========================================================================
+   10 REALMS — DARK MODE (Default AuraMeme cyber-clean surface #12131b)
+   ========================================================================== */
+
+/* Tier 1: Luyện Khí (1-10) — Sơ Khai Mist Slate (clean border, zero glow) */
+.am-lvl-pill[data-realm-tier="1"],
+.am-title-badge[data-realm-tier="1"] {
+  --am-tier-bg: rgba(148, 163, 184, 0.13);
+  --am-tier-bg-end: rgba(100, 116, 139, 0.07);
+  --am-tier-border: rgba(148, 163, 184, 0.34);
+  --am-tier-text: #cbd5e1;
+  --am-tier-glow: none;
+}
+
+/* Tier 2: Trúc Cơ (11-20) — Thanh Ngọc Jade Teal (clean border, ultra-subtle edge) */
+.am-lvl-pill[data-realm-tier="2"],
+.am-title-badge[data-realm-tier="2"] {
+  --am-tier-bg: rgba(45, 212, 191, 0.13);
+  --am-tier-bg-end: rgba(20, 184, 166, 0.06);
+  --am-tier-border: rgba(45, 212, 191, 0.38);
+  --am-tier-text: #5eead4;
+  --am-tier-glow: none;
+}
+
+/* Tier 3: Kim Đan (21-30) — Linh Lục Emerald Spirit (crisp border, faint ambient) */
+.am-lvl-pill[data-realm-tier="3"],
+.am-title-badge[data-realm-tier="3"] {
+  --am-tier-bg: rgba(52, 211, 153, 0.15);
+  --am-tier-bg-end: rgba(16, 185, 129, 0.07);
+  --am-tier-border: rgba(52, 211, 153, 0.44);
+  --am-tier-text: #6ee7b7;
+  --am-tier-glow: 0 0 6px rgba(16, 185, 129, 0.14);
+}
+
+/* Tier 4: Nguyên Anh (31-40) — Băng Lam Glacial Azure (soft gradient + light glow) */
+.am-lvl-pill[data-realm-tier="4"],
+.am-title-badge[data-realm-tier="4"] {
+  --am-tier-bg: rgba(56, 189, 248, 0.17);
+  --am-tier-bg-end: rgba(14, 165, 233, 0.08);
+  --am-tier-border: rgba(56, 189, 248, 0.48);
+  --am-tier-text: #7dd3fc;
+  --am-tier-glow: 0 0 8px rgba(56, 189, 248, 0.2);
+}
+
+/* Tier 5: Hóa Thần (41-50) — Tinh Lam Astral Indigo (mid gradient + soft aura) */
+.am-lvl-pill[data-realm-tier="5"],
+.am-title-badge[data-realm-tier="5"] {
+  --am-tier-bg: rgba(129, 140, 248, 0.2);
+  --am-tier-bg-end: rgba(79, 70, 229, 0.1);
+  --am-tier-border: rgba(129, 140, 248, 0.54);
+  --am-tier-text: #a5b4fc;
+  --am-tier-glow: 0 0 9px rgba(99, 102, 241, 0.26);
+}
+
+/* Tier 6: Luyện Hư (51-60) — Hư Không Void Violet (nebula gradient + glow) */
+.am-lvl-pill[data-realm-tier="6"],
+.am-title-badge[data-realm-tier="6"] {
+  --am-tier-bg: rgba(167, 139, 250, 0.22);
+  --am-tier-bg-end: rgba(109, 40, 217, 0.12);
+  --am-tier-border: rgba(167, 139, 250, 0.58);
+  --am-tier-text: #c4b5fd;
+  --am-tier-glow: 0 0 10px rgba(139, 92, 246, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* Tier 7: Hợp Thể (61-70) — Tử Hoa Royal Amethyst (multi-tone gradient + inner highlight) */
+.am-lvl-pill[data-realm-tier="7"],
+.am-title-badge[data-realm-tier="7"] {
+  --am-tier-bg: rgba(192, 132, 252, 0.24);
+  --am-tier-bg-end: rgba(217, 70, 239, 0.14);
+  --am-tier-border: rgba(216, 180, 254, 0.62);
+  --am-tier-text: #f0abfc;
+  --am-tier-glow: 0 0 11px rgba(192, 132, 252, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+/* Tier 8: Đại Thừa (71-80) — Xích Diễm Crimson Flame (double-layer border + warm crimson glow) */
+.am-lvl-pill[data-realm-tier="8"],
+.am-title-badge[data-realm-tier="8"] {
+  --am-tier-bg: rgba(244, 63, 94, 0.24);
+  --am-tier-bg-end: rgba(190, 18, 60, 0.14);
+  --am-tier-border: rgba(251, 113, 133, 0.68);
+  --am-tier-text: #fda4af;
+  --am-tier-glow: 0 0 0 1px rgba(244, 63, 94, 0.22), 0 0 12px rgba(244, 63, 94, 0.38), inset 0 1px 0 rgba(255, 228, 230, 0.2);
+}
+
+/* Tier 9: Độ Kiếp (81-90) — Thiên Kiếp Storm Ember (layered ring + intense controlled radiance) */
+.am-lvl-pill[data-realm-tier="9"],
+.am-title-badge[data-realm-tier="9"] {
+  --am-tier-bg: rgba(249, 115, 22, 0.26);
+  --am-tier-bg-end: rgba(225, 29, 72, 0.18);
+  --am-tier-border: rgba(251, 146, 60, 0.78);
+  --am-tier-text: #fed7aa;
+  --am-tier-glow: 0 0 0 1px rgba(251, 146, 60, 0.28), 0 0 14px rgba(249, 115, 22, 0.44), inset 0 1px 0 rgba(255, 237, 213, 0.25);
+  --am-tier-sheen: rgba(254, 215, 170, 0.32);
+}
+
+/* Tier 10: Phi Thăng (91-100) — Cửu Thiên Celestial Prismatic Aurora (peak rarity, refined not flashy) */
+.am-lvl-pill[data-realm-tier="10"],
+.am-title-badge[data-realm-tier="10"] {
+  --am-tier-bg: rgba(168, 85, 247, 0.28);
+  --am-tier-bg-end: rgba(56, 189, 248, 0.24);
+  --am-tier-border: rgba(233, 221, 255, 0.85);
+  --am-tier-text: #f5f3ff;
+  --am-tier-glow: 0 0 0 1px rgba(76, 215, 246, 0.38), 0 0 16px rgba(168, 85, 247, 0.48), 0 0 8px rgba(76, 215, 246, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  --am-tier-sheen: rgba(233, 221, 255, 0.42);
+  background: linear-gradient(125deg, rgba(168, 85, 247, 0.34) 0%, rgba(99, 102, 241, 0.26) 45%, rgba(76, 215, 246, 0.32) 100%);
+}
+
+/* ==========================================================================
+   2 SPECIAL COSMETIC TITLES — DISTINCT FROM 10 REALMS & PREMIUM PLUS/PRIME
+   ========================================================================== */
+
+/* Khang Dev: Bá Chủ Thiên Lôi — Sovereign Thunder Gold */
+.am-title-badge[data-special-title="thunder"] {
+  --am-tier-bg: rgba(245, 158, 11, 0.24);
+  --am-tier-bg-end: rgba(180, 83, 9, 0.16);
+  --am-tier-border: rgba(251, 191, 36, 0.82);
+  --am-tier-text: #fde68a;
+  --am-tier-glow: 0 0 0 1px rgba(251, 191, 36, 0.26), 0 0 14px rgba(245, 158, 11, 0.42), inset 0 1px 0 rgba(254, 243, 199, 0.3);
+  --am-tier-sheen: rgba(254, 240, 138, 0.36);
+  background: linear-gradient(120deg, rgba(245, 158, 11, 0.28) 0%, rgba(217, 119, 6, 0.18) 55%, rgba(251, 191, 36, 0.28) 100%);
+  font-weight: 700;
+}
+
+/* Kien Dev: Thiên Tướng Độ Ách — Sovereign Crimson Warden */
+.am-title-badge[data-special-title="warden"] {
+  --am-tier-bg: rgba(225, 29, 72, 0.26);
+  --am-tier-bg-end: rgba(124, 58, 237, 0.2);
+  --am-tier-border: rgba(251, 113, 133, 0.82);
+  --am-tier-text: #fecdd3;
+  --am-tier-glow: 0 0 0 1px rgba(244, 63, 94, 0.28), 0 0 14px rgba(225, 29, 72, 0.44), inset 0 1px 0 rgba(255, 228, 230, 0.28);
+  --am-tier-sheen: rgba(254, 205, 211, 0.34);
+  background: linear-gradient(120deg, rgba(225, 29, 72, 0.28) 0%, rgba(159, 18, 57, 0.2) 55%, rgba(139, 92, 246, 0.24) 100%);
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   RESTRAINED COMPOSITOR-ONLY SHEEN (Tiers 9-10 & Special Titles)
+   - Static by default; opted-in inside @media (prefers-reduced-motion: no-preference)
+   - Runs smoothly on prominent (--lg) badges; on feed (--md/--sm) activates only on hover
+     so hundreds of PostCards never run concurrent infinite animations.
+   ========================================================================== */
+@keyframes am-realm-sheen {
+  0%, 72% {
+    transform: translateX(-140%) skewX(-22deg);
+    opacity: 0;
+  }
+  80% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateX(220%) skewX(-22deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .am-lvl-pill--lg[data-realm-tier="9"]::after,
+  .am-title-badge--lg[data-realm-tier="9"]::after,
+  .am-lvl-pill--lg[data-realm-tier="10"]::after,
+  .am-title-badge--lg[data-realm-tier="10"]::after,
+  .am-title-badge--lg[data-special-title]::after,
+  .am-lvl-pill[data-realm-tier="9"]:hover::after,
+  .am-title-badge[data-realm-tier="9"]:hover::after,
+  .am-lvl-pill[data-realm-tier="10"]:hover::after,
+  .am-title-badge[data-realm-tier="10"]:hover::after,
+  .am-title-badge[data-special-title]:hover::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 45%;
+    background: linear-gradient(90deg, transparent, var(--am-tier-sheen), transparent);
+    pointer-events: none;
+    will-change: transform, opacity;
+    animation: am-realm-sheen 4.8s ease-in-out infinite;
+  }
+}
+
+/* ==========================================================================
+   LIGHT MODE (.u219[data-theme="light"]) — High-contrast (>= 4.5:1)
+   ========================================================================== */
+.u219[data-theme="light"] .am-lvl-pill[data-realm-tier="1"],
+.u219[data-theme="light"] .am-title-badge[data-realm-tier="1"] {
+  --am-tier-bg: #f1f5f9;
+  --am-tier-bg-end: #e2e8f0;
+  --am-tier-border: #94a3b8;
+  --am-tier-text: #334155;
+  --am-tier-glow: none;
+}
+
+.u219[data-theme="light"] .am-lvl-pill[data-realm-tier="2"],
+.u219[data-theme="light"] .am-title-badge[data-realm-tier="2"] {
+  --am-tier-bg: #f0fdfa;
+  --am-tier-bg-end: #ccfbf1;
+  --am-tier-border: #2dd4bf;
+  --am-tier-text: #0f766e;
+  --am-tier-glow: none;
+}
+
+.u219[data-theme="light"] .am-lvl-pill[data-realm-tier="3"],
+.u219[data-theme="light"] .am-title-badge[data-realm-tier="3"] {
+  --am-tier-bg: #ecfdf5;
+  --am-tier-bg-end: #d1fae5;
+  --am-tier-border: #34d399;
+  --am-tier-text: #047857;
+  --am-tier-glow: 0 1px 3px rgba(4, 120, 87, 0.12);
+}
+
+.u219[data-theme="light"] .am-lvl-pill[data-realm-tier="4"],
+.u219[data-theme="light"] .am-title-badge[data-realm-tier="4"] {
+  --am-tier-bg: #f0f9ff;
+  --am-tier-bg-end: #e0f2fe;
+  --am-tier-border: #38bdf8;
+  --am-tier-text: #0369a1;
+  --am-tier-glow: 0 1px 5px rgba(3, 105, 161, 0.16);
+}
+
+.u219[data-theme="light"] .am-lvl-pill[data-realm-tier="5"],
+.u219[data-theme="light"] .am-title-badge[data-realm-tier="5"] {
+  --am-tier-bg: #eef2ff;
+  --am-tier-bg-end: #e0e7ff;
+  --am-tier-border: #818cf8;
+  --am-tier-text: #3730a3;
+  --am-tier-glow: 0 1px 6px rgba(55, 48, 163, 0.18);
+}
+
+.u219[data-theme="light"] .am-lvl-pill[data-realm-tier="6"],
+.u219[data-theme="light"] .am-title-badge[data-realm-tier="6"] {
+  --am-tier-bg: #f5f3ff;
+  --am-tier-bg-end: #ede9fe;
+  --am-tier-border: #a78bfa;
+  --am-tier-text: #5b21b6;
+  --am-tier-glow: 0 2px 8px rgba(91, 33, 182, 0.2);
+}
+
+.u219[data-theme="light"] .am-lvl-pill[data-realm-tier="7"],
+.u219[data-theme="light"] .am-title-badge[data-realm-tier="7"] {
+  --am-tier-bg: #fdf4ff;
+  --am-tier-bg-end: #fae8ff;
+  --am-tier-border: #c084fc;
+  --am-tier-text: #86198f;
+  --am-tier-glow: 0 2px 9px rgba(134, 25, 143, 0.22);
+}
+
+.u219[data-theme="light"] .am-lvl-pill[data-realm-tier="8"],
+.u219[data-theme="light"] .am-title-badge[data-realm-tier="8"] {
+  --am-tier-bg: #fff1f2;
+  --am-tier-bg-end: #ffe4e6;
+  --am-tier-border: #fb7185;
+  --am-tier-text: #9f1239;
+  --am-tier-glow: 0 0 0 1px rgba(225, 29, 72, 0.16), 0 2px 10px rgba(159, 18, 57, 0.22);
+}
+
+.u219[data-theme="light"] .am-lvl-pill[data-realm-tier="9"],
+.u219[data-theme="light"] .am-title-badge[data-realm-tier="9"] {
+  --am-tier-bg: #fff7ed;
+  --am-tier-bg-end: #ffedd5;
+  --am-tier-border: #f97316;
+  --am-tier-text: #9a3412;
+  --am-tier-glow: 0 0 0 1px rgba(249, 115, 22, 0.2), 0 2px 11px rgba(154, 52, 18, 0.24);
+}
+
+.u219[data-theme="light"] .am-lvl-pill[data-realm-tier="10"],
+.u219[data-theme="light"] .am-title-badge[data-realm-tier="10"] {
+  --am-tier-border: #7c3aed;
+  --am-tier-text: #3b0764;
+  --am-tier-glow: 0 0 0 1px rgba(14, 165, 233, 0.28), 0 3px 12px rgba(124, 58, 237, 0.24);
+  background: linear-gradient(125deg, #f3e8ff 0%, #e0e7ff 50%, #e0f2fe 100%);
+}
+
+.u219[data-theme="light"] .am-title-badge[data-special-title="thunder"] {
+  --am-tier-border: #d97706;
+  --am-tier-text: #78350f;
+  --am-tier-glow: 0 0 0 1px rgba(217, 119, 6, 0.22), 0 2px 10px rgba(217, 119, 6, 0.24);
+  background: linear-gradient(120deg, #fffbeb 0%, #fef3c7 55%, #fde68a 100%);
+}
+
+.u219[data-theme="light"] .am-title-badge[data-special-title="warden"] {
+  --am-tier-border: #e11d48;
+  --am-tier-text: #881337;
+  --am-tier-glow: 0 0 0 1px rgba(225, 29, 72, 0.22), 0 2px 10px rgba(225, 29, 72, 0.24);
+  background: linear-gradient(120deg, #fff1f2 0%, #ffe4e6 55%, #f3e8ff 100%);
+}
+
+/* ==========================================================================
+   FORCED COLORS MODE (Windows High Contrast)
+   ========================================================================== */
+@media (forced-colors: active) {
+  .am-lvl-pill,
+  .am-title-badge {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: none;
+  }
+}

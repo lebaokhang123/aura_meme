@@ -137,3 +137,31 @@ npx.cmd playwright test --config=../.github/playwright.auth.config.mjs auth-test
   - `task4_contact_desktop_light.png` (Desktop 1440px Light Mode)
   - `task4_contact_mobile_dark.png` (Mobile 375px Dark Mode)
   - `task4_contact_mobile_light.png` (Mobile 375px Light Mode)
+
+---
+
+## 5. Task 6 — Hệ thống Màu & Hiệu ứng 10 Cảnh Giới + 2 Chức Danh Đặc Biệt (`feat/realm-title-task6`)
+
+- **Base SHA:** `682d247` (`feat/premium-sandbox-task5`)
+- **Worktree:** `D:\Big\du_an_lon\aura_meme_p2_task6`
+
+### 5.1. Vì sao làm & Quyết định Kiến trúc
+- **Single Source of Truth cho 10 cảnh giới:** Chuẩn hóa hàm `realm_for_level(level)`, `special_title_for_username(username)`, `public_title_for_user(level, username)` tại `backend/app/aura_v1.py`, dùng chung cho `UserPublic` (`account_schemas.py`), `AccountPrivate` (`account.py`), và `leaderboard` (`aura_reads.py`).
+- **Loại bỏ hoàn toàn hardcode username trên Frontend:** Trước Task 6, `social-api.js`, `AuraProgress.jsx`, và `ProfilePage.jsx` có điều kiện `username === 'khang_dev'`. Task 6 gỡ bỏ toàn bộ logic đó; frontend chỉ render dữ liệu `level`, `realm`, `title` do backend xác thực và cấp phát.
+- **Tách bạch Level thật và Chức danh đặc biệt:** `Bá Chủ Thiên Lôi` (Khang Dev) và `Thiên Tướng Độ Ách` (Kien Dev) là cosmetic title độc lập, không biến thành cảnh giới thứ 11/12. Huy hiệu `LVL` của họ vẫn giữ đúng màu/bậc của cảnh giới thật (ví dụ `LVL 79` -> Tier 8 `Đại Thừa`, `LVL 12` -> Tier 2 `Trúc Cơ`) và tự động thăng bậc khi lên Level mà không mất danh hiệu đặc biệt.
+
+### 5.2. Data Flow & Phân quyền / Bảo mật
+1. **Backend:** `UserProgress.level_cached` (policy-gated qua `public_level_column(now)`) -> `UserPublic.public_identity()` suy diễn `(realm, title)`. Nếu `level is None`, cả `realm` và `title` đều bị lược bỏ (`exclude_if=None`), tuyệt đối không bịa chức danh.
+2. **Session `/users/me`:** `AccountPrivate.title` sử dụng `exclude_if=lambda v: v is None`, chỉ trả về cho tài khoản có cosmetic title đặc biệt để sidebar Home hiển thị chính xác mà không làm thay đổi contract của user thường.
+3. **Frontend:** `frontend/src/realm-tier.js` + `frontend/src/components/RealmBadges.jsx` + `frontend/src/realm-badges.css` dùng chung cho Home (`PostCard`, `AuraProgress`), Explore (`PostCard`), Comment (`CommentSection`), Profile (`ProfilePage`, `PostCard`, `AuraProgress`), và `HallIdentity`.
+
+### 5.3. Ngôn ngữ Thiết kế Màu sắc, Hiệu năng & Accessibility
+- **Thang năng lượng 10 cảnh giới thống nhất:** Slate (`Luyện Khí`) -> Jade (`Trúc Cơ`) -> Emerald (`Kim Đan`) -> Azure (`Nguyên Anh`) -> Indigo (`Hóa Thần`) -> Violet (`Luyện Hư`) -> Amethyst (`Hợp Thể`) -> Crimson (`Đại Thừa`) -> Lightning Ember (`Độ Kiếp`) -> Celestial Prismatic (`Phi Thăng`).
+- **Hiệu năng Feed:** Zero animation chạy nền trên các thẻ compact (`--sm`/`--md`) trong feed/bình luận để cuộn 60fps ngay cả khi có hàng trăm bài viết; hiệu ứng sheen chỉ kích hoạt trên badge lớn (`--lg`) hoặc khi hover, chỉ animate `transform`/`opacity` trên compositor thread và tuân thủ `@media (prefers-reduced-motion: no-preference)`.
+- **Accessibility:** Tương phản văn bản >= 4.5:1 ở cả Dark Mode và Light Mode (`.u219[data-theme="light"]`), có biểu tượng SVG nhỏ cho 2 chức danh đặc biệt (WCAG 1.4.1), và fallback `@media (forced-colors: active)`.
+
+### 5.4. Giới hạn & Gợi ý Giải thích Phỏng vấn
+- **Giới hạn:** Trang `/rank` UI vẫn giữ `MaintenancePage` theo cấu hình hiện tại (API `/api/v1/leaderboard` đã sẵn sàng trả `level`, `realm`, `title`). Không thêm dependency ngoài.
+- **Khi phỏng vấn có thể trình bày:**
+  - *Tại sao không hardcode chức danh admin ở frontend?* Vì phân quyền/nhận diện phải đi từ backend (single source of truth), tránh bị giả mạo hoặc lệch trạng thái khi policy chưa sẵn sàng.
+  - *Tại sao không dùng animation liên tục trên PostCard?* Hàng trăm animation `box-shadow` đồng thời gây repaint nặng; dùng CSS tĩnh trên feed và compositor-only `transform`/`opacity` + `prefers-reduced-motion: no-preference` giúp giữ 60fps và đạt chuẩn accessibility.

@@ -23,6 +23,7 @@ import { LocalizedPage, useLocalized } from './localize.jsx';
 import './preferences-theme.css';
 import { SocialProvider } from './SocialContext.jsx';
 import './social.css';
+import './realm-badges.css';
 import AdminPage from './components/AdminPage.jsx';
 import PremiumPage from './components/PremiumPage.jsx';
 import PremiumCheckoutPage from './components/PremiumCheckoutPage.jsx';

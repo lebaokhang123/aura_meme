@@ -8,9 +8,8 @@ import {usePremium} from '../PremiumContext.jsx';
 import {useLocalized} from '../localize.jsx';
 import {ReactionBar} from './ReactionBar.jsx';
 import {icon,SocialMessage} from './social-ui.jsx';
-import {authorClasses} from '../generated/social-stitch.jsx';
 import {POSTS} from '../feed-data.js';
-import {apiStyleAuthor,LevelPill} from './PostCard.jsx';
+import {LevelPill,TitleBadge} from './RealmBadges.jsx';
 import {relativeTime} from '../relative-time.js';
 import UserAvatar from './UserAvatar.jsx';
 export {relativeTime};
@@ -24,8 +23,7 @@ function CommentRow({comment}) {
   ));
   const effectiveAuthorTier=(isCurrentAuthor&&subscription?.is_active?subscription.tier:null)||comment.membershipTier||comment.membership_tier||author?.membershipTier||author?.membership_tier||'free';
   const author=comment.api?{avatar:comment.authorId===current?.id?current.avatar:comment.avatar,displayName:comment.authorId===current?.id?current.displayName:comment.authorName,membershipTier:comment.membershipTier||comment.membership_tier}:DEMO_USERS.find(user=>user.username===comment.author);
-  const profile=comment.api?{handle:comment.handle,level:comment.level,nickname:comment.nickname}:POSTS.find(post=>post.id===({Khang_dev:'khang',Kien_dev:'kien',Gigachad:'gigachad'}[comment.author]));
-  const classes=authorClasses(comment.api?apiStyleAuthor(comment.author):comment.author,true);
+  const profile=comment.api?{handle:comment.handle,level:comment.level,realm:comment.realm,nickname:comment.nickname}:POSTS.find(post=>post.id===({Khang_dev:'khang',Kien_dev:'kien',Gigachad:'gigachad'}[comment.author]));
   const isAuthor=comment.api?current?.id===comment.authorId:current?.username===comment.author;
   const isAdmin=!MOCK_AUTH&&Array.isArray(current?.roles)&&current.roles.includes('ADMIN');
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[menuOpen,setMenuOpen]=useState(false),[confirm,setConfirm]=useState(null),[reason,setReason]=useState('');
@@ -58,8 +56,8 @@ function CommentRow({comment}) {
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <span translate={comment.api?'no':undefined} className="font-label-md text-[13px] font-bold text-on-surface hover:underline cursor-pointer break-all">{author.displayName}</span>
             <span translate={comment.api?'no':undefined} className="text-[11px] text-outline font-normal">{profile.handle}</span>
-            <LevelPill level={profile.level} className={`${classes.level} whitespace-nowrap shrink-0`}/>
-            {profile.nickname&&<span className={`${classes.nickname} whitespace-nowrap shrink-0`} translate="no">{profile.nickname}</span>}
+            <LevelPill level={profile.level} size="sm"/>
+            <TitleBadge level={profile.level} realm={profile.realm} title={profile.nickname} size="sm"/>
           </div>
           <time className="text-outline text-[10.5px] font-mono-tag leading-tight" dateTime={comment.createdAt?new Date(comment.createdAt).toISOString():undefined}>
             {comment.createdAt ? relativeTime(comment.createdAt, language) : (comment.timeLabel || (language==='en'?'Just now':'Vừa xong'))}
