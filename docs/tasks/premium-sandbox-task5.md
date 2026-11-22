@@ -1072,3 +1072,49 @@ Thực hiện chuẩn xác yêu cầu của Owner về bản sắc nhận diện
   - `task5_modal_restored.png`: Modal xác nhận đơn hàng khôi phục chuẩn gọn, không còn nút chọn phương thức.
   - `task5_checkout_methods.png`: Giao diện chọn phương thức PayPal / Nhập thẻ rõ ràng tại trang checkout.
   - `task5_history_icon_buttons.png`: Cột Thao tác tinh gọn với icon-only buttons, ẩn hiện chuẩn xác theo trạng thái đơn hàng.
+
+---
+
+## 22. Bàn giao Vòng Tinh chỉnh: Sắp xếp Giao dịch Mới nhất Trước & Toolbar Tìm kiếm kèm Menu Lọc Dropdown (/premium/history)
+
+### 22.1. Sắp xếp Giao dịch Mới nhất Trước (Newest on Top)
+- **Nguyên nhân gốc rễ (Root Cause):**
+  - Câu truy vấn SQLAlchemy backend ban đầu đã có `.order_by(SubscriptionOrder.created_at.desc(), SubscriptionOrder.id.desc())`.
+  - Tuy nhiên, server mô phỏng preview môi trường thủ công (`scratch/preview_proxy.cjs`, port 8001) lưu trữ đơn hàng trong một `Map` và trả về `Array.from(orders.values())` theo thứ tự chèn FIFO (giao dịch cũ nhất lên đầu: 21:06 -> 21:07 -> 21:08).
+- **Khắc phục triệt để:**
+  - Áp dụng thuật toán sắp xếp đa tầng ổn định: `b.created_at - a.created_at || b.order_code.localeCompare(a.order_code)` trên cả PostgreSQL query, preview proxy (`preview_proxy.cjs`), endpoint `/api/v1/premium/orders/successful`, và toàn bộ Playwright test mock API.
+  - Thứ tự hiển thị đảm bảo **mới nhất ở trên cùng** (21:08 -> 21:07 -> 21:06) và ổn định xuyên suốt phân trang (trang 1 luôn là 10 đơn mới nhất, trang 2 là 5 đơn cũ hơn).
+
+### 22.2. Toolbar Tìm kiếm & Menu Lọc Dropdown Hiện đại
+- **Loại bỏ hàng nút bộ lọc dàn trải:** Thay thế toàn bộ hàng filter chip nằm ngang cũ bằng thanh công cụ (Toolbar) gọn gàng, chuẩn phong cách cyberpunk:
+  - **Ô tìm kiếm mã đơn hàng (Bên trái):**
+    - Input `.history-search-input` với icon kính lúp `search` và nút xóa nhanh `close` khi có từ khóa.
+    - Placeholder: `Tìm mã đơn hàng...` (VI) / `Search order code...` (EN).
+    - Tự động debounce 300ms, trang bị cơ chế theo dõi định danh request `reqIdRef` để loại bỏ phản hồi trễ (stale out-of-order responses).
+    - Hỗ trợ tìm kiếm chuỗi con (case-insensitive substring) theo `order_code`.
+    - Backend hỗ trợ tham số `q` (sanitized, tối đa 64 ký tự, escape ký tự đặc biệt `%`, `_`, `\`, phạm vi nghiêm ngặt theo `user_id` của tài khoản).
+  - **Nút mở menu lọc trạng thái (Bên phải):**
+    - Button `.history-filter-btn` tích hợp icon `filter_list`, nhãn trạng thái hiện tại (`Tất cả`, `Thành công`, `Chờ thanh toán`, ...), mũi tên xoay chiều linh hoạt (`arrow_drop_down` / `arrow_drop_up`).
+    - Chấm màu nhận diện `.history-filter-active-dot` phát sáng cyan khi áp dụng bộ lọc trạng thái khác mặc định.
+  - **Menu Popover Dropdown (`.history-filter-dropdown`):**
+    - Tiêu đề header `TRẠNG THÁI ĐƠN HÀNG`.
+    - Danh sách 7 tùy chọn trạng thái: `Tất cả`, `Thành công`, `Chờ thanh toán`, `Đang xác nhận`, `Thất bại`, `Đã hủy`, `Hết hạn`.
+    - Tùy chọn đang kích hoạt có icon check `check` màu cyan và nền highlight xanh dịu.
+    - Đóng dropdown tự động khi click chọn, khi click ra ngoài (outside click) hoặc khi nhấn phím `Escape`.
+    - Tự động reset về trang 1 khi thay đổi điều kiện lọc hoặc từ khóa tìm kiếm.
+  - **Trạng thái rỗng (Empty State):**
+    - Khi không tìm thấy giao dịch nào phù hợp, hiển thị thông báo "Không tìm thấy giao dịch phù hợp" kèm nút "Xóa tìm kiếm & bộ lọc" (`.history-clear-all-btn`) giúp khôi phục danh sách chỉ với 1 click.
+
+### 22.3. Khắc phục Xung đột CSS Input Form
+- Giải quyết triệt để lỗi do plugin `@tailwindcss/forms` từ CDN nạp đè `background-color: #fff` lên thẻ `input[type="text"]`.
+- Áp dụng cấu hình giao diện dark cyber chuẩn (`background-color: #0b0f19 !important`, viền và focus cyan thanh thoát).
+
+### 22.4. Kết quả Kiểm thử & Bằng chứng Nghiệm thu
+- **Frontend Unit Tests:** 81/81 passed (100%).
+- **Frontend Production Build:** `npm.cmd run build` thành công, zero errors.
+- **Backend Tests:** 467 passed, 788 deselected (integration), 0 failed.
+- **Backend Order Security Suite:** 18/18 passed (bổ sung test case `test_list_orders_search_and_sort`).
+- **Playwright Test Suite (`premium-sandbox.spec.js`):** 20/20 passed (100%).
+- **Bằng chứng hình ảnh:**
+  - `task5_history_icon_buttons.png`: Toolbar tìm kiếm dark mode và menu lọc trạng thái cùng bảng giao dịch sắp xếp mới nhất lên đầu.
+  - `task5_history_filter_dropdown.png`: Dropdown menu lọc trạng thái mở ra với checkmark và tùy chọn trực quan.

@@ -147,6 +147,7 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
       const pageNum = parseInt(url.searchParams.get('page') || '1', 10);
       const limit = parseInt(url.searchParams.get('limit') || '10', 10);
       const statusFilter = url.searchParams.get('status');
+      const q = (url.searchParams.get('q') || '').trim().toLowerCase();
 
       let allOrders = [
         {
@@ -162,8 +163,8 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
           status: 'success',
           provider: 'paypal_sandbox',
           provider_txn_id: '78B98765ABC12345',
-          created_at: now,
-          completed_at: now,
+          created_at: '2026-11-20T10:30:00Z',
+          completed_at: '2026-11-20T10:30:00Z',
         },
         {
           id: '00000000-0000-4000-8000-000000000002',
@@ -177,19 +178,31 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
           currency: 'USD',
           status: 'pending',
           provider: 'paypal_sandbox',
-          created_at: now,
+          created_at: '2026-11-20T10:00:00Z',
         },
       ];
-      if (statusFilter) {
+
+      // Sort newest created_at first
+      allOrders.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0) || String(b.order_code).localeCompare(String(a.order_code)));
+
+      if (statusFilter && statusFilter !== 'all') {
         allOrders = allOrders.filter((o) => o.status === statusFilter);
       }
+      if (q) {
+        allOrders = allOrders.filter((o) => (o.order_code || '').toLowerCase().includes(q));
+      }
+      const total = allOrders.length;
+      const total_pages = Math.max(1, Math.ceil(total / limit));
+      const offset = (pageNum - 1) * limit;
+      const items = allOrders.slice(offset, offset + limit);
+
       return send(200, {
-        items: allOrders,
+        items,
         pagination: {
           page: pageNum,
           page_size: limit,
-          total: allOrders.length,
-          total_pages: Math.max(1, Math.ceil(allOrders.length / limit)),
+          total,
+          total_pages,
         },
       });
     }
@@ -983,19 +996,53 @@ test('Part E: Payment History page (/premium/history) displays orders, opens det
   await expect(rows.first().locator('.badge-tier-prime')).toBeVisible();
   await expect(rows.first().locator('.badge-status-success')).toBeVisible();
 
-  // Check filter chips and pagination
-  await expect(page.locator('.history-filter-chip.active')).toContainText('Tất cả');
+  // Check search input, filter dropdown and pagination
+  const searchInput = page.locator('.history-search-input');
+  await expect(searchInput).toBeVisible();
+  await expect(searchInput).toHaveAttribute('placeholder', 'Tìm mã đơn hàng...');
+
+  const filterBtn = page.locator('.history-filter-btn');
+  await expect(filterBtn).toBeVisible();
+  await expect(page.locator('.history-filter-btn-text')).toHaveText('Tất cả');
+
   await expect(page.locator('.history-pagination-bar')).toBeVisible();
   await expect(page.locator('.history-pagination-info')).toContainText('Trang 1 / 1');
   await expect(page.locator('.history-pagination-info')).toContainText('2 giao dịch');
 
-  // Filter to pending
-  await page.locator('.history-filter-chip:has-text("Chờ thanh toán")').click();
+  // Test search: filter by order code "AM-PLUS"
+  await searchInput.fill('AM-PLUS');
+  await expect(page.locator('.history-row')).toHaveCount(1);
+  await expect(page.locator('.history-row').first().locator('.history-td-code')).toContainText('AM-PLUS');
+
+  // Clear search via clear button
+  const clearBtn = page.locator('.history-search-clear');
+  await expect(clearBtn).toBeVisible();
+  await clearBtn.click();
+  await expect(page.locator('.history-row')).toHaveCount(2);
+
+  // Test search: non-existent query shows empty state
+  await searchInput.fill('AM-NOT-FOUND');
+  await expect(page.locator('.history-row')).toHaveCount(0);
+  await expect(page.locator('.history-empty h3')).toContainText('Không tìm thấy giao dịch phù hợp');
+  await page.locator('.history-clear-all-btn').click();
+  await expect(page.locator('.history-row')).toHaveCount(2);
+
+  // Test filter dropdown: open dropdown and select "Chờ thanh toán"
+  await filterBtn.click();
+  const dropdown = page.locator('.history-filter-dropdown');
+  await expect(dropdown).toBeVisible();
+  await dropdown.locator('.history-filter-item:has-text("Chờ thanh toán")').click();
+  await expect(dropdown).not.toBeVisible();
+  await expect(filterBtn).toHaveClass(/history-filter-btn--active/);
+  await expect(page.locator('.history-filter-active-dot')).toBeVisible();
   await expect(page.locator('.history-row')).toHaveCount(1);
   await expect(page.locator('.history-row').first().locator('.badge-status-pending')).toBeVisible();
 
-  // Reset filter to all
-  await page.locator('.history-filter-chip:has-text("Tất cả")').click();
+  // Reset filter dropdown to "Tất cả"
+  await filterBtn.click();
+  await expect(dropdown).toBeVisible();
+  await dropdown.locator('.history-filter-item:has-text("Tất cả")').click();
+  await expect(dropdown).not.toBeVisible();
   await expect(page.locator('.history-row')).toHaveCount(2);
 
   const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
@@ -1072,11 +1119,16 @@ test('Part G: Capture Task 5 Evidence Screenshots for Owner', async ({ page, con
   await expect(page.locator('.checkout-method-selector')).toBeVisible();
   await page.screenshot({ path: `${artifactsDir}/task5_checkout_methods.png` });
 
-  // 3. Capture history table with compact icon buttons
+  // 3. Capture history table with compact icon buttons and search toolbar
   await page.goto('/premium/history');
   await expect(page.locator('.history-table')).toBeVisible();
   await expect(page.locator('.history-action-btn[title="Xem chi tiết"]').first()).toBeVisible();
   await page.screenshot({ path: `${artifactsDir}/task5_history_icon_buttons.png`, fullPage: true });
+
+  // 4. Capture history with filter dropdown open
+  await page.locator('.history-filter-btn').click();
+  await expect(page.locator('.history-filter-dropdown')).toBeVisible();
+  await page.screenshot({ path: `${artifactsDir}/task5_history_filter_dropdown.png` });
 });
 
 

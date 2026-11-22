@@ -11,12 +11,17 @@ export default function PaymentHistoryPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [statusFilter, setStatusFilter] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [downloadSuccess, setDownloadSuccess] = useState(null);
   const [subscription, setSubscription] = useState(null);
   const dialogRef = useRef(null);
+  const filterDropdownRef = useRef(null);
+  const reqIdRef = useRef(0);
 
   const prefs = readPreferences();
   const language = prefs.language || 'vi';
@@ -32,7 +37,38 @@ export default function PaymentHistoryPage() {
     { id: 'expired', vi: 'Hết hạn', en: 'Expired' },
   ];
 
+  // Debounce search input by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Click outside and Escape key to close filter dropdown
+  useEffect(() => {
+    if (!filterMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target)) {
+        setFilterMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setFilterMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [filterMenuOpen]);
+
   const loadData = async () => {
+    const curReqId = ++reqIdRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -40,8 +76,11 @@ export default function PaymentHistoryPage() {
         page: String(page),
         limit: String(pageSize),
       });
-      if (statusFilter) {
+      if (statusFilter && statusFilter !== 'all') {
         queryParams.set('status', statusFilter);
+      }
+      if (searchQuery) {
+        queryParams.set('q', searchQuery);
       }
 
       const [ordersRes, statusRes] = await Promise.all([
@@ -51,6 +90,9 @@ export default function PaymentHistoryPage() {
         }),
         auth.read('/premium/status').catch(() => null),
       ]);
+
+      // Ignore out-of-order responses
+      if (curReqId !== reqIdRef.current) return;
 
       const items = Array.isArray(ordersRes) ? ordersRes : (ordersRes.items || []);
       const pagination = ordersRes.pagination || {
@@ -62,26 +104,46 @@ export default function PaymentHistoryPage() {
 
       setOrders(items);
       setTotalPages(pagination.total_pages || 1);
-      setTotalItems(pagination.total || items.length);
+      setTotalItems(pagination.total ?? items.length);
 
       if (statusRes && statusRes.subscription) {
         setSubscription(statusRes.subscription);
       }
     } catch (err) {
+      if (curReqId !== reqIdRef.current) return;
       setError(err.message || t('Không thể tải lịch sử giao dịch.', 'Unable to load payment history.'));
     } finally {
-      setLoading(false);
+      if (curReqId === reqIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     loadData();
-  }, [page, statusFilter, language]);
+  }, [page, statusFilter, searchQuery, language]);
 
-  const handleFilterChange = (filterId) => {
+  const handleSelectStatus = (filterId) => {
     setStatusFilter(filterId);
     setPage(1);
+    setFilterMenuOpen(false);
   };
+
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setSearchQuery('');
+    setPage(1);
+  };
+
+  const handleClearAll = () => {
+    setSearchInput('');
+    setSearchQuery('');
+    setStatusFilter('');
+    setPage(1);
+  };
+
+  const activeOption = filterOptions.find(opt => (statusFilter || '') === opt.id) || filterOptions[0];
+  const isFilterActive = Boolean(statusFilter && statusFilter !== 'all');
 
   const handleOpenDetail = (order) => {
     setSelectedOrder(order);
@@ -270,18 +332,90 @@ export default function PaymentHistoryPage() {
           </div>
         )}
 
-        {/* Status Filter Bar */}
-        <div className="history-filter-bar" role="toolbar" aria-label={t('Lọc theo trạng thái', 'Filter by status')}>
-          {filterOptions.map(opt => (
+        {/* Search & Filter Toolbar */}
+        <div className="history-toolbar">
+          {/* Search Box */}
+          <div className="history-search-wrap">
+            <span className="material-symbols-outlined history-search-icon" aria-hidden="true">
+              search
+            </span>
+            <input
+              type="text"
+              className="history-search-input"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={t('Tìm mã đơn hàng...', 'Search order code...')}
+              aria-label={t('Tìm kiếm theo mã đơn hàng', 'Search by order code')}
+              maxLength={64}
+            />
+            {searchInput && (
+              <button
+                type="button"
+                className="history-search-clear"
+                onClick={handleClearSearch}
+                title={t('Xóa tìm kiếm', 'Clear search')}
+                aria-label={t('Xóa tìm kiếm', 'Clear search')}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
+            )}
+          </div>
+
+          {/* Filter Popover Button & Menu */}
+          <div className="history-filter-menu-wrap" ref={filterDropdownRef}>
             <button
-              key={opt.id}
               type="button"
-              className={`history-filter-chip ${statusFilter === opt.id ? 'active' : ''}`}
-              onClick={() => handleFilterChange(opt.id)}
+              className={`history-filter-btn ${isFilterActive ? 'history-filter-btn--active' : ''}`}
+              onClick={() => setFilterMenuOpen((prev) => !prev)}
+              title={t('Lọc giao dịch', 'Filter transactions')}
+              aria-label={t('Lọc giao dịch', 'Filter transactions')}
+              aria-haspopup="listbox"
+              aria-expanded={filterMenuOpen}
             >
-              {language === 'en' ? opt.en : opt.vi}
+              <span className="material-symbols-outlined" aria-hidden="true">filter_list</span>
+              <span className="history-filter-btn-text">
+                {language === 'en' ? activeOption.en : activeOption.vi}
+              </span>
+              {isFilterActive && <span className="history-filter-active-dot" aria-hidden="true" />}
+              <span className="material-symbols-outlined history-filter-arrow" aria-hidden="true">
+                {filterMenuOpen ? 'arrow_drop_up' : 'arrow_drop_down'}
+              </span>
             </button>
-          ))}
+
+            {filterMenuOpen && (
+              <div
+                className="history-filter-dropdown"
+                role="listbox"
+                aria-label={t('Lọc theo trạng thái', 'Filter by status')}
+              >
+                <div className="history-filter-dropdown-header">
+                  <span>{t('Trạng thái đơn hàng', 'Order Status')}</span>
+                </div>
+                {filterOptions.map((opt) => {
+                  const isSelected = (statusFilter || '') === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      className={`history-filter-item ${isSelected ? 'history-filter-item--selected' : ''}`}
+                      onClick={() => handleSelectStatus(opt.id)}
+                    >
+                      <span className="history-filter-item-label">
+                        {language === 'en' ? opt.en : opt.vi}
+                      </span>
+                      {isSelected && (
+                        <span className="material-symbols-outlined history-filter-check" aria-hidden="true">
+                          check
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Content States */}
@@ -301,22 +435,34 @@ export default function PaymentHistoryPage() {
         ) : orders.length === 0 ? (
           <div className="history-empty">
             <div className="history-empty-icon">
-              <span className="material-symbols-outlined" aria-hidden="true">inbox</span>
+              <span className="material-symbols-outlined" aria-hidden="true">
+                {searchQuery || isFilterActive ? 'search_off' : 'inbox'}
+              </span>
             </div>
-            <h3>{t('Chưa có giao dịch nào', 'No transactions found')}</h3>
+            <h3>
+              {searchQuery || isFilterActive
+                ? t('Không tìm thấy giao dịch phù hợp', 'No matching transactions found')
+                : t('Chưa có giao dịch nào', 'No transactions found')}
+            </h3>
             <p>
-              {statusFilter
-                ? t('Không có giao dịch nào phù hợp với bộ lọc trạng thái đã chọn.', 'No transactions matched the selected status filter.')
-                : t('Bạn chưa thực hiện giao dịch mua gói hội viên nào trên hệ thống thử nghiệm.', 'You have not completed any membership purchases on the sandbox system yet.')}
+              {searchQuery || isFilterActive
+                ? t(
+                    'Không tìm thấy kết quả nào phù hợp với điều kiện tìm kiếm hoặc bộ lọc hiện tại.',
+                    'No results found matching your current search query or status filter.'
+                  )
+                : t(
+                    'Bạn chưa thực hiện giao dịch mua gói hội viên nào trên hệ thống thử nghiệm.',
+                    'You have not completed any membership purchases on the sandbox system yet.'
+                  )}
             </p>
-            {statusFilter ? (
+            {searchQuery || isFilterActive ? (
               <button
                 type="button"
-                className="history-filter-chip active"
-                style={{ marginTop: '10px' }}
-                onClick={() => handleFilterChange('')}
+                className="history-clear-all-btn"
+                onClick={handleClearAll}
               >
-                {t('Xem tất cả giao dịch', 'View all transactions')}
+                <span className="material-symbols-outlined" aria-hidden="true">clear_all</span>
+                {t('Xóa tìm kiếm & bộ lọc', 'Clear search & filter')}
               </button>
             ) : (
               <a href="/premium" className="history-empty-cta">
