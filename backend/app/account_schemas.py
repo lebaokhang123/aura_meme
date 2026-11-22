@@ -57,8 +57,8 @@ class PublicProfile(UserPublic):
 class ProfilePatch(BaseModel):
     model_config = ConfigDict(extra="forbid", json_schema_extra={"minProperties": 1})
     # Omission is allowed; explicit null still fails the non-nullable string type.
-    display_name: str = Field(default=None, min_length=1, max_length=50)
-    bio: str | None = Field(default=None, max_length=300)
+    display_name: str = Field(default=None, min_length=1, max_length=25)
+    bio: str | None = Field(default=None, max_length=100)
     birth_year: StrictInt | None = Field(default=None, ge=1900, le=9999)
     address: str | None = Field(default=None, max_length=255)
     phone: str | None = Field(default=None, max_length=30)
@@ -81,8 +81,8 @@ class ProfilePatch(BaseModel):
             stripped = value.strip()
             if not stripped:
                 raise ValueError("Tên hiển thị không được để trống hoặc chỉ có khoảng trắng.")
-            if len(stripped) > 50:
-                raise ValueError("Tên hiển thị không được vượt quá 50 ký tự.")
+            if len(stripped) > 25:
+                raise ValueError("Tên hiển thị không được vượt quá 25 ký tự.")
             return stripped
         return value
 
@@ -91,8 +91,8 @@ class ProfilePatch(BaseModel):
     def valid_bio(cls, value):
         if value is not None:
             stripped = value.strip()
-            if len(stripped) > 300:
-                raise ValueError("Tiểu sử không được vượt quá 300 ký tự.")
+            if len(stripped) > 100:
+                raise ValueError("Tiểu sử không được vượt quá 100 ký tự.")
             return stripped or None
         return value
 

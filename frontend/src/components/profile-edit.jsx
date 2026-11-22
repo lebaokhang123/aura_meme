@@ -23,22 +23,22 @@ export function EditProfile({ profile, onSaved, onCancel }) {
       });
       return;
     }
-    if (trimmedName.length > 50) {
+    if (trimmedName.length > 25) {
       setError({
         message: t(
-          'Tên hiển thị không được vượt quá 50 ký tự.',
-          'Display name cannot exceed 50 characters.'
+          'Tên hiển thị không được vượt quá 25 ký tự.',
+          'Display name cannot exceed 25 characters.'
         ),
       });
       return;
     }
 
     const trimmedBio = bio.trim() || null;
-    if (trimmedBio && trimmedBio.length > 300) {
+    if (trimmedBio && trimmedBio.length > 100) {
       setError({
         message: t(
-          'Tiểu sử không được vượt quá 300 ký tự.',
-          'Bio cannot exceed 300 characters.'
+          'Tiểu sử không được vượt quá 100 ký tự.',
+          'Bio cannot exceed 100 characters.'
         ),
       });
       return;
@@ -77,14 +77,14 @@ export function EditProfile({ profile, onSaved, onCancel }) {
             aria-hidden="true"
             style={{ fontSize: '11px', color: 'var(--am-on-surface-variant, #94a3b8)', fontFamily: "'JetBrains Mono', monospace" }}
           >
-            {name.length}/50
+            {name.length}/25
           </span>
         </div>
         <input
           id="profile-display-name"
           autoFocus
           required
-          maxLength={50}
+          maxLength={25}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -98,12 +98,12 @@ export function EditProfile({ profile, onSaved, onCancel }) {
             aria-hidden="true"
             style={{ fontSize: '11px', color: 'var(--am-on-surface-variant, #94a3b8)', fontFamily: "'JetBrains Mono', monospace" }}
           >
-            {bio.length}/300
+            {bio.length}/100
           </span>
         </div>
         <textarea
           id="profile-bio"
-          maxLength={300}
+          maxLength={100}
           rows={5}
           value={bio}
           onChange={(e) => setBio(e.target.value)}
