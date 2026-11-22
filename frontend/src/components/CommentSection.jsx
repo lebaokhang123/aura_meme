@@ -4,6 +4,7 @@ import {commentsFor} from '../social-model.js';
 import {useSocial} from '../SocialContext.jsx';
 import {DEMO_USERS,readDemoUser} from '../demo.js';
 import {usePreferences} from '../PreferencesContext.jsx';
+import {usePremium} from '../PremiumContext.jsx';
 import {useLocalized} from '../localize.jsx';
 import {ReactionBar} from './ReactionBar.jsx';
 import {icon,SocialMessage} from './social-ui.jsx';
@@ -15,6 +16,13 @@ import UserAvatar from './UserAvatar.jsx';
 export {relativeTime};
 function CommentRow({comment}) {
   const render=useLocalized(),{commit}=useSocial(),current=readDemoUser(),{language}=usePreferences();
+  const {subscription}=usePremium?.()||{};
+  const isCurrentAuthor=Boolean(current&&(
+    (comment.authorId&&comment.authorId===current.id)||
+    (comment.author&&current.username&&comment.author.toLowerCase()===current.username.toLowerCase())||
+    (comment.handle&&current.username&&comment.handle.toLowerCase()===`@${current.username.toLowerCase()}`)
+  ));
+  const effectiveAuthorTier=(isCurrentAuthor&&subscription?.is_active?subscription.tier:null)||comment.membershipTier||comment.membership_tier||author?.membershipTier||author?.membership_tier||'free';
   const author=comment.api?{avatar:comment.authorId===current?.id?current.avatar:comment.avatar,displayName:comment.authorId===current?.id?current.displayName:comment.authorName,membershipTier:comment.membershipTier||comment.membership_tier}:DEMO_USERS.find(user=>user.username===comment.author);
   const profile=comment.api?{handle:comment.handle,level:comment.level,nickname:comment.nickname}:POSTS.find(post=>post.id===({Khang_dev:'khang',Kien_dev:'kien',Gigachad:'gigachad'}[comment.author]));
   const classes=authorClasses(comment.api?apiStyleAuthor(comment.author):comment.author,true);
@@ -43,7 +51,7 @@ function CommentRow({comment}) {
     }catch(e){setError(e.message)}finally{pending.current=false;setBusy(false)}
   };
   return render(<div className="flex items-start gap-3 p-2.5 rounded-xl bg-surface-container/40 hover:bg-surface-container/70 transition-colors" data-comment-id={comment.id}>
-    <UserAvatar src={author.avatar} alt={author.displayName} tier={author.membershipTier||author.membership_tier} size="sm"/>
+    <UserAvatar src={author.avatar} alt={author.displayName} tier={effectiveAuthorTier} size="sm"/>
     <div className="flex-1 flex flex-col gap-1 min-w-0">
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col min-w-0 gap-0.5">
@@ -96,6 +104,8 @@ function CommentRow({comment}) {
 }
 export function CommentSection({postId,active=true}) {
   const render=useLocalized(),{state,commit,loadComments,commentPages}=useSocial(),user=readDemoUser();
+  const {subscription}=usePremium?.()||{};
+  const effectiveUserTier=(subscription?.is_active?subscription.tier:null)||user?.membershipTier||user?.membership_tier||'free';
   const [text,setText]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const pending=useRef(false),draft=useRef(null);
   const input=useRef(null);
@@ -113,7 +123,7 @@ export function CommentSection({postId,active=true}) {
   };
   return render(<div className="flex flex-col gap-3.5 pt-3 border-t border-surface-container-high/80 mt-1">
     <form onSubmit={send} className="flex items-center gap-2.5">
-      {user?<UserAvatar src={user.avatar} alt={user.displayName} tier={user.membershipTier||user.membership_tier} size="md"/>:<span className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-outline shrink-0">{icon('person')}</span>}
+      {user?<UserAvatar src={user.avatar} alt={user.displayName} tier={effectiveUserTier} size="md"/>:<span className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-outline shrink-0">{icon('person')}</span>}
       <div className="flex-1 flex items-center gap-2 min-w-0 bg-surface-container rounded-xl p-2.5 border border-surface-container-high">
         <textarea ref={input} style={{fieldSizing:'content',minHeight:0,maxHeight:120}} aria-label="Nội dung bình luận" value={text} onChange={event=>setText(event.target.value)} maxLength={2000} rows={1} className="w-full p-0 bg-transparent border-0 outline-none focus:ring-0 resize-none text-on-surface font-body-sm text-body-sm min-w-0" placeholder={user?'Viết bình luận...':'Đăng nhập để bình luận'} onKeyDown={event=>{if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();event.currentTarget.form.requestSubmit()}}}/>
         <ReactionBar target="comment" id={`draft-${postId}`} compact onPick={insert}/>
