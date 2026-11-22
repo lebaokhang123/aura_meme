@@ -30,6 +30,16 @@ AuraMeme là đồ án web cộng đồng chia sẻ meme. Frontend chính hiện
 
 Cần Node.js >=22.12.0, backend và PostgreSQL đã cấu hình. `run.bat demo`/`run.bat dev` dùng Auth API thật, frontend tại `http://localhost:5173`; không trộn hostname với 127.0.0.1. Auth/Social cần revision `0010_social_reactions`; launcher dừng nếu DB rỗng hoặc schema không khớp và không tự migrate/seed. Nâng demo từ0009 chỉ sau khi Owner duyệt, có backup và restore drill; development giữ nguyên.
 
+### Chạy demo Bảo Khố (Vault MVP)
+Để chạy bản demo có đầy đủ 2 rương (70 Meme + 5 Background):
+1. Đảm bảo thư mục `backend/demo.local/catalog` có đủ 75 file ảnh (nguồn lưu trữ tại `D:\Big\du_an_lon\aura_meme_mvp\backend\demo.local\catalog`).
+2. Đảm bảo `backend/demo.local/.env` có:
+   ```env
+   VAULT_RUNTIME_ENABLED=true
+   AURAMEME_OWNER_MEME_DEMO=1
+   ```
+3. Chạy `.\run.bat demo`. Đăng nhập một trong ba tài khoản demo (`khang_dev@example.com`, `kien_dev@example.com`, `gigachad@example.com`) để mở và trang bị vật phẩm.
+
 Tại root repository đã cấu hình demo và cài dependencies, chạy:
 
 ```powershell
@@ -70,9 +80,24 @@ Browser tests dùng Chrome qua Playwright. Tailwind Play CDN, Google Fonts và m
 
 Frontend/backend nền đã checkpoint qua PR #26/#27. Không tự migrate/seed database development. Code frontend cũ có thể phục hồi qua Git history; backup/evidence nội bộ không được đưa lên GitHub.
 
-## Game Mechanics V1 — đặc tả, chưa bật runtime
+## Game Mechanics V1 — Khôi phục Bảo Khố MVP & Đồng bộ
 
-Owner đã chốt 10 cảnh giới ×10 Level; XP lên cấp ` 10 + Level ` từ Lv.1–100, điểm danh +15 Aura gốc/ngày tại07:00 Việt Nam và earned XP cap135/ngày. Rank tính Aura gốc. Hai rương Meme/Ảnh Bìa quay miễn phí, có cooldown, nhận trùng; odds D68,9/C20/B10/A1/S0,1 và không cộng XP khi mở hòm. Plus30 ngày XP×2, Prime365 ngày XP×3; VNPAY Sandbox, chưa bán tiền thật. Ví Khí Vận/generator legacy đang hoãn. Cần task API/schema/test tương ứng trước khi tích hợp.
+Owner đã chốt 10 cảnh giới ×10 Level; XP lên cấp ` 10 + Level ` từ Lv.1–100, điểm danh +15 Aura gốc/ngày tại 07:00 Việt Nam và earned XP cap 135/ngày. Rank tính Aura gốc.
+
+### Hai rương Bảo Khố (Vault V1)
+- **Rương Background:** 5 background D/C/B/A/S (1 background mỗi cấp hiếm).
+- **Rương Meme:** 70 avatar meme (D=25, C=18, B=14, A=8, S=5), đã được duyệt tên và quyền demo nội bộ.
+- **Tỷ lệ mở rương:** D=68.9% (6890 bps), C=20.0% (2000 bps), B=10.0% (1000 bps), A=1.0% (100 bps), S=0.1% (10 bps).
+- **Quy tắc EXP hiện hành:** Mỗi lần mở rương thành công nhận **+2 EXP** (tối đa 100 lượt có thưởng/ngày, trần 200 EXP/ngày, độc lập với trần Social 135 EXP/ngày). Từ lượt 101 trở đi vẫn nhận vật phẩm, không cộng thêm EXP. Retry cùng Idempotency-Key trả lại biên lai gốc, không cấp thưởng hay EXP trùng.
+  > *Lưu ý mâu thuẫn tài liệu:* Tài liệu Game Mechanics sơ khởi cũ từng ghi "không XP từ quay", nhưng bản thiết kế MVP hoàn thiện (Phiên 005–010) và runtime code chính thức đã chốt thưởng **+2 EXP/lượt mở**. Giữ nguyên runtime đã được Owner nghiệm thu.
+
+### Hiện trạng dữ liệu & Đồng bộ với dev
+- **Code Vault:** Đầy đủ trên `dev@8b22c29` (Frontend `VaultPage.jsx`, backend `app.vault`, `app.vault_runtime`, `app.vault_open`, `app.vault_exp_award`).
+- **Bản vá quyền private demo (`app/catalog_rights.py`):** Khôi phục điều kiện `owner_private_demo` (vốn được tạo trong `aura_meme_mvp` ngày 16/11 nhưng chưa commit vào `dev`), cho phép duyệt 70 meme sưu tầm khi cờ `AURAMEME_OWNER_MEME_DEMO=1` chạy trên database demo.
+- **Dữ liệu Database:** 75 asset items, 2 case definitions, 2 published loot tables tồn tại đầy đủ, nguyên vẹn trong PostgreSQL `aurameme_demo` (schema `0012_aura_v1`).
+- **Media Catalog:** Đủ 75/75 file ảnh tại `backend/demo.local/catalog`, khớp 100% mã hash SHA-256 với database.
+- **Môi trường Codex QA 5189:** Sử dụng database test cô lập (`aurameme_test` trên Docker `aurameme-hotfix-test-15`), tuân thủ nghiêm ngặt quy tắc an toàn không can thiệp/seed vào `aurameme_demo`, do đó không tự có sẵn catalog demo nếu không nối cấu hình.
+- **Bảo mật Git:** Tuyệt đối không commit 70 file meme riêng, file `.env`, signing key hay database dump lên Git public. Cấu hình nằm trong thư mục `demo.local/` (đã được `.gitignore` bảo vệ qua `*.local`).
 
 ## Phạm vi kiểm chứng
 
