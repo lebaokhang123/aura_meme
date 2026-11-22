@@ -15,9 +15,9 @@ const REALM_FIXTURES = [
   { tier: 10, level: 100, realm: 'Phi Thăng', title: 'Phi Thăng', username: 'tu_si_10', name: 'Nguyễn Trần Hoàng Minh Quân' },
 ];
 
-const SPECIAL_FIXTURES = [
-  { tier: 8, level: 79, realm: 'Đại Thừa', title: 'Bá Chủ Thiên Lôi', special: 'thunder', username: 'khang_dev', name: 'Khang Dev' },
-  { tier: 2, level: 12, realm: 'Trúc Cơ', title: 'Thiên Tướng Độ Ách', special: 'warden', username: 'kien_dev', name: 'Kien Dev' },
+const ADMIN_FIXTURES = [
+  { tier: 8, level: 79, realm: 'Đại Thừa', title: 'Sáng Thế Thần', special: 'creator', username: 'khang_dev', name: 'Khang Dev' },
+  { tier: 2, level: 12, realm: 'Trúc Cơ', title: 'Sáng Thế Thần', special: 'creator', username: 'kien_dev', name: 'Kien Dev' },
 ];
 
 const uuid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -32,7 +32,7 @@ async function setupFeedMocks(context, { theme = 'dark', language = 'vi' } = {})
 
   const category = { id: uuid(900), slug: 'cong-nghe', name: 'Công nghệ', post_count: 13 };
   const allAuthors = [
-    ...SPECIAL_FIXTURES,
+    ...ADMIN_FIXTURES,
     ...REALM_FIXTURES,
     { tier: null, level: null, realm: null, title: null, username: 'no_level_user', name: 'Khách Chưa Có Level' },
   ];
@@ -41,10 +41,10 @@ async function setupFeedMocks(context, { theme = 'dark', language = 'vi' } = {})
     id: uuid(100 + idx),
     title: `Meme Cảnh Giới #${idx + 1}`,
     content:
-      item.special === 'thunder'
-        ? 'Khi deploy thứ 6 lúc 17:59 mà production vẫn xanh 100% — uy lực Thiên Lôi!'
-        : item.special === 'warden'
-        ? 'Review 400 dòng diff trong 5 phút và bắt trúng race condition trước khi merge.'
+      item.username === 'khang_dev'
+        ? 'Khi deploy thứ 6 lúc 17:59 mà production vẫn xanh 100% — Hào Quang Khởi Nguyên!'
+        : item.username === 'kien_dev'
+        ? 'Review 400 dòng diff trong 5 phút — Vạn Vận Quy Tông bắt trúng race condition.'
         : item.level
         ? `Tu luyện đạt ${item.realm} (LVL ${item.level}) — kiểm tra hiển thị huy hiệu cấp bậc và độ tương phản.`
         : 'Bài viết của tài khoản chưa có Level — tuyệt đối không được bịa chức danh.',
@@ -75,7 +75,7 @@ async function setupFeedMocks(context, { theme = 'dark', language = 'vi' } = {})
     {
       id: uuid(501),
       post_id: posts[0].id,
-      body: 'Huy hiệu Thiên Tướng Độ Ách vẫn giữ nguyên LVL 12 (Trúc Cơ) thật!',
+      body: 'Cả hai Admin dùng chung Sáng Thế Thần (Vạn Vận Quy Tông) nhưng vẫn giữ LVL 12 (Trúc Cơ) thật!',
       created_at: new Date(Date.now() - 60000).toISOString(),
       author: {
         id: uuid(201),
@@ -86,7 +86,7 @@ async function setupFeedMocks(context, { theme = 'dark', language = 'vi' } = {})
         avatar_url: null,
         level: 12,
         realm: 'Trúc Cơ',
-        title: 'Thiên Tướng Độ Ách',
+        title: 'Sáng Thế Thần',
         membership_tier: 'plus',
       },
     },
@@ -140,11 +140,36 @@ async function setupFeedMocks(context, { theme = 'dark', language = 'vi' } = {})
           display_name: 'Khang Dev',
           roles: ['USER', 'ADMIN'],
           status: 'active',
-          title: 'Bá Chủ Thiên Lôi',
+          title: 'Sáng Thế Thần',
           avatar_url: null,
           cover_url: null,
         },
       });
+    }
+    if (p === '/users/khang_dev') {
+      return route.fulfill({
+        json: {
+          id: uuid(200),
+          username: 'khang_dev',
+          display_name: 'Khang Dev',
+          created_at: '2026-01-01T00:00:00Z',
+          bio: 'Kiến trúc sư hệ thống AuraMeme — Vạn Vận Quy Tông.',
+          avatar_url: null,
+          level: 79,
+          realm: 'Đại Thừa',
+          title: 'Sáng Thế Thần',
+          membership_tier: 'prime',
+        },
+      });
+    }
+    if (p === '/users/khang_dev/comments') {
+      return route.fulfill({ json: { items: [], pagination: { page: 1, page_size: 1, total: 14, total_pages: 14 } } });
+    }
+    if (p === '/users/khang_dev/activity') {
+      return route.fulfill({ json: { total: 42, days: [] } });
+    }
+    if (p.startsWith('/inventory/me')) {
+      return route.fulfill({ json: { items: [], pagination: { page: 1, page_size: 9, total: 0, total_pages: 1 } } });
     }
     if (p === '/aura/progress') {
       return route.fulfill({
@@ -224,74 +249,8 @@ async function setupFeedMocks(context, { theme = 'dark', language = 'vi' } = {})
   return { posts, comments };
 }
 
-test('Task 6: All 10 realms + 2 Admin titles render accurately in feed & comments without fabrication or overflow', async ({ page, context }) => {
-  const { posts } = await setupFeedMocks(context, { theme: 'dark', language: 'vi' });
-  await page.setViewportSize({ width: 1440, height: 960 });
-  await page.goto('/');
-
-  // Wait for all 13 posts to render
-  const cards = page.locator('article[data-post-id]');
-  await expect(cards).toHaveCount(posts.length);
-
-  // Verify AuraProgress sidebar card uses backend-authorized special title (Khang Dev, LVL 79)
-  const auraCard = page.locator('[data-aura]');
-  await expect(auraCard.locator('.am-lvl-pill[data-realm-tier="8"]')).toHaveText('LVL 79');
-  await expect(auraCard.locator('.am-title-badge[data-special-title="thunder"]')).toContainText('Bá Chủ Thiên Lôi');
-
-  // Verify all 10 realm tiers exist across feed posts
-  for (const r of REALM_FIXTURES) {
-    const lvl = page.locator(`article .am-lvl-pill[data-realm-tier="${r.tier}"]`, { hasText: `LVL ${r.level}` });
-    const title = page.locator(`article .am-title-badge[data-realm-tier="${r.tier}"]`, { hasText: r.title });
-    await expect(lvl.first()).toBeVisible();
-    await expect(title.first()).toBeVisible();
-  }
-
-  // Verify 2 Admin special titles keep their real LVL tier (Khang = tier 8, Kien = tier 2)
-  const khangCard = page.locator(`article[data-post-id="${posts[0].id}"]`);
-  await expect(khangCard.locator('.am-lvl-pill[data-realm-tier="8"]')).toHaveText('LVL 79');
-  await expect(khangCard.locator('.am-title-badge[data-special-title="thunder"]')).toContainText('Bá Chủ Thiên Lôi');
-
-  const kienCard = page.locator(`article[data-post-id="${posts[1].id}"]`);
-  await expect(kienCard.locator('.am-lvl-pill[data-realm-tier="2"]')).toHaveText('LVL 12');
-  await expect(kienCard.locator('.am-title-badge[data-special-title="warden"]')).toContainText('Thiên Tướng Độ Ách');
-
-  // Verify user without level renders ZERO level/title badges (never fabricated)
-  const noLevelCard = page.locator(`article[data-post-id="${posts[posts.length - 1].id}"]`);
-  await expect(noLevelCard.locator('.am-lvl-pill')).toHaveCount(0);
-  await expect(noLevelCard.locator('.am-title-badge')).toHaveCount(0);
-
-  // Open comments on first post and verify compact sm badges
-  await khangCard.getByRole('button', { name: 'Bình luận' }).click();
-  await expect(khangCard.locator('[data-comment-id]')).toHaveCount(3);
-  await expect(khangCard.locator('[data-comment-id] .am-title-badge--sm[data-special-title="warden"]')).toContainText('Thiên Tướng Độ Ách');
-  await expect(khangCard.locator('[data-comment-id] .am-lvl-pill--sm[data-realm-tier="10"]')).toHaveText('LVL 100');
-
-  // Verify feed performance: zero running CSS animations on compact feed cards at rest
-  const feedRunningAnims = await page.evaluate(() => {
-    const badges = Array.from(document.querySelectorAll('article .am-lvl-pill, article .am-title-badge'));
-    return badges.reduce((sum, el) => sum + el.getAnimations({ subtree: true }).length, 0);
-  });
-  expect(feedRunningAnims).toBe(0);
-
-  // Verify zero horizontal overflow
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-
-  await page.screenshot({ path: `${ARTIFACTS_DIR}/task6_feed_comments_dark.png`, fullPage: false });
-
-  // Mobile 375px Dark Feed + Comments
-  await page.setViewportSize({ width: 375, height: 812 });
-  await page.waitForTimeout(100);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.screenshot({ path: `${ARTIFACTS_DIR}/task6_feed_mobile_375.png`, fullPage: false });
-
-  // Dedicated 10-Realm + 2 Admin Title Matrix in TRUE Dark Mode
-  await page.setViewportSize({ width: 1280, height: 880 });
-  await renderMatrix(page, 'dark');
-  await page.screenshot({ path: `${ARTIFACTS_DIR}/task6_realm_matrix_dark.png`, fullPage: true });
-});
-
 async function renderMatrix(page, theme) {
-  await page.evaluate(({ realms, specials, theme }) => {
+  await page.evaluate(({ realms, admins, theme }) => {
     const isLight = theme === 'light';
     document.body.style.background = isLight ? '#F4F2EE' : '#12131b';
     const root = document.getElementById('root');
@@ -322,28 +281,27 @@ async function renderMatrix(page, theme) {
       )
       .join('');
 
-    const boltSvg = '<span class="am-title-badge-glyph"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.6 1.2 3.5 8.8h4.1L6.4 14.8l6.1-7.6H8.4l1.2-6Z"/></svg></span>';
-    const shieldSvg = '<span class="am-title-badge-glyph"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.4 2.4 3.6v4.1c0 3.3 2.3 6.2 5.6 6.9 3.3-.7 5.6-3.6 5.6-6.9V3.6L8 1.4Zm0 2.1 3.6 1.4v2.8c0 2.3-1.5 4.4-3.6 5-2.1-.6-3.6-2.7-3.6-5V4.9L8 3.5Z"/></svg></span>';
+    const creatorSvg = '<span class="am-title-badge-glyph am-title-badge-glyph--creator"><svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.4" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/><path d="M9 1.6 10.65 7.35 16.4 9 10.65 10.65 9 16.4 7.35 10.65 1.6 9 7.35 7.35 9 1.6Z" fill="currentColor"/><circle cx="9" cy="9" r="1.5" fill="#fffdf7"/></svg></span>';
 
-    const specialsHtml = specials
+    const adminsHtml = admins
       .map(
-        (s) => `
-        <div style="display:grid;grid-template-columns:186px 1fr 1fr 1fr;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;background:${cardBg};border:1px solid ${border};">
+        (a) => `
+        <div style="display:grid;grid-template-columns:196px 1fr 1fr 1fr;align-items:center;gap:12px;padding:14px 16px;border-radius:10px;background:${cardBg};border:1px solid ${border};">
           <div style="display:flex;flex-direction:column;">
-            <span style="font:700 13px/18px 'Plus Jakarta Sans',sans-serif;color:${textMain};">${s.name} (@${s.username})</span>
-            <span style="font:500 11px/15px 'JetBrains Mono',monospace;color:${textMuted};">Real Tier ${s.tier} (${s.realm})</span>
+            <span style="font:700 13px/18px 'Plus Jakarta Sans',sans-serif;color:${textMain};">${a.name} (@${a.username})</span>
+            <span style="font:500 11px/15px 'JetBrains Mono',monospace;color:${textMuted};">Real Tier ${a.tier} (${a.realm})</span>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
-            <span class="am-lvl-pill am-lvl-pill--sm" data-realm-tier="${s.tier}">LVL ${s.level}</span>
-            <span class="am-title-badge am-title-badge--sm" data-realm-tier="${s.tier}" data-special-title="${s.special}">${s.special === 'thunder' ? boltSvg : shieldSvg}<span>${s.title}</span></span>
+            <span class="am-lvl-pill am-lvl-pill--sm" data-realm-tier="${a.tier}">LVL ${a.level}</span>
+            <span class="am-title-badge am-title-badge--sm" data-realm-tier="${a.tier}" data-special-title="creator"><span class="am-creator-convergence"></span>${creatorSvg}<span class="am-title-badge-label">${a.title}</span></span>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
-            <span class="am-lvl-pill am-lvl-pill--md" data-realm-tier="${s.tier}">LVL ${s.level}</span>
-            <span class="am-title-badge am-title-badge--md" data-realm-tier="${s.tier}" data-special-title="${s.special}">${s.special === 'thunder' ? boltSvg : shieldSvg}<span>${s.title}</span></span>
+            <span class="am-lvl-pill am-lvl-pill--md" data-realm-tier="${a.tier}">LVL ${a.level}</span>
+            <span class="am-title-badge am-title-badge--md" data-realm-tier="${a.tier}" data-special-title="creator"><span class="am-creator-convergence"></span>${creatorSvg}<span class="am-title-badge-label">${a.title}</span></span>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span class="am-lvl-pill am-lvl-pill--lg" data-realm-tier="${s.tier}">LVL ${s.level}</span>
-            <span class="am-title-badge am-title-badge--lg" data-realm-tier="${s.tier}" data-special-title="${s.special}">${s.special === 'thunder' ? boltSvg : shieldSvg}<span>${s.title}</span></span>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="am-lvl-pill am-lvl-pill--lg" data-realm-tier="${a.tier}">LVL ${a.level}</span>
+            <span class="am-title-badge am-title-badge--lg" data-realm-tier="${a.tier}" data-special-title="creator"><span class="am-creator-convergence"></span>${creatorSvg}<span class="am-title-badge-label">${a.title}</span></span>
           </div>
         </div>`,
       )
@@ -351,21 +309,98 @@ async function renderMatrix(page, theme) {
 
     root.innerHTML = `
       <div style="max-width:1180px;margin:0 auto;padding:24px;display:flex;flex-direction:column;gap:16px;background:${isLight ? '#F4F2EE' : '#12131b'};min-height:100vh;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;">
-          <div>
-            <h1 style="margin:0;font:800 22px/28px 'Plus Jakarta Sans',sans-serif;color:${textMain};">AuraMeme Task 6 — 10 Cảnh Giới &amp; 2 Chức Danh Đặc Biệt (${theme.toUpperCase()})</h1>
-            <p style="margin:4px 0 0;font:400 13px/18px Inter,sans-serif;color:${textMuted};">Cột hiển thị: Comment (SM) · PostCard / Rank (MD) · Profile / Aura Card (LG)</p>
-          </div>
+        <div>
+          <h1 style="margin:0;font:800 22px/28px 'Plus Jakarta Sans',sans-serif;color:${textMain};">AuraMeme Task 6 — 10 Cảnh Giới &amp; Danh Hiệu Sáng Thế Thần (${theme.toUpperCase()})</h1>
+          <p style="margin:4px 0 0;font:400 13px/18px Inter,sans-serif;color:${textMuted};">Cột hiển thị: Comment (SM) · PostCard / Rank (MD) · Profile / Aura Card (LG)</p>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">${rowsHtml}</div>
-        <h2 style="margin:6px 0 0;font:700 14px/20px 'Plus Jakarta Sans',sans-serif;color:${textMuted};text-transform:uppercase;letter-spacing:0.06em;">Special Cosmetic Titles (Preserves Real Level &amp; Realm Tier)</h2>
-        <div style="display:flex;flex-direction:column;gap:8px;">${specialsHtml}</div>
+        <h2 style="margin:8px 0 0;font:700 14px/20px 'Plus Jakarta Sans',sans-serif;color:${textMuted};text-transform:uppercase;letter-spacing:0.06em;">Admin Unified Cosmetic Title: Sáng Thế Thần — Vạn Vận Quy Tông (Identical Style, Preserves Real Level)</h2>
+        <div style="display:flex;flex-direction:column;gap:10px;">${adminsHtml}</div>
       </div>
     `;
-  }, { realms: REALM_FIXTURES, specials: SPECIAL_FIXTURES, theme });
+  }, { realms: REALM_FIXTURES, admins: ADMIN_FIXTURES, theme });
 }
 
-test('Task 6: Visual QA Matrix (10 Realms + 2 Admin Titles) in Light Mode, EN & Reduced Motion', async ({ page, context }) => {
+test('Task 6: Unified Sáng Thế Thần + 10 Realms render identically for both Admins with zero feed animation & zero old titles', async ({ page, context }) => {
+  const { posts } = await setupFeedMocks(context, { theme: 'dark', language: 'vi' });
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.goto('/');
+
+  const cards = page.locator('article[data-post-id]');
+  await expect(cards).toHaveCount(posts.length);
+
+  // Zero retired titles anywhere in active DOM
+  const bodyText = await page.locator('body').innerText();
+  expect(bodyText).not.toContain('Bá Chủ Thiên Lôi');
+  expect(bodyText).not.toContain('Thiên Tướng Độ Ách');
+
+  // AuraProgress sidebar card shows Khang Dev LVL 79 (Tier 8) + Sáng Thế Thần (creator)
+  const auraCard = page.locator('[data-aura]');
+  await expect(auraCard.locator('.am-lvl-pill[data-realm-tier="8"]')).toHaveText('LVL 79');
+  await expect(auraCard.locator('.am-title-badge[data-special-title="creator"]')).toContainText('Sáng Thế Thần');
+
+  // Both Admins share EXACT same special-title="creator" styling while preserving real Level tiers
+  const khangCard = page.locator(`article[data-post-id="${posts[0].id}"]`);
+  const kienCard = page.locator(`article[data-post-id="${posts[1].id}"]`);
+  await expect(khangCard.locator('.am-lvl-pill[data-realm-tier="8"]')).toHaveText('LVL 79');
+  await expect(kienCard.locator('.am-lvl-pill[data-realm-tier="2"]')).toHaveText('LVL 12');
+
+  const khangBadge = khangCard.locator('.am-title-badge[data-special-title="creator"]');
+  const kienBadge = kienCard.locator('.am-title-badge[data-special-title="creator"]');
+  await expect(khangBadge).toContainText('Sáng Thế Thần');
+  await expect(kienBadge).toContainText('Sáng Thế Thần');
+
+  const [khangStyle, kienStyle] = await Promise.all([
+    khangBadge.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return `${s.color}|${s.borderColor}|${s.backgroundImage}`;
+    }),
+    kienBadge.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return `${s.color}|${s.borderColor}|${s.backgroundImage}`;
+    }),
+  ]);
+  expect(khangStyle).toBe(kienStyle);
+
+  // User without level renders ZERO level/title badges
+  const noLevelCard = page.locator(`article[data-post-id="${posts[posts.length - 1].id}"]`);
+  await expect(noLevelCard.locator('.am-lvl-pill')).toHaveCount(0);
+  await expect(noLevelCard.locator('.am-title-badge')).toHaveCount(0);
+
+  // Open comments on first post
+  await khangCard.getByRole('button', { name: 'Bình luận' }).click();
+  await expect(khangCard.locator('[data-comment-id]')).toHaveCount(3);
+  await expect(khangCard.locator('[data-comment-id] .am-title-badge--sm[data-special-title="creator"]')).toContainText('Sáng Thế Thần');
+
+  // Feed performance: ZERO running animations on compact feed/comment cards at rest
+  const feedRunningAnims = await page.evaluate(() => {
+    const badges = Array.from(document.querySelectorAll('article .am-lvl-pill, article .am-title-badge'));
+    return badges.reduce((sum, el) => sum + el.getAnimations({ subtree: true }).length, 0);
+  });
+  expect(feedRunningAnims).toBe(0);
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: `${ARTIFACTS_DIR}/task6_feed_comments_dark.png`, fullPage: false });
+
+  // Mobile 375px Dark Feed + Comments
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: `${ARTIFACTS_DIR}/task6_feed_mobile_375.png`, fullPage: false });
+
+  // Admin Profile screenshot (shows LG Sacred Halo + Divine Smoke + Prime Avatar ring coexisting cleanly)
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.goto('/profile/khang_dev');
+  await expect(page.locator('.am-profile-name .am-title-badge--lg[data-special-title="creator"]')).toContainText('Sáng Thế Thần');
+  await page.screenshot({ path: `${ARTIFACTS_DIR}/task6_admin_profile.png`, fullPage: false });
+
+  // Dedicated 10-Realm + Unified Admin Matrix in Dark Mode
+  await page.setViewportSize({ width: 1280, height: 880 });
+  await renderMatrix(page, 'dark');
+  await page.screenshot({ path: `${ARTIFACTS_DIR}/task6_realm_matrix_dark.png`, fullPage: true });
+});
+
+test('Task 6: Visual QA Matrix (10 Realms + Sáng Thế Thần) in Light Mode, EN & Reduced Motion', async ({ page, context }) => {
   await setupFeedMocks(context, { theme: 'light', language: 'en' });
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto('/');
@@ -379,7 +414,7 @@ test('Task 6: Visual QA Matrix (10 Realms + 2 Admin Titles) in Light Mode, EN & 
   await renderMatrix(page, 'light');
   await page.screenshot({ path: `${ARTIFACTS_DIR}/task6_realm_matrix_light.png`, fullPage: true });
 
-  // Verify prefers-reduced-motion disables sheen animations completely
+  // Verify prefers-reduced-motion disables smoke & convergence animations completely
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const reducedAnims = await page.evaluate(() => {
     const badges = Array.from(document.querySelectorAll('.am-lvl-pill, .am-title-badge'));

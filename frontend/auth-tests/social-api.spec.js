@@ -192,10 +192,10 @@ test('PostCard and CommentRow display validated Level and Chức danh for Admin 
  const khangPostId='00000000-0000-4000-8000-000000000701';
  const alicePostId='00000000-0000-4000-8000-000000000702';
  const plainPostId='00000000-0000-4000-8000-000000000703';
- const khangAuthor={id:'00000000-0000-4000-8000-000000000711',username:'khang_dev',display_name:'Khang Dev',level:79,realm:'Hóa Thần',title:'Bá Chủ Thiên Lôi',avatar_url:null};
+ const khangAuthor={id:'00000000-0000-4000-8000-000000000711',username:'khang_dev',display_name:'Khang Dev',level:79,realm:'Đại Thừa',title:'Sáng Thế Thần',avatar_url:null};
  const aliceAuthor={id:'00000000-0000-4000-8000-000000000712',username:'alice',display_name:'Alice Wonder',level:1,realm:'Luyện Khí',title:'Luyện Khí',avatar_url:null};
  const plainAuthor={id:'00000000-0000-4000-8000-000000000713',username:'new_user',display_name:'New User',avatar_url:null};
- const kienAuthor={id:'00000000-0000-4000-8000-000000000714',username:'kien_dev',display_name:'Kien Dev',level:9,realm:'Luyện Khí',title:'Thiên Tướng Độ Ách',avatar_url:null};
+ const kienAuthor={id:'00000000-0000-4000-8000-000000000714',username:'kien_dev',display_name:'Kien Dev',level:9,realm:'Luyện Khí',title:'Sáng Thế Thần',avatar_url:null};
  api.posts.push(
   {id:khangPostId,title:'Khang Post',content:'Khang content',category_id:cid,counts:counts(),reaction:null,author:khangAuthor},
   {id:alicePostId,title:'Alice Post',content:'Alice content',category_id:cid,counts:counts(),reaction:null,author:aliceAuthor},
@@ -211,7 +211,7 @@ test('PostCard and CommentRow display validated Level and Chức danh for Admin 
  await expect(khangCard.locator('.social-post-header')).toContainText('Khang Dev');
  await expect(khangCard.locator('.social-post-header')).toContainText('@khang_dev');
  await expect(khangCard.locator('.social-post-header')).toContainText('LVL 79');
- await expect(khangCard.locator('.social-post-header')).toContainText('Bá Chủ Thiên Lôi');
+ await expect(khangCard.locator('.social-post-header')).toContainText('Sáng Thế Thần');
  await expect(aliceCard.locator('.social-post-header')).toContainText('Alice Wonder');
  await expect(aliceCard.locator('.social-post-header')).toContainText('@alice');
  await expect(aliceCard.locator('.social-post-header')).toContainText('LVL 1');
@@ -223,5 +223,5 @@ test('PostCard and CommentRow display validated Level and Chức danh for Admin 
  await expect(kienComment).toContainText('Kien Dev');
  await expect(kienComment).toContainText('@kien_dev');
  await expect(kienComment).toContainText('LVL 9');
- await expect(kienComment).toContainText('Thiên Tướng Độ Ách');
+ await expect(kienComment).toContainText('Sáng Thế Thần');
 });

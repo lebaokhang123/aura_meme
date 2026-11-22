@@ -224,38 +224,167 @@
 }
 
 /* ==========================================================================
-   2 SPECIAL COSMETIC TITLES — DISTINCT FROM 10 REALMS & PREMIUM PLUS/PRIME
+   UNIFIED ADMIN COSMETIC TITLE: SÁNG THẾ THẦN — VẠN VẬN QUY TÔNG
+   - Cosmic Violet nebula base + Pearl White text + Sacred Gold rim + Celestial Cyan convergence
+   - Distinct from all 10 realms AND distinct from Aura Prime solid amber/gold
+   - Size tiers: SM (static sacred glow), MD (sacred halo; smoke/convergence on hover/focus),
+     LG (full Sacred Halo + Divine Smoke + Cosmic Convergence under no-preference motion)
    ========================================================================== */
 
-/* Khang Dev: Bá Chủ Thiên Lôi — Sovereign Thunder Gold */
-.am-title-badge[data-special-title="thunder"] {
-  --am-tier-bg: rgba(245, 158, 11, 0.24);
-  --am-tier-bg-end: rgba(180, 83, 9, 0.16);
-  --am-tier-border: rgba(251, 191, 36, 0.82);
-  --am-tier-text: #fde68a;
-  --am-tier-glow: 0 0 0 1px rgba(251, 191, 36, 0.26), 0 0 14px rgba(245, 158, 11, 0.42), inset 0 1px 0 rgba(254, 243, 199, 0.3);
-  --am-tier-sheen: rgba(254, 240, 138, 0.36);
-  background: linear-gradient(120deg, rgba(245, 158, 11, 0.28) 0%, rgba(217, 119, 6, 0.18) 55%, rgba(251, 191, 36, 0.28) 100%);
+.am-title-badge[data-special-title="creator"] {
+  --am-tier-border: rgba(250, 214, 118, 0.86);
+  --am-tier-text: #fffdf7;
+  --am-tier-sheen: rgba(254, 249, 195, 0.55);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(92, 225, 255, 0.24) 0%, transparent 62%),
+    linear-gradient(125deg, #24114c 0%, #3b1c7a 38%, #1e2860 72%, #2b1459 100%);
+  border: 1px solid rgba(250, 214, 118, 0.86);
+  color: #fffdf7;
   font-weight: 700;
+  letter-spacing: 0.02em;
+  overflow: visible;
+  z-index: 1;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 253, 247, 0.24),
+    inset 0 0 10px rgba(92, 225, 255, 0.22),
+    0 0 0 1px rgba(139, 92, 246, 0.42),
+    0 0 12px rgba(250, 214, 118, 0.32),
+    0 0 18px rgba(92, 225, 255, 0.2);
 }
 
-/* Kien Dev: Thiên Tướng Độ Ách — Sovereign Crimson Warden */
-.am-title-badge[data-special-title="warden"] {
-  --am-tier-bg: rgba(225, 29, 72, 0.26);
-  --am-tier-bg-end: rgba(124, 58, 237, 0.2);
-  --am-tier-border: rgba(251, 113, 133, 0.82);
-  --am-tier-text: #fecdd3;
-  --am-tier-glow: 0 0 0 1px rgba(244, 63, 94, 0.28), 0 0 14px rgba(225, 29, 72, 0.44), inset 0 1px 0 rgba(255, 228, 230, 0.28);
-  --am-tier-sheen: rgba(254, 205, 211, 0.34);
-  background: linear-gradient(120deg, rgba(225, 29, 72, 0.28) 0%, rgba(159, 18, 57, 0.2) 55%, rgba(139, 92, 246, 0.24) 100%);
-  font-weight: 700;
+.am-title-badge[data-special-title="creator"] .am-title-badge-label {
+  position: relative;
+  z-index: 2;
+  text-shadow: 0 0 8px rgba(250, 214, 118, 0.48), 0 1px 1px rgba(13, 14, 21, 0.65);
+}
+
+.am-title-badge[data-special-title="creator"] .am-title-badge-glyph--creator {
+  position: relative;
+  z-index: 2;
+  color: #fde68a;
+  filter: drop-shadow(0 0 4px rgba(250, 214, 118, 0.72));
+}
+
+/* SM (Comments): Sacred border + gentle glow, ZERO continuous smoke/convergence */
+.am-title-badge--sm[data-special-title="creator"] {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 253, 247, 0.2),
+    0 0 0 1px rgba(139, 92, 246, 0.34),
+    0 0 8px rgba(250, 214, 118, 0.26);
+}
+
+/* LG (Profile / Aura Card): Prominent Sacred Halo */
+.am-title-badge--lg[data-special-title="creator"] {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 253, 247, 0.34),
+    inset 0 0 14px rgba(92, 225, 255, 0.3),
+    0 0 0 1.5px rgba(139, 92, 246, 0.52),
+    0 0 16px rgba(250, 214, 118, 0.44),
+    0 0 26px rgba(92, 225, 255, 0.28);
+}
+
+/* Cosmic Convergence layer (Vạn Vận Quy Tông — clipped strictly inside badge pill) */
+.am-creator-convergence {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.am-creator-convergence::before,
+.am-creator-convergence::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 55%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Left-to-center cyan/pearl energy stream */
+.am-creator-convergence::before {
+  left: -10%;
+  background: linear-gradient(90deg, transparent 0%, rgba(92, 225, 255, 0.46) 55%, rgba(255, 253, 247, 0.55) 85%, transparent 100%);
+}
+
+/* Right-to-center gold/violet energy stream */
+.am-creator-convergence::after {
+  right: -10%;
+  background: linear-gradient(270deg, transparent 0%, rgba(250, 214, 118, 0.5) 55%, rgba(233, 221, 255, 0.52) 85%, transparent 100%);
+}
+
+/* Divine Smoke / Ethereal Nebula Mist around badge (bounded, pointer-events: none) */
+.am-title-badge--lg[data-special-title="creator"]::before,
+.am-title-badge--md[data-special-title="creator"]:hover::before,
+.am-title-badge--md[data-special-title="creator"]:focus-visible::before {
+  content: "";
+  position: absolute;
+  inset: -6px -10px;
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(92, 225, 255, 0.36) 0%, transparent 58%),
+    radial-gradient(ellipse at 80% 50%, rgba(250, 214, 118, 0.34) 0%, transparent 58%),
+    radial-gradient(ellipse at 50% 50%, rgba(168, 85, 247, 0.34) 0%, transparent 72%);
+  filter: blur(7px);
+  opacity: 0.72;
+}
+
+@keyframes am-creator-smoke-drift {
+  0%, 100% {
+    transform: translate3d(-2px, 0, 0) scale(0.97, 0.96);
+    opacity: 0.56;
+  }
+  50% {
+    transform: translate3d(2px, -1px, 0) scale(1.05, 1.08);
+    opacity: 0.88;
+  }
+}
+
+@keyframes am-creator-converge-left {
+  0% {
+    transform: translateX(-85%) scaleX(0.9);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.85;
+  }
+  65% {
+    transform: translateX(35%) scaleX(0.45);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(35%) scaleX(0.45);
+    opacity: 0;
+  }
+}
+
+@keyframes am-creator-converge-right {
+  0% {
+    transform: translateX(85%) scaleX(0.9);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.85;
+  }
+  65% {
+    transform: translateX(-35%) scaleX(0.45);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(-35%) scaleX(0.45);
+    opacity: 0;
+  }
 }
 
 /* ==========================================================================
-   RESTRAINED COMPOSITOR-ONLY SHEEN (Tiers 9-10 & Special Titles)
+   RESTRAINED COMPOSITOR-ONLY MOTION
    - Static by default; opted-in inside @media (prefers-reduced-motion: no-preference)
-   - Runs smoothly on prominent (--lg) badges; on feed (--md/--sm) activates only on hover
-     so hundreds of PostCards never run concurrent infinite animations.
+   - Zero infinite animation on compact feed (--md/--sm) cards at rest for 60fps scroll
    ========================================================================== */
 @keyframes am-realm-sheen {
   0%, 72% {
@@ -276,12 +405,10 @@
   .am-title-badge--lg[data-realm-tier="9"]::after,
   .am-lvl-pill--lg[data-realm-tier="10"]::after,
   .am-title-badge--lg[data-realm-tier="10"]::after,
-  .am-title-badge--lg[data-special-title]::after,
   .am-lvl-pill[data-realm-tier="9"]:hover::after,
   .am-title-badge[data-realm-tier="9"]:hover::after,
   .am-lvl-pill[data-realm-tier="10"]:hover::after,
-  .am-title-badge[data-realm-tier="10"]:hover::after,
-  .am-title-badge[data-special-title]:hover::after {
+  .am-title-badge[data-realm-tier="10"]:hover::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -290,6 +417,28 @@
     pointer-events: none;
     will-change: transform, opacity;
     animation: am-realm-sheen 4.8s ease-in-out infinite;
+  }
+
+  /* Sáng Thế Thần: LG runs smooth slow smoke + inward convergence; MD activates on hover/focus */
+  .am-title-badge--lg[data-special-title="creator"]::before,
+  .am-title-badge--md[data-special-title="creator"]:hover::before,
+  .am-title-badge--md[data-special-title="creator"]:focus-visible::before {
+    will-change: transform, opacity;
+    animation: am-creator-smoke-drift 5.6s ease-in-out infinite;
+  }
+
+  .am-title-badge--lg[data-special-title="creator"] .am-creator-convergence::before,
+  .am-title-badge--md[data-special-title="creator"]:hover .am-creator-convergence::before,
+  .am-title-badge--md[data-special-title="creator"]:focus-visible .am-creator-convergence::before {
+    will-change: transform, opacity;
+    animation: am-creator-converge-left 3.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  }
+
+  .am-title-badge--lg[data-special-title="creator"] .am-creator-convergence::after,
+  .am-title-badge--md[data-special-title="creator"]:hover .am-creator-convergence::after,
+  .am-title-badge--md[data-special-title="creator"]:focus-visible .am-creator-convergence::after {
+    will-change: transform, opacity;
+    animation: am-creator-converge-right 3.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
   }
 }
 
@@ -385,18 +534,23 @@
   background: linear-gradient(125deg, #f3e8ff 0%, #e0e7ff 50%, #e0f2fe 100%);
 }
 
-.u219[data-theme="light"] .am-title-badge[data-special-title="thunder"] {
-  --am-tier-border: #d97706;
-  --am-tier-text: #78350f;
-  --am-tier-glow: 0 0 0 1px rgba(217, 119, 6, 0.22), 0 2px 10px rgba(217, 119, 6, 0.24);
-  background: linear-gradient(120deg, #fffbeb 0%, #fef3c7 55%, #fde68a 100%);
+.u219[data-theme="light"] .am-title-badge[data-special-title="creator"] {
+  --am-tier-border: #ca8a04;
+  --am-tier-text: #fffdf7;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.28) 0%, transparent 65%),
+    linear-gradient(125deg, #2e1065 0%, #4c1d95 45%, #1e3a8a 100%);
+  border-color: #eab308;
+  color: #fffdf7;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 253, 247, 0.28),
+    0 0 0 1px rgba(124, 58, 237, 0.32),
+    0 2px 12px rgba(202, 138, 4, 0.3),
+    0 3px 16px rgba(56, 189, 248, 0.22);
 }
 
-.u219[data-theme="light"] .am-title-badge[data-special-title="warden"] {
-  --am-tier-border: #e11d48;
-  --am-tier-text: #881337;
-  --am-tier-glow: 0 0 0 1px rgba(225, 29, 72, 0.22), 0 2px 10px rgba(225, 29, 72, 0.24);
-  background: linear-gradient(120deg, #fff1f2 0%, #ffe4e6 55%, #f3e8ff 100%);
+.u219[data-theme="light"] .am-title-badge[data-special-title="creator"] .am-title-badge-label {
+  text-shadow: 0 0 6px rgba(250, 214, 118, 0.4);
 }
 
 /* ==========================================================================

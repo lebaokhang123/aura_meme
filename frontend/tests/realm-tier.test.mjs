@@ -52,30 +52,34 @@ test('all 10 realms and 21 boundary levels map identically to backend Aura V1', 
   }
 });
 
-test('special cosmetic titles preserve real level/realm tier and never fabricate without level', () => {
-  const khang = resolveRealmBadges({ level: 79, realm: 'Đại Thừa', title: 'Bá Chủ Thiên Lôi' });
+test('unified Admin title Sáng Thế Thần preserves real level/realm tier and never fabricates without level', () => {
+  const khang = resolveRealmBadges({ level: 79, realm: 'Đại Thừa', title: 'Sáng Thế Thần' });
   assert.equal(khang.levelNum, 79);
   assert.equal(khang.realmTier, 8);
   assert.equal(khang.realmName, 'Đại Thừa');
-  assert.equal(khang.titleText, 'Bá Chủ Thiên Lôi');
-  assert.equal(khang.specialKind, 'thunder');
+  assert.equal(khang.titleText, 'Sáng Thế Thần');
+  assert.equal(khang.specialKind, 'creator');
 
   // After leveling up to 100, special title remains while tier upgrades to 10
-  const khang100 = resolveRealmBadges({ level: 100, realm: 'Phi Thăng', title: 'Bá Chủ Thiên Lôi' });
+  const khang100 = resolveRealmBadges({ level: 100, realm: 'Phi Thăng', title: 'Sáng Thế Thần' });
   assert.equal(khang100.realmTier, 10);
-  assert.equal(khang100.specialKind, 'thunder');
+  assert.equal(khang100.specialKind, 'creator');
 
-  const kien = resolveRealmBadges({ level: 'LVL 12', realm: 'Trúc Cơ', title: 'Thiên Tướng Độ Ách' });
+  // Kien Dev shares the EXACT same specialKind ('creator') while keeping real Tier 2 (Trúc Cơ)
+  const kien = resolveRealmBadges({ level: 'LVL 12', realm: 'Trúc Cơ', title: 'Sáng Thế Thần' });
   assert.equal(kien.levelNum, 12);
   assert.equal(kien.realmTier, 2);
-  assert.equal(kien.specialKind, 'warden');
+  assert.equal(kien.specialKind, 'creator');
 
+  // Old retired titles no longer activate special styling
+  assert.equal(specialTitleKind('Bá Chủ Thiên Lôi'), null);
+  assert.equal(specialTitleKind('Thiên Tướng Độ Ách'), null);
   assert.equal(specialTitleKind('Phi Thăng'), null);
   assert.equal(specialTitleKind('constructor'), null);
 
   // Missing or invalid levels never fabricate realm or title
   for (const bad of [null, undefined, 0, -5, 101, 1.5, '', 'LVL 0', 'LVL 101', 'abc']) {
-    const empty = resolveRealmBadges({ level: bad, realm: 'Phi Thăng', title: 'Bá Chủ Thiên Lôi' });
+    const empty = resolveRealmBadges({ level: bad, realm: 'Phi Thăng', title: 'Sáng Thế Thần' });
     assert.equal(empty.levelNum, null);
     assert.equal(empty.realmTier, null);
     assert.equal(empty.titleText, '');

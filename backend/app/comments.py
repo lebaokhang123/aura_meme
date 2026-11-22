@@ -48,10 +48,11 @@ class CommentPage(BaseModel):
     pagination: Pagination
 
 
-def comment_dto(comment, user, profile, level=None, membership_tier="free"):
+def comment_dto(comment, user, profile, level=None, is_admin=False, membership_tier="free"):
     author = UserPublic(id=user.id, username=user.username, display_name=profile.display_name,
                         created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url, level=level,
-                        membership_tier=membership_tier if membership_tier in {"plus", "prime"} else "free")
+                        membership_tier=membership_tier if membership_tier in {"plus", "prime"} else "free",
+                        is_admin_title=bool(is_admin))
     return CommentResponse(id=comment.id, post_id=comment.post_id, author=author,
                            body=comment.body, created_at=comment.created_at)
 
@@ -86,8 +87,8 @@ def list_comments(post_id: UUID, request: Request, page: int = Query(1, ge=1),
         raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
     with request.app.state.auth_session_factory() as db:
         require_public_post(db, post_id)
-        from app.aura_runtime import public_level_column
-        statement = select(Comment, User, Profile, public_level_column(request.app.state.auth.now())).join(User, User.id == Comment.author_id).join(
+        from app.aura_runtime import public_is_admin_column, public_level_column
+        statement = select(Comment, User, Profile, public_level_column(request.app.state.auth.now()), public_is_admin_column()).join(User, User.id == Comment.author_id).join(
             Profile, Profile.user_id == User.id).where(Comment.post_id == post_id,
                 Comment.status == "visible", Comment.deleted_at.is_(None), User.status == "active",
                 Comment.post_id.in_(public_post_id(post_id)))
@@ -108,7 +109,7 @@ def list_comments(post_id: UUID, request: Request, page: int = Query(1, ge=1),
 def add_comment(post_id: UUID, payload: CommentInput, request: Request, account=Depends(require_account_csrf)):
     lock_public_post(account.db, post_id)
     now = request.app.state.auth.now()
-    from app.aura_runtime import award_comment, read_public_level
+    from app.aura_runtime import award_comment, read_public_is_admin, read_public_level
     if payload.request_id is not None:
         existing=account.db.get(Comment,payload.request_id)
         if existing is not None:
@@ -116,7 +117,7 @@ def add_comment(post_id: UUID, payload: CommentInput, request: Request, account=
                 raise AuthError(409,"CONFLICT","Request ID already used.")
             from app.membership import read_users_membership_tiers
             tiers = read_users_membership_tiers(account.db, {account.user.id}, now)
-            return comment_dto(existing,account.user,account.db.get(Profile,account.user.id),read_public_level(account.db,account.user.id,now),membership_tier=tiers.get(account.user.id, "free"))
+            return comment_dto(existing,account.user,account.db.get(Profile,account.user.id),read_public_level(account.db,account.user.id,now),is_admin=read_public_is_admin(account.db,account.user.id),membership_tier=tiers.get(account.user.id, "free"))
     comment = Comment(id=payload.request_id or uuid4(), post_id=post_id, author_id=account.user.id, body=payload.body,
                       status="visible", created_at=now, updated_at=now, deleted_at=None)
     account.db.add(comment)
@@ -147,7 +148,7 @@ def add_comment(post_id: UUID, payload: CommentInput, request: Request, account=
         )
     from app.membership import read_users_membership_tiers
     tiers = read_users_membership_tiers(account.db, {account.user.id}, now)
-    return comment_dto(comment, account.user, account.db.get(Profile, account.user.id), read_public_level(account.db, account.user.id, now), membership_tier=tiers.get(account.user.id, "free"))
+    return comment_dto(comment, account.user, account.db.get(Profile, account.user.id), read_public_level(account.db, account.user.id, now), is_admin=read_public_is_admin(account.db, account.user.id), membership_tier=tiers.get(account.user.id, "free"))
 
 
 @router.delete("/comments/{comment_id}", status_code=204, operation_id="deleteComment",
@@ -223,8 +224,8 @@ def list_user_comments(request: Request, username: str = Path(min_length=3, max_
     with request.app.state.auth_session_factory() as db:
         if db.scalar(select(User.id).where(User.username == username, User.status == "active")) is None:
             raise AuthError(404, "NOT_FOUND", "Profile not found.")
-        from app.aura_runtime import public_level_column
-        statement = select(Comment, User, Profile, public_level_column(request.app.state.auth.now())).join(User, User.id == Comment.author_id).join(
+        from app.aura_runtime import public_is_admin_column, public_level_column
+        statement = select(Comment, User, Profile, public_level_column(request.app.state.auth.now()), public_is_admin_column()).join(User, User.id == Comment.author_id).join(
             Profile, Profile.user_id == User.id).where(User.username == username, User.status == "active",
                 Comment.status == "visible", Comment.deleted_at.is_(None),
                 Comment.post_id.in_(public_posts().with_only_columns(Post.id)))

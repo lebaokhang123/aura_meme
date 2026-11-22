@@ -15,8 +15,7 @@ export const REALMS = Object.freeze([
 ]);
 
 export const SPECIAL_TITLE_KINDS = Object.freeze({
-  'Bá Chủ Thiên Lôi': 'thunder',
-  'Thiên Tướng Độ Ách': 'warden',
+  'Sáng Thế Thần': 'creator',
 });
 
 export function parseLevel(value) {

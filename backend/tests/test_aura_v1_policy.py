@@ -51,33 +51,49 @@ def test_all_realm_boundaries_exact(level, expected_realm):
     state = level_progress(THRESHOLDS[level - 1])
     assert state["level"] == level
     assert state["realm"] == expected_realm
-    assert public_title_for_user(level, "regular_user") == (expected_realm, expected_realm)
+    assert public_title_for_user(level, is_admin=False) == (expected_realm, expected_realm)
 
 
 def test_special_titles_and_negative_level_boundaries():
     from uuid import uuid4
+    from sqlalchemy import select
+    from sqlalchemy.dialects import postgresql
     from app.account_schemas import AccountPrivate, UserPublic
-    from app.aura_v1 import public_title_for_user, realm_for_level, special_title_for_username
+    from app.aura_runtime import public_is_admin_column
+    from app.aura_v1 import ADMIN_COSMETIC_TITLE, admin_cosmetic_title, public_title_for_user, realm_for_level
+    from app.models import User
     now = datetime(2026, 11, 22, 12, 0, tzinfo=timezone.utc)
-    # Admin special titles persist across all level upgrades without replacing true realm
-    for level in (1, 10, 11, 79, 80, 81, 100):
+    assert ADMIN_COSMETIC_TITLE == "Sáng Thế Thần"
+    # Verified Admin role gets unified "Sáng Thế Thần" across all level upgrades while preserving real realm
+    for level in (1, 10, 11, 12, 79, 80, 81, 100):
         expected_realm = realm_for_level(level)
-        assert public_title_for_user(level, "khang_dev") == (expected_realm, "Bá Chủ Thiên Lôi")
-        assert public_title_for_user(level, "kien_dev") == (expected_realm, "Thiên Tướng Độ Ách")
-        assert public_title_for_user(level, "other_admin") == (expected_realm, expected_realm)
-    # Missing level never fabricates realm or title, even for special usernames
-    assert public_title_for_user(None, "khang_dev") == (None, None)
-    assert public_title_for_user(None, "kien_dev") == (None, None)
-    assert public_title_for_user(None, "regular_user") == (None, None)
+        assert public_title_for_user(level, is_admin=True) == (expected_realm, "Sáng Thế Thần")
+        assert public_title_for_user(level, is_admin=False) == (expected_realm, expected_realm)
+    # Missing level never fabricates realm or title, even for verified Admins
+    assert public_title_for_user(None, is_admin=True) == (None, None)
+    assert public_title_for_user(None, is_admin=False) == (None, None)
     # Invalid levels are rejected
     for bad_level in (0, -1, 101, True, 1.5, "10"):
         with pytest.raises(ValueError):
             realm_for_level(bad_level)
-    # AccountPrivate omits title for normal users, includes backend-authorized title for special users
+    # Username alone NEVER grants Admin title without verified DB Admin role
+    for spoof_name in ("khang_dev", "kien_dev", "admin"):
+        non_admin = UserPublic(id=uuid4(), username=spoof_name, display_name="Spoof", created_at=now, level=79, is_admin_title=False).model_dump()
+        assert non_admin["realm"] == "Đại Thừa"
+        assert non_admin["title"] == "Đại Thừa"
+        assert "is_admin_title" not in non_admin
+    # Both verified Admins receive the exact same unified title "Sáng Thế Thần" and keep their true realm
+    khang = UserPublic(id=uuid4(), username="khang_dev", display_name="Khang Dev", created_at=now, level=79, is_admin_title=True).model_dump()
+    kien = UserPublic(id=uuid4(), username="kien_dev", display_name="Kien Dev", created_at=now, level=12, is_admin_title=True).model_dump()
+    assert khang["realm"] == "Đại Thừa" and khang["title"] == "Sáng Thế Thần" and "is_admin_title" not in khang
+    assert kien["realm"] == "Trúc Cơ" and kien["title"] == "Sáng Thế Thần" and "is_admin_title" not in kien
+    # AccountPrivate omits title for normal users, includes backend-authorized title for verified Admins
     base = dict(id=uuid4(), username="alice", email="alice@example.com", display_name="Alice", roles=["USER"], status="active")
-    assert "title" not in AccountPrivate(**base, title=special_title_for_username("alice")).model_dump()
-    assert AccountPrivate(**{**base, "username": "khang_dev"}, title=special_title_for_username("khang_dev")).model_dump()["title"] == "Bá Chủ Thiên Lôi"
-    assert AccountPrivate(**{**base, "username": "kien_dev"}, title=special_title_for_username("kien_dev")).model_dump()["title"] == "Thiên Tướng Độ Ách"
+    assert "title" not in AccountPrivate(**base, title=admin_cosmetic_title(False)).model_dump()
+    assert AccountPrivate(**{**base, "roles": ["USER", "ADMIN"]}, title=admin_cosmetic_title(True)).model_dump()["title"] == "Sáng Thế Thần"
     # UserPublic ignores forged client title/realm when level is None
-    forged = UserPublic(id=uuid4(), username="khang_dev", display_name="Khang", created_at=now, level=None, realm="Phi Thăng", title="Bá Chủ Thiên Lôi").model_dump()
+    forged = UserPublic(id=uuid4(), username="khang_dev", display_name="Khang", created_at=now, level=None, realm="Phi Thăng", title="Sáng Thế Thần", is_admin_title=True).model_dump()
     assert "realm" not in forged and "title" not in forged
+    # Zero N+1 SQL verification: public_is_admin_column compiles to correlated EXISTS subquery
+    compiled_sql = str(select(User.id, public_is_admin_column()).compile(dialect=postgresql.dialect())).lower()
+    assert "exists (" in compiled_sql and "user_roles" in compiled_sql and "roles" in compiled_sql

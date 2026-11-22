@@ -33,11 +33,13 @@ class UserPublic(BaseModel):
     realm: str | None = Field(default=None, exclude_if=lambda value: value is None)
     title: str | None = Field(default=None, exclude_if=lambda value: value is None)
     membership_tier: Literal["free", "plus", "prime"] = "free"
+    # Internal server-verified flag (from DB Role.code == "ADMIN"); never serialized to public JSON.
+    is_admin_title: bool = Field(default=False, exclude=True)
 
     @model_validator(mode="after")
     def public_identity(self):
         from app.aura_v1 import public_title_for_user
-        self.realm, self.title = public_title_for_user(self.level, self.username)
+        self.realm, self.title = public_title_for_user(self.level, is_admin=bool(self.is_admin_title))
         return self
 
 

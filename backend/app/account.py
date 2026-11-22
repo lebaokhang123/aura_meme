@@ -16,12 +16,12 @@ PROFILE_FIELDS = ("birth_year", "address", "phone", "bio", "avatar_media_id", "c
 
 
 def private_profile(account):
-    from app.aura_v1 import special_title_for_username
+    from app.aura_v1 import admin_cosmetic_title
     basic = user_private(account.db, account.user)
     profile = account.db.get(Profile, account.user.id)
     return AccountPrivate(**basic.model_dump(), **{name: getattr(profile, name) for name in PROFILE_FIELDS},
                           avatar_url=profile.avatar_url, cover_url=media_url(profile.cover_media_id),
-                          title=special_title_for_username(account.user.username))
+                          title=admin_cosmetic_title("ADMIN" in basic.roles))
 
 
 @router.get("/me", response_model=AccountPrivate, operation_id="getMe",
@@ -64,16 +64,16 @@ def change_password(payload: PasswordChange, request: Request, account=Depends(r
             responses={status: {"model": ErrorResponse} for status in (404, 422, 429, 500)})
 def get_public_user(request: Request, username: str = Path(min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$")):
     with request.app.state.auth_session_factory() as db:
-        from app.aura_runtime import public_level_column
-        row = db.execute(select(User, Profile, public_level_column(request.app.state.auth.now())).join(
+        from app.aura_runtime import public_is_admin_column, public_level_column
+        row = db.execute(select(User, Profile, public_level_column(request.app.state.auth.now()), public_is_admin_column()).join(
             Profile, Profile.user_id == User.id).where(User.username == username, User.status == "active")).one_or_none()
         if row is None:
             raise AuthError(404, "NOT_FOUND", "Profile not found.")
-        user, profile, level = row
+        user, profile, level, is_admin = row
         from app.membership import read_users_membership_tiers
         now = request.app.state.auth.now()
         tiers = read_users_membership_tiers(db, {user.id}, now)
         membership_tier = tiers.get(user.id, "free")
         return PublicProfile(id=user.id, username=user.username, display_name=profile.display_name,
                           created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url,
-                          level=level, membership_tier=membership_tier)
+                          level=level, membership_tier=membership_tier, is_admin_title=bool(is_admin))

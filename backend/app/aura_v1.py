@@ -6,10 +6,7 @@ from zoneinfo import ZoneInfo
 
 SCHEMA = "aurameme-aura-v1"
 REALMS = ("Luyện Khí", "Trúc Cơ", "Kim Đan", "Nguyên Anh", "Hóa Thần", "Luyện Hư", "Hợp Thể", "Đại Thừa", "Độ Kiếp", "Phi Thăng")
-SPECIAL_TITLES = {
-    "khang_dev": "Bá Chủ Thiên Lôi",
-    "kien_dev": "Thiên Tướng Độ Ách",
-}
+ADMIN_COSMETIC_TITLE = "Sáng Thế Thần"
 THRESHOLDS = tuple(sum(10+n for n in range(1,level)) for level in range(1,101))
 _POLICY = {"schema":SCHEMA,"version":1,"daily_cap":135,"checkin_xp":15,"reset_hour":7,"timezone":"Asia/Ho_Chi_Minh","max_level":100,"multipliers_enabled":False,
     "rewards":{"post_author":{"xp":10,"daily_limit":2},"reaction_actor":{"xp":1,"daily_limit":10},"reaction_author":{"xp":2,"daily_limit":20},"comment_actor":{"xp":2,"daily_limit":10},"comment_author":{"xp":3,"daily_limit":10}}}
@@ -32,17 +29,15 @@ def realm_for_level(level: int) -> str:
     return REALMS[(level - 1) // 10]
 
 
-def special_title_for_username(username: str | None) -> str | None:
-    if not isinstance(username, str):
-        return None
-    return SPECIAL_TITLES.get(username)
+def admin_cosmetic_title(is_admin: bool) -> str | None:
+    return ADMIN_COSMETIC_TITLE if is_admin is True else None
 
 
-def public_title_for_user(level: int | None, username: str | None) -> tuple[str | None, str | None]:
+def public_title_for_user(level: int | None, is_admin: bool = False) -> tuple[str | None, str | None]:
     if level is None:
         return None, None
     derived_realm = realm_for_level(level)
-    return derived_realm, special_title_for_username(username) or derived_realm
+    return derived_realm, admin_cosmetic_title(is_admin) or derived_realm
 
 
 def level_progress(total):
