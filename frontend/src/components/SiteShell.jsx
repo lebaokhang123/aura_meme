@@ -4,6 +4,8 @@ import { readDemoUser } from '../demo.js';
 import {MOCK_AUTH} from '../auth.js';
 import {logoutAccount} from '../runtime.js';
 import { useFeed } from '../FeedContext.jsx';
+import { usePreferences } from '../PreferencesContext.jsx';
+import { usePremium } from '../PremiumContext.jsx';
 import { LanguageSwitch } from './LanguageSwitch.jsx';
 import { ThemeSwitch } from './ThemeSwitch.jsx';
 import { NotificationsDropdown } from './NotificationsDropdown.jsx';
@@ -22,6 +24,12 @@ export function GithubIcon() {
 
 export function SiteHeader() {
   const render = useLocalized();
+  const { language } = usePreferences();
+  const t = (vi, en) => (language === 'en' ? en : vi);
+  const { subscription } = usePremium();
+  const isPlus = !!(subscription?.is_active && subscription?.tier === 'plus');
+  const isPrime = !!(subscription?.is_active && subscription?.tier === 'prime');
+  const hasAura = isPlus || isPrime;
   const { filters, update, url } = useFeed();
   const [query, setQuery] = useState(filters.q);
   useEffect(() => setQuery(filters.q), [filters.q]);
@@ -105,6 +113,18 @@ export function SiteHeader() {
         <div className="site-tools">
           <ThemeSwitch />
           <LanguageSwitch open={open === 'language'} onToggle={() => toggle('language')} onClose={() => setOpen(null)} />
+          <a
+            href="/premium"
+            className={`header-premium-btn ${isPrime ? 'header-premium-btn--prime' : isPlus ? 'header-premium-btn--plus' : 'header-premium-btn--free'}`}
+            title={isPrime ? 'Aura Prime' : isPlus ? 'Aura Plus' : t('Mua gói hội viên Aura', 'Get Aura Membership')}
+          >
+            <span className="material-symbols-outlined header-premium-icon" aria-hidden="true">
+              {isPrime ? 'diamond' : isPlus ? 'workspace_premium' : 'stars'}
+            </span>
+            <span className="header-premium-text">
+              {isPrime ? 'Aura Prime' : isPlus ? 'Aura Plus' : t('Mua Aura', 'Get Aura')}
+            </span>
+          </a>
           {user ? <>
             <div className="site-notifications" data-header-popup="notifications">
               <button
@@ -132,7 +152,36 @@ export function SiteHeader() {
                 />
               )}
             </div>
-            <div className="site-account" data-header-popup="account"><button ref={accountButton} type="button" className="account-trigger" aria-label="Mở menu tài khoản" aria-haspopup="true" aria-expanded={open === 'account'} aria-controls="site-account-menu" onClick={() => toggle('account')}><img className="account-avatar" src={user.avatar} alt={`Ảnh đại diện ${user.displayName}`} width="32" height="32" /></button>
+            <div className="site-account" data-header-popup="account">
+              <button
+                ref={accountButton}
+                type="button"
+                className={`account-trigger ${hasAura ? (isPrime ? 'has-aura-prime' : 'has-aura-plus') : ''}`}
+                aria-label="Mở menu tài khoản"
+                aria-haspopup="true"
+                aria-expanded={open === 'account'}
+                aria-controls="site-account-menu"
+                onClick={() => toggle('account')}
+              >
+                <img
+                  className={`account-avatar ${isPrime ? 'aura-avatar--prime' : isPlus ? 'aura-avatar--plus' : ''}`}
+                  src={user.avatar}
+                  alt={`Ảnh đại diện ${user.displayName}`}
+                  width="32"
+                  height="32"
+                />
+                {hasAura && (
+                  <span
+                    className={`aura-member-badge ${isPrime ? 'aura-member-badge--prime' : 'aura-member-badge--plus'}`}
+                    title={isPrime ? t('Hội viên Aura Prime', 'Aura Prime Member') : t('Hội viên Aura Plus', 'Aura Plus Member')}
+                    aria-label={isPrime ? t('Hội viên Aura Prime', 'Aura Prime Member') : t('Hội viên Aura Plus', 'Aura Plus Member')}
+                  >
+                    <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                  </span>
+                )}
+              </button>
               {open === 'account' && <div className="site-dropdown" id="site-account-menu"><button type="button" onClick={() => { setOpen(null); if(MOCK_AUTH)profile.current.showModal();else location.assign('/profile'); }}>{symbol('person')}Thông tin</button><button type="button" className="logout-action" onClick={event => logoutAccount(event.currentTarget)}>{symbol('logout')}Đăng xuất</button></div>}
             </div>
           </> : <div className="site-auth">{auth}</div>}

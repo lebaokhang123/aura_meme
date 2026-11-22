@@ -571,13 +571,62 @@ class Notification(Base):
     )
 
 
+class SubscriptionOrder(Base):
+    __tablename__ = "subscription_orders"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    order_code: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id"), nullable=False)
+    tier: Mapped[str] = mapped_column(Text, nullable=False)
+    duration_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount_vnd: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    currency: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_txn_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provider_response_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provider_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    payment_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("ix_subscription_orders_user_created", "user_id", created_at.desc()),
+        Index("ix_subscription_orders_order_code", "order_code", unique=True),
+        CheckConstraint("tier IN ('plus', 'prime')", name="ck_subscription_orders_tier"),
+        CheckConstraint("status IN ('pending', 'success', 'failed', 'cancelled', 'expired')", name="ck_subscription_orders_status"),
+        CheckConstraint("provider IN ('sandbox_simulated', 'vnpay_sandbox', 'paypal_sandbox', 'unselected')", name="ck_subscription_orders_provider"),
+    )
+
+
+class UserSubscription(Base):
+    __tablename__ = "user_subscriptions"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id"), unique=True, nullable=False)
+    tier: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    order_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("subscription_orders.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("ix_user_subscriptions_user_id", "user_id", unique=True),
+        Index("ix_user_subscriptions_expires", "expires_at"),
+        CheckConstraint("tier IN ('plus', 'prime')", name="ck_user_subscriptions_tier"),
+        CheckConstraint("status IN ('active', 'expired', 'cancelled')", name="ck_user_subscriptions_status"),
+    )
+
+
 def reviewed_metadata(revision):
     """Exact reviewed predecessor shapes; never mutate mapped runtime metadata."""
     if revision not in {'0009_vault_open','0010_social_reactions','0011_vault_v1','0012_aura_v1'}:
         raise ValueError('Unknown reviewed schema revision')
     metadata = MetaData(naming_convention=Base.metadata.naming_convention)
     for table in Base.metadata.sorted_tables:
-        if table.name == 'notifications':
+        if table.name in {'notifications', 'subscription_orders', 'user_subscriptions'}:
             continue
         if revision != '0012_aura_v1' and table.name == 'aura_reward_events':
             continue

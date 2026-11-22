@@ -227,7 +227,7 @@ def test_user_public_level_contract_and_policy_gated_sql():
     now = datetime(2026, 11, 14, 12, 0, tzinfo=timezone.utc)
     base = dict(id=uuid4(), username='alice', display_name='Alice', created_at=now, bio=None, avatar_url=None)
     legacy = UserPublic(**base).model_dump()
-    assert set(legacy) == {'id', 'username', 'display_name', 'created_at', 'bio', 'avatar_url'}
+    assert set(legacy) == {'id', 'username', 'display_name', 'created_at', 'bio', 'avatar_url', 'membership_tier'}
     with_level = PublicProfile(**base, level=11).model_dump()
     assert with_level['level'] == 11
     assert with_level['realm'] == 'Trúc Cơ'

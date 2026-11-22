@@ -21,9 +21,10 @@ export function apiAuthor(value){
  const realm=level&&typeof value.realm==='string'?value.realm:'';
  const serverTitle=level&&typeof value.title==='string'?value.title:'';
  const nickname=serverTitle||(value.username==='khang_dev'?'Bá Chủ Thiên Lôi':value.username==='kien_dev'?'Thiên Tướng Độ Ách':realm);
+ const membershipTier=['plus','prime'].includes(value.membership_tier)?value.membership_tier:'free';
  return {author:value.username,authorId:value.id,authorName:value.display_name,handle:'@'+value.username,
  avatar:apiMedia(value.avatar_url)||'/assets/identity/default-avatar.svg',
- level:level?'LVL '+level:'',realm,nickname};
+ level:level?'LVL '+level:'',realm,nickname,membershipTier};
 }
 export function apiCategory(value){
  apiId(value?.id);if(typeof value.slug!=='string'||!/^[-a-z0-9]{1,80}$/.test(value.slug)||typeof value.name!=='string'||(value.post_count!==undefined&&(!Number.isSafeInteger(value.post_count)||value.post_count<0)))bad();

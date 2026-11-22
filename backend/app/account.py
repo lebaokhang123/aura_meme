@@ -68,5 +68,10 @@ def get_public_user(request: Request, username: str = Path(min_length=3, max_len
         if row is None:
             raise AuthError(404, "NOT_FOUND", "Profile not found.")
         user, profile, level = row
+        from app.membership import read_users_membership_tiers
+        now = request.app.state.auth.now()
+        tiers = read_users_membership_tiers(db, {user.id}, now)
+        membership_tier = tiers.get(user.id, "free")
         return PublicProfile(id=user.id, username=user.username, display_name=profile.display_name,
-                          created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url, level=level)
+                          created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url,
+                          level=level, membership_tier=membership_tier)

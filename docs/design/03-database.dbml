@@ -604,6 +604,42 @@ Table notifications {
   Note: 'P2 | Hệ thống thông báo cá nhân'
 }
 
+Table subscription_orders {
+  id uuid [not null, pk]
+  order_code text [not null]
+  user_id uuid [not null]
+  tier text [not null]
+  duration_days integer [not null]
+  amount_cents integer [not null]
+  amount_vnd bigint [not null]
+  currency text [not null]
+  status text [not null]
+  provider text [not null]
+  provider_txn_id text
+  provider_response_code text
+  provider_payload jsonb [not null]
+  payment_url text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  completed_at timestamptz
+
+  Note: 'P2 | Đơn mua gói Premium sandbox'
+}
+
+Table user_subscriptions {
+  id uuid [not null, pk]
+  user_id uuid [not null]
+  tier text [not null]
+  status text [not null]
+  starts_at timestamptz [not null]
+  expires_at timestamptz [not null]
+  order_id uuid
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'P2 | Trạng thái hội viên Premium sandbox'
+}
+
 // LOGICAL GROUPS - one PostgreSQL database, not independent databases
 
 TableGroup account_auth [note: 'Tài khoản, phân quyền, phiên đăng nhập'] {
@@ -830,3 +866,6 @@ Ref: post_reactions.(user_id, meme_asset_id) > user_inventory.(user_id, asset_id
 Ref: comment_reactions.(user_id, meme_asset_id) > user_inventory.(user_id, asset_id) [delete: restrict]
 Ref: notifications.recipient_user_id > users.id [delete: restrict]
 Ref: notifications.actor_user_id > users.id [delete: restrict]
+Ref: subscription_orders.user_id > users.id [delete: restrict]
+Ref: user_subscriptions.user_id > users.id [delete: restrict]
+Ref: user_subscriptions.order_id > subscription_orders.id [delete: restrict]

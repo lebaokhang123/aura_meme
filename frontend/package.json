@@ -10,6 +10,7 @@
     "test": "vite build --mode mock && playwright test"
   },
   "dependencies": {
+    "jspdf": "^4.2.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

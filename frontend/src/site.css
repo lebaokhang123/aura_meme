@@ -184,3 +184,336 @@ html { --site-header-height: 65px; }
 .notification-modal-action-btn:hover { background: #6c32d4; }
 .notification-modal-dismiss-btn { background: transparent; color: #cac4d0; border: 1px solid #49454f; border-radius: 8px; padding: 8px 16px; font: 600 13px/18px 'Plus Jakarta Sans', sans-serif; cursor: pointer; transition: background 0.15s; }
 .notification-modal-dismiss-btn:hover { background: #2b2c3a; color: #fff; }
+
+/* ==========================================================================
+   Aura Membership - Header Button, Avatar Glow & Member Badge
+   ========================================================================== */
+.header-premium-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  font: 600 12px/1 'Plus Jakarta Sans', sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  flex-shrink: 0;
+}
+.header-premium-btn:hover {
+  transform: translateY(-1px);
+}
+.header-premium-btn:active {
+  transform: scale(0.97);
+}
+.header-premium-icon {
+  font-size: 15px !important;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+.header-premium-text {
+  letter-spacing: 0.2px;
+}
+
+/* Free tier: RGB gradient sweep */
+.header-premium-btn--free {
+  background: linear-gradient(90deg, #7c3aed, #06b6d4, #3b82f6, #7c3aed);
+  background-size: 300% 100%;
+  animation: auraRgbSweep 6s linear infinite;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.3);
+}
+.header-premium-btn--free:hover {
+  box-shadow: 0 0 16px rgba(124, 58, 237, 0.5);
+}
+
+@keyframes auraRgbSweep {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+
+/* Plus tier: Celestial sky-blue-cyan theme */
+.header-premium-btn--plus {
+  background: linear-gradient(135deg, #031424 0%, #073552 50%, #031424 100%);
+  color: #bae6fd;
+  border: 1px solid #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45), inset 0 0 8px rgba(6, 182, 212, 0.2);
+}
+.header-premium-btn--plus .header-premium-icon {
+  color: #38bdf8;
+}
+.header-premium-btn--plus:hover {
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.7), inset 0 0 10px rgba(6, 182, 212, 0.35);
+  border-color: #7dd3fc;
+}
+
+/* Prime tier: Radiant warm celestial gold-amber theme (VIP) */
+.header-premium-btn--prime {
+  background: linear-gradient(135deg, #1c1300 0%, #3d2c00 50%, #1c1300 100%);
+  color: #fef08a;
+  border: 1px solid #fbbf24;
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.65), 0 0 28px rgba(245, 158, 11, 0.35), inset 0 0 10px rgba(253, 224, 71, 0.4);
+}
+.header-premium-btn--prime .header-premium-icon {
+  color: #fde047;
+}
+.header-premium-btn--prime:hover {
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.9), 0 0 36px rgba(245, 158, 11, 0.5), inset 0 0 14px rgba(253, 224, 71, 0.5);
+  border-color: #fef08a;
+}
+
+/* Avatar indicator styles */
+.account-trigger {
+  position: relative;
+}
+
+.user-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Plus tier: Cyan / Blue pulse animation */
+.aura-avatar--plus,
+.account-avatar.aura-avatar--plus {
+  box-shadow: 0 0 0 2px #38bdf8, 0 0 10px rgba(56, 189, 248, 0.75), 0 0 18px rgba(6, 182, 212, 0.45);
+  animation: auraPulsePlus 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Prime tier: Intense gold / amber VIP celestial radiant pulse */
+.aura-avatar--prime,
+.account-avatar.aura-avatar--prime {
+  box-shadow: 0 0 0 2.5px #fbbf24, 0 0 14px rgba(251, 191, 36, 0.85), 0 0 24px rgba(245, 158, 11, 0.65), 0 0 32px rgba(253, 224, 71, 0.45);
+  animation: auraPulsePrime 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes auraPulsePlus {
+  0%, 100% {
+    box-shadow: 0 0 0 2px #38bdf8, 0 0 10px rgba(56, 189, 248, 0.65), 0 0 16px rgba(14, 165, 233, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 2.5px #7dd3fc, 0 0 16px rgba(56, 189, 248, 0.9), 0 0 24px rgba(6, 182, 212, 0.65);
+  }
+}
+
+@keyframes auraPulsePrime {
+  0%, 100% {
+    box-shadow: 0 0 0 2.5px #fbbf24, 0 0 12px rgba(251, 191, 36, 0.75), 0 0 20px rgba(245, 158, 11, 0.5), 0 0 28px rgba(253, 224, 71, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 3.5px #fef08a, 0 0 22px rgba(251, 191, 36, 1), 0 0 34px rgba(245, 158, 11, 0.85), 0 0 46px rgba(253, 224, 71, 0.6);
+  }
+}
+
+/* Member Checkmark Badges */
+.aura-member-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #0284c7;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--site-header-bg, #0d0e12);
+  box-shadow: 0 0 6px rgba(2, 132, 199, 0.6);
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.aura-member-badge--plus {
+  background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+  border-color: #031424;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.7);
+}
+
+.aura-member-badge--prime {
+  background: linear-gradient(135deg, #d97706 0%, #fbbf24 100%);
+  border-color: #1c1300;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.85), 0 0 16px rgba(245, 158, 11, 0.5);
+}
+
+/* Profile Premium Badges */
+.profile-premium-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+}
+
+.profile-premium-badge-icon {
+  font-size: 16px !important;
+}
+
+.profile-premium-badge--plus {
+  background: linear-gradient(135deg, rgba(3, 20, 36, 0.95) 0%, rgba(7, 53, 82, 0.95) 100%);
+  border: 1px solid #38bdf8;
+  color: #bae6fd;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.5), inset 0 0 8px rgba(6, 182, 212, 0.25);
+}
+
+.profile-premium-badge--plus .profile-premium-badge-icon {
+  color: #38bdf8;
+}
+
+.profile-premium-badge--prime {
+  background: linear-gradient(135deg, rgba(28, 19, 0, 0.95) 0%, rgba(61, 44, 0, 0.95) 100%);
+  border: 1px solid #fbbf24;
+  color: #fef08a;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.65), 0 0 28px rgba(245, 158, 11, 0.35), inset 0 0 10px rgba(253, 224, 71, 0.35);
+}
+
+.profile-premium-badge--prime .profile-premium-badge-icon {
+  color: #fde047;
+}
+
+/* Premium Selection Panel Glow by Selected Tier */
+.premium-selector-panel {
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              background 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  isolation: isolate;
+}
+
+/* Ambient smoke aura layers inside the panel */
+.premium-smoke-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(55px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.65;
+  transition: opacity 0.5s ease, background 0.5s ease, transform 0.5s ease;
+}
+
+.premium-smoke-glow--top {
+  top: -40px;
+  right: -30px;
+  width: 220px;
+  height: 220px;
+  animation: smokeFloatTop 8s ease-in-out infinite alternate;
+}
+
+.premium-smoke-glow--bottom {
+  bottom: -40px;
+  left: -30px;
+  width: 200px;
+  height: 200px;
+  animation: smokeFloatBottom 9s ease-in-out infinite alternate;
+}
+
+.premium-smoke-glow--center {
+  top: 40%;
+  left: 30%;
+  width: 180px;
+  height: 180px;
+  animation: smokeFloatCenter 10s ease-in-out infinite alternate;
+}
+
+@keyframes smokeFloatTop {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-20px, 20px) scale(1.15); }
+}
+
+@keyframes smokeFloatBottom {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(25px, -15px) scale(1.1); }
+}
+
+@keyframes smokeFloatCenter {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.35; }
+  100% { transform: translate(15px, 20px) scale(1.2); opacity: 0.55; }
+}
+
+/* Ensure contents stay above smoke */
+.premium-selector-heading,
+.u056 {
+  position: relative;
+  z-index: 1;
+}
+
+/* Plus tier: Cyan / Ocean Blue smoke aura (màu xanh) */
+.premium-selector-panel--plus {
+  border: 1px solid rgba(56, 189, 248, 0.65) !important;
+  background: radial-gradient(ellipse at 85% 15%, rgba(6, 182, 212, 0.16) 0%, transparent 65%),
+              radial-gradient(ellipse at 15% 85%, rgba(56, 189, 248, 0.12) 0%, transparent 60%),
+              var(--ux-page) !important;
+  box-shadow: 0 0 35px rgba(6, 182, 212, 0.22),
+              0 0 20px rgba(56, 189, 248, 0.35),
+              inset 0 0 30px rgba(6, 182, 212, 0.08) !important;
+}
+
+.premium-selector-panel--plus .workspace-kicker {
+  color: #38bdf8 !important;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+}
+
+.premium-smoke-glow--plus.premium-smoke-glow--top {
+  background: rgba(6, 182, 212, 0.35);
+}
+.premium-smoke-glow--plus.premium-smoke-glow--bottom {
+  background: rgba(56, 189, 248, 0.3);
+}
+.premium-smoke-glow--plus.premium-smoke-glow--center {
+  background: rgba(14, 165, 233, 0.25);
+}
+
+/* Prime tier: Radiant warm celestial gold-amber smoke aura (màu vàng VIP) */
+.premium-selector-panel--prime {
+  border: 1px solid rgba(251, 191, 36, 0.75) !important;
+  background: radial-gradient(ellipse at 85% 15%, rgba(251, 191, 36, 0.18) 0%, transparent 65%),
+              radial-gradient(ellipse at 15% 85%, rgba(245, 158, 11, 0.14) 0%, transparent 60%),
+              var(--ux-page) !important;
+  box-shadow: 0 0 45px rgba(251, 191, 36, 0.32),
+              0 0 24px rgba(245, 158, 11, 0.45),
+              inset 0 0 35px rgba(253, 224, 71, 0.1) !important;
+}
+
+.premium-selector-panel--prime .workspace-kicker {
+  color: #fbbf24 !important;
+  text-shadow: 0 0 12px rgba(251, 191, 36, 0.7);
+}
+
+.premium-smoke-glow--prime.premium-smoke-glow--top {
+  background: rgba(251, 191, 36, 0.4);
+}
+.premium-smoke-glow--prime.premium-smoke-glow--bottom {
+  background: rgba(245, 158, 11, 0.35);
+}
+.premium-smoke-glow--prime.premium-smoke-glow--center {
+  background: rgba(253, 224, 71, 0.25);
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .header-premium-btn--free,
+  .aura-avatar--plus,
+  .aura-avatar--prime,
+  .account-avatar.aura-avatar--plus,
+  .account-avatar.aura-avatar--prime,
+  .premium-smoke-glow--top,
+  .premium-smoke-glow--bottom,
+  .premium-smoke-glow--center {
+    animation: none !important;
+  }
+}
+

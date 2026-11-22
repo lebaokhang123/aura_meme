@@ -10,7 +10,10 @@ import {ShareButton} from './ShareButton.jsx';
 import {useSocial} from '../SocialContext.jsx';
 import {commentsFor} from '../social-model.js';
 import {usePreferences} from '../PreferencesContext.jsx';
+import {usePremium} from '../PremiumContext.jsx';
+import {readDemoUser} from '../demo.js';
 import {POSTS} from '../feed-data.js';
+import UserAvatar from './UserAvatar.jsx';
 
 const authors={khang:'Khang_dev',kien:'Kien_dev',gigachad:'Gigachad'};
 export const apiStyleAuthor=username=>username==='kien_dev'?'Kien_dev':'Khang_dev';
@@ -21,9 +24,17 @@ export function HallIdentity({id}) {
 }
 export function PostHeader({post,variant,menu}) {
   const render=useLocalized(),classes=authorClasses(post.api?apiStyleAuthor(post.author):post.author||authors[post.id]),{language}=usePreferences();
+  const {subscription}=usePremium?.()||{};
+  const currentUser=readDemoUser?.();
+  const isCurrentAuthor=Boolean(currentUser&&(
+    (post.authorId&&post.authorId===currentUser.id)||
+    (post.author&&currentUser.username&&post.author.toLowerCase()===currentUser.username.toLowerCase())||
+    (post.handle&&currentUser.username&&post.handle.toLowerCase()===`@${currentUser.username.toLowerCase()}`)
+  ));
+  const effectiveTier=(isCurrentAuthor&&subscription?.is_active?subscription.tier:null)||post.membershipTier||post.membership_tier||'free';
   const timeLabel=post.createdAt?relativeTime(post.createdAt,language):(post.timeLabel||'');
   return render(<div className="flex items-center justify-between social-post-header">
-    <div className="flex items-center gap-3 min-w-0 social-post-identity"><img className="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-secondary/50" src={post.avatar} alt={post.authorName}/>
+    <div className="flex items-center gap-3 min-w-0 social-post-identity"><UserAvatar src={post.avatar} alt={post.authorName} tier={effectiveTier} size="md"/>
       <div className="flex flex-col min-w-0"><div className="flex items-center gap-1.5 flex-wrap">
         <span className={`font-label-lg text-label-lg text-on-surface font-bold hover:underline cursor-pointer ${post.api?'inline-block max-w-full break-words':variant==='explore'?'flex flex-col whitespace-nowrap':''}`}>{variant==='profile'?<a href={'/profile/'+encodeURIComponent(post.author)} translate="no">{post.authorName}</a>:variant==='explore'?<PostLink post={post}/>:post.authorName}{' '}{post.api?<a href={'/profile/'+encodeURIComponent(post.author)} className="text-xs text-outline font-normal">{post.handle}</a>:<span className="text-xs text-outline font-normal">{post.handle}</span>}</span>
         <LevelPill level={post.level} className={`${classes.level} whitespace-nowrap shrink-0`}/>{post.nickname&&<span className={`${classes.nickname} whitespace-nowrap shrink-0`} translate="no">{post.nickname}</span>}

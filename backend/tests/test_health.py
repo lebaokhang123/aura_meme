@@ -28,11 +28,12 @@ def test_health_and_openapi_without_a_database(monkeypatch):
                                           "/api/v1/comments/{comment_id}/reactions", "/api/v1/comments/{comment_id}/interactions", "/api/v1/admin/comments/{comment_id}",
                                           "/api/v1/admin/users", "/api/v1/admin/users/{user_id}",
                                           "/api/v1/admin/users/{user_id}/roles", "/api/v1/admin/posts",
-                                          "/api/v1/admin/posts/{post_id}", "/api/v1/admin/comments", "/api/v1/admin/assets", "/api/v1/admin/posts/{post_id}/media", "/api/v1/admin/audit-logs", "/api/v1/admin/announcements", "/api/v1/admin/announcements/{announcement_id}", "/api/v1/admin/announcements/{announcement_id}/publish", "/api/v1/admin/announcements/{announcement_id}/withdraw", "/api/v1/contact",
+                                          "/api/v1/admin/posts/{post_id}", "/api/v1/admin/comments", "/api/v1/admin/assets", "/api/v1/admin/posts/{post_id}/media", "/api/v1/admin/audit-logs", "/api/v1/admin/orders", "/api/v1/admin/announcements", "/api/v1/admin/announcements/{announcement_id}", "/api/v1/admin/announcements/{announcement_id}/publish", "/api/v1/admin/announcements/{announcement_id}/withdraw", "/api/v1/contact",
                                           "/api/v1/admin/contacts", "/api/v1/admin/contacts/{contact_id}",
                                           "/api/v1/users/me/posts", "/api/v1/users/me/posts/{post_id}",
                                           "/api/v1/posts/{post_id}/reactions", "/api/v1/posts/{post_id}/bookmark", "/api/v1/aura/progress", "/api/v1/leaderboard", "/api/v1/aura/check-in", "/api/v1/inventory/me", "/api/v1/inventory/equipment/{slot_kind}", "/api/v1/catalog/assets/{asset_id}", "/api/v1/vault/cases", "/api/v1/vault/cases/{case_id}", "/api/v1/vault/cases/{case_id}/open", "/api/v1/catalog", "/api/v1/inventory/equipment", "/api/v1/vault/opens/by-request",
-                                          "/api/v1/notifications", "/api/v1/notifications/unread-count", "/api/v1/notifications/{notification_id}", "/api/v1/notifications/{notification_id}/read", "/api/v1/notifications/read-all"}
+                                          "/api/v1/notifications", "/api/v1/notifications/unread-count", "/api/v1/notifications/{notification_id}", "/api/v1/notifications/{notification_id}/read", "/api/v1/notifications/read-all",
+                                          "/api/v1/premium/status", "/api/v1/premium/orders", "/api/v1/premium/orders/successful", "/api/v1/premium/orders/{order_code}", "/api/v1/premium/orders/{order_code}/init-paypal", "/api/v1/premium/orders/{order_code}/simulate", "/api/v1/premium/orders/{order_code}/capture", "/api/v1/premium/paypal/webhook", "/api/v1/premium/vnpay-return", "/api/v1/premium/vnpay-ipn"}
         assert contract["paths"]["/health"]["get"]["operationId"] == "health"
         model = contract["components"]["schemas"]["HealthResponse"]
         assert model["required"] == ["status"]
@@ -51,7 +52,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         assert patch["additionalProperties"] is False and patch["minProperties"] == 1
         assert patch["properties"]["display_name"]["type"] == "string"
         public = contract["components"]["schemas"]["UserPublic"]
-        assert set(public["properties"]) == {"id", "username", "display_name", "created_at", "bio", "avatar_url", "level", "realm", "title"}
+        assert set(public["properties"]) == {"id", "username", "display_name", "created_at", "bio", "avatar_url", "level", "realm", "title", "membership_tier"}
         assert public["properties"]["avatar_url"]["format"] == "uri-reference"
         assert {"type": "string"} in public["properties"]["avatar_url"]["anyOf"]
         profile = contract["components"]["schemas"]["PublicProfile"]

@@ -5,12 +5,12 @@ import {usePreferences} from '../PreferencesContext.jsx';
 import {adminPage,canAdmin} from '../admin-api.js';
 import '../workspace.css';
 
-const sections=[['users','Người dùng','Users',['users']],['content','Nội dung','Content',['posts','comments','categories']],['contacts','Liên hệ','Contacts',['contacts']],['moderation','Kiểm duyệt','Moderation',['audit-logs','assets']],['notifications','Thông báo','Notifications',['announcements']]];
-const labels={users:['Người dùng','Users'],posts:['Bài viết','Posts'],comments:['Bình luận','Comments'],categories:['Danh mục','Categories'],contacts:['Hộp thư liên hệ','Contact inbox'],'audit-logs':['Nhật ký quản trị','Admin activity'],assets:['Trạng thái vật phẩm','Asset status'],announcements:['Thông báo hệ thống','System announcements']};
+const sections=[['users','Người dùng','Users',['users']],['content','Nội dung','Content',['posts','comments','categories']],['contacts','Liên hệ','Contacts',['contacts']],['moderation','Kiểm duyệt','Moderation',['audit-logs','assets','orders']],['notifications','Thông báo','Notifications',['announcements']]];
+const labels={users:['Người dùng','Users'],posts:['Bài viết','Posts'],comments:['Bình luận','Comments'],categories:['Danh mục','Categories'],contacts:['Hộp thư liên hệ','Contact inbox'],'audit-logs':['Nhật ký quản trị','Admin activity'],assets:['Trạng thái vật phẩm','Asset status'],orders:['Giao dịch','Transactions'],announcements:['Thông báo hệ thống','System announcements']};
 const sectionIcons={users:'group',content:'article',contacts:'inbox',moderation:'shield',notifications:'campaign'};
-const resourceNotes={users:['Quản lý trạng thái và quyền truy cập của thành viên.','Manage member status and access.'],posts:['Xem nội dung và kiểm soát những bài xuất hiện trong cộng đồng.','Review posts and control their visibility in the community.'],comments:['Xem và xử lý bình luận, kể cả nội dung đã ẩn.','Review comments, including hidden content.'],categories:['Sắp xếp nội dung bằng các danh mục dùng chung.','Organize community content with shared categories.'],contacts:['Đọc và phân loại tin nhắn gửi đến AuraMeme.','Read and triage messages sent to AuraMeme.'],'audit-logs':['Ghi lại các thay đổi do quản trị viên thực hiện: ai đã làm gì và khi nào.','Log of administrative actions: who did what and when.'],assets:['Kiểm tra trạng thái hoạt động và duyệt của danh mục vật phẩm.','Inspect catalog availability and review status.'],announcements:['Soạn thảo, quản lý và phát thông báo tới các thành viên.','Draft, manage, and broadcast announcements to community members.']};
+const resourceNotes={users:['Quản lý trạng thái và quyền truy cập của thành viên.','Manage member status and access.'],posts:['Xem nội dung và kiểm soát những bài xuất hiện trong cộng đồng.','Review posts and control their visibility in the community.'],comments:['Xem và xử lý bình luận, kể cả nội dung đã ẩn.','Review comments, including hidden content.'],categories:['Sắp xếp nội dung bằng các danh mục dùng chung.','Organize community content with shared categories.'],contacts:['Đọc và phân loại tin nhắn gửi đến AuraMeme.','Read and triage messages sent to AuraMeme.'],'audit-logs':['Ghi lại các thay đổi do quản trị viên thực hiện: ai đã làm gì và khi nào.','Log of administrative actions: who did what and when.'],assets:['Kiểm tra trạng thái hoạt động và duyệt của danh mục vật phẩm.','Inspect catalog availability and review status.'],orders:['Xem danh sách và lịch sử các giao dịch thanh toán gói hội viên.','View member subscription orders and payment history.'],announcements:['Soạn thảo, quản lý và phát thông báo tới các thành viên.','Draft, manage, and broadcast announcements to community members.']};
 const Icon=({name,...props})=><span className="material-symbols-outlined" aria-hidden="true" {...props}>{name}</span>;
-const states={users:['active','locked','deleted'],posts:['draft','published','hidden','deleted'],comments:['visible','hidden','deleted'],categories:['active','hidden'],contacts:['new','in_review','resolved'],assets:['pending','approved','rejected','unknown'],announcements:['draft','published','withdrawn']};
+const states={users:['active','locked','deleted'],posts:['draft','published','hidden','deleted'],comments:['visible','hidden','deleted'],categories:['active','hidden'],contacts:['new','in_review','resolved'],assets:['pending','approved','rejected','unknown'],orders:['pending','success','failed','cancelled'],announcements:['draft','published','withdrawn']};
 const auditActionLabels={
   'contact.update':['Cập nhật trạng thái liên hệ','Updated contact status'],
   'post.update':['Cập nhật bài viết','Updated post'],
@@ -137,9 +137,26 @@ export default function AdminPage(){
       </details>
     </div>}
     {resource==='announcements'&&<><h3>{row.title}</h3><p className="workspace-meta">@{row.actor_username||'admin'} · {stamp(row.created_at)}{row.published_at&&` · ${t('Phát lúc:','Broadcasted at:')} ${stamp(row.published_at)}`}{typeof row.recipients_count==='number'&&` · ${row.recipients_count} ${t('người nhận','recipients')}`}</p><p className="admin-content-snippet" translate="no">{row.body?.length>120?(row.body.slice(0,120)+'…'):row.body}</p></>}
+    {resource==='orders'&&<div>
+      <h3 className="flex items-center gap-2">
+        <code className="text-secondary font-mono">{row.order_code}</code>
+        <span className="workspace-badge" style={{textTransform:'uppercase',fontSize:'11px',background:row.tier==='prime'?'rgba(234, 179, 8, 0.2)':'rgba(56, 189, 248, 0.2)',color:row.tier==='prime'?'#facc15':'#38bdf8'}}>
+          {row.tier==='prime'?'Aura Prime':'Aura Plus'}
+        </span>
+      </h3>
+      <p className="workspace-meta">
+        <span>{row.amount_vnd_formatted||(row.amount_vnd?.toLocaleString('vi-VN')+' đ')}</span>
+        <span>·</span>
+        <span>{row.provider==='paypal_sandbox'?'PayPal':row.provider==='sandbox_simulated'?'Thẻ':(row.provider==='unselected'||!row.provider?t('Chưa chọn','Not selected'):row.provider)}</span>
+        <span>·</span>
+        <span>{row.created_at?stamp(row.created_at):''}</span>
+        {row.provider_txn_id&&<span>· Txn: <code className="text-outline">{row.provider_txn_id}</code></span>}
+      </p>
+    </div>}
    </div><div className="admin-row-status">
     {resource==='audit-logs'&&<time className="workspace-meta" dateTime={row.created_at}>{stamp(row.created_at)}</time>}
-    {row.status&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='assets'&&<span className="workspace-badge">{row.active?t('Đang bật','Active'):t('Đang tắt','Inactive')}</span>}
+    {resource==='orders'&&<span className="workspace-badge" data-status={row.status} style={{fontWeight:600}}>{row.status==='success'?t('Thành công','Success'):row.status==='pending'?t('Chờ xử lý','Pending'):row.status==='failed'?t('Thất bại','Failed'):row.status}</span>}
+    {row.status&&resource!=='orders'&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='assets'&&<span className="workspace-badge">{row.active?t('Đang bật','Active'):t('Đang tắt','Inactive')}</span>}
     </div><div className="workspace-row-actions">{resource==='users'&&row.status!=='deleted'&&<><button type="button" disabled={busy} onClick={()=>confirm(row,{status:row.status==='active'?'locked':'active'},row.status==='active'?t('Khóa tài khoản','Lock account'):t('Mở khóa tài khoản','Unlock account'))}>{row.status==='active'?t('Khóa','Lock'):t('Mở khóa','Unlock')}</button><button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'roles',row,roles:[...row.roles]})}}>{t('Sửa vai trò','Edit roles')}</button></>}
     {(resource==='posts'||resource==='comments')&&<div className="admin-action-icons">
       <button type="button" className="admin-icon-btn" disabled={busy} aria-label={resource==='posts'?t('Xem chi tiết bài viết','View post details'):t('Xem chi tiết bình luận','View comment details')} title={resource==='posts'?t('Xem chi tiết bài viết','View post details'):t('Xem chi tiết bình luận','View comment details')} onClick={()=>{setError('');setEdit({type:'content-preview',row,targetResource:resource})}}><Icon name="visibility"/></button>

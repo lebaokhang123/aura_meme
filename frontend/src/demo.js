@@ -22,7 +22,13 @@ export function readDemoUser() {
       return cachedResultUser;
     }
     cachedSnapshotUser = user;
-    cachedResultUser = Object.freeze({...user,displayName:user.display_name,avatar:user.avatar_url||'/assets/identity/default-avatar.svg'});
+    cachedResultUser = Object.freeze({
+      ...user,
+      displayName: user.display_name,
+      avatar: user.avatar_url || '/assets/identity/default-avatar.svg',
+      membershipTier: user.membership_tier || user.membershipTier || 'free',
+      membership_tier: user.membership_tier || user.membershipTier || 'free',
+    });
     return cachedResultUser;
   }
   try {
