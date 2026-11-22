@@ -289,6 +289,9 @@ test('Logged in user can confirm order in modal, navigate to checkout, enter sim
   await expect(page.locator('.checkout-order-summary')).toContainText('Aura Plus');
   await expect(page.locator('.checkout-order-summary')).toContainText('130.000 VNĐ');
 
+  // Switch to card method to test card flow
+  await page.locator('.checkout-method-card[data-method="card"]').click();
+
   // Verify simulated card form fields
   await expect(page.locator('#cardholder-name')).toHaveValue('NGUYEN VAN A');
   await expect(page.locator('#card-number')).toHaveValue('4242 4242 4242 4242');
@@ -331,6 +334,9 @@ test('Logged in user can confirm order in modal, navigate to checkout, enter sim
 test('Simulated checkout form validates inputs and handles failure safely without card leakage', async ({ page, context }) => {
   const s = await setupMockApi(context, 0, null, false);
   await page.goto('/premium/checkout?order=AM-SUB-TEST-1234');
+
+  // Switch to card method
+  await page.locator('.checkout-method-card[data-method="card"]').click();
 
   // Clear card number and try to submit
   await page.locator('#card-number').fill('');
@@ -535,21 +541,21 @@ test('Phase A Identity: swapped icons, avatar glow everywhere, profile badge, an
   };
   await setupMockApi(context, 0, plusSub, false);
 
-  // Check Home with Plus
+  // Check Home with Plus (Cyan/Blue + workspace_premium)
   await page.goto('/');
   const plusHeaderBtn = page.locator('.header-premium-btn--plus');
-  await expect(plusHeaderBtn.locator('.header-premium-icon')).toHaveText('diamond');
+  await expect(plusHeaderBtn.locator('.header-premium-icon')).toHaveText('workspace_premium');
   const perksPlusHeader = page.locator('.font-mono-tag:has-text("AURA PERKS")').locator('..');
-  await expect(perksPlusHeader.locator('.material-symbols-outlined')).toHaveText('diamond');
+  await expect(perksPlusHeader.locator('.material-symbols-outlined')).toHaveText('workspace_premium');
   const perksPlusActive = page.locator('span:has-text("Đang kích hoạt")');
-  await expect(perksPlusActive).toHaveClass(/border-amber-400\/50/);
+  await expect(perksPlusActive).toHaveClass(/border-cyan-300\/60/);
   await page.screenshot({ path: `${artifactsDir}/task5_identity_home_plus.png` });
 
   // Check Profile with Plus
   await page.goto('/profile');
   const plusProfileBadge = page.locator('.profile-premium-badge--plus');
   await expect(plusProfileBadge).toBeVisible();
-  await expect(plusProfileBadge.locator('.profile-premium-badge-icon')).toHaveText('diamond');
+  await expect(plusProfileBadge.locator('.profile-premium-badge-icon')).toHaveText('workspace_premium');
   await expect(plusProfileBadge).toContainText('Aura Plus');
   await expect(page.locator('.am-profile-avatar img')).toHaveClass(/aura-avatar--plus/);
   await page.screenshot({ path: `${artifactsDir}/task5_identity_profile_plus.png` });
@@ -559,7 +565,7 @@ test('Phase A Identity: swapped icons, avatar glow everywhere, profile badge, an
   await expect(page.locator('.premium-selector-panel')).toHaveClass(/premium-selector-panel--plus/);
   await page.screenshot({ path: `${artifactsDir}/task5_identity_premium_plus.png` });
 
-  // 2. Prime identity test
+  // 2. Prime identity test (Gold/Amber + diamond)
   const primeSub = {
     tier: 'prime',
     is_active: true,
@@ -573,18 +579,18 @@ test('Phase A Identity: swapped icons, avatar glow everywhere, profile badge, an
   // Check Home with Prime
   await page.goto('/');
   const primeHeaderBtn = page.locator('.header-premium-btn--prime');
-  await expect(primeHeaderBtn.locator('.header-premium-icon')).toHaveText('workspace_premium');
+  await expect(primeHeaderBtn.locator('.header-premium-icon')).toHaveText('diamond');
   const perksPrimeHeader = page.locator('.font-mono-tag:has-text("AURA PERKS")').locator('..');
-  await expect(perksPrimeHeader.locator('.material-symbols-outlined')).toHaveText('workspace_premium');
+  await expect(perksPrimeHeader.locator('.material-symbols-outlined')).toHaveText('diamond');
   const perksPrimeActive = page.locator('span:has-text("Đang kích hoạt")');
-  await expect(perksPrimeActive).toHaveClass(/border-cyan-300\/60/);
+  await expect(perksPrimeActive).toHaveClass(/border-amber-300\/60/);
   await page.screenshot({ path: `${artifactsDir}/task5_identity_home_prime.png` });
 
   // Check Profile with Prime
   await page.goto('/profile');
   const primeProfileBadge = page.locator('.profile-premium-badge--prime');
   await expect(primeProfileBadge).toBeVisible();
-  await expect(primeProfileBadge.locator('.profile-premium-badge-icon')).toHaveText('workspace_premium');
+  await expect(primeProfileBadge.locator('.profile-premium-badge-icon')).toHaveText('diamond');
   await expect(primeProfileBadge).toContainText('Aura Prime');
   await expect(page.locator('.am-profile-avatar img')).toHaveClass(/aura-avatar--prime/);
   await page.screenshot({ path: `${artifactsDir}/task5_identity_profile_prime.png` });
@@ -593,5 +599,39 @@ test('Phase A Identity: swapped icons, avatar glow everywhere, profile badge, an
   await page.goto('/premium');
   await expect(page.locator('.premium-selector-panel')).toHaveClass(/premium-selector-panel--prime/);
   await page.screenshot({ path: `${artifactsDir}/task5_identity_premium_prime.png` });
+});
+
+test('Payment method selector switches between PayPal and Card inputs', async ({ page, context }) => {
+  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
+  await setupMockApi(context, 0, null, false);
+  await page.goto('/premium/checkout?order=AM-SUB-TEST-1234');
+
+  // Initially PayPal is selected
+  const paypalMethod = page.locator('.checkout-method-card[data-method="paypal"]');
+  const cardMethod = page.locator('.checkout-method-card[data-method="card"]');
+  await expect(paypalMethod).toHaveClass(/active/);
+  await expect(cardMethod).not.toHaveClass(/active/);
+  await expect(page.locator('.checkout-paypal-action-box')).toBeVisible();
+  await expect(page.locator('.checkout-card-form-expand')).toHaveCount(0);
+  await page.screenshot({ path: `${artifactsDir}/task5_checkout_method_selector_paypal.png` });
+
+  // Switch to Card
+  await cardMethod.click();
+  await expect(cardMethod).toHaveClass(/active/);
+  await expect(paypalMethod).not.toHaveClass(/active/);
+  await expect(page.locator('.checkout-card-form-expand')).toBeVisible();
+  await expect(page.locator('#card-number')).toBeVisible();
+  await page.screenshot({ path: `${artifactsDir}/task5_checkout_method_selector_card.png` });
+
+  // Switch back to PayPal and capture receipt screenshot
+  await paypalMethod.click();
+  await expect(paypalMethod).toHaveClass(/active/);
+  await expect(page.locator('.checkout-card-form-expand')).toHaveCount(0);
+
+  // Quick sandbox capture to verify receipt artifact
+  await page.locator('.checkout-btn-secondary').click();
+  const receipt = page.locator('.u081-receipt');
+  await expect(receipt).toBeVisible();
+  await page.screenshot({ path: `${artifactsDir}/task5_checkout_paypal_receipt.png` });
 });
 

@@ -547,3 +547,74 @@ Toàn bộ ảnh chụp màn hình kiểm chứng đã được ghi nhận trong
 3. **Thanh toán PayPal Sandbox:**
    - [task5_paypal_checkout_page.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_paypal_checkout_page.png): Trang thanh toán với thẻ hành động PayPal Sandbox chuyên biệt.
    - [task5_paypal_receipt_success.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_paypal_receipt_success.png): Biên nhận kích hoạt thành công gói hội viên thông qua PayPal Sandbox capture.
+
+
+---
+
+## 13. BỔ SUNG & HOÀN THIỆN THEO PHẢN HỒI MỚI NHẤT CỦA OWNER (TASK 5 FINAL POLISH)
+
+### 13.1. Sửa đúng bản sắc nhận diện hội viên (Identity Swap Correction)
+Thực hiện chuẩn xác yêu cầu của Owner về bản sắc nhận diện giữa 2 gói:
+- **Aura Plus ($5 / 30 ngày):** Tone màu **Xanh ngọc / Cyan** (`#38bdf8`, `#06b6d4`, `#0284c7`) đi kèm biểu tượng **Huy hiệu** (`workspace_premium`). Đồng bộ glow xanh viền avatar, badge huy hiệu xanh, button Header xanh và card Aura Perks xanh.
+- **Aura Prime ($50 / 365 ngày):** Tone màu **Vàng hoàng kim / Amber** (`#fbbf24`, `#f59e0b`, `#fef08a`) đi kèm biểu tượng **Kim cương** (`diamond`). Cảm giác VIP quyền năng, hào quang vàng tỏa sáng, badge kim cương vàng, button Header vàng và card Aura Perks vàng.
+- **Đồng bộ toàn diện trên tất cả các vị trí:**
+  - Nút Header (`.header-premium-btn--plus`, `.header-premium-btn--prime`).
+  - Avatar glow và tick hội viên trên Header, Feed, Explore, Comment và Trang cá nhân Profile.
+  - Huy hiệu hồ sơ (`.profile-premium-badge--plus`, `.profile-premium-badge--prime`).
+  - Thẻ quyền lợi Aura Perks tại `/home` (`.font-mono-tag`, border, active badge).
+  - Bảng chọn gói tại `/premium`.
+
+### 13.2. Nâng cấp khối chọn gói và hiệu ứng Smoke Aura (`/premium`)
+- Thêm các phần tử hiệu ứng khói mờ bồng bềnh (`.premium-smoke-glow--top`, `.premium-smoke-glow--bottom`, `.premium-smoke-glow--center`) bên trong panel `.premium-selector-panel`.
+- Khói mờ tự động chuyển đổi màu tương ứng với gói được chọn:
+  - Gói Plus: Khói xanh ngọc / cyan huyền ảo (`rgba(6, 182, 212, 0.25)`).
+  - Gói Prime: Khói vàng hoàng kim / amber uy nghi (`rgba(245, 158, 11, 0.3)`).
+- Tự động nhận diện trạng thái hội viên hiện tại: Nếu đang có gói Prime, mặc định chọn Prime; nếu đang có gói Plus, mặc định chọn Plus. Người dùng chưa mua gói có thể bấm qua lại giữa 2 gói để xem trước hiệu ứng động mượt mà.
+
+### 13.3. Thiết kế lại giao diện thanh toán gọn gàng (`/premium/checkout`)
+- Loại bỏ sự chật chội và form thẻ cồng kềnh mặc định: Thay thế bằng **Bộ chọn phương thức thanh toán (Payment Method Selector)** dạng thẻ radio cao cấp:
+  1. **PayPal Sandbox (Cổng chính — Mặc định):** Hiển thị khối tóm tắt an toàn, nút thanh toán chính *"Thanh toán với PayPal"* (chuyển sang trang PayPal Checkout) và nút phụ *"Mô phỏng duyệt Sandbox tức thì"* cho môi trường kiểm thử nội bộ.
+  2. **Nhập thẻ thử nghiệm (Mô phỏng trình duyệt):** Khi người dùng nhấp chọn, khung nhập thẻ thử nghiệm mở rộng trơn tru (accordion animation). Form thẻ được tối ưu gọn gàng, có nút mẫu tự điền 1-click `4242 · 12/28 · 123`.
+
+### 13.4. Tích hợp PayPal Sandbox luồng thật & An toàn thông tin
+- Nạp bộ thông tin Sandbox Merchant từ tệp cấu hình của Owner vào `backend/.env` (được bảo vệ tuyệt đối trong `.gitignore`, không bao giờ commit hay làm lộ secret/mật khẩu).
+- Cập nhật backend `backend/app/premium.py` truyền `return_url = http://localhost:5173/premium/checkout?order={order_code}` và `cancel_url` chính xác tới PayPal Orders v2 API.
+- Cập nhật máy chủ `scratch/preview_proxy.cjs` gọi trực tiếp API PayPal Sandbox (`https://api-m.sandbox.paypal.com`) để sinh đơn hàng thật, lấy `approve_url` và hỗ trợ capture đơn an toàn.
+
+### 13.5. Kết quả Kiểm thử & Nghiệm thu Kỹ thuật
+1. **Frontend Unit Tests:**
+   ```powershell
+   node --test frontend/tests/*.test.mjs
+   ```
+   - **Kết quả:** 62/62 passed (1.08s).
+2. **Frontend Production Build:**
+   ```powershell
+   cd frontend
+   npm.cmd run build
+   ```
+   - **Kết quả:** Vite v7.3.8 build hoàn tất 0 lỗi (3.89s).
+3. **Backend Unit & PayPal Pytest:**
+   ```powershell
+   cd backend
+   pytest -m "not integration" -q
+   pytest tests/test_paypal_sandbox.py -q
+   ```
+   - **Kết quả:** 447 passed (unit) + 4 passed (PayPal sandbox), 0 failed.
+4. **Playwright E2E Browser Suites:**
+   ```powershell
+   cd frontend
+   npx.cmd playwright test --config=../.github/playwright.auth.config.mjs auth-tests/premium-sandbox.spec.js --workers=1
+   npx.cmd playwright test --config=../.github/playwright.auth.config.mjs auth-tests/rank-api.spec.js auth-tests/aura-api.spec.js auth-tests/profile-fidelity.spec.js auth-tests/profile-contact.spec.js auth-tests/social-api.spec.js --workers=1 --retries=0
+   ```
+   - **Kết quả:** 12/12 passed (`premium-sandbox.spec.js`) + 64/64 passed (Core regression suites) = **76/76 tests passed (100%)**.
+
+### 13.6. Danh sách Artifact hình ảnh kiểm chứng (Fresh Artifacts)
+- [task5_identity_home_plus.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_home_plus.png): Home với Aura Plus xanh ngọc và biểu tượng `workspace_premium`.
+- [task5_identity_profile_plus.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_profile_plus.png): Profile với Aura Plus xanh ngọc, avatar glow xanh và badge `workspace_premium`.
+- [task5_identity_premium_plus.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_premium_plus.png): Trang `/premium` với selector panel Plus và hiệu ứng smoke xanh ngọc.
+- [task5_identity_home_prime.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_home_prime.png): Home với Aura Prime vàng hoàng kim và biểu tượng `diamond`.
+- [task5_identity_profile_prime.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_profile_prime.png): Profile với Aura Prime vàng hoàng kim, avatar glow vàng và badge `diamond`.
+- [task5_identity_premium_prime.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_premium_prime.png): Trang `/premium` với selector panel Prime và hiệu ứng smoke vàng hoàng kim.
+- [task5_checkout_method_selector_paypal.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_method_selector_paypal.png): Trang checkout với bộ chọn phương thức thanh toán, mặc định PayPal Sandbox.
+- [task5_checkout_method_selector_card.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_method_selector_card.png): Trang checkout khi chọn Nhập thẻ thử nghiệm, form thẻ mở rộng mượt mà.
+- [task5_checkout_paypal_receipt.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_paypal_receipt.png): Biên nhận kích hoạt gói hội viên thành công sau khi capture PayPal.
