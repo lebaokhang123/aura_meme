@@ -617,4 +617,36 @@ Thực hiện chuẩn xác yêu cầu của Owner về bản sắc nhận diện
 - [task5_identity_premium_prime.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_identity_premium_prime.png): Trang `/premium` với selector panel Prime và hiệu ứng smoke vàng hoàng kim.
 - [task5_checkout_method_selector_paypal.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_method_selector_paypal.png): Trang checkout với bộ chọn phương thức thanh toán, mặc định PayPal Sandbox.
 - [task5_checkout_method_selector_card.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_method_selector_card.png): Trang checkout khi chọn Nhập thẻ thử nghiệm, form thẻ mở rộng mượt mà.
-- [task5_checkout_paypal_receipt.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_paypal_receipt.png): Biên nhận kích hoạt gói hội viên thành công sau khi capture PayPal.
+- [task5_checkout_paypal_receipt.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_checkout_paypal_receipt.png): Biên nhận kích hoạt gói hội viên thành công sau khi capture PayPal kèm nút tải biên lai PDF.
+- [task5_admin_orders_tab.png](file:///C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa/task5_admin_orders_tab.png): Khu quản trị `/admin` Tab 3 "Giao dịch" hiển thị danh sách đơn hàng và trạng thái.
+
+---
+
+## 14. Vòng tinh chỉnh trải nghiệm thanh toán & nhận diện theo phản hồi Owner (Next Round)
+
+### 14.1. Mapping hiệu ứng nhận diện hội viên chuẩn hóa
+- **Aura Plus:** Xanh ngọc (`cyan/sky-blue`) + Icon huy hiệu (`workspace_premium`).
+- **Aura Prime:** Vàng hoàng kim (`gold/amber`) + Icon kim cương (`diamond`).
+- Giữ vững nhất quán trên toàn bộ Header, Profile, Perks card, Selector panel, và bài viết/bình luận.
+
+### 14.2. Tinh chỉnh trang thanh toán `/premium/checkout`
+- **Nút "Quay lại gói hội viên":** Thiết kế dạng pill gọn gàng, cân đối, không tràn hoặc lệch trên mobile và desktop.
+- **Ghi chú đơn hàng:** Chuẩn hóa text thành *"Hệ thống thanh toán thử nghiệm"*.
+- **Icon phương thức:** Sử dụng trực tiếp ảnh chuẩn `/assets/payment/paypal.png` và `/assets/payment/credit_card.png` sạch sẽ, không khung bao thô kệch.
+- **Hàng nút thanh toán PayPal (tỉ lệ 4:1):**
+  - Nút chính (chiếm 4 phần): *"Thanh toán ngay"* có logo PayPal.
+  - Nút phụ mô phỏng tức thì (chiếm 1 phần): Icon tia sét (`bolt`), hỗ trợ cơ chế xác nhận 2 bước (hover tooltip "Duyệt thanh toán thử nghiệm PayPal tức thì", bấm lần 1 chuyển sang "Bấm lại lần nữa để xác nhận", bấm lần 2 mới thực hiện capture).
+
+### 14.3. Xuất biên lai PDF chuẩn SaaS (`jsPDF`)
+- Tạo module `frontend/src/receipt-pdf.js` xuất file PDF `aurameme-receipt-<order_code>.pdf` với độ phân giải cao.
+- Thiết kế chuẩn phong cách AuraMeme: Header cyberpunk, bảng thông tin đơn hàng, số tiền VNĐ/USD, mã giao dịch, thời hạn, watermark đã duyệt, ghi chú sandbox.
+- Bổ sung nút *"Biên lai: Tải về"* ngay trong hộp biên nhận thành công.
+
+### 14.4. Mã đơn hàng duy nhất, Lịch sử giao dịch & Tab 3 `/admin`
+- Định dạng mã đơn hàng duy nhất không trùng lặp: `AM-{TIER}-{TIMESTAMP}-{RANDOM}`.
+- Bổ sung endpoint backend `GET /api/v1/premium/orders` cho người dùng xem lịch sử đơn hàng.
+- Bổ sung endpoint `GET /api/v1/admin/orders` và Tab 3 *"Giao dịch"* trong mục *"Kiểm duyệt"* tại `/admin`.
+
+### 14.5. Hiển thị Halo Avatar hội viên tại Trang chủ (`/home`) và Khám phá (`/explore`)
+- Tích hợp `UserAvatar` vào ô soạn thảo bài viết (`Composer.jsx`) hiển thị viền và badge khi người dùng đăng nhập có gói Plus/Prime.
+- Tự động hiển thị viền/glow Plus/Prime trên avatar tác giả bài viết (`PostCard.jsx`) và bình luận (`CommentSection.jsx`) khi tác giả là hội viên hoạt động.
