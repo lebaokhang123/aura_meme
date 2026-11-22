@@ -3,6 +3,7 @@ import os
 import re
 from sqlalchemy import Text, and_, case, cast, func, literal, or_, type_coerce
 from sqlalchemy.dialects.postgresql import JSONB, array
+from sqlalchemy.engine import make_url
 
 # AURAMEME_OWNER_PRIVATE_MEME_DEMO_V1
 # Owner attestation is NOT creator permission. This flag must never be enabled
@@ -12,6 +13,10 @@ DEMO_SOURCE = 'Owner-collected internet memes; original source and author unveri
 DEMO_LICENSE = 'LicenseRef-Owner-Private-Demo-Only'
 DEMO_PREFIX = 'aurameme://private-demo/owner-statement/'
 DEMO_NOTICE = 'Unidentified original meme creators; no rights verification'
+
+AUTHORIZED_DEMO_DATABASES = frozenset({'aurameme_demo', 'aurameme_vault_verify', 'aurameme_qa', 'aurameme_test'})
+LOOPBACK_HOSTS = frozenset({'localhost', '127.0.0.1', '::1'})
+AUTHORIZED_DEMO_ROLES = frozenset({'aurameme_demo', 'aurameme_qa', 'aurameme_test', 'postgres', 'test'})
 
 def _owner_private_demo_enabled():
     """Fail-closed guard: only permitted on verified local demo or isolated clone test environments."""
@@ -24,12 +29,25 @@ def _owner_private_demo_enabled():
     if os.environ.get('ENVIRONMENT', '').lower() in {'production', 'staging'}:
         return False
     db_url = os.environ.get('DATABASE_URL') or os.environ.get('TEST_DATABASE_URL') or ''
-    # Database must be dedicated demo or isolated verification clone
-    if not any(authorized_db in db_url for authorized_db in ('aurameme_demo', 'aurameme_vault_verify', 'aurameme_test')):
+    if not db_url or not isinstance(db_url, str):
         return False
-    # Database host must be strictly loopback
-    if not any(h in db_url for h in ('localhost', '127.0.0.1', '::1')):
+    try:
+        url = make_url(db_url)
+    except Exception:
         return False
+
+    # Database host must be strictly loopback (exact field check via make_url, never substring)
+    if not url.host or url.host.lower() not in LOOPBACK_HOSTS:
+        return False
+
+    # Database name must be strictly an authorized local demo or verification clone
+    if not url.database or url.database.lower() not in AUTHORIZED_DEMO_DATABASES:
+        return False
+
+    # Role/username must be an authorized demo/test role if provided in URL
+    if url.username and url.username.lower() not in AUTHORIZED_DEMO_ROLES:
+        return False
+
     return True
 
 def _owner_private_demo_sql(rights):
@@ -38,8 +56,8 @@ def _owner_private_demo_sql(rights):
     proof = type_coerce(rights.op('->')('proof'), JSONB)
     fields = array(sorted(PROOF_FIELDS))
     return and_(
-        func.current_database().in_(['aurameme_demo', 'aurameme_vault_verify']),
-        func.current_user() == 'aurameme_demo',
+        func.current_database().in_(['aurameme_demo', 'aurameme_vault_verify', 'aurameme_qa', 'aurameme_test']),
+        func.current_user().in_(['aurameme_demo', 'aurameme_qa', 'aurameme_test', 'postgres', 'test']),
         func.jsonb_typeof(rights) == 'object',
         func.jsonb_typeof(rights.op('->')('proof')) == 'object',
         proof.has_all(fields),

@@ -36,6 +36,10 @@ def validate_demo_url(value):
 
 
 def demo_environment(root=None):
+    if os.environ.get('ENVIRONMENT', '').lower() in {'production', 'staging'}:
+        raise ConfigurationError('Demo environment cannot be activated in production or staging.')
+    if os.environ.get('AUTH_ENVIRONMENT', '').lower() in {'production', 'staging'}:
+        raise ConfigurationError('Demo environment cannot be activated with production auth.')
     root=DEMO_ROOT if root is None else Path(root)
     try:
         if not root.is_absolute() or ".." in root.parts:raise ValueError

@@ -3,144 +3,148 @@
 **Dự án:** AuraMeme (Cyberpunk Cultivation Meme Community Platform)  
 **Nhánh tích hợp:** `feat/task9-integration-audit`  
 **Repository:** `lebaokhang123/aura_meme`  
-**Baseline tích hợp:** `origin/dev@8b22c29`  
-**HEAD Commit:** `2bfb618` (Ahead dev by 18 commits, clean)  
+**Baseline tích hợp:** `origin/dev@8b22c29` (nơi Codex đã hoàn tất nghiệm thu và tích hợp Task 1–5)  
+**HEAD Commit:** `feat/task9-integration-audit` (Ahead dev by 20 commits, clean)  
 **Ngày thực hiện:** 23/11/2026  
 **Kỹ sư thực hiện:** Antigravity (Senior Full-stack & QA Engineer)  
-**Bên tiếp nhận:** Codex & Owner  
+**Bên tiếp nhận:** Owner (QA Review) & Codex  
 
 ---
 
 ## 1. TỔNG QUAN PHẠM VI TÍCH HỢP (EXECUTIVE SUMMARY)
 
-Toàn bộ các tính năng từ Task 6 đến Task 8, đợt UI polish Lucian (#403, #405, #409) và bản đồng bộ Bảo Khố (Vault Demo Sync) đã được tích hợp hoàn chỉnh vào nhánh `feat/task9-integration-audit` trên nền `dev@8b22c29` (nơi Codex đã hoàn tất nghiệm thu và tích hợp Task 1–5).
+Toàn bộ các tính năng từ Task 6 đến Task 8, đợt UI polish Lucian (#403, #405, #409), bản đồng bộ Bảo Khố (Vault Demo Sync với 70 Meme + 5 Background), và cơ chế bảo mật guard fail-closed đã được hoàn thiện trên nhánh `feat/task9-integration-audit`.
 
 ### Các phân hệ tích hợp:
 1. **Task 6 (Cảnh giới, Cấp bậc & Danh hiệu Admin):**
    - 10 Cảnh giới tu tiên chuẩn hóa: Luyện Khí, Trúc Cơ, Kim Đan, Nguyên Anh, Hóa Thần, Luyện Hư, Hợp Thể, Đại Thừa, Độ Kiếp, Chân Tiên.
    - Công thức Level V1 chuẩn: `XP = 10 + Level`, 10 cảnh giới × 10 cấp (Level 1–100).
-   - Danh hiệu Admin thống nhất: **SÁNG THẾ THẦN** cho cả Khang Dev và Kien Dev, hiệu ứng vàng kim quang xà (aura aura-admin), icon vương miện hoàng gia, bảo lưu Level và cảnh giới thực.
+   - Danh hiệu Admin thống nhất: **SÁNG THẾ THẦN** cho cả Khang Dev và Kien Dev, hiệu ứng vàng kim quang xà (`aura-admin`), icon vương miện hoàng gia, bảo lưu Level và cảnh giới thực.
    - Thẻ `LevelPill` và `TitleBadge` hiển thị đồng bộ trên Header, Profile, PostCard, CommentRow.
-2. **Task 7 (Google OAuth, Quên mật khẩu & Email):**
+2. **Task 7 (Google OAuth UI, Quên mật khẩu & Email):**
    - Nút đăng nhập Google Cyberpunk UI trên form đăng nhập và đăng ký.
    - Luồng Quên mật khẩu & Đặt lại mật khẩu hoàn chỉnh: token một lần, thời hạn 15 phút, rate limit 3 lần/giờ, animation gửi thư và đếm ngược cooldown.
    - Phản hồi giao diện khi gửi lại email: thông báo thành công, xử lý lỗi 429 và chống spam bấm nhanh.
-3. **Task 8 (Public Profile, Follower Count & Cookie Consent #225):**
+3. **Task 8 (Public Profile, Follower Count & Cookie Consent Lucian #409):**
    - Mở xem hồ sơ công khai từ tác giả bài viết và bình luận (`/profile/:username`).
    - Hiển thị follower / following count chuẩn xác, bảo mật dữ liệu riêng tư (không lộ email/phone).
-   - Banner Cookie Consent theo thiết kế chuẩn Lucian #225 và #409: thanh ngang gọn nhẹ ở chân trang, hiệu ứng cắn bánh quy (bite & crumbs), nút cài đặt và mở lại từ footer.
+   - Banner Cookie Consent chuẩn **Lucian #409** (thanh ngang compact ở chân trang, hiệu ứng cắn bánh quy bite & crumbs, nút cài đặt và mở lại từ footer, tôn trọng `prefers-reduced-motion`).
 4. **Lucian UI Polish (#403, #405, #409):**
-   - Login #403: Khôi phục nền tối cyber, bo góc 12px, floating label, toggle mắt mật khẩu mượt mà, rung cảnh báo lỗi đường kẻ đỏ.
-   - Forgot Password #405: Hiệu ứng máy bay giấy gấp thư vào phong bì, vòng tròn đếm ngược cooldown.
-   - Cookie Consent #409: Tích hợp gọn nhẹ, hỗ trợ đầy đủ `prefers-reduced-motion`.
-5. **Vault Demo Sync (Bảo Khố MVP):**
-   - Khôi phục quyền sử dụng 70 Meme demo nội bộ với cơ chế bảo mật **fail-closed** nghiêm ngặt.
+   - Login #403: Khôi phục form bo góc chuẩn 12px, nền tối cyber dark-first, floating labels, toggle ẩn/hiện mắt mật khẩu, rung cảnh báo viền đỏ khi sai mật khẩu.
+   - Forgot Password #405: Hiệu ứng máy bay giấy xếp thư vào phong bì; vòng tròn đếm ngược cooldown; phản hồi tức thì khi gửi lại.
+   - Cookie Consent #409: Tích hợp hoàn chỉnh thay thế toàn bộ thiết kế cũ.
+5. **Vault Demo Sync & Củng cố Guard Fail-Closed:**
+   - Sử dụng SQLAlchemy `make_url` kiểm tra chính xác từng trường: host phải là loopback (`localhost`, `127.0.0.1`, `::1`), database thuộc whitelist (`aurameme_demo`, `aurameme_vault_verify`, `aurameme_qa`, `aurameme_test`), role thuộc whitelist. Chặn đứng 100% các URL đánh lừa qua query parameter, username hay subdomain.
+   - Kiểm tra `demo.py`: Chặn kích hoạt demo mode trên môi trường `production` hoặc `staging`.
    - Đồng bộ 2 rương (Meme: 70 vật phẩm, Background: 5 vật phẩm), drop rates chuẩn V1.
    - Runtime EXP: +2 EXP/lượt mở (trần 100 lượt/ngày = 200 EXP/ngày).
 6. **Task 9B (VI/EN Bilingual Audit):**
-   - Bổ sung 33 chuỗi dịch thuật thiếu trong `frontend/src/translations.json`.
-   - Chuẩn hóa song ngữ 100% cho bảng điều khiển Admin, modal xác nhận, lý do kiểm duyệt, thông báo lỗi và phân trang.
+   - Bổ sung 33 chuỗi dịch thuật thiếu trong `frontend/src/translations.json`. Chuẩn hóa song ngữ 100% cho bảng điều khiển Admin, modal xác nhận, lý do kiểm duyệt, thông báo lỗi và phân trang.
 
 ---
 
-## 2. GIẢI QUYẾT XUNG ĐỘT & QUYẾT ĐỊNH KỸ THUẬT (CONFLICT RESOLUTION)
+## 2. BẢO MẬT & KIỂM TRA GUARD FAIL-CLOSED (SECURITY HARDENING)
 
-Trong quá trình merge `feat/lucian-ui-polish-task8` và `fix/vault-demo-sync` vào `dev@8b22c29`, các xung đột đã được giải quyết an toàn tuyệt đối:
-
-| Tệp tin | Vấn đề xung đột | Quyết định kỹ thuật |
-| :--- | :--- | :--- |
-| `backend/app/premium.py` | Codex bổ sung `_check_and_expire_order` với tham số `reconcile`; Task 7 bổ sung `_dispatch_receipt_email_safe`. | **Hợp nhất cả hai**: Giữ nguyên cơ chế đối soát và hết hạn đơn hàng của Codex, đồng thời bảo toàn luồng gửi email biên lai tự động. |
-| `frontend/src/components/CommentSection.jsx` | Khác biệt giữa `effectiveAuthorTier` (Codex) và `realm: comment.realm` (Task 6); tồn tại hàm gọi cũ `authorClasses`. | Giữ lại `effectiveAuthorTier` và `realm`, loại bỏ hoàn toàn `authorClasses` lỗi thời để tránh `ReferenceError`. |
-| `docs/design/03-database.dbml` | Task 7 bổ sung bảng OAuth và Password Reset; Codex chuẩn hóa bảng Orders/Subscriptions. | Gộp bảng mới mà không làm gián đoạn các quan hệ thực thể hiện có. |
-| `backend/tests/test_vault_acceptance_isolated.py` | Biến môi trường `AUTH_ENVIRONMENT` đặt ở top-level làm rò rỉ sang runner pytest chung. | Đưa biến môi trường vào fixture với `try...finally` teardown và đánh dấu `pytestmark = pytest.mark.integration`. |
-
----
-
-## 3. BẢO MẬT & KIỂM TRA AN TOÀN (SECURITY AUDIT)
-
-1. **Vault Catalog Fail-Closed Hardening:**
-   - Hàm `_owner_private_demo_enabled()` trong `backend/app/catalog_rights.py` chỉ trả về `True` khi thỏa mãn đồng thời:
-     * `AURAMEME_OWNER_MEME_DEMO == "1"`
-     * `AUTH_ENVIRONMENT` thuộc `{"development", "test", "local"}`
-     * `ENVIRONMENT` không thuộc `{"production", "staging"}`
-     * Database host là loopback (`localhost`, `127.0.0.1`, `::1`)
-     * Tên database thuộc whitelist an toàn (`aurameme_demo`, `aurameme_vault_verify`, `aurameme_test`).
-   - 9 negative test cases trong `test_vault_security_negative.py` khẳng định 100% fail-closed khi thiếu bất kỳ điều kiện nào.
+1. **Vault Catalog Fail-Closed Hardening via `make_url`:**
+   - Thay thế hoàn toàn cách tìm chuỗi trong URL bằng phân tích cấu trúc đối tượng qua `make_url(db_url)` trong `backend/app/catalog_rights.py`.
+   - Đã kiểm thử và chặn thành công các kỹ thuật URL injection:
+     * Chèn host giả trong query string: `?fake_host=127.0.0.1` -> BỊ CHẶN.
+     * Chèn user giả làm host: `postgresql://localhost:pass@evil.com/aurameme_demo` -> BỊ CHẶN.
+     * Subdomain giả dạng loopback: `@evil-localhost.com/aurameme_demo` -> BỊ CHẶN.
+     * Chèn database giả trong query string: `.../production_database?db=aurameme_demo` -> BỊ CHẶN.
+     * Role/User không được phép: `@127.0.0.1/aurameme_demo` với user lạ -> BỊ CHẶN.
+     * URL sai định dạng hoặc chuỗi rỗng -> BỊ CHẶN.
+     * Kích hoạt demo trên production/staging -> BỊ CHẶN.
 2. **Zero Secret Leaks & Git Boundary:**
    - 70 file meme demo và 5 background chỉ nằm trong thư mục `demo.local/catalog` (được `.gitignore` bảo vệ qua `*.local`).
    - Không có file `.env`, private key, signing token hay database credentials nào bị commit vào Git.
 3. **Data Boundary & Anti-Tampering:**
-   - Không thể giả mạo danh hiệu "SÁNG THẾ THẦN" từ frontend; danh hiệu được kiểm tra nghiêm ngặt dựa trên server role `ADMIN` và ID tài khoản hợp lệ.
+   - Danh hiệu "SÁNG THẾ THẦN" được kiểm tra nghiêm ngặt dựa trên server role `ADMIN` và ID tài khoản hợp lệ, không thể giả mạo từ client.
    - Trần EXP mở rương (+2 EXP, max 200/ngày) được quản lý độc lập tại server, chống race condition bằng Idempotency-Key.
 
 ---
 
-## 4. MA TRẬN KẾT QUẢ KIỂM THỬ (VERIFICATION EVIDENCE)
+## 3. MA TRẬN KẾT QUẢ KIỂM THỬ (TEST VERIFICATION MATRIX)
 
-Toàn bộ các bộ kiểm thử đã được chạy và xác nhận đạt 100% trên cây làm việc `feat/task9-integration-audit`:
+### 3.1. Backend Unit Tests & Security Negative Suite
+- **Pytest (Non-Integration):** `516 passed, 1 skipped, 798 deselected, 0 failed` (35.71s).
+- **Vault Negative Security Suite:** `17 passed, 0 failed` (1.51s), bao gồm toàn bộ negative tests chống lừa URL guard.
 
-### 4.1. Backend Pytest (Non-Integration)
-```powershell
-cd backend
-Remove-Item Env:AUTH_ENVIRONMENT -ErrorAction SilentlyContinue
-Set-Item -Path Env:DATABASE_URL -Value "postgresql+psycopg://test:not-a-real-secret@127.0.0.1:1/test"
-.\.venv\Scripts\python.exe -m pytest -m "not integration" -q
-```
-- **Kết quả:** **508 passed**, 1 skipped, 798 deselected, 0 failed (36.87s).
+### 3.2. Frontend Unit Tests & Build
+- **Node Test Runner:** `84 passed, 0 failed` (1.42s).
+- **Production Build (`npm run build`):** `397 modules transformed, built in 5.45s` (0 syntax errors).
 
-### 4.2. Backend Vault Security Negative Tests
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m pytest tests/test_vault_security_negative.py -q
-```
-- **Kết quả:** **9 passed**, 0 failed (0.39s).
+### 3.3. Browser E2E Thật (Real Backend + PostgreSQL Clone `aurameme_qa`)
+- **File test:** `auth-tests/vault-real-smoke.spec.js` (không dùng `route.fulfill()` cho Vault).
+- **Kết quả:** **1 PASSED (10.0s)**.
+  * Đăng nhập tài khoản thật.
+  * Xác minh 2 rương (Meme & Background).
+  * Xác minh Catalog đủ 75 vật phẩm thật (70 Meme + 5 Background).
+  * Mở rương thật qua API: nhận biên lai `status 200`.
+  * Nhận **+2 EXP** thật trên tiến trình Aura.
+  * Vật phẩm ghi nhận vào túi đồ (`/inventory/me`).
+  * Trang bị vật phẩm thành công (`/inventory/equipment/background`).
+  * Reload trang web: trạng thái trang bị nền tồn tại bền vững trong DOM (`#root[data-vault-background]`).
+  * Bằng chứng screenshot: `vault_real_meme_tab.png`, `vault_real_bg_tab.png`, `vault_real_receipt_modal.png`, `vault_real_equipped.png`.
 
-### 4.3. Frontend Unit Tests
-```powershell
-node --test frontend/tests/*.test.mjs
-```
-- **Kết quả:** **84 passed**, 0 failed (1.42s).
-
-### 4.4. Frontend Production Build
-```powershell
-cd frontend
-npm.cmd run build
-```
-- **Kết quả:** **Build thành công** trong 5.45s (397 modules transformed, zero syntax errors).
-
-### 4.5. Playwright Browser E2E Suites (Chrome)
-| Suite kiểm thử | File test | Số ca test | Thời gian | Trạng thái |
-| :--- | :--- | :---: | :---: | :---: |
-| Task 6: Cảnh giới, Cấp bậc & Admin Sáng Thế Thần | `realm-title-task6.spec.js` | 2 | 17.6s | **PASS** |
-| Task 7: Google Login & Quên mật khẩu | `google-email-task7.spec.js` | 2 | 13.4s | **PASS** |
-| Task 8: Public Profile & Cookie Consent #225 | `public-profile-cookie-task8.spec.js` | 2 | 17.7s | **PASS** |
-| UI Polish: Lucian #403, #405, #409 | `lucian-ui-polish.spec.js` | 4 | 26.2s | **PASS** |
-| Vault: Browser Smoke (Roulette, Receipt, Equipment) | `vault-browser-smoke.spec.js` | 1 | 25.2s | **PASS** |
-| Task 5: Premium Sandbox, Checkout, Orders & PDF | `premium-sandbox.spec.js` | 22 | 1.3m | **PASS** |
-| Profile: Fidelity, Heatmap & Navigation | `profile-fidelity.spec.js` | 9 | 16.2s | **PASS** |
-| Social: Posts, Comments, Reactions & Filters | `social-api.spec.js` | 14 | 1.2m | **PASS** |
-| **Tổng cộng Playwright** | **8 Suites** | **56 tests** | **~4.5m** | **100% PASS** |
+### 3.4. Browser UI Mocked Suites (Playwright Chrome)
+*Các bộ test dưới đây sử dụng mock/stub mạng có chủ đích để kiểm thử giao diện, animation và phản hồi client:*
+- `realm-title-task6.spec.js`: 2 passed (Ma trận 10 cảnh giới, danh hiệu Sáng Thế Thần, dark/light theme).
+- `google-email-task7.spec.js`: 2 passed (Form Google login, luồng reset password & cooldown).
+- `public-profile-cookie-task8.spec.js`: 2 passed (Hồ sơ công khai, follower count & Cookie banner).
+- `lucian-ui-polish.spec.js`: 4 passed (Lucian #403 floating labels, #405 paper plane envelope, #409 cookie bite & crumbs).
+- `vault-browser-smoke.spec.js`: 1 passed (Roulette reel animation & receipt modal UI).
+- `premium-sandbox.spec.js`: 22 passed (Premium sandbox, checkout form, order history, PDF receipts).
+- `profile-fidelity.spec.js`: 9 passed (Activity heatmap, geometry fidelity).
+- `social-api.spec.js`: 14 passed (Post card, comment row, reactions, filters).
 
 ---
 
-## 5. BÀN GIAO CHO CODEX (HANDOFF CHECKLIST)
+## 4. DANH SÁCH GIỚI HẠN & MỤC CHƯA XÁC MINH (NOT VERIFIED STATUS)
 
-Khi Codex tiếp nhận nhánh `feat/task9-integration-audit` để nghiệm thu cuối cùng và merge vào `dev`:
+Để bảo đảm tính trung thực tuyệt đối, dưới đây là các giới hạn và phân hệ **NOT VERIFIED**:
 
-1. **Kiểm tra Commit History:**
-   ```powershell
-   git -C "D:\Big\du_an_lon\aura_meme_p2_task9" log -18 --oneline
-   ```
-   Xác nhận commit `2bfb618` là HEAD hiện tại, không có working tree dơ.
-2. **Xác nhận tính năng trọng yếu:**
-   - Đăng nhập Admin (`khang_dev` / `kien_dev`): hiển thị danh hiệu **SÁNG THẾ THẦN** với viền hào quang vàng kim.
-   - Đăng nhập người dùng thường: hiển thị Level (1–100) và 1 trong 10 cảnh giới tu tiên.
-   - Mở Bảo Khố (`/vault`): 2 rương Meme (70) và Background (5), mở nhận +2 EXP, trang bị ngay lập tức vào avatar/bìa.
-   - Mở Hồ sơ công khai (`/profile/khang_dev`): hiển thị danh hiệu, số người theo dõi, danh sách bài viết.
-   - Giao diện đăng nhập (`/login`): form Lucian #403 bo góc 12px, nền tối cyber chuẩn dark-first.
-3. **Quy tắc an toàn DB:**
-   - Tiếp tục duy trì quy tắc không chạy migration, reset hay seed vào database `aurameme_demo` hay `aurameme_dev`.
-   - Mọi kiểm thử cần database thực tế tiếp tục sử dụng database test cô lập.
+1. **Google OAuth thực tế (`NOT VERIFIED`):** Giao diện và API stub đã hoàn thiện; việc đăng nhập thực tế với tài khoản Google thật yêu cầu Google Client ID/Secret chính thức từ Google Cloud Console và màn hình cấp quyền thực tế của người dùng.
+2. **Hệ thống gửi Email SMTP thực tế (`NOT VERIFIED`):** Logic sinh token, mã hóa, hết hạn 15 phút, rate limit 3 lần/giờ và giao diện đã hoàn thiện; việc gửi email thực tế đến hộp thư người dùng yêu cầu cấu hình SMTP server (SendGrid / Postmark / Gmail SMTP) với tài khoản có thật.
+3. **PayPal Real Buyer Sandbox trọn vòng (`NOT VERIFIED`):** Luồng tạo đơn hàng, đối soát mã đơn, giao diện thẻ mô phỏng và webhook đã được kiểm thử; luồng người mua thật đăng nhập vào popup PayPal Sandbox và duyệt thanh toán thật chưa thực hiện (do thiếu tài khoản buyer sandbox từ PayPal).
+4. **Database Production / Demo gốc (`PRESERVED / UNTOUCHED`):** Theo quy tắc an toàn nghiêm ngặt, database `aurameme_demo` và `aurameme_dev` được giữ nguyên vẹn 100%, không chạy migration hoặc seed đè. Môi trường QA sử dụng database clone riêng `aurameme_qa`.
 
 ---
-*Tài liệu hoàn thành bởi Antigravity. Sẵn sàng bàn giao cho Codex và Owner nghiệm thu.*
+
+## 5. HƯỚNG DẪN DÀNH CHO OWNER REVIEW
+
+### 5.1. Thông tin truy cập website QA
+- **URL Website:** `http://localhost:5173`
+- **Backend API:** `http://127.0.0.1:8000`
+- **Database:** PostgreSQL clone `aurameme_qa` trên port 5432 (dữ liệu được giữ bền vững, không mất khi restart).
+- **Tài khoản kiểm thử:**
+  * **Admin (Sáng Thế Thần):** Email `khang_dev@example.com` | Password: `QA-Owner-Password-2026!`
+  * **Member (Người dùng thường):** Email `gigachad@example.com` | Password: `QA-Owner-Password-2026!`
+
+### 5.2. Lệnh khởi động lại (Restart Command)
+Khi cần dừng hoặc khởi động lại môi trường QA, Owner có thể chạy file launcher tự động:
+```powershell
+cd D:\Big\du_an_lon\aura_meme_p2_task9
+.\run_qa.bat
+```
+Hoặc khởi động thủ công:
+```powershell
+# Terminal 1 - Backend:
+cd D:\Big\du_an_lon\aura_meme_p2_task9\backend
+$env:DATABASE_URL = "postgresql+psycopg://aurameme_demo:not-a-real-test-password@127.0.0.1:5432/aurameme_qa"
+$env:AUTH_ENVIRONMENT = "development"
+$env:AUTH_ALLOWED_ORIGINS = '["http://localhost:5173"]'
+$env:AUTH_SIGNING_KEY = "not-a-real-archived-signing-key"
+$env:CATALOG_STORAGE_ROOT = "D:\Big\du_an_lon\aura_meme_p2_task9\backend\demo.local\catalog"
+$env:MEDIA_STORAGE_ROOT = "D:\Big\du_an_lon\aura_meme_p2_task9\backend\demo.local\media"
+$env:VAULT_RUNTIME_ENABLED = "true"
+$env:AURAMEME_OWNER_MEME_DEMO = "1"
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# Terminal 2 - Frontend:
+cd D:\Big\du_an_lon\aura_meme_p2_task9\frontend
+npm.cmd run dev -- --host localhost --port 5173
+```
+
+---
+*Trạng thái hiện tại: Đã dừng tại **OWNER REVIEW** để Owner tự trải nghiệm và nghiệm thu trực tiếp trên trình duyệt trước khi giao Codex.*

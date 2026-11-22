@@ -143,3 +143,68 @@ def test_mit_licensed_rights_always_valid_independent_of_demo_flag():
     os.environ.pop('AURAMEME_OWNER_MEME_DEMO', None)
     os.environ['AUTH_ENVIRONMENT'] = 'production'
     assert reviewed_source_rights(VALID_MIT_RIGHTS)
+
+
+def test_deceptive_query_host_rejected():
+    os.environ['AURAMEME_OWNER_MEME_DEMO'] = '1'
+    os.environ['AUTH_ENVIRONMENT'] = 'development'
+    os.environ['DATABASE_URL'] = 'postgresql+psycopg://aurameme_demo:pass@evil.com:5432/aurameme_demo?fake_host=127.0.0.1'
+    assert not _owner_private_demo_enabled()
+    assert not reviewed_source_rights(VALID_PRIVATE_DEMO_RIGHTS)
+
+
+def test_deceptive_user_host_rejected():
+    os.environ['AURAMEME_OWNER_MEME_DEMO'] = '1'
+    os.environ['AUTH_ENVIRONMENT'] = 'development'
+    os.environ['DATABASE_URL'] = 'postgresql+psycopg://localhost:pass@evil.com:5432/aurameme_demo'
+    assert not _owner_private_demo_enabled()
+    assert not reviewed_source_rights(VALID_PRIVATE_DEMO_RIGHTS)
+
+
+def test_deceptive_subdomain_host_rejected():
+    os.environ['AURAMEME_OWNER_MEME_DEMO'] = '1'
+    os.environ['AUTH_ENVIRONMENT'] = 'development'
+    os.environ['DATABASE_URL'] = 'postgresql+psycopg://aurameme_demo:pass@evil-localhost.com:5432/aurameme_demo'
+    assert not _owner_private_demo_enabled()
+    assert not reviewed_source_rights(VALID_PRIVATE_DEMO_RIGHTS)
+
+
+def test_deceptive_query_database_rejected():
+    os.environ['AURAMEME_OWNER_MEME_DEMO'] = '1'
+    os.environ['AUTH_ENVIRONMENT'] = 'development'
+    os.environ['DATABASE_URL'] = 'postgresql+psycopg://aurameme_demo:pass@127.0.0.1:5432/production_database?db=aurameme_demo'
+    assert not _owner_private_demo_enabled()
+    assert not reviewed_source_rights(VALID_PRIVATE_DEMO_RIGHTS)
+
+
+def test_unauthorized_role_in_url_rejected():
+    os.environ['AURAMEME_OWNER_MEME_DEMO'] = '1'
+    os.environ['AUTH_ENVIRONMENT'] = 'development'
+    os.environ['DATABASE_URL'] = 'postgresql+psycopg://attacker_role:pass@127.0.0.1:5432/aurameme_demo'
+    assert not _owner_private_demo_enabled()
+    assert not reviewed_source_rights(VALID_PRIVATE_DEMO_RIGHTS)
+
+
+def test_invalid_database_url_fails_closed():
+    os.environ['AURAMEME_OWNER_MEME_DEMO'] = '1'
+    os.environ['AUTH_ENVIRONMENT'] = 'development'
+    os.environ['DATABASE_URL'] = 'not-a-valid-database-url'
+    assert not _owner_private_demo_enabled()
+    assert not reviewed_source_rights(VALID_PRIVATE_DEMO_RIGHTS)
+
+
+def test_demo_environment_rejects_production():
+    from app.config import ConfigurationError
+    from app.demo import demo_environment
+    os.environ['ENVIRONMENT'] = 'production'
+    with pytest.raises(ConfigurationError, match='cannot be activated in production'):
+        demo_environment()
+
+
+def test_demo_environment_rejects_staging():
+    from app.config import ConfigurationError
+    from app.demo import demo_environment
+    os.environ['ENVIRONMENT'] = 'staging'
+    with pytest.raises(ConfigurationError, match='cannot be activated in production or staging'):
+        demo_environment()
+
