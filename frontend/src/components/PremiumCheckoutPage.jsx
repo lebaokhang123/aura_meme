@@ -563,17 +563,6 @@ export default function PremiumCheckoutPage() {
                       </span>
                       <span>{t('Tải PDF', 'Download PDF')}</span>
                     </button>
-                    <button
-                      type="button"
-                      className="checkout-btn-print-receipt"
-                      onClick={() => window.print()}
-                      title={t('In biên lai', 'Print Receipt')}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-                        print
-                      </span>
-                      <span>{t('In biên lai', 'Print')}</span>
-                    </button>
                   </div>
                 </div>
 
@@ -662,7 +651,7 @@ export default function PremiumCheckoutPage() {
                         height="28"
                       />
                       <div className="checkout-method-text">
-                        <h3>{t('Nhập thẻ thử nghiệm', 'Simulated Card Input')}</h3>
+                        <h3>{t('Nhập thẻ', 'Card Payment')}</h3>
                         <p>{t('Mô phỏng tức thì trên trình duyệt', 'Instant browser simulation')}</p>
                       </div>
                     </div>
@@ -755,11 +744,11 @@ export default function PremiumCheckoutPage() {
                     <span className="checkout-demo-pill-val">4242 · 12/28 · 123</span>
                   </div>
 
-                  {/* Nhóm 1: Thẻ thanh toán (Card Details) */}
+                  {/* Thẻ thanh toán (Card Details) */}
                   <div className="checkout-form-section">
                     <div className="checkout-form-section-title">
                       <span className="material-symbols-outlined" aria-hidden="true">credit_card</span>
-                      <span>{t('Nhóm 1 — Thẻ thanh toán', 'Group 1 — Card Details')}</span>
+                      <span>{t('Thẻ thanh toán', 'Card Details')}</span>
                     </div>
 
                     <div className="checkout-form-group">
@@ -843,11 +832,11 @@ export default function PremiumCheckoutPage() {
                     </div>
                   </div>
 
-                  {/* Nhóm 2: Thông tin thanh toán (Billing Information) */}
+                  {/* Thông tin thanh toán (Billing Information) */}
                   <div className="checkout-form-section">
                     <div className="checkout-form-section-title">
                       <span className="material-symbols-outlined" aria-hidden="true">badge</span>
-                      <span>{t('Nhóm 2 — Thông tin thanh toán', 'Group 2 — Billing Information')}</span>
+                      <span>{t('Thông tin thanh toán', 'Billing Information')}</span>
                     </div>
 
                     <div className="checkout-form-group">

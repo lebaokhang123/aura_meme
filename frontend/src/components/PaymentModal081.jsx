@@ -148,7 +148,7 @@ export default function PaymentModal081({
         {/* Discreet note */}
         <div className="u081-note">
           <span className="material-symbols-outlined" aria-hidden="true">info</span>
-          <span>{t('Hệ thống PayPal Sandbox — Không thu tiền thật', 'PayPal Sandbox — No real money charged')}</span>
+          <span>{t('Hệ thống thanh toán thử nghiệm', 'Sandbox payment system')}</span>
         </div>
 
         {/* Single Primary Action Button */}
