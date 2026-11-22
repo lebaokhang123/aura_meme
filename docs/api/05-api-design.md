@@ -1,5 +1,11 @@
 # AuraMeme — API Contract & Data Flow
 
+## Contract đã triển khai trên nhánh nghiệm thu Task 1–5
+
+OpenAPI đi kèm bổ sung thao tác notifications, admin announcements, đơn hội viên, webhook và tra cứu giao dịch. Hộp thư truy vấn theo session; bản master quản trị chỉ sửa qua route admin có RBAC và CSRF. Phát lại thông báo đã published trả 409. Dữ liệu hồ sơ công khai có membership_tier và có thể có level, realm, title. ProfilePatch giới hạn display_name 25 và bio 100 ký tự.
+
+Checkout tạo đơn, chọn phương thức rồi init/capture PayPal hoặc gửi hành động thẻ mô phỏng. Backend đọc giá theo gói, khóa đơn và chỉ cộng thời hạn một lần sau đối soát. GET chi tiết giới hạn chủ đơn hoặc ADMIN trong DB. Lịch sử cá nhân hỗ trợ page, limit, status, q và sắp theo ngày tạo rồi id giảm dần. PDF được tạo trong trình duyệt từ dữ liệu đã được phép đọc. PayPal Sandbox E2E qua người mua ở trạng thái NOT VERIFIED.
+
 **Milestone:** M0.5 · **Backend:** FastAPI modular monolith · **Data:** PostgreSQL · **Trạng thái:** thiết kế mục tiêu, chưa triển khai.
 
 **Tài liệu cùng mốc:** [`05-openapi.yaml`](./05-openapi.yaml) là **hợp đồng machine-readable**; [`05-data-flows.drawio`](./05-data-flows.drawio) là **sơ đồ luồng** 6 tab (đen trắng). File Markdown này mô tả ranh giới, quyền truy cập, bất biến dữ liệu và điều kiện nghiệm thu, không lặp chi tiết mọi schema.

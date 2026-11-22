@@ -1,5 +1,9 @@
 # AuraMeme — Task 2: Admin Workspace UX Refinement Engineering Handoff
 
+## Checkpoint kỹ thuật 22/11/2026
+
+Bộ test PostgreSQL kiểm draft chưa fan-out, publish một lần, publish lặp trả 409, withdraw cập nhật bản người nhận. Test browser kiểm composer, phân trang và nút thao tác. Screenshot mới ghi qua Playwright outputPath trong worktree.
+
 Tài liệu bàn giao kỹ thuật hoàn thành **Task 2: Tối ưu trải nghiệm trang quản trị `/admin` (Admin Workspace UX Refinement)** và đợt nghiệm thu **Task 2 Final Polish** theo đúng yêu cầu chỉ đạo của Owner, ChatGPT giám sát và Codex review cuối.
 
 ---

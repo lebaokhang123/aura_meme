@@ -1,5 +1,9 @@
 # AuraMeme — Notifications QA V1 Engineering Handoff
 
+## Checkpoint kỹ thuật 22/11/2026
+
+Đã kiểm trên PostgreSQL 17 việc tách hộp thư hai tài khoản, đánh dấu đã đọc và ẩn master. Mutation hộp thư chặn cả ID của bản quản trị. CI/test UI dùng transport giả lập để kiểm soát số request khi mở chuông.
+
 Tài liệu bàn giao kỹ thuật hoàn thiện hệ thống Thông báo (Notifications) và Kiểm duyệt (Moderation) theo yêu cầu QA của Owner.
 
 ---

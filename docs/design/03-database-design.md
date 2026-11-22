@@ -1,5 +1,13 @@
 # AuraMeme — Database Design & Data Dictionary
 
+## Schema nghiệm thu 0013–0014
+
+`0013_notifications` thêm hộp thư, hai FK người nhận/tác nhân và unique dedupe_key. Khi xóa người nhận thì xóa hộp thư liên quan. Khi xóa tác nhân thì đặt actor_id của thông báo (cột `actor_user_id`) về NULL.
+
+`0014_premium_sandbox` thêm `subscription_orders` với mã đơn unique và `user_subscriptions` với unique user_id. Giá USD lưu bằng cent nguyên, VND và thời hạn lưu theo đơn. Thời hạn mới tính từ thời điểm lớn hơn giữa hiện tại và ngày hết hạn cũ. Xem tên FK và quy tắc xóa trong DBML.
+
+Trên PostgreSQL 17 biệt lập đã chạy upgrade, downgrade và upgrade lại, kiểm metadata, constraint và rollback dữ liệu trong bộ migration. Downgrade của hai revision khóa bảng và từ chối schema có dữ liệu. Với môi trường có dữ liệu, cần phương án phục hồi từ bản sao đã xác minh hoặc migration tiến. Demo cần phê duyệt riêng.
+
 **Mốc:** M0.3 · **Cơ sở dữ liệu:** PostgreSQL · **Kiến trúc:** một database, bảy phân hệ logic.
 
 Tài liệu này quy định cấu trúc dữ liệu dự kiến của AuraMeme, đồng bộ với `03-erd-aurameme.drawio`. Mọi bảng đều có khai báo kiểu, khóa và quan hệ. Đây là **đặc tả thiết kế**, không phải bằng chứng rằng migration hoặc hệ thống đã được triển khai.

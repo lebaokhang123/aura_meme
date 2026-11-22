@@ -1,5 +1,13 @@
 # TÀI LIỆU BÀN GIAO KỸ THUẬT — TASK 5: PREMIUM SANDBOX & VNPAY ADAPTER (FINAL POLISH)
 
+## Checkpoint kỹ thuật 22/11/2026
+
+Baseline Task 5 682d247. GET đơn kiểm quyền ADMIN từ user_roles và roles. PayPal yêu cầu merchant khi đối soát, ID của provider gắn với đơn trước capture, webhook đối chiếu capture từ Orders. DB test xác nhận cùng một đơn mô phỏng xử lý hai lần chỉ cấp 30 ngày. PDF đọc số tiền và thời điểm từ đơn đã lưu. Luồng người mua PayPal Sandbox CREATED → APPROVED → CAPTURE COMPLETED → DB success → hội viên active vẫn NOT VERIFIED; smoke tạo order và các HTTP stub chỉ chứng minh từng phần.
+
+Bằng chứng tại commit `c277cdf` (sau `80c2c04`). 348 ca thuộc các module backend chịu ảnh hưởng qua trên PostgreSQL 17 cô lập, kể cả HTTP chủ đơn/người khác/admin và xóa bài có audit. Unit frontend 81/81 và build production qua. Playwright mock 142/149 lượt đầu, 7/7 qua sau sửa. Playwright cấu hình API dùng HTTP fixture 153/156 lượt cuối toàn bộ, 3 ca chạy lại hai lần đều qua. Một bộ chạy riêng checkout/profile qua 28/29 trước khi sửa selector ảnh đại diện. Các số này là những lượt độc lập. Smoke PayPal yêu cầu cấu hình sandbox của merchant và thao tác approve của người mua.
+
+Lượt cuối backend ở c277cdf có 1.244 pass, 12 skip, 4 ca migration demo được loại chủ động, 1 deprecation warning. Hai container PostgreSQL 17 tạm đã đóng. Sau bản sửa PDF 6ae923f, build và 81 unit frontend qua, toàn bộ 20 ca Playwright Premium qua. Đã xuất, render và đọc lại PDF tổng hợp một trang bằng pypdf. Dòng lịch sử cũng khớp số tiền, và đơn pending/failed/cancelled/expired không sinh biên lai. Mã đơn, chủ đơn, số tiền 5,25 USD và 139.000 VNĐ, ngày, phương thức thẻ và mã giao dịch khớp dữ liệu đầu vào, dù người đang xem là admin. Migration 0013 và 0014 từ chối downgrade có dữ liệu nghiệp vụ. Quyết định rollback trên môi trường khác cần bản sao lưu đã xác minh và kế hoạch khôi phục.
+
 **Mã Task:** TASK-5-PREMIUM-SANDBOX-FINAL  
 **Nhánh Git:** `feat/premium-sandbox-task5`  
 **Base Commit Kế thừa:** `75a2a98` (Task 5 ban đầu) kết hợp cherry-pick Task 4 (`c72f8b2`, `27a3b7a`)  

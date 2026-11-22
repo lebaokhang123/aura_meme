@@ -1,5 +1,13 @@
 # AuraMeme
 
+## Nghiệm thu Task 1–5 · 22/11/2026
+
+Bản nghiệm thu xuất phát từ Task 5 `682d247`. Baseline GitHub `dev` là `eacfa7d`. Tích hợp chờ Owner duyệt. Frontend React/Vite JSX, backend FastAPI và PostgreSQL.
+
+Người dùng có hộp thư cá nhân, trang chính sách VI/EN tại `/privacy.html`, cấp độ và chức danh công khai theo tác giả. Admin quản lý vòng đời thông báo. Premium Sandbox bán Plus 5 USD/30 ngày và Prime 50 USD/365 ngày, không tự gia hạn. Lịch sử và biên lai đọc dữ liệu đơn từ API. Bằng chứng thanh toán trọn vòng qua người mua PayPal Sandbox còn thiếu.
+
+Xem các tài liệu trong [docs/tasks](docs/tasks), [hợp đồng API](docs/api/05-api-design.md) và [thiết kế dữ liệu](docs/design/03-database-design.md).
+
 AuraMeme là đồ án web cộng đồng chia sẻ meme. Frontend chính hiện là bản Stitch React đã được Owner duyệt; Auth đã nối với FastAPI/PostgreSQL; Social/Blog đã nối API; Game Mechanics chưa tích hợp.
 
 ## Frontend hiện tại

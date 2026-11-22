@@ -109,3 +109,5 @@ Owner có Sửa/Xóa, Admin có Ẩn bài; comment moderation qua API admin có 
 Guest chỉ đọc, 401/CSRF/error phải hiển thị lỗi. My Meme/inventory và Aura/Level/Rank/Vault/Payment chưa bật.
 Ảnh <=5MiB,<=12triệu pixel/frame; GIF<=60frames,tổng<=40triệu pixel, server kiểm MIME/signature/ownership.
 Không copy các mật khẩu demo vào source, lệnh, test logs hoặc PR.
+
+Nghiệm thu Task 1–5: npm ci, npm run build, node --test tests/*.test.mjs. Tại frontend chạy npx playwright test --config=../.github/playwright.auth.config.mjs --workers=1 cho API stub. Bộ mock cần npm run build -- --mode mock trước khi chạy --config=../.github/playwright.config.mjs. Các báo cáo này không xác nhận giao dịch PayPal thật.

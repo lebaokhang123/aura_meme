@@ -1,5 +1,13 @@
 # AuraMeme — System Architecture
 
+## Thông báo, danh tính và Premium Sandbox · Task 1–5
+
+Thông báo social và bản ghi quản trị cùng transaction với hành động nguồn. Bản quản trị lưu trạng thái draft/published/withdrawn, bản phát có khóa duy nhất theo thông báo và người nhận. Session xác định hộp thư và backend kiểm quyền quản trị. Trang chính sách tĩnh hỗ trợ đường dẫn trực tiếp và nội dung tiếng Việt khi JavaScript tắt.
+
+Thông tin công khai của tác giả do backend chiếu từ hồ sơ, tiến trình và hội viên. Chức danh chỉ dùng để hiển thị. RBAC đọc bảng vai trò. Khi thiếu level hợp lệ, DTO bỏ level và chức danh. Rank giữ chính sách điểm earned hiện hành.
+
+Đơn Sandbox lưu giá và thời hạn lúc mua. Capture, webhook và đối soát đơn cũ dùng chung phép kiểm tra USD, merchant, tham chiếu đơn và capture COMPLETED. Khóa dòng đơn giữ hai callback của cùng đơn xử lý tuần tự. Callback webhook lấy thông tin Orders từ PayPal; xác minh không đủ thì dừng cấp quyền. Giao diện thẻ mô phỏng chỉ gửi hành động thanh toán và cần bật mô phỏng ngoài production. Không bật Live.
+
 **Milestone:** M0.4 · **Phạm vi:** Kiến trúc ứng dụng, môi trường local, triển khai AWS và vận hành.  
 **Sơ đồ:** [`04-system-architecture.drawio`](./04-system-architecture.drawio) (4 tab, đen trắng).  
 **Trạng thái:** Kiến trúc **mục tiêu được đưa ra để chủ dự án duyệt**; tài liệu không xác nhận rằng các thành phần đã triển khai.

@@ -1,5 +1,9 @@
 # AuraMeme — Task 3: Trang Chính sách Bảo mật (Privacy Policy V3 Final Polish) Engineering Handoff
 
+## Checkpoint kỹ thuật 22/11/2026
+
+Nghiệm thu đường dẫn trực tiếp, reload, VI/EN, theme, liên kết mục, bố cục mobile và fallback khi tắt JavaScript bằng Chromium. Nội dung Owner duyệt được giữ nguyên.
+
 Tài liệu bàn giao kỹ thuật hoàn thành **Task 3 Final: Privacy Policy V3 — Hoàn thiện nội dung và đồng bộ Footer** cho nền tảng AuraMeme, tuân thủ đúng yêu cầu chỉ đạo cuối cùng của Owner.
 
 > [!NOTE]

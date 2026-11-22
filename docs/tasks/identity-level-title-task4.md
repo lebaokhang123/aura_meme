@@ -1,5 +1,9 @@
 # AuraMeme — Task 4: Level, Chức Danh & UI Polish Engineering Handoff
 
+## Checkpoint kỹ thuật 22/11/2026
+
+Hai patch cuối 6e72143 và 72f2032 tương đương c72f8b2 và 27a3b7a trên Task 5. Chức danh công khai không tham gia kiểm quyền. Sửa thứ tự khởi tạo biến tác giả của bình luận để feed mock render được. Bộ Profile/Contact đã chạy đủ chín ca sau khi đổi phép đo form sang khoảng cách thực giữa các phần tử.
+
 Tài liệu bàn giao kỹ thuật hoàn thành **Task 4: Chuẩn hóa Level, Chức danh tác giả & Tinh chỉnh Giao diện** cho nền tảng AuraMeme theo chỉ đạo của Owner và ChatGPT.
 
 ---
