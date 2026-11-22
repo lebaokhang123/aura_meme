@@ -714,3 +714,59 @@ Thực hiện chuẩn xác yêu cầu của Owner về bản sắc nhận diện
   - **Playwright Premium E2E Suite (`premium-sandbox.spec.js`):** 17/17 passed (100%).
   - **Database aurameme_demo:** Giữ nguyên vẹn 100%, không migration, không reset, không chỉnh sửa dữ liệu.
 
+---
+
+## 16. Vòng tinh chỉnh cuối: Biên lai PDF tiếng Việt & Nội dung Checkout (Final Receipt & Checkout Content Polish)
+
+### 16.1. Chuẩn hóa nội dung giao diện thanh toán & Modal xác nhận (Phần A)
+- **Modal xác nhận (`PaymentModal081.jsx`):**
+  - Chuyển đổi dòng ghi chú sang chuẩn hoá: `Hệ thống thanh toán thử nghiệm` (Bản EN: `Sandbox payment system`).
+  - Giữ nguyên toàn bộ cấu trúc modal, nút bấm và căn giữa viewport đã được nghiệm thu.
+- **Phương thức thanh toán & form thẻ (`PremiumCheckoutPage.jsx`):**
+  - Nút phương thức thanh toán: `Nhập thẻ` (Bản EN: `Card Payment`).
+  - Tiêu đề nhóm thẻ: `Thẻ thanh toán` (Bản EN: `Card Details`).
+  - Tiêu đề nhóm thông tin: `Thông tin thanh toán` (Bản EN: `Billing Information`).
+  - Loại bỏ hoàn toàn các tiền tố rườm rà *"Nhóm 1 —"*, *"Nhóm 2 —"* theo yêu cầu Owner.
+
+### 16.2. Loại bỏ chức năng In toàn trang trình duyệt (Phần C)
+- Loại bỏ nút *"In biên lai"* (`.checkout-btn-print-receipt`) và sự kiện `window.print()` trong `PremiumCheckoutPage.jsx` vốn tạo ra file in nguyên trang checkout (`AuraMeme.pdf`) 2 trang không phù hợp làm chứng từ.
+- Dọn dẹp các CSS print thừa liên quan trong `payment-ring-081.css`.
+- Giữ vững duy nhất nút *"Tải PDF"* (`.checkout-btn-download-receipt`) để xuất file biên lai chuẩn SaaS A4 một trang.
+
+### 16.3. Tái cấu trúc toàn diện Biên lai PDF với Font Unicode tiếng Việt (Phần B)
+- **Nhúng font Unicode chính thức:**
+  - Tích hợp bộ font vector chính thức của Google: **Roboto Regular & Roboto Bold** (bản quyền mở **Apache 2.0**) trực tiếp vào `frontend/src/fonts/roboto-fonts.js`.
+  - Khắc phục triệt để 100% lỗi mất dấu tiếng Việt trên mọi ký tự `ă, â, ê, ô, ơ, ư, đ` và thanh điệu tiếng Việt.
+  - Văn bản trong file PDF hoàn toàn là vector text, cho phép bôi đen, tìm kiếm (`searchable`) và sao chép (`selectable`).
+  - Không tải font động qua CDN tại thời điểm người dùng bấm tải (hoạt động offline 100%).
+- **Cập nhật thông tin đơn vị phát hành (Issuer Details):**
+  - Đơn vị phát hành: **AuraSpark Global Inc.**
+  - Tên cộng đồng: **AuraMeme Community**
+  - Website: `https://aurameme.com`
+  - Email: `sammybkhang@gmail.com`
+  - Xóa bỏ triệt để các thông tin cũ: *AuraMeme Global Inc.*, *Cyberpunk Cultivation Meme Community*, *Cyberpunk Cultivation Platform*, *Sandbox Gateway Operations*, *support@aurameme.me*, *https://aurameme.me*.
+  - Không tự tiện đưa thông tin mã số thuế, địa chỉ pháp lý khi chưa có xác nhận từ Owner.
+- **Căn chỉnh bố cục bảng dịch vụ & Tỷ giá tham chiếu VNĐ:**
+  - Sửa dứt điểm lỗi dính cột thời hạn và số lượng (`30 days (30 ngay)1`): Phân tách thành các cột độc lập có tọa độ chuẩn: Cột Thời hạn (`X: 98`), Cột SL (`X: 135` center), Cột Đơn giá (`X: 160` right), Cột Thành tiền (`X: 187` right).
+  - Tỷ giá tham chiếu hiển thị đầy đủ `VNĐ` không bị cắt chữ: `Giá tham khảo: 130.000 VNĐ` (Aura Plus) và `Giá tham khảo: 1.250.000 VNĐ` (Aura Prime).
+  - Tự động đo độ rộng và căn lề an toàn (`margin right 190mm`), đảm bảo số tiền USD và VND không bao giờ bị tràn lề hay đè lên nhau.
+- **Lịch sử thanh toán tái sử dụng (Payment History Table):**
+  - Thiết kế bảng `LỊCH SỬ THANH TOÁN / PAYMENT HISTORY` dạng component đa cột chuẩn mực: Phương thức, Ngày, Số tiền, Trạng thái, Mã tham chiếu.
+  - Phân biệt rõ ràng mã đơn AuraMeme và mã giao dịch PayPal (PayPal Order ID / Capture ID), không dùng mã đơn AuraMeme thay thế cho mã PayPal.
+- **Loại bỏ thuế giả và con dấu giả:**
+  - Bỏ hoàn toàn các dòng `Tax (0%)`, `Miễn thuế`, `Official tax invoice`, `Verified receipt`.
+  - Giữ ghi chú minh bạch dưới chân trang: *Biên lai giao dịch thử nghiệm — Không phát sinh thanh toán tiền thật.*
+
+### 16.4. Tổng hợp Commit và Kiểm thử đợt Polish cuối
+- **Commits:**
+  1. `68346e1`: `fix(checkout): chuẩn hóa nội dung thanh toán và bỏ chức năng in toàn bộ trang`
+  2. `10fe123`: `fix(receipt): sửa font tiếng Việt và bố cục biên lai`
+  3. `docs(premium): cập nhật tài liệu nghiệm thu biên lai và nội dung checkout`
+- **Kết quả kiểm thử:**
+  - **Frontend Unit Tests:** 80/80 passed (100%).
+  - **Frontend Build (Vite 7):** Chunks build hoàn tất 0 lỗi.
+  - **Playwright Premium Suite:** 17/17 passed (100%).
+  - **Backend Tests:** 33/33 passed (100%).
+  - **PDF Verification:** Đạt chuẩn 1 trang A4, 100% font tiếng Việt có dấu, text selectable, layout cân đối.
+
+
