@@ -285,7 +285,7 @@ test('Logged in user can confirm order in modal, navigate to checkout, enter sim
   await expect(dialog.locator('#u081-title')).toContainText('Xác nhận đơn hàng — Aura Plus');
   await expect(dialog.locator('.u081-price-primary')).toContainText('130.000 VNĐ');
   expect(await dialog.locator('.u081-price-primary').innerText()).not.toMatch(/USD|\$/);
-  await expect(dialog.locator('.u081-note')).toContainText('PayPal Sandbox');
+  await expect(dialog.locator('.u081-note')).toContainText('Hệ thống thanh toán thử nghiệm');
 
   const box = await dialog.boundingBox();
   const viewport = page.viewportSize();
@@ -509,6 +509,7 @@ test('Order confirmation modal displays single currency and centers across VI/EN
   const dialog = page.locator('.u081-dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.u081-price-primary')).toContainText('$5 USD');
+  await expect(dialog.locator('.u081-note')).toContainText('Sandbox payment system');
   expect(await dialog.locator('.u081-price-primary').innerText()).not.toMatch(/VNĐ|đ/);
 
   // Check centering
@@ -531,6 +532,7 @@ test('Order confirmation modal displays single currency and centers across VI/EN
   await page.locator('.premium-prime').click();
   await page.locator('.u056-cta').click();
   await expect(dialog.locator('.u081-price-primary')).toContainText('1.250.000 VNĐ');
+  await expect(dialog.locator('.u081-note')).toContainText('Hệ thống thanh toán thử nghiệm');
   expect(await dialog.locator('.u081-price-primary').innerText()).not.toMatch(/USD|\$/);
   await dialog.locator('.u081-close-btn').click();
 });
@@ -786,9 +788,10 @@ test('Part C: Simulated card form is structured into 2 clean groups with complet
 
   // Switch to simulated card method
   await page.locator('.checkout-method-card[data-method="card"]').click();
+  await expect(page.locator('.checkout-method-card[data-method="card"] h3')).toHaveText('Nhập thẻ');
 
   // Verify Group 1: Thẻ thanh toán
-  const group1Title = page.locator('.checkout-form-section-title:has-text("Nhóm 1 — Thẻ thanh toán")');
+  const group1Title = page.locator('.checkout-form-section-title:has-text("Thẻ thanh toán")');
   await expect(group1Title).toBeVisible();
   await expect(page.locator('label[for="card-number"]')).toHaveText('Số thẻ');
   await expect(page.locator('#card-number')).toBeVisible();
@@ -796,7 +799,7 @@ test('Part C: Simulated card form is structured into 2 clean groups with complet
   await expect(page.locator('#card-cvv')).toBeVisible();
 
   // Verify Group 2: Thông tin thanh toán
-  const group2Title = page.locator('.checkout-form-section-title:has-text("Nhóm 2 — Thông tin thanh toán")');
+  const group2Title = page.locator('.checkout-form-section-title:has-text("Thông tin thanh toán")');
   await expect(group2Title).toBeVisible();
   await expect(page.locator('label[for="cardholder-name"]')).toHaveText('Tên trên thẻ');
   await expect(page.locator('#cardholder-name')).toBeVisible();
@@ -869,7 +872,7 @@ test('Part D: Security check rejects invalid order codes and enforces read-only 
   await expect(page.locator('.checkout-success-alert')).toBeVisible();
   await expect(page.locator('.checkout-success-alert')).toContainText('đã được thanh toán thành công');
   await expect(page.locator('.checkout-btn-download-receipt')).toBeVisible();
-  await expect(page.locator('.checkout-btn-print-receipt')).toBeVisible();
+  await expect(page.locator('.checkout-btn-print-receipt')).toHaveCount(0);
   // Payment action button must not be present
   await expect(page.locator('.checkout-btn-pay')).toHaveCount(0);
 });

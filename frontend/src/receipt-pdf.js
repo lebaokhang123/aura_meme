@@ -1,9 +1,13 @@
 import { jsPDF } from 'jspdf';
+import { registerReceiptFonts } from './fonts/roboto-fonts.js';
 
 /**
- * Safely parses any date representation (ISO string, unix seconds, milliseconds, or null)
+ * Safely parses any date representation (ISO string, unix seconds, milliseconds, or Date)
  * and formats it as DD/MM/YYYY HH:mm:ss.
  * Under no circumstances does this ever return "Invalid Date".
+ *
+ * @param {*} val - Date value to format
+ * @returns {string} Formatted date string DD/MM/YYYY HH:mm:ss
  */
 export function formatReceiptDate(val) {
   if (!val) return formatDateObj(new Date());
@@ -38,33 +42,45 @@ function formatDateObj(d) {
 }
 
 /**
- * Downloads an authentic, clean, SaaS-style A4 PDF receipt for AuraMeme memberships.
- * Inspired by OpenAI / Stripe modern invoices:
- * - Pure white A4 portrait (210mm x 297mm)
- * - 100% direct vector & text primitives via jsPDF (fully selectable/copyable text)
- * - No raster canvas screenshot, no poster borders, no artificial stamps
- * - Clean metadata, itemized table, totals, payment history, and sandbox notice
+ * Generates an authentic, clean, SaaS-style A4 jsPDF instance for AuraMeme memberships.
+ * Pure vector/text primitives via jsPDF with embedded Unicode Roboto font:
+ * - 100% searchable, selectable, copyable text with complete Vietnamese diacritics.
+ * - Single A4 page (210mm x 297mm), clean white background, balanced vertical rhythm.
+ * - Updated official issuer info: AuraSpark Global Inc. & AuraMeme Community.
+ * - Accurate USD pricing ($5.00 / $50.00) and reference VND (~130.000 VNĐ / ~1.250.000 VNĐ).
+ * - Separated columns, full order codes without clipping, reusable payment history table.
+ * - No fake tax rows, no fake seals/stamps; transparent sandbox receipt notice.
  *
- * @param {Object} order - Order details from API or receipt state
+ * @param {Object} order - Order details from API or checkout state
  * @param {Object} [user] - Active authenticated user details
+ * @returns {jsPDF|null} Configured jsPDF instance
  */
-export function downloadReceiptPdf(order, user) {
-  if (!order) return false;
+export function generateReceiptPdfDoc(order, user) {
+  if (!order) return null;
 
   const orderCode = order.order_code || order.orderCode || 'AM-ORDER';
   const tier = (order.tier || order.tierName || 'plus').toLowerCase().replace('aura ', '');
   const isPrime = tier === 'prime';
   const tierTitle = isPrime ? 'Aura Prime' : 'Aura Plus';
   const durationDays = order.duration_days || order.durationDays || (isPrime ? 365 : 30);
-  const boostMultiplier = order.boost_multiplier || (isPrime ? 3 : 2);
 
-  // Exact USD and VND amounts
+  // Exact USD and reference VND amounts
   const amountUsdValue = isPrime ? '50.00' : '5.00';
   const amountUsdFormatted = `${amountUsdValue} USD`;
   const amountVndFormatted = isPrime ? '1.250.000 VNĐ' : '130.000 VNĐ';
 
-  const provider = order.provider === 'paypal_sandbox' ? 'PayPal Sandbox v2' : 'Thanh toan Thu nghiem';
-  const txnId = order.paypal_order_id || order.provider_txn_id || orderCode;
+  // Payment provider name
+  let providerName = 'Thanh toán thử nghiệm';
+  if (order.provider === 'paypal_sandbox') {
+    providerName = 'PayPal Sandbox';
+  } else if (order.provider === 'vnpay_sandbox') {
+    providerName = 'VNPAY Sandbox';
+  } else if (order.provider === 'simulated' || order.payment_method === 'card') {
+    providerName = 'Thẻ thử nghiệm';
+  }
+
+  // Transaction reference (distinguish PayPal Order ID/Capture ID from AuraMeme order code)
+  const txnRef = order.paypal_order_id || order.provider_txn_id || orderCode;
   const username = user?.username || user?.displayName || 'khang_dev';
 
   const rawDate = order.completed_at || order.activatedAt || order.created_at;
@@ -77,225 +93,286 @@ export function downloadReceiptPdf(order, user) {
     format: 'a4',
   });
 
-  // 1. Header Top
-  doc.setFont('helvetica', 'bold');
+  // Register embedded Roboto Unicode fonts
+  registerReceiptFonts(doc);
+
+  // Brand Accent Colors
+  const accentColor = isPrime ? [245, 158, 11] : [6, 182, 212]; // Amber-500 or Cyan-500
+
+  // 1. HEADER (Y: 20 -> 44)
+  // Left: Brand Logo & Community
+  doc.setFont('Roboto', 'bold');
   doc.setFontSize(22);
   doc.setTextColor(17, 24, 39);
   doc.text('AURAMEME', 20, 26);
 
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('Roboto', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(107, 114, 128);
-  doc.text('Cyberpunk Cultivation Platform', 20, 31);
-  doc.text('https://aurameme.me · support@aurameme.me', 20, 35.5);
+  doc.text('AuraMeme Community', 20, 31.5);
+  doc.text('https://aurameme.com', 20, 36);
 
-  // Right Header - Receipt Title
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(22);
+  // Right: Document Title & Status
+  doc.setFont('Roboto', 'bold');
+  doc.setFontSize(18);
   doc.setTextColor(17, 24, 39);
-  doc.text('RECEIPT', 190, 26, { align: 'right' });
+  doc.text('BIÊN LAI THANH TOÁN', 190, 25, { align: 'right' });
 
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('Roboto', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(107, 114, 128);
-  doc.text('BIEN LAI THANH TOAN', 190, 31, { align: 'right' });
+  doc.text('PAYMENT RECEIPT', 190, 30, { align: 'right' });
 
-  // Paid Status Badge
+  // Status Badge: PAID / ĐÃ THANH TOÁN
   doc.setFillColor(236, 253, 245); // emerald-50
   doc.setDrawColor(16, 185, 129); // emerald-500
   doc.setLineWidth(0.3);
-  doc.roundedRect(152, 34.5, 38, 6.5, 1.5, 1.5, 'FD');
-  doc.setFont('helvetica', 'bold');
+  doc.roundedRect(146, 33.5, 44, 6.5, 1.5, 1.5, 'FD');
+  doc.setFont('Roboto', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(4, 120, 87); // emerald-700
-  doc.text('PAID / DA THANH TOAN', 171, 39, { align: 'center' });
+  doc.text('PAID / ĐÃ THANH TOÁN', 168, 38, { align: 'center' });
 
   // Top Divider Line
-  doc.setDrawColor(229, 231, 235); // gray-200
+  doc.setDrawColor(229, 231, 235);
   doc.setLineWidth(0.3);
-  doc.line(20, 44, 190, 44);
+  doc.line(20, 43, 190, 43);
 
-  // 2. Metadata Columns (Issuer on left, Order details on right)
-  // Left: Issuer info
-  doc.setFont('helvetica', 'bold');
+  // 2. METADATA SECTION (Y: 48 -> 84)
+  // Left Column: Đơn vị phát hành / Issued By
+  doc.setFont('Roboto', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(156, 163, 175);
-  doc.text('ISSUED BY / DON VI PHAT HANH', 20, 51);
+  doc.text('ĐƠN VỊ PHÁT HÀNH / ISSUED BY', 20, 49.5);
 
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('Roboto', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(31, 41, 55);
-  doc.text('AuraMeme Global Inc.', 20, 56.5);
+  doc.text('AuraSpark Global Inc.', 20, 56);
 
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('Roboto', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(75, 85, 99);
-  doc.text('Cyberpunk Cultivation Meme Community', 20, 61);
-  doc.text('Sandbox Gateway Operations', 20, 65.5);
-  doc.text('support@aurameme.me', 20, 70);
+  doc.text('AuraMeme Community', 20, 61.5);
+  doc.text('https://aurameme.com', 20, 67);
+  doc.text('sammybkhang@gmail.com', 20, 72.5);
 
-  // Right: Transaction & Customer info
-  doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(156, 163, 175);
-  doc.text('TRANSACTION DETAILS / THONG TIN DON HANG', 105, 51);
+  doc.text('Hệ thống thử nghiệm (Sandbox Environment)', 20, 78);
 
-  const metaFields = [
-    ['Order Code / Ma don:', orderCode],
-    ['Date / Ngay thanh toan:', dateFormatted],
-    ['Payment Method / Cong:', provider],
-    ['Customer / Khach hang:', '@' + username],
-    ['Transaction Ref / Ma GD:', txnId.length > 28 ? txnId.substring(0, 28) + '...' : txnId],
+  // Right Column: Thông tin giao dịch / Transaction Details
+  doc.setFont('Roboto', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(156, 163, 175);
+  doc.text('THÔNG TIN GIAO DỊCH / TRANSACTION DETAILS', 105, 49.5);
+
+  const metaRows = [
+    ['Mã đơn hàng / Order Code:', orderCode],
+    ['Ngày thanh toán / Date:', dateFormatted],
+    ['Phương thức / Method:', providerName],
+    ['Tài khoản / Customer:', '@' + username],
+    ['Mã tham chiếu / Reference:', txnRef],
   ];
 
-  metaFields.forEach(([lbl, val], idx) => {
-    const curY = 56.5 + idx * 4.5;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
+  metaRows.forEach(([lbl, val], idx) => {
+    const curY = 56 + idx * 5.5;
+    doc.setFont('Roboto', 'normal');
+    doc.setFontSize(8);
     doc.setTextColor(107, 114, 128);
     doc.text(lbl, 105, curY);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
+    doc.setFont('Roboto', 'bold');
+    // Scale down font slightly if order code / reference is very long
+    if (val.length > 28) {
+      doc.setFontSize(7);
+    } else if (val.length > 22) {
+      doc.setFontSize(7.5);
+    } else {
+      doc.setFontSize(8);
+    }
     doc.setTextColor(17, 24, 39);
     doc.text(val, 190, curY, { align: 'right' });
   });
 
-  // 3. Highlight Payment Line (Clean SaaS summary block)
+  // 3. HIGHLIGHT PAYMENT SUMMARY BLOCK (Y: 88 -> 104)
   doc.setFillColor(249, 250, 251);
   doc.setDrawColor(229, 231, 235);
-  doc.roundedRect(20, 82, 170, 14, 2, 2, 'FD');
+  doc.roundedRect(20, 88, 170, 15, 2, 2, 'FD');
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  // Left accent pill bar
+  doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+  doc.roundedRect(20, 88, 3, 15, 1, 1, 'F');
+
+  doc.setFont('Roboto', 'bold');
+  doc.setFontSize(12);
   doc.setTextColor(17, 24, 39);
-  doc.text(`${amountUsdFormatted} paid on ${dateOnly}`, 25, 90.5);
+  doc.text(`${amountUsdFormatted} paid on ${dateOnly}`, 27, 97.5);
 
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('Roboto', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(107, 114, 128);
-  doc.text(`(Ty gia tham chieu: ~${amountVndFormatted})`, 185, 90.5, { align: 'right' });
+  doc.text(`Giá tham khảo: ${amountVndFormatted}`, 186, 97.5, { align: 'right' });
 
-  // 4. Itemized Table
-  const tableY = 103;
+  // 4. ITEMIZED SERVICES TABLE (Y: 112 -> 142)
+  const tableY = 112;
+
+  // Header row
   doc.setFillColor(243, 244, 246);
-  doc.rect(20, tableY, 170, 7, 'F');
+  doc.rect(20, tableY, 170, 7.5, 'F');
   doc.setDrawColor(209, 213, 219);
   doc.line(20, tableY, 190, tableY);
-  doc.line(20, tableY + 7, 190, tableY + 7);
+  doc.line(20, tableY + 7.5, 190, tableY + 7.5);
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFont('Roboto', 'bold');
+  doc.setFontSize(7.5);
   doc.setTextColor(75, 85, 99);
-  doc.text('DESCRIPTION / DICH VU', 23, tableY + 4.8);
-  doc.text('DURATION', 105, tableY + 4.8);
-  doc.text('QTY', 130, tableY + 4.8, { align: 'center' });
-  doc.text('UNIT PRICE', 155, tableY + 4.8, { align: 'right' });
-  doc.text('AMOUNT', 187, tableY + 4.8, { align: 'right' });
+  doc.text('DỊCH VỤ / DESCRIPTION', 23, tableY + 5.2);
+  doc.text('THỜI HẠN / DURATION', 98, tableY + 5.2);
+  doc.text('SL / QTY', 135, tableY + 5.2, { align: 'center' });
+  doc.text('ĐƠN GIÁ / PRICE', 160, tableY + 5.2, { align: 'right' });
+  doc.text('THÀNH TIỀN / AMOUNT', 187, tableY + 5.2, { align: 'right' });
 
-  // Table Row Item
-  const rowY = tableY + 7;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
+  // Data row
+  const rowY = tableY + 7.5;
+  doc.setFont('Roboto', 'bold');
+  doc.setFontSize(9);
   doc.setTextColor(17, 24, 39);
-  doc.text(`${tierTitle} Membership Subscription`, 23, rowY + 5.5);
+  doc.text(`Gói hội viên ${tierTitle} / ${tierTitle} Subscription`, 23, rowY + 6);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFont('Roboto', 'normal');
+  doc.setFontSize(7.5);
   doc.setTextColor(107, 114, 128);
   const tierBenefit = isPrime
-    ? `EXP Multiplier x${boostMultiplier} · Gold Diamond Avatar Glow & Identity`
-    : `EXP Multiplier x${boostMultiplier} · Cyan Badge Avatar Ring & Identity`;
-  doc.text(tierBenefit, 23, rowY + 9.5);
+    ? 'Hội viên 365 ngày · Dấu ấn Aura Prime hoàng kim'
+    : 'Hội viên 30 ngày · Dấu ấn Aura Plus xanh ngọc';
+  doc.text(tierBenefit, 23, rowY + 11);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
+  // Duration column (well-separated, never colliding with QTY)
+  doc.setFont('Roboto', 'normal');
+  doc.setFontSize(8);
   doc.setTextColor(55, 65, 81);
-  doc.text(`${durationDays} days (${durationDays} ngay)`, 105, rowY + 6.5);
-  doc.text('1', 130, rowY + 6.5, { align: 'center' });
-  doc.text(amountUsdFormatted, 155, rowY + 6.5, { align: 'right' });
+  doc.text(`${durationDays} ngày (${durationDays}d)`, 98, rowY + 7);
 
-  doc.setFont('helvetica', 'bold');
-  doc.text(amountUsdFormatted, 187, rowY + 6.5, { align: 'right' });
+  // Qty column
+  doc.text('1', 135, rowY + 7, { align: 'center' });
+
+  // Unit Price column
+  doc.text(amountUsdFormatted, 160, rowY + 7, { align: 'right' });
+
+  // Amount column
+  doc.setFont('Roboto', 'bold');
+  doc.text(amountUsdFormatted, 187, rowY + 7, { align: 'right' });
 
   doc.setDrawColor(229, 231, 235);
-  doc.line(20, rowY + 12, 190, rowY + 12);
+  doc.line(20, rowY + 15, 190, rowY + 15);
 
-  // 5. Totals Section (Right Aligned)
-  const totalStartY = rowY + 16;
+  // 5. TOTALS SECTION (Y: 140 -> 168)
+  const totalStartY = rowY + 20;
   const totals = [
-    ['Subtotal / Tam tinh:', amountUsdFormatted],
-    ['Tax / Thue (0%):', '0.00 USD'],
-    ['Total / Tong thanh toan:', amountUsdFormatted],
-    ['Amount Paid / Da thanh toan:', amountUsdFormatted],
+    ['Tạm tính / Subtotal:', amountUsdFormatted, false],
+    ['Tổng thanh toán / Total Amount:', amountUsdFormatted, true],
+    ['Đã thanh toán / Amount Paid:', amountUsdFormatted, true],
   ];
 
-  totals.forEach(([lbl, val], idx) => {
-    const curY = totalStartY + idx * 5;
-    const isFinal = idx >= 2;
-    doc.setFont('helvetica', isFinal ? 'bold' : 'normal');
-    doc.setFontSize(isFinal ? 9.5 : 8.5);
-    doc.setTextColor(
-      isFinal ? (idx === 3 ? 4 : 17) : 107,
-      isFinal ? (idx === 3 ? 120 : 24) : 114,
-      isFinal ? (idx === 3 ? 87 : 39) : 128
-    );
-    doc.text(lbl, 115, curY);
+  totals.forEach(([lbl, val, isFinal], idx) => {
+    const curY = totalStartY + idx * 5.5;
+    doc.setFont('Roboto', isFinal ? 'bold' : 'normal');
+    doc.setFontSize(isFinal ? 9 : 8);
+    if (idx === 2) {
+      doc.setTextColor(4, 120, 87); // Emerald green for paid amount
+    } else if (isFinal) {
+      doc.setTextColor(17, 24, 39);
+    } else {
+      doc.setTextColor(107, 114, 128);
+    }
+    doc.text(lbl, 112, curY);
     doc.text(val, 187, curY, { align: 'right' });
   });
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  // Reference VND Note below total
+  doc.setFont('Roboto', 'normal');
+  doc.setFontSize(7.5);
   doc.setTextColor(156, 163, 175);
-  doc.text(`Ref VND / Tham chieu: ~${amountVndFormatted}`, 187, totalStartY + 23, { align: 'right' });
+  doc.text(`Giá tham khảo: ~${amountVndFormatted}`, 187, totalStartY + 19, { align: 'right' });
 
-  // 6. Payment History Block
-  const histY = totalStartY + 31;
-  doc.setFont('helvetica', 'bold');
+  // 6. PAYMENT HISTORY SECTION (Y: 180 -> 215)
+  const histY = totalStartY + 27;
+  doc.setFont('Roboto', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(31, 41, 55);
-  doc.text('PAYMENT HISTORY / LICH SU THANH TOAN', 20, histY);
+  doc.text('LỊCH SỬ THANH TOÁN / PAYMENT HISTORY', 20, histY);
 
   doc.setDrawColor(209, 213, 219);
-  doc.line(20, histY + 2, 190, histY + 2);
+  doc.line(20, histY + 2.5, 190, histY + 2.5);
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
+  // History Table Header
+  doc.setFillColor(249, 250, 251);
+  doc.rect(20, histY + 3, 170, 6, 'F');
+  doc.setFont('Roboto', 'bold');
+  doc.setFontSize(7);
   doc.setTextColor(107, 114, 128);
-  doc.text('PAYMENT METHOD', 23, histY + 6.5);
-  doc.text('DATE', 85, histY + 6.5);
-  doc.text('AMOUNT PAID', 135, histY + 6.5, { align: 'right' });
-  doc.text('STATUS / REFERENCE', 187, histY + 6.5, { align: 'right' });
+  doc.text('PHƯƠNG THỨC / METHOD', 23, histY + 7.2);
+  doc.text('NGÀY / DATE', 78, histY + 7.2);
+  doc.text('SỐ TIỀN / AMOUNT', 124, histY + 7.2, { align: 'right' });
+  doc.text('TRẠNG THÁI / STATUS', 148, histY + 7.2, { align: 'center' });
+  doc.text('MÃ THAM CHIẾU / REF', 187, histY + 7.2, { align: 'right' });
 
   doc.setDrawColor(243, 244, 246);
-  doc.line(20, histY + 8.5, 190, histY + 8.5);
+  doc.line(20, histY + 9, 190, histY + 9);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  // History Row (Render current transaction details)
+  const histRowY = histY + 14;
+  doc.setFont('Roboto', 'normal');
+  doc.setFontSize(7.5);
   doc.setTextColor(55, 65, 81);
-  doc.text(provider, 23, histY + 13);
-  doc.text(dateFormatted, 85, histY + 13);
-  doc.text(amountUsdFormatted, 135, histY + 13, { align: 'right' });
-  doc.setFont('helvetica', 'bold');
+  doc.text(providerName, 23, histRowY);
+  doc.text(dateFormatted, 78, histRowY);
+  doc.text(amountUsdFormatted, 124, histRowY, { align: 'right' });
+
+  doc.setFont('Roboto', 'bold');
   doc.setTextColor(4, 120, 87);
-  doc.text(`SUCCESS / ${orderCode.substring(0, 16)}...`, 187, histY + 13, { align: 'right' });
+  doc.text('HOÀN TẤT', 148, histRowY, { align: 'center' });
+
+  doc.setFont('Roboto', 'normal');
+  doc.setTextColor(75, 85, 99);
+  // Scale reference text if long
+  if (txnRef.length > 26) {
+    doc.setFontSize(6.5);
+  } else {
+    doc.setFontSize(7);
+  }
+  doc.text(txnRef, 187, histRowY, { align: 'right' });
 
   doc.setDrawColor(229, 231, 235);
-  doc.line(20, histY + 16, 190, histY + 16);
+  doc.line(20, histRowY + 4, 190, histRowY + 4);
 
-  // 7. Footer Note & Page Number
+  // 7. FOOTER SECTION (Y: 268 -> 282)
   doc.setDrawColor(229, 231, 235);
   doc.setLineWidth(0.2);
-  doc.line(20, 272, 190, 272);
+  doc.line(20, 268, 190, 268);
 
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('Roboto', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(156, 163, 175);
-  doc.text('Bien lai dien tu tao tu dong tu Cong thanh toan Thu nghiem AuraMeme PayPal Sandbox.', 20, 277);
-  doc.text('Moi truong thu nghiem sandbox phuc vu nghiem thu - Khong phat sinh chi phi tien that.', 20, 281);
-  doc.text('Page 1 of 1', 190, 277, { align: 'right' });
+  doc.text('Biên lai giao dịch thử nghiệm — Không phát sinh thanh toán tiền thật.', 20, 273.5);
+  doc.text('Sandbox transaction receipt — For development and verification purposes only.', 20, 277.5);
+  doc.text('Trang 1 / 1  (Page 1 of 1)', 190, 273.5, { align: 'right' });
 
-  // Save PDF file
+  return doc;
+}
+
+/**
+ * Downloads the generated PDF receipt in browser environment.
+ *
+ * @param {Object} order - Order details
+ * @param {Object} [user] - User details
+ * @returns {boolean} True if saved
+ */
+export function downloadReceiptPdf(order, user) {
+  const doc = generateReceiptPdfDoc(order, user);
+  if (!doc) return false;
+  const orderCode = order.order_code || order.orderCode || 'AM-ORDER';
   doc.save(`aurameme-receipt-${orderCode}.pdf`);
   return true;
 }
