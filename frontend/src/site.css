@@ -236,34 +236,34 @@ html { --site-header-height: 65px; }
   100% { background-position: 300% 50%; }
 }
 
-/* Plus tier: Fiery red-orange-gold Grandmaster theme */
+/* Plus tier: Celestial sky-blue-cyan theme */
 .header-premium-btn--plus {
-  background: linear-gradient(135deg, #1c0a00 0%, #3d1400 50%, #1c0a00 100%);
-  color: #fef08a;
-  border: 1px solid #f97316;
-  box-shadow: 0 0 12px rgba(249, 115, 22, 0.45), inset 0 0 8px rgba(234, 179, 8, 0.2);
+  background: linear-gradient(135deg, #031424 0%, #073552 50%, #031424 100%);
+  color: #bae6fd;
+  border: 1px solid #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45), inset 0 0 8px rgba(6, 182, 212, 0.2);
 }
 .header-premium-btn--plus .header-premium-icon {
-  color: #fb923c;
-}
-.header-premium-btn--plus:hover {
-  box-shadow: 0 0 18px rgba(249, 115, 22, 0.7), inset 0 0 10px rgba(234, 179, 8, 0.35);
-  border-color: #fbbf24;
-}
-
-/* Prime tier: Bright silver-blue-cyan-gold Challenger theme */
-.header-premium-btn--prime {
-  background: linear-gradient(135deg, #031424 0%, #082f49 50%, #031424 100%);
-  color: #f8fafc;
-  border: 1px solid #38bdf8;
-  box-shadow: 0 0 16px rgba(56, 189, 248, 0.55), inset 0 0 10px rgba(251, 191, 36, 0.3);
-}
-.header-premium-btn--prime .header-premium-icon {
   color: #38bdf8;
 }
+.header-premium-btn--plus:hover {
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.7), inset 0 0 10px rgba(6, 182, 212, 0.35);
+  border-color: #7dd3fc;
+}
+
+/* Prime tier: Radiant warm celestial gold-amber theme (VIP) */
+.header-premium-btn--prime {
+  background: linear-gradient(135deg, #1c1300 0%, #3d2c00 50%, #1c1300 100%);
+  color: #fef08a;
+  border: 1px solid #fbbf24;
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.65), 0 0 28px rgba(245, 158, 11, 0.35), inset 0 0 10px rgba(253, 224, 71, 0.4);
+}
+.header-premium-btn--prime .header-premium-icon {
+  color: #fde047;
+}
 .header-premium-btn--prime:hover {
-  box-shadow: 0 0 22px rgba(56, 189, 248, 0.8), inset 0 0 12px rgba(251, 191, 36, 0.45);
-  border-color: #e2e8f0;
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.9), 0 0 36px rgba(245, 158, 11, 0.5), inset 0 0 14px rgba(253, 224, 71, 0.5);
+  border-color: #fef08a;
 }
 
 /* Avatar indicator styles */
@@ -279,35 +279,35 @@ html { --site-header-height: 65px; }
   flex-shrink: 0;
 }
 
-/* Plus tier: Swapped to Prime-style intense multi-step aura pulse in Grandmaster fiery palette */
+/* Plus tier: Cyan / Blue pulse animation */
 .aura-avatar--plus,
 .account-avatar.aura-avatar--plus {
-  box-shadow: 0 0 0 2px #f97316, 0 0 10px rgba(239, 68, 68, 0.75), 0 0 18px rgba(234, 179, 8, 0.5);
+  box-shadow: 0 0 0 2px #38bdf8, 0 0 10px rgba(56, 189, 248, 0.75), 0 0 18px rgba(6, 182, 212, 0.45);
   animation: auraPulsePlus 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
-/* Prime tier: Swapped to harmonic breathing flow in Challenger multi-layer celestial palette */
+/* Prime tier: Intense gold / amber VIP celestial radiant pulse */
 .aura-avatar--prime,
 .account-avatar.aura-avatar--prime {
-  box-shadow: 0 0 0 2.5px #38bdf8, 0 0 14px rgba(56, 189, 248, 0.85), 0 0 24px rgba(6, 182, 212, 0.65), 0 0 32px rgba(251, 191, 36, 0.45);
+  box-shadow: 0 0 0 2.5px #fbbf24, 0 0 14px rgba(251, 191, 36, 0.85), 0 0 24px rgba(245, 158, 11, 0.65), 0 0 32px rgba(253, 224, 71, 0.45);
   animation: auraPulsePrime 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 @keyframes auraPulsePlus {
   0%, 100% {
-    box-shadow: 0 0 0 2px #f97316, 0 0 10px rgba(239, 68, 68, 0.65), 0 0 16px rgba(249, 115, 22, 0.45);
+    box-shadow: 0 0 0 2px #38bdf8, 0 0 10px rgba(56, 189, 248, 0.65), 0 0 16px rgba(14, 165, 233, 0.4);
   }
   50% {
-    box-shadow: 0 0 0 3px #fbbf24, 0 0 18px rgba(239, 68, 68, 0.95), 0 0 26px rgba(249, 115, 22, 0.75), 0 0 34px rgba(234, 179, 8, 0.4);
+    box-shadow: 0 0 0 2.5px #7dd3fc, 0 0 16px rgba(56, 189, 248, 0.9), 0 0 24px rgba(6, 182, 212, 0.65);
   }
 }
 
 @keyframes auraPulsePrime {
   0%, 100% {
-    box-shadow: 0 0 0 2.5px #38bdf8, 0 0 12px rgba(56, 189, 248, 0.75), 0 0 20px rgba(14, 165, 233, 0.5), 0 0 28px rgba(251, 191, 36, 0.35);
+    box-shadow: 0 0 0 2.5px #fbbf24, 0 0 12px rgba(251, 191, 36, 0.75), 0 0 20px rgba(245, 158, 11, 0.5), 0 0 28px rgba(253, 224, 71, 0.35);
   }
   50% {
-    box-shadow: 0 0 0 3.5px #f8fafc, 0 0 20px rgba(56, 189, 248, 1), 0 0 32px rgba(6, 182, 212, 0.85), 0 0 42px rgba(251, 191, 36, 0.6);
+    box-shadow: 0 0 0 3.5px #fef08a, 0 0 22px rgba(251, 191, 36, 1), 0 0 34px rgba(245, 158, 11, 0.85), 0 0 46px rgba(253, 224, 71, 0.6);
   }
 }
 
@@ -331,17 +331,17 @@ html { --site-header-height: 65px; }
 }
 
 .aura-member-badge--plus {
-  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
-  border-color: #1c0a00;
-  color: #fef08a;
-  box-shadow: 0 0 8px rgba(249, 115, 22, 0.7);
+  background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+  border-color: #031424;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.7);
 }
 
 .aura-member-badge--prime {
-  background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
-  border-color: #031424;
-  color: #f8fafc;
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.85), 0 0 14px rgba(251, 191, 36, 0.4);
+  background: linear-gradient(135deg, #d97706 0%, #fbbf24 100%);
+  border-color: #1c1300;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.85), 0 0 16px rgba(245, 158, 11, 0.5);
 }
 
 /* Profile Premium Badges */
@@ -363,50 +363,144 @@ html { --site-header-height: 65px; }
 }
 
 .profile-premium-badge--plus {
-  background: linear-gradient(135deg, rgba(28, 10, 0, 0.95) 0%, rgba(61, 20, 0, 0.95) 100%);
-  border: 1px solid #f97316;
-  color: #fef08a;
-  box-shadow: 0 0 14px rgba(249, 115, 22, 0.5), inset 0 0 8px rgba(234, 179, 8, 0.25);
+  background: linear-gradient(135deg, rgba(3, 20, 36, 0.95) 0%, rgba(7, 53, 82, 0.95) 100%);
+  border: 1px solid #38bdf8;
+  color: #bae6fd;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.5), inset 0 0 8px rgba(6, 182, 212, 0.25);
 }
 
 .profile-premium-badge--plus .profile-premium-badge-icon {
-  color: #fb923c;
+  color: #38bdf8;
 }
 
 .profile-premium-badge--prime {
-  background: linear-gradient(135deg, rgba(3, 20, 36, 0.95) 0%, rgba(8, 47, 73, 0.95) 100%);
-  border: 1px solid #38bdf8;
-  color: #f8fafc;
-  box-shadow: 0 0 18px rgba(56, 189, 248, 0.65), inset 0 0 10px rgba(251, 191, 36, 0.35);
+  background: linear-gradient(135deg, rgba(28, 19, 0, 0.95) 0%, rgba(61, 44, 0, 0.95) 100%);
+  border: 1px solid #fbbf24;
+  color: #fef08a;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.65), 0 0 28px rgba(245, 158, 11, 0.35), inset 0 0 10px rgba(253, 224, 71, 0.35);
 }
 
 .profile-premium-badge--prime .profile-premium-badge-icon {
-  color: #38bdf8;
+  color: #fde047;
 }
 
 /* Premium Selection Panel Glow by Selected Tier */
 .premium-selector-panel {
-  transition: border-color 0.4s ease, box-shadow 0.4s ease, background 0.4s ease;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              background 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  isolation: isolate;
 }
 
+/* Ambient smoke aura layers inside the panel */
+.premium-smoke-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(55px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.65;
+  transition: opacity 0.5s ease, background 0.5s ease, transform 0.5s ease;
+}
+
+.premium-smoke-glow--top {
+  top: -40px;
+  right: -30px;
+  width: 220px;
+  height: 220px;
+  animation: smokeFloatTop 8s ease-in-out infinite alternate;
+}
+
+.premium-smoke-glow--bottom {
+  bottom: -40px;
+  left: -30px;
+  width: 200px;
+  height: 200px;
+  animation: smokeFloatBottom 9s ease-in-out infinite alternate;
+}
+
+.premium-smoke-glow--center {
+  top: 40%;
+  left: 30%;
+  width: 180px;
+  height: 180px;
+  animation: smokeFloatCenter 10s ease-in-out infinite alternate;
+}
+
+@keyframes smokeFloatTop {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-20px, 20px) scale(1.15); }
+}
+
+@keyframes smokeFloatBottom {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(25px, -15px) scale(1.1); }
+}
+
+@keyframes smokeFloatCenter {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.35; }
+  100% { transform: translate(15px, 20px) scale(1.2); opacity: 0.55; }
+}
+
+/* Ensure contents stay above smoke */
+.premium-selector-heading,
+.u056 {
+  position: relative;
+  z-index: 1;
+}
+
+/* Plus tier: Cyan / Ocean Blue smoke aura (màu xanh) */
 .premium-selector-panel--plus {
-  border: 1px solid rgba(249, 115, 22, 0.55) !important;
-  box-shadow: 0 0 35px rgba(239, 68, 68, 0.22), 0 0 15px rgba(249, 115, 22, 0.3), inset 0 0 20px rgba(251, 191, 36, 0.06);
+  border: 1px solid rgba(56, 189, 248, 0.65) !important;
+  background: radial-gradient(ellipse at 85% 15%, rgba(6, 182, 212, 0.16) 0%, transparent 65%),
+              radial-gradient(ellipse at 15% 85%, rgba(56, 189, 248, 0.12) 0%, transparent 60%),
+              var(--ux-page) !important;
+  box-shadow: 0 0 35px rgba(6, 182, 212, 0.22),
+              0 0 20px rgba(56, 189, 248, 0.35),
+              inset 0 0 30px rgba(6, 182, 212, 0.08) !important;
 }
 
 .premium-selector-panel--plus .workspace-kicker {
-  color: #fb923c !important;
-  text-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
+  color: #38bdf8 !important;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
 }
 
+.premium-smoke-glow--plus.premium-smoke-glow--top {
+  background: rgba(6, 182, 212, 0.35);
+}
+.premium-smoke-glow--plus.premium-smoke-glow--bottom {
+  background: rgba(56, 189, 248, 0.3);
+}
+.premium-smoke-glow--plus.premium-smoke-glow--center {
+  background: rgba(14, 165, 233, 0.25);
+}
+
+/* Prime tier: Radiant warm celestial gold-amber smoke aura (màu vàng VIP) */
 .premium-selector-panel--prime {
-  border: 1px solid rgba(56, 189, 248, 0.65) !important;
-  box-shadow: 0 0 40px rgba(6, 182, 212, 0.28), 0 0 20px rgba(56, 189, 248, 0.4), inset 0 0 25px rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.75) !important;
+  background: radial-gradient(ellipse at 85% 15%, rgba(251, 191, 36, 0.18) 0%, transparent 65%),
+              radial-gradient(ellipse at 15% 85%, rgba(245, 158, 11, 0.14) 0%, transparent 60%),
+              var(--ux-page) !important;
+  box-shadow: 0 0 45px rgba(251, 191, 36, 0.32),
+              0 0 24px rgba(245, 158, 11, 0.45),
+              inset 0 0 35px rgba(253, 224, 71, 0.1) !important;
 }
 
 .premium-selector-panel--prime .workspace-kicker {
-  color: #38bdf8 !important;
-  text-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+  color: #fbbf24 !important;
+  text-shadow: 0 0 12px rgba(251, 191, 36, 0.7);
+}
+
+.premium-smoke-glow--prime.premium-smoke-glow--top {
+  background: rgba(251, 191, 36, 0.4);
+}
+.premium-smoke-glow--prime.premium-smoke-glow--bottom {
+  background: rgba(245, 158, 11, 0.35);
+}
+.premium-smoke-glow--prime.premium-smoke-glow--center {
+  background: rgba(253, 224, 71, 0.25);
 }
 
 /* Reduced motion support */
@@ -415,7 +509,10 @@ html { --site-header-height: 65px; }
   .aura-avatar--plus,
   .aura-avatar--prime,
   .account-avatar.aura-avatar--plus,
-  .account-avatar.aura-avatar--prime {
+  .account-avatar.aura-avatar--prime,
+  .premium-smoke-glow--top,
+  .premium-smoke-glow--bottom,
+  .premium-smoke-glow--center {
     animation: none !important;
   }
 }

@@ -119,7 +119,7 @@ export function SiteHeader() {
             title={isPrime ? 'Aura Prime' : isPlus ? 'Aura Plus' : t('Mua gói hội viên Aura', 'Get Aura Membership')}
           >
             <span className="material-symbols-outlined header-premium-icon" aria-hidden="true">
-              {isPrime ? 'workspace_premium' : isPlus ? 'diamond' : 'stars'}
+              {isPrime ? 'diamond' : isPlus ? 'workspace_premium' : 'stars'}
             </span>
             <span className="header-premium-text">
               {isPrime ? 'Aura Prime' : isPlus ? 'Aura Plus' : t('Mua Aura', 'Get Aura')}

@@ -262,25 +262,25 @@
    Aura Membership - Plan Theming & EXP Badges
    ========================================================================== */
 .u056-p.premium-plus {
-  --plan-accent: #f97316;
-  --plan-accent-glow: rgba(249, 115, 22, 0.25);
-  --plan-gold: #eab308;
-  border-color: rgba(249, 115, 22, 0.35);
+  --plan-accent: #38bdf8;
+  --plan-accent-glow: rgba(56, 189, 248, 0.25);
+  --plan-gold: #06b6d4;
+  border-color: rgba(56, 189, 248, 0.35);
 }
 .u056-p.premium-plus:hover {
-  border-color: rgba(249, 115, 22, 0.7);
-  box-shadow: 0 0 16px rgba(249, 115, 22, 0.2);
+  border-color: rgba(56, 189, 248, 0.7);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
 }
 
 .u056-p.premium-prime {
-  --plan-accent: #38bdf8;
-  --plan-accent-glow: rgba(56, 189, 248, 0.3);
-  --plan-gold: #fbbf24;
-  border-color: rgba(56, 189, 248, 0.4);
+  --plan-accent: #fbbf24;
+  --plan-accent-glow: rgba(251, 191, 36, 0.35);
+  --plan-gold: #fde047;
+  border-color: rgba(251, 191, 36, 0.45);
 }
 .u056-p.premium-prime:hover {
-  border-color: rgba(56, 189, 248, 0.8);
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+  border-color: rgba(251, 191, 36, 0.85);
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.3);
 }
 
 .u056-badge-exp {
@@ -296,14 +296,14 @@
   font-style: normal;
 }
 .u056-badge-exp--plus {
-  background: rgba(249, 115, 22, 0.18);
-  color: #fb923c;
-  border: 1px solid rgba(249, 115, 22, 0.45);
-}
-.u056-badge-exp--prime {
   background: rgba(56, 189, 248, 0.18);
   color: #38bdf8;
   border: 1px solid rgba(56, 189, 248, 0.5);
+}
+.u056-badge-exp--prime {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fef08a;
+  border: 1px solid rgba(251, 191, 36, 0.6);
 }
 
 .u056-badge-exp.wig {
