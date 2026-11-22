@@ -38,6 +38,23 @@
   --ux-shadow-strong: rgba(40, 30, 80, 0.3);
 }
 
+.u219[data-theme="light"] .u403-f,
+.u219[data-theme="light"] .u405-f {
+  background: #FFFFFF !important;
+  box-shadow: inset 0 0 0 1px rgba(22, 21, 27, 0.17) !important;
+}
+
+.u219[data-theme="light"] .u403-f input.u403-in,
+.u219[data-theme="light"] .u405-f input.u405-in {
+  color: #16151B !important;
+}
+
+.u219[data-theme="light"] .u403-f input.u403-in:-webkit-autofill,
+.u219[data-theme="light"] .u405-f input.u405-in:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #FFFFFF inset !important;
+  -webkit-text-fill-color: #16151B !important;
+}
+
 /* ============================================================
    FORGOT PASSWORD #405
    ============================================================ */
@@ -122,22 +139,23 @@
 .u405-f {
   position: relative;
   height: 52px;
-  border-radius: 12px;
-  background: var(--ux-surface);
-  box-shadow: inset 0 0 0 1px var(--ux-line-2);
+  border-radius: 12px !important;
+  background: var(--am-surface-container-low, #1a1b23) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--am-outline-variant, #49454f) !important;
+  overflow: hidden;
   transition: box-shadow .2s;
 }
 
 .u405-f:hover {
-  box-shadow: inset 0 0 0 1px var(--ux-ink-3);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--ux-ink-3) !important;
 }
 
 .u405-f.is-f {
-  box-shadow: inset 0 0 0 1.5px var(--ux-accent), 0 0 0 4px var(--ux-accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--ux-accent), 0 0 0 4px var(--ux-accent-soft) !important;
 }
 
 .u405-f.is-err {
-  box-shadow: inset 0 0 0 1px var(--ux-danger);
+  box-shadow: inset 0 0 0 1px var(--ux-danger) !important;
 }
 
 .u405-f::after {
@@ -193,17 +211,29 @@
   color: var(--ux-danger);
 }
 
-.u405-in {
+.u405-f input.u405-in,
+input.u405-in {
   position: absolute;
   inset: 0;
   width: 100%;
   padding: 21px 15px 6px;
-  border: 0;
-  border-radius: 12px;
-  background: none;
-  outline: none;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
   font-size: 14px;
-  color: var(--ux-ink);
+  color: var(--ux-ink, #e3e1ed) !important;
+}
+
+.u405-f input.u405-in:-webkit-autofill,
+.u405-f input.u405-in:-webkit-autofill:hover,
+.u405-f input.u405-in:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--am-surface-container-low, #1a1b23) inset !important;
+  -webkit-text-fill-color: var(--ux-ink, #e3e1ed) !important;
+  transition: background-color 5000s ease-in-out 0s;
+  border-radius: 12px !important;
 }
 
 .u405-in:focus-visible {
@@ -522,9 +552,10 @@
 .u403-f {
   position: relative;
   height: 52px;
-  border-radius: 12px;
-  background: var(--ux-surface);
-  box-shadow: inset 0 0 0 1px var(--ux-line-2);
+  border-radius: 12px !important;
+  background: var(--am-surface-container-low, #1a1b23) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--am-outline-variant, #49454f) !important;
+  overflow: hidden;
   transition: box-shadow .2s;
 }
 
@@ -533,15 +564,15 @@
 }
 
 .u403-f:hover {
-  box-shadow: inset 0 0 0 1px var(--ux-ink-3);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--ux-ink-3) !important;
 }
 
 .u403-f.is-f {
-  box-shadow: inset 0 0 0 1.5px var(--ux-accent), 0 0 0 4px var(--ux-accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--ux-accent), 0 0 0 4px var(--ux-accent-soft) !important;
 }
 
 .u403-f.is-err {
-  box-shadow: inset 0 0 0 1px var(--ux-danger);
+  box-shadow: inset 0 0 0 1px var(--ux-danger) !important;
 }
 
 .u403-f::after {
@@ -597,17 +628,29 @@
   color: var(--ux-danger);
 }
 
-.u403-in {
+.u403-f input.u403-in,
+input.u403-in {
   position: absolute;
   inset: 0;
   width: 100%;
   padding: 21px 15px 6px;
-  border: 0;
-  border-radius: 12px;
-  background: none;
-  outline: none;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
   font-size: 14px;
-  color: var(--ux-ink);
+  color: var(--ux-ink, #e3e1ed) !important;
+}
+
+.u403-f input.u403-in:-webkit-autofill,
+.u403-f input.u403-in:-webkit-autofill:hover,
+.u403-f input.u403-in:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--am-surface-container-low, #1a1b23) inset !important;
+  -webkit-text-fill-color: var(--ux-ink, #e3e1ed) !important;
+  transition: background-color 5000s ease-in-out 0s;
+  border-radius: 12px !important;
 }
 
 .u403-in:focus-visible {

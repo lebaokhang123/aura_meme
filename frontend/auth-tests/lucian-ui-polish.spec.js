@@ -29,6 +29,7 @@ async function setupAuthMocks(context) {
           json: { error: { code: 'INVALID_CREDENTIALS', message: 'Tên đăng nhập hoặc mật khẩu không chính xác.' } },
         });
       }
+      await new Promise((r) => setTimeout(r, 120));
       return route.fulfill({
         json: {
           user: { id: '00000000-0000-0000-0000-000000000001', username: 'khang_dev', display_name: 'Khang Dev' },
