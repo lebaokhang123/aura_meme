@@ -324,7 +324,7 @@ def test_simulate_direct_call_production_guard():
 
     with pytest.raises(AuthError) as exc_info:
         simulate_subscription_order(
-            order_code="AM-ORDER-TEST",
+            order_code="AM-PLUS-1795330000-TEST1234",
             payload=SimulateOrderInput(action="pay_success"),
             request=mock_request,
             account=mock_account,
@@ -884,7 +884,7 @@ def test_get_subscription_order_endpoint():
     mock_db = MagicMock()
     order = SubscriptionOrder(
         id=uuid4(),
-        order_code="AM-ORD-GET-123",
+        order_code="AM-PLUS-1795330001-GET12345",
         user_id=user_id,
         tier="plus",
         duration_days=30,
@@ -898,8 +898,8 @@ def test_get_subscription_order_endpoint():
     mock_db.scalar.return_value = order
     mock_account.db = mock_db
 
-    dto = get_subscription_order("AM-ORD-GET-123", account=mock_account)
-    assert dto.order_code == "AM-ORD-GET-123"
+    dto = get_subscription_order("AM-PLUS-1795330001-GET12345", account=mock_account)
+    assert dto.order_code == "AM-PLUS-1795330001-GET12345"
     assert dto.tier == "plus"
     assert dto.amount_vnd == 130000
     assert dto.amount_vnd % 10000 == 0
@@ -907,7 +907,7 @@ def test_get_subscription_order_endpoint():
     # Non-existent or non-owned order
     mock_db.scalar.return_value = None
     with pytest.raises(AuthError) as exc_info:
-        get_subscription_order("AM-UNKNOWN-999", account=mock_account)
+        get_subscription_order("AM-PLUS-1795330002-UNKNOWN1", account=mock_account)
     assert exc_info.value.status == 404
     assert exc_info.value.code == "NOT_FOUND"
 

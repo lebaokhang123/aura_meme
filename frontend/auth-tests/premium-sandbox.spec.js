@@ -846,5 +846,34 @@ test('Part C: Simulated card form is structured into 2 clean groups with complet
   expect(capReq.body?.cardNumber).toBeUndefined();
 });
 
+test('Part D: Security check rejects invalid order codes and enforces read-only completed orders', async ({ context, page }) => {
+  await setupMockApi(context, 0, null);
+
+  // 1. Visit with invalid order code format
+  await page.goto('/premium/checkout?order=INVALID-CODE');
+  await expect(page.locator('.checkout-load-error')).toBeVisible();
+  await expect(page.locator('.checkout-load-error')).toContainText('Mã đơn hàng không đúng định dạng');
+  await expect(page.locator('.checkout-btn-pay')).toHaveCount(0);
+
+  // 2. Visit with order code that is already successful (Idempotency / read-only receipt)
+  const paidSub = {
+    tier: 'prime',
+    is_active: true,
+    expires_at: '2027-11-22T00:00:00Z',
+    boost_multiplier: 3,
+  };
+  await setupMockApi(context, 0, paidSub);
+
+  await page.goto('/premium/checkout?order=AM-PRIME-1700000000-A1B2C3D4');
+  await expect(page.locator('.u081-receipt')).toBeVisible();
+  await expect(page.locator('.checkout-success-alert')).toBeVisible();
+  await expect(page.locator('.checkout-success-alert')).toContainText('đã được thanh toán thành công');
+  await expect(page.locator('.checkout-btn-download-receipt')).toBeVisible();
+  await expect(page.locator('.checkout-btn-print-receipt')).toBeVisible();
+  // Payment action button must not be present
+  await expect(page.locator('.checkout-btn-pay')).toHaveCount(0);
+});
+
+
 
 

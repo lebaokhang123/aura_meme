@@ -104,6 +104,11 @@ export default function PremiumCheckoutPage() {
       setLoading(false);
       return;
     }
+    if (typeof code !== 'string' || code.length > 64 || !/^AM-[A-Za-z0-9\-_]{6,60}$/.test(code)) {
+      setLoadError(t('Mã đơn hàng không đúng định dạng.', 'Invalid order code format.'));
+      setLoading(false);
+      return;
+    }
     setOrderCode(code);
 
     let mounted = true;
@@ -328,7 +333,7 @@ export default function PremiumCheckoutPage() {
             <h2 style={{ margin: '16px 0 8px', color: 'var(--am-on-surface)' }}>
               {t('Không thể tiếp tục thanh toán', 'Unable to Proceed with Checkout')}
             </h2>
-            <p style={{ color: 'var(--am-on-surface-variant)', marginBottom: '24px' }}>
+            <p className="checkout-load-error" style={{ color: 'var(--am-on-surface-variant)', marginBottom: '24px' }}>
               {loadError || t('Đơn hàng không tồn tại hoặc đã hết hạn.', 'Order not found or expired.')}
             </p>
             <a

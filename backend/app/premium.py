@@ -3,8 +3,18 @@ from datetime import datetime, timedelta, timezone
 import json
 import logging
 import math
+import re
 from typing import Literal
 from uuid import UUID, uuid4
+
+ORDER_CODE_REGEX = re.compile(r"^AM-(PLUS|PRIME)-\d{9,12}-[A-Z0-9]{4,12}$")
+
+
+def validate_order_code(order_code: str) -> str:
+    """Validate order code format, length, and character set strictly."""
+    if not order_code or len(order_code) > 64 or not ORDER_CODE_REGEX.match(order_code):
+        raise AuthError(422, "INVALID_ORDER_CODE", "Mã đơn hàng không đúng định dạng.")
+    return order_code
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import RedirectResponse
@@ -355,14 +365,16 @@ def get_subscription_order(
     account=Depends(require_authenticated_user),
 ):
     """Retrieve authoritative order status for authenticated user."""
-    order = account.db.scalar(
-        select(SubscriptionOrder).where(
-            SubscriptionOrder.order_code == order_code,
-            SubscriptionOrder.user_id == account.user.id,
-        )
-    )
+    validate_order_code(order_code)
+
+    is_admin = bool(account.user.roles and "ADMIN" in account.user.roles)
+    stmt = select(SubscriptionOrder).where(SubscriptionOrder.order_code == order_code)
+    if not is_admin:
+        stmt = stmt.where(SubscriptionOrder.user_id == account.user.id)
+
+    order = account.db.scalar(stmt)
     if not order:
-        raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại hoặc không thuộc tài khoản của bạn.")
+        raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại.")
 
     plan = get_plan(order.tier)
     return OrderDto(
@@ -395,6 +407,8 @@ def simulate_subscription_order(
     request: Request,
     account=Depends(require_account_csrf),
 ):
+    validate_order_code(order_code)
+
     auth_runtime = getattr(request.app.state, "auth", None)
     auth_env = getattr(auth_runtime.settings, "auth_environment", "production") if auth_runtime and hasattr(auth_runtime, "settings") else "production"
     premium_settings = getattr(request.app.state, "premium", None)
@@ -408,15 +422,15 @@ def simulate_subscription_order(
         select(SubscriptionOrder).where(
             SubscriptionOrder.order_code == order_code,
             SubscriptionOrder.user_id == account.user.id,
-        )
+        ).with_for_update()
     )
     if not order:
-        raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại hoặc không thuộc tài khoản của bạn.")
+        raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại.")
 
     plan = get_plan(order.tier)
 
     # Idempotent response if order is already resolved
-    if order.status in {"success", "failed", "cancelled"}:
+    if order.status == "success":
         return OrderDto(
             id=order.id,
             order_code=order.order_code,
@@ -432,6 +446,9 @@ def simulate_subscription_order(
             created_at=order.created_at,
             completed_at=order.completed_at,
         )
+
+    if order.status in {"failed", "cancelled", "expired"}:
+        raise AuthError(409, "ORDER_NOT_PAYABLE", "Đơn hàng không ở trạng thái có thể thanh toán.")
 
     if payload.action == "pay_success":
         order.status = "success"
@@ -505,15 +522,17 @@ def capture_subscription_order(
     payload: CaptureOrderInput | None = None,
     account=Depends(require_account_csrf),
 ):
+    validate_order_code(order_code)
+
     now = request.app.state.auth.now()
     order = account.db.scalar(
         select(SubscriptionOrder).where(
             SubscriptionOrder.order_code == order_code,
             SubscriptionOrder.user_id == account.user.id,
-        )
+        ).with_for_update()
     )
     if not order:
-        raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại hoặc không thuộc tài khoản của bạn.")
+        raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại.")
 
     plan = get_plan(order.tier)
 
@@ -536,7 +555,10 @@ def capture_subscription_order(
         )
 
     if order.status in {"failed", "cancelled", "expired"}:
-        raise AuthError(400, "ORDER_FINALIZED", f"Đơn hàng đã kết thúc với trạng thái '{order.status}'. Không thể xử lý lại.")
+        raise AuthError(409, "ORDER_NOT_PAYABLE", "Đơn hàng không ở trạng thái có thể thanh toán.")
+
+    auth_runtime = getattr(request.app.state, "auth", None)
+    auth_env = getattr(auth_runtime.settings, "auth_environment", "production") if auth_runtime and hasattr(auth_runtime, "settings") else "production"
 
     paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
 
@@ -581,6 +603,9 @@ def capture_subscription_order(
             order.provider_payload = capture_res
             order.provider_response_code = "COMPLETED"
         else:
+            # Production boundary guard: Never allow mock simulation fallback in production environment
+            if auth_env == "production":
+                raise AuthError(503, "PAYPAL_NOT_CONFIGURED", "Cổng thanh toán PayPal chưa được cấu hình cho môi trường production.")
             # Mock sandbox simulation mode
             if payload and payload.mock_fail:
                 order.status = "failed"
