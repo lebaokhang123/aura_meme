@@ -816,6 +816,9 @@ test('Admin page moderation section includes Tab 3 Giao dịch (orders)', async 
   const ordersTab = page.getByRole('button', { name: /Giao dịch|Transactions/ });
   await expect(ordersTab).toBeVisible();
   await ordersTab.click();
+  await expect(page.locator('select option[value="pending"]')).toHaveText('Chờ thanh toán');
+  await expect(page.locator('select option[value="expired"]')).toHaveText('Hết hạn');
+  await expect(page.locator('select option[value="cancelled"]')).toHaveText('Đã hủy');
 
   // Verify order row is rendered with order_code, tier badge and amount
   await expect(page.locator('.workspace-rows')).toContainText('AM-PRIME-1700000000-A1B2C3D4');

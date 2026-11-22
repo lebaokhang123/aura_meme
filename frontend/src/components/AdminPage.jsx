@@ -40,10 +40,10 @@ const auditTargetLabels={
   category:['Danh mục','Category'],
   asset:['Vật phẩm','Asset']
 };
-const statusLabels={active:['Hoạt động','Active'],locked:['Đã khóa','Locked'],deleted:['Đã xóa','Deleted'],draft:['Bản nháp','Draft'],published:['Công khai','Published'],visible:['Hiển thị','Visible'],hidden:['Đã ẩn','Hidden'],new:['Mới','New'],in_review:['Đang xử lý','In review'],resolved:['Đã xử lý','Resolved'],pending:['Chờ duyệt','Pending'],approved:['Đã duyệt','Approved'],rejected:['Từ chối','Rejected'],unknown:['Chưa rõ','Unknown'],withdrawn:['Đã thu hồi','Withdrawn']};
+const statusLabels={active:['Hoạt động','Active'],locked:['Đã khóa','Locked'],deleted:['Đã xóa','Deleted'],draft:['Bản nháp','Draft'],published:['Công khai','Published'],visible:['Hiển thị','Visible'],hidden:['Đã ẩn','Hidden'],new:['Mới','New'],in_review:['Đang xử lý','In review'],resolved:['Đã xử lý','Resolved'],pending:['Chờ duyệt','Pending'],approved:['Đã duyệt','Approved'],rejected:['Từ chối','Rejected'],unknown:['Chưa rõ','Unknown'],withdrawn:['Đã thu hồi','Withdrawn'],success:['Thành công','Completed'],failed:['Thất bại','Failed'],cancelled:['Đã hủy','Cancelled'],expired:['Hết hạn','Expired']};
 export default function AdminPage(){
  const session=useSyncExternalStore(auth.subscribe,auth.snapshot),{language}=usePreferences(),t=(vi,en)=>language==='en'?en:vi;
- const title=resource=>t(...labels[resource]),status=value=>statusLabels[value]?t(...statusLabels[value]):value,formatAuditAction=a=>auditActionLabels[a]?t(...auditActionLabels[a]):a,formatAuditTarget=trg=>auditTargetLabels[trg]?t(...auditTargetLabels[trg]):trg;
+ const title=resource=>t(...labels[resource]),status=value=>resource==='orders'&&value==='pending'?t('Chờ thanh toán','Pending'):statusLabels[value]?t(...statusLabels[value]):value,formatAuditAction=a=>auditActionLabels[a]?t(...auditActionLabels[a]):a,formatAuditTarget=trg=>auditTargetLabels[trg]?t(...auditTargetLabels[trg]):trg;
  const allowed=!MOCK_AUTH&&session.status==='authenticated'&&canAdmin(session.user),owner=allowed?session.user.id:null;
  const [resource,setResource]=useState('users'),[query,setQuery]=useState(''),[search,setSearch]=useState(''),[filter,setFilter]=useState(''),[role,setRole]=useState(''),[page,setPage]=useState(1),[revision,setRevision]=useState(0);
  const [result,setData]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[denied,setDenied]=useState(false),[edit,setEdit]=useState(null),[busy,setBusy]=useState(false),[holdingPreview,setHoldingPreview]=useState(false),[copiedId,setCopiedId]=useState(null);
@@ -155,7 +155,7 @@ export default function AdminPage(){
     </div>}
    </div><div className="admin-row-status">
     {resource==='audit-logs'&&<time className="workspace-meta" dateTime={row.created_at}>{stamp(row.created_at)}</time>}
-    {resource==='orders'&&<span className="workspace-badge" data-status={row.status} style={{fontWeight:600}}>{row.status==='success'?t('Thành công','Success'):row.status==='pending'?t('Chờ xử lý','Pending'):row.status==='failed'?t('Thất bại','Failed'):row.status==='expired'?t('Hết hạn','Expired'):row.status==='cancelled'?t('Đã hủy','Cancelled'):row.status}</span>}
+    {resource==='orders'&&<span className="workspace-badge" data-status={row.status} style={{fontWeight:600}}>{status(row.status)}</span>}
     {row.status&&resource!=='orders'&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='assets'&&<span className="workspace-badge">{row.active?t('Đang bật','Active'):t('Đang tắt','Inactive')}</span>}
     </div><div className="workspace-row-actions">{resource==='users'&&row.status!=='deleted'&&<><button type="button" disabled={busy} onClick={()=>confirm(row,{status:row.status==='active'?'locked':'active'},row.status==='active'?t('Khóa tài khoản','Lock account'):t('Mở khóa tài khoản','Unlock account'))}>{row.status==='active'?t('Khóa','Lock'):t('Mở khóa','Unlock')}</button><button type="button" disabled={busy} onClick={()=>{setError('');setEdit({type:'roles',row,roles:[...row.roles]})}}>{t('Sửa vai trò','Edit roles')}</button></>}
     {(resource==='posts'||resource==='comments')&&<div className="admin-action-icons">
