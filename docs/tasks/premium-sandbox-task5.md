@@ -650,3 +650,67 @@ Thực hiện chuẩn xác yêu cầu của Owner về bản sắc nhận diện
 ### 14.5. Hiển thị Halo Avatar hội viên tại Trang chủ (`/home`) và Khám phá (`/explore`)
 - Tích hợp `UserAvatar` vào ô soạn thảo bài viết (`Composer.jsx`) hiển thị viền và badge khi người dùng đăng nhập có gói Plus/Prime.
 - Tự động hiển thị viền/glow Plus/Prime trên avatar tác giả bài viết (`PostCard.jsx`) và bình luận (`CommentSection.jsx`) khi tác giả là hội viên hoạt động.
+
+---
+
+## 15. Vòng sửa Checkout UX, Biên lai PDF tối giản và An toàn giao dịch (A → B → C → D)
+
+### 15.1. Phần A: Sửa lỗi điều hướng trình duyệt và trạng thái Checkout
+- **Hiện tượng lỗi:** Khi người dùng thanh toán thành công, xem biên nhận rồi bấm nút Back của trình duyệt quay lại `/premium`, modal bị kẹt ở trạng thái loading/busy *"Đang chuyển sang thanh toán..."*. Nếu người dùng forward lại checkout, trang bị treo ở trạng thái processing.
+- **Giải pháp thực hiện:**
+  - `PaymentModal081.jsx`: Lắng nghe sự kiện `pageshow` của browser bfcache; khi `event.persisted` hoặc trang được tải lại từ cache, tự động reset `busy = false`, xóa `error` và khôi phục nút bấm để người dùng có thể thao tác bình thường. Khi bấm xác nhận chuyển hướng, reset sạch state trước khi `location.assign`.
+  - `PremiumPage.jsx`: Lắng nghe sự kiện `pageshow`, tự động đóng dialog (`dialogOpen = false`) và kích hoạt làm mới trạng thái hội viên (`refresh()`) cùng `/api/v1/premium/status` từ backend để cập nhật danh tính mới nhất.
+  - `PremiumCheckoutPage.jsx`: Lắng nghe sự kiện `pageshow`; khi đơn hàng đã ở trạng thái `success`, trực tiếp hiển thị giao diện biên nhận hoàn tất chế độ Read-Only với alert thông báo rõ ràng *"Đơn hàng này đã được thanh toán thành công vào <ngày giờ>"*, hiển thị nút *"In biên lai"*, *"Tải biên lai PDF"* và *"Về trang hội viên"*, ẩn hoàn toàn các nút submit thanh toán để chống thanh toán trùng lặp. Khi đơn hàng ở trạng thái `cancelled` hoặc `failed`, hiển thị thông báo lỗi cụ thể và cung cấp nút quay về chọn lại gói.
+
+### 15.2. Phần B: Tái thiết kế biên lai tối giản AuraMeme Minimal Receipt & Sửa dứt điểm Invalid Date
+- **Định hướng thiết kế:** Lấy cảm hứng từ hóa đơn tối giản, chuyên nghiệp của OpenAI (ChatGPT) và Stripe. Thay thế hoàn toàn giao diện poster tối màu nặng nề và con dấu giả lập không phù hợp.
+- **Quy chuẩn kỹ thuật AuraMeme Minimal Receipt:**
+  - Khổ giấy tiêu chuẩn A4 (210mm × 297mm), nền trắng tinh tế, lề 20mm chuẩn in ấn.
+  - Văn bản vector thuần túy sử dụng `jsPDF` (`text()`, `rect()`, `line()`), cho phép người dùng bôi đen, chọn và sao chép văn bản (selectable text).
+  - Không chèn font raster hóa lỗi font tiếng Việt, không dùng ảnh chụp màn hình render mờ nhòe.
+  - Màu sắc nhận diện nhẹ nhàng: Điểm nhấn viền mỏng cyan (`#06b6d4`) cho Aura Plus và gold (`#f59e0b`) cho Aura Prime.
+  - Bố cục thông tin: Logo AuraMeme, tiêu đề *"BIÊN LAI DỊCH VỤ / SERVICE RECEIPT"*, bảng 2 cột thông tin đơn vị phát hành và khách hàng, bảng chi tiết dịch vụ gồm tên gói, thời hạn, đơn giá USD và quy đổi VND, tổng thanh toán và ghi chú môi trường thử nghiệm.
+  - **Sửa dứt điểm "Invalid Date":** Tạo hàm `formatReceiptDate(rawDate)` trong `receipt-pdf.js`, xử lý an toàn mọi định dạng đầu vào (Unix timestamp tính bằng giây hoặc mili-giây, chuỗi ISO-8601, null, undefined hoặc chuỗi rác) không bao giờ ném ngoại lệ hay trả về "Invalid Date".
+  - Hiển thị chuẩn xác đơn giá: `$5.00 USD` (130.000 VNĐ) cho Aura Plus và `$50.00 USD` (1.250.000 VNĐ) cho Aura Prime.
+
+### 15.3. Phần C: Cấu trúc lại form thẻ thử nghiệm (Simulated Card Information)
+- Form nhập thẻ thử nghiệm được chia thành 2 nhóm rõ ràng, mạch lạc:
+  - **Nhóm 1 — Thẻ thanh toán:** Số thẻ (`Số thẻ`), Ngày hết hạn (`MM/YY`), Mã bảo mật (`CVV`).
+  - **Nhóm 2 — Thông tin thanh toán:** Tên trên thẻ (`Tên trên thẻ`), Quốc gia (dropdown với Việt Nam, Hoa Kỳ, Nhật Bản, v.v.), Địa chỉ dòng 1, Địa chỉ dòng 2 (tùy chọn), Thành phố, Mã bưu chính, Số điện thoại kèm mã vùng tự động cập nhật theo quốc gia (`+84` cho VN, `+1` cho US).
+- Form được trang bị pill tự động điền mẫu dữ liệu thử nghiệm hợp lệ (`Điền mẫu thẻ test`).
+- Toàn bộ thông tin thẻ và thông tin thanh toán chỉ lưu tạm thời trong bộ nhớ RAM của component React phục vụ trải nghiệm người dùng, tuyệt đối không gửi lên backend, không lưu cookie, không lưu localStorage hay database.
+
+### 15.4. Phần D: Kiểm tra an toàn bảo mật (Order Code, IDOR, Idempotency & Production Guards)
+- **Kiểm thực mã đơn hàng (`validate_order_code`):**
+  - Giới hạn độ dài tối đa 64 ký tự.
+  - Regex kiểm duyệt định dạng nghiêm ngặt: `^AM-(PLUS|PRIME)-\d{9,12}-[A-Z0-9]{4,12}$`.
+  - Từ chối ngay lập tức các chuỗi SQL injection, XSS, ký tự thường hoặc sai tiền tố bằng lỗi `422 INVALID_ORDER_CODE`.
+  - Frontend kiểm duyệt mã đơn trước khi gửi request để chặn đứng tham số URL độc hại.
+- **Chống lỗi phân quyền đối tượng (IDOR Protection):**
+  - Mọi API đọc (`GET /orders/{order_code}`), mô phỏng (`POST /orders/{order_code}/simulate`), và bắt giao dịch (`POST /orders/{order_code}/capture`) đều ràng buộc chặt chẽ điều kiện `order.user_id == account.user.id`.
+  - Nếu mã đơn không tồn tại hoặc thuộc tài khoản của người dùng khác, API luôn trả về `404 NOT_FOUND` đồng nhất, ngăn chặn kỹ thuật dò quét ID người dùng. Tài khoản Admin có quyền tra cứu phục vụ kiểm duyệt.
+- **Chống bắt giao dịch lặp và đảm bảo Idempotency (Row-level Locking):**
+  - Áp dụng khóa dòng database `with_for_update()` khi truy vấn đơn hàng trong giao dịch thanh toán.
+  - Nếu đơn hàng đã ở trạng thái `success`, API capture và simulate lập tức trả về đối tượng `OrderDto` hiện tại (HTTP 200) mà không trừ tiền, không gọi PayPal capture lại và không cộng dồn thêm ngày hội viên nhiều lần.
+  - Nếu đơn hàng đã kết thúc ở trạng thái `failed`, `cancelled` hoặc `expired`, API từ chối xử lý với mã lỗi `409 ORDER_NOT_PAYABLE`.
+- **Ranh giới an toàn môi trường Production (Production Boundary Guard):**
+  - Trong môi trường `production`, API capture yêu cầu bắt buộc phải có `paypal_order_id` hợp lệ và PayPal adapter đã được cấu hình.
+  - Nếu PayPal chưa cấu hình, API trả về `503 PAYPAL_NOT_CONFIGURED`, tuyệt đối không cho phép fallback mô phỏng tự động cấp quyền hội viên miễn phí.
+  - API `simulate` trực tiếp từ chối phục vụ trong môi trường `production` với mã lỗi `403 FORBIDDEN`.
+
+### 15.5. Tổng hợp Commit và Kết quả kiểm thử (Part E)
+- **Chuỗi Commit Conventional tiếng Việt:**
+  1. `b99a055`: `fix(checkout): sửa trạng thái điều hướng sau thanh toán`
+  2. `4ca1c56`: `style(receipt): thiết kế lại biên lai tối giản và sửa ngày giao dịch`
+  3. `ed0cad9`: `feat(checkout): bổ sung thông tin thanh toán thử nghiệm`
+  4. `2cd391b`: `test(payment): kiểm thử phân quyền mã đơn và chống capture lặp`
+
+- **Kết quả kiểm thử toàn diện:**
+  - **Frontend Unit Tests:** 79/79 passed (100%).
+  - **Frontend Build (Vite):** 0 errors, chunks build tối ưu thành công.
+  - **Backend Unit & Security Pytest:** 452 passed, 788 deselected (integration), 0 failed.
+  - **PayPal Sandbox Pytest (`test_paypal_sandbox.py`):** 4/4 passed.
+  - **Order Security Pytest (`test_order_security.py`):** 5/5 passed.
+  - **Playwright Premium E2E Suite (`premium-sandbox.spec.js`):** 17/17 passed (100%).
+  - **Database aurameme_demo:** Giữ nguyên vẹn 100%, không migration, không reset, không chỉnh sửa dữ liệu.
+
