@@ -58,9 +58,11 @@ class OrderDto(BaseModel):
     amount_usd_cents: int
     amount_usd_formatted: str
     amount_vnd: int
+    amount_vnd_formatted: str | None = None
     currency: str
     status: str
     provider: str
+    provider_txn_id: str | None = None
     payment_url: str | None = None
     created_at: datetime
     completed_at: datetime | None = None
@@ -323,6 +325,7 @@ def create_subscription_order(
 @router.get(
     "/orders",
     operation_id="listSubscriptionOrders",
+    response_model=list[OrderDto],
     responses={**ERRORS},
 )
 def list_subscription_orders(
@@ -335,23 +338,32 @@ def list_subscription_orders(
             .where(SubscriptionOrder.user_id == account.user.id)
             .order_by(SubscriptionOrder.created_at.desc())
         ).all()
-        return [
-            {
-                "id": str(o.id),
-                "order_code": o.order_code,
-                "tier": o.tier,
-                "provider": o.provider,
-                "amount_vnd": o.amount_vnd,
-                "duration_days": o.duration_days,
-                "status": o.status,
-                "provider_txn_id": o.provider_txn_id,
-                "created_at": o.created_at.isoformat() if o.created_at else None,
-                "completed_at": o.completed_at.isoformat() if o.completed_at else None,
-            }
-            for o in orders
-        ]
-    except Exception:
-        return []
+        result = []
+        for o in orders:
+            plan = get_plan(o.tier)
+            result.append(
+                OrderDto(
+                    id=o.id,
+                    order_code=o.order_code,
+                    tier=o.tier,
+                    duration_days=o.duration_days,
+                    amount_usd_cents=o.amount_cents,
+                    amount_usd_formatted=plan.amount_usd_formatted if plan else f"${o.amount_cents / 100:.2f}",
+                    amount_vnd=o.amount_vnd,
+                    amount_vnd_formatted=f"{o.amount_vnd:,} VNĐ".replace(",", "."),
+                    currency=o.currency,
+                    status=o.status,
+                    provider=o.provider,
+                    provider_txn_id=o.provider_txn_id,
+                    payment_url=o.payment_url,
+                    created_at=o.created_at,
+                    completed_at=o.completed_at,
+                )
+            )
+        return result
+    except Exception as exc:
+        logger.error("Failed to list subscription orders for user %s: %s", account.user.id, exc, exc_info=True)
+        raise AuthError(500, "INTERNAL_ERROR", "Không thể lấy danh sách đơn hàng.")
 
 
 @router.get(

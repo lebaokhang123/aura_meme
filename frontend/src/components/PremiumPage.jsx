@@ -529,6 +529,30 @@ export default function PremiumPage() {
             <p className="u056-price-note">
               {t('Không tự động gia hạn.', 'No automatic renewal.')}
             </p>
+
+            <div style={{ textAlign: 'center', marginTop: '12px' }}>
+              <a
+                href="/premium/history"
+                className="premium-history-link"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '12.5px',
+                  color: 'var(--ux-accent, #38bdf8)',
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  transition: 'opacity 0.2s',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }} aria-hidden="true">
+                  receipt_long
+                </span>
+                {t('Xem lịch sử thanh toán & biên lai', 'View payment history & receipts')}
+              </a>
+            </div>
           </div>
         </section>
       </div>

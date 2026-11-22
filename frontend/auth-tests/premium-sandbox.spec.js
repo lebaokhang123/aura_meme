@@ -121,6 +121,41 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
       });
     }
 
+    if (path === '/premium/orders' && method === 'GET') {
+      return send(200, [
+        {
+          id: '00000000-0000-4000-8000-000000000001',
+          order_code: 'AM-PRIME-1795330988-XNSBYM98',
+          tier: 'prime',
+          duration_days: 365,
+          amount_usd_cents: 5000,
+          amount_usd_formatted: '$50',
+          amount_vnd: 1250000,
+          amount_vnd_formatted: '1.250.000 VNĐ',
+          currency: 'USD',
+          status: 'success',
+          provider: 'paypal_sandbox',
+          provider_txn_id: '78B98765ABC12345',
+          created_at: now,
+          completed_at: now,
+        },
+        {
+          id: '00000000-0000-4000-8000-000000000002',
+          order_code: 'AM-PLUS-1795335788-TAJ5HAE0',
+          tier: 'plus',
+          duration_days: 30,
+          amount_usd_cents: 500,
+          amount_usd_formatted: '$5',
+          amount_vnd: 130000,
+          amount_vnd_formatted: '130.000 VNĐ',
+          currency: 'USD',
+          status: 'pending',
+          provider: 'paypal_sandbox',
+          created_at: now,
+        },
+      ]);
+    }
+
     if (path.startsWith('/premium/orders/') && method === 'GET') {
       const code = path.split('/')[3];
       return send(200, {
@@ -875,6 +910,43 @@ test('Part D: Security check rejects invalid order codes and enforces read-only 
   await expect(page.locator('.checkout-btn-print-receipt')).toHaveCount(0);
   // Payment action button must not be present
   await expect(page.locator('.checkout-btn-pay')).toHaveCount(0);
+});
+
+test('Part E: Payment History page (/premium/history) displays orders, opens details modal and downloads receipt', async ({ page, context }) => {
+  await setupMockApi(context, 0, null);
+  await page.goto('/premium/history');
+
+  // Verify page header
+  await expect(page.locator('.history-title')).toHaveText('Lịch sử thanh toán & biên lai');
+
+  // Verify order table has 2 rows
+  const rows = page.locator('.history-row');
+  await expect(rows).toHaveCount(2);
+
+  // Check Prime order row
+  await expect(rows.first().locator('.history-td-code')).toContainText('AM-PRIME-1795330988-XNSBYM98');
+  await expect(rows.first().locator('.badge-tier-prime')).toBeVisible();
+  await expect(rows.first().locator('.badge-status-success')).toBeVisible();
+
+  const artifactsDir = 'C:/Users/sammy/.gemini/antigravity/brain/cc803197-d415-4eaf-80c2-1173a22c12aa';
+  await page.screenshot({ path: `${artifactsDir}/task5_payment_history_table.png`, fullPage: true });
+
+  // Click "Chi tiết" on first row -> opens detail modal
+  await rows.first().locator('.history-action-btn:has-text("Chi tiết")').click();
+  const detailModal = page.locator('.history-detail-modal');
+  await expect(detailModal).toBeVisible();
+  await expect(detailModal.locator('#history-detail-title')).toHaveText('Chi tiết giao dịch');
+  await expect(detailModal.locator('.history-detail-value code').first()).toHaveText('AM-PRIME-1795330988-XNSBYM98');
+  await page.screenshot({ path: `${artifactsDir}/task5_payment_history_modal.png` });
+
+  // Close modal
+  await detailModal.locator('.u081-close-btn').click();
+  await expect(detailModal).not.toBeVisible();
+
+  // Click "Tải biên lai" -> triggers download and displays toast
+  await rows.first().locator('.history-action-btn--download').click();
+  await expect(page.locator('.history-toast')).toBeVisible();
+  await expect(page.locator('.history-toast')).toContainText('Đã tải biên lai cho đơn hàng AM-PRIME-1795330988-XNSBYM98');
 });
 
 
