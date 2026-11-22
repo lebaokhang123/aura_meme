@@ -19,7 +19,7 @@ DEMO_ROOT = Path(__file__).resolve().parents[1] / 'demo.local'
 DEMO_REVISION = '0012_aura_v1'
 FIELDS = {'DATABASE_URL', 'DB_CONNECT_TIMEOUT', 'AUTH_SIGNING_KEY', 'AUTH_ENVIRONMENT',
           'AUTH_ALLOWED_ORIGINS', 'MEDIA_STORAGE_ROOT', 'CATALOG_STORAGE_ROOT'}
-OPTIONAL_FIELDS = {'VAULT_RUNTIME_ENABLED'}
+OPTIONAL_FIELDS = {'VAULT_RUNTIME_ENABLED', 'AURAMEME_OWNER_MEME_DEMO'}
 
 
 def validate_demo_url(value):
@@ -46,6 +46,9 @@ def demo_environment(root=None):
             raise ValueError
         values.setdefault('VAULT_RUNTIME_ENABLED','false')
         if values['VAULT_RUNTIME_ENABLED'] not in {'true','false'}:
+            raise ValueError
+        values.setdefault('AURAMEME_OWNER_MEME_DEMO', '1')
+        if values['AURAMEME_OWNER_MEME_DEMO'] not in {'0', '1', 'true', 'false'}:
             raise ValueError
         validate_demo_url(values['DATABASE_URL'])
         Settings(_env_file=None, database_url=values['DATABASE_URL'], db_connect_timeout=values['DB_CONNECT_TIMEOUT'])
