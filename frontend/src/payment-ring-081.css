@@ -451,18 +451,27 @@
 .checkout-back-link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   color: var(--am-secondary, #d0bcff);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 13.5px;
+  font-weight: 600;
   text-decoration: none;
   width: fit-content;
-  transition: opacity 0.15s ease;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(208, 188, 255, 0.06);
+  border: 1px solid rgba(208, 188, 255, 0.2);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  margin-bottom: 4px;
+  align-self: flex-start;
 }
 
 .checkout-back-link:hover {
-  opacity: 0.8;
-  text-decoration: underline;
+  background: rgba(208, 188, 255, 0.15);
+  border-color: rgba(208, 188, 255, 0.4);
+  color: #ffffff;
+  transform: translateX(-3px);
+  text-decoration: none;
 }
 
 .checkout-header {
@@ -804,6 +813,13 @@
   margin-left: 8px;
 }
 
+.checkout-method-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 /* PayPal Action Box */
 .checkout-paypal-action-box {
   background: rgba(0, 112, 186, 0.08);
@@ -814,6 +830,169 @@
   flex-direction: column;
   gap: 14px;
   animation: checkoutSlideDown 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.checkout-paypal-btn-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  align-items: stretch;
+}
+
+.checkout-btn-paypal {
+  flex: 4;
+  min-height: 48px;
+  background: linear-gradient(135deg, #0070ba 0%, #003087 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700 !important;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 112, 186, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.checkout-btn-paypal-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.checkout-instant-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
+
+.checkout-btn-instant {
+  width: 100%;
+  min-height: 48px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(0, 112, 186, 0.4);
+  color: #38bdf8;
+  border-radius: 12px;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.checkout-btn-instant:hover {
+  background: rgba(0, 112, 186, 0.2);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.checkout-btn-instant.confirming {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #fbbf24;
+  color: #fbbf24;
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.35);
+  animation: instantPulse 1.2s infinite;
+}
+
+@keyframes instantPulse {
+  0%, 100% {
+    box-shadow: 0 0 14px rgba(251, 191, 36, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(251, 191, 36, 0.85);
+  }
+}
+
+.checkout-instant-bolt {
+  font-size: 22px;
+}
+
+/* Tooltip on instant button */
+.checkout-instant-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  background: #111827;
+  color: #f3f4f6;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform: translateY(4px);
+  z-index: 20;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.checkout-instant-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  right: 18px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #111827 transparent transparent transparent;
+}
+
+.checkout-instant-wrapper:hover .checkout-instant-tooltip,
+.checkout-btn-instant.confirming + .checkout-instant-tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.checkout-btn-instant.confirming + .checkout-instant-tooltip {
+  background: #78350f;
+  color: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.checkout-btn-instant.confirming + .checkout-instant-tooltip::after {
+  border-color: #78350f transparent transparent transparent;
+}
+
+/* Receipt download row */
+.u081-receipt-download-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  margin-top: 6px;
+}
+
+.checkout-btn-download-receipt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.checkout-btn-download-receipt:hover {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
 }
 
 .checkout-paypal-desc {

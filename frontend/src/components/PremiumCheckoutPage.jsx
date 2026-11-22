@@ -1,9 +1,11 @@
 // Lucian UX/UI Prompt #081 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#081
 // Dedicated Simulated Checkout Page for AuraMeme Cyberpunk Cultivation Platform
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePreferences } from '../PreferencesContext.jsx';
 import { usePremium } from '../PremiumContext.jsx';
 import { auth } from '../auth.js';
+import { readDemoUser } from '../demo.js';
+import { downloadReceiptPdf } from '../receipt-pdf.js';
 import '../payment-ring-081.css';
 
 export default function PremiumCheckoutPage() {
@@ -31,6 +33,28 @@ export default function PremiumCheckoutPage() {
   const [statusText, setStatusText] = useState('');
   const [checkoutError, setCheckoutError] = useState('');
   const [receipt, setReceipt] = useState(null);
+  const [instantConfirmStep, setInstantConfirmStep] = useState(0);
+  const instantTimerRef = useRef(null);
+
+  const handleInstantCaptureClick = () => {
+    if (instantConfirmStep === 0) {
+      setInstantConfirmStep(1);
+      if (instantTimerRef.current) clearTimeout(instantTimerRef.current);
+      instantTimerRef.current = setTimeout(() => {
+        setInstantConfirmStep(0);
+      }, 4000);
+    } else {
+      if (instantTimerRef.current) clearTimeout(instantTimerRef.current);
+      setInstantConfirmStep(0);
+      executeCapture();
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (instantTimerRef.current) clearTimeout(instantTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -333,7 +357,7 @@ export default function PremiumCheckoutPage() {
 
             <div className="u081-note">
               <span className="material-symbols-outlined" aria-hidden="true">info</span>
-              <span>{t('Hệ thống PayPal Sandbox — Không thu tiền thật', 'PayPal Sandbox — No real money charged')}</span>
+              <span>{t('Hệ thống thanh toán thử nghiệm', 'Sandbox Payment System')}</span>
             </div>
           </section>
 
@@ -422,6 +446,23 @@ export default function PremiumCheckoutPage() {
                   <span>{t('Trạng thái', 'Status')}:</span>
                   <span className="u081-receipt-badge">{t('ĐÃ KÍCH HOẠT (ACTIVE)', 'ACTIVE')}</span>
                 </div>
+                <div className="u081-receipt-row u081-receipt-download-row">
+                  <span>{t('Biên lai:', 'Receipt:')}</span>
+                  <button
+                    type="button"
+                    className="checkout-btn-download-receipt"
+                    onClick={() => {
+                      const activeUser = auth.snapshot()?.user || readDemoUser?.();
+                      downloadReceiptPdf(receipt || order, activeUser);
+                    }}
+                    title={t('Tải về biên lai PDF', 'Download PDF Receipt')}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                      download
+                    </span>
+                    <span>{t('Tải về', 'Download')}</span>
+                  </button>
+                </div>
 
                 <a href="/" className="checkout-btn-home">
                   <span className="material-symbols-outlined" aria-hidden="true">
@@ -450,12 +491,16 @@ export default function PremiumCheckoutPage() {
                     onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setPaymentMethod('paypal')}
                   >
                     <div className="checkout-method-info">
-                      <span className="material-symbols-outlined checkout-method-icon">
-                        account_balance_wallet
-                      </span>
+                      <img
+                        src="/assets/payment/paypal.png"
+                        alt="PayPal"
+                        className="checkout-method-img"
+                        width="28"
+                        height="28"
+                      />
                       <div className="checkout-method-text">
                         <h3>
-                          PayPal Sandbox
+                          PayPal
                           <span className="checkout-method-badge">{t('Cổng chính', 'Primary')}</span>
                         </h3>
                         <p>{t('Thanh toán an toàn qua cổng PayPal Sandbox v2', 'Secure payment via PayPal Sandbox v2')}</p>
@@ -476,9 +521,13 @@ export default function PremiumCheckoutPage() {
                     onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setPaymentMethod('card')}
                   >
                     <div className="checkout-method-info">
-                      <span className="material-symbols-outlined checkout-method-icon">
-                        credit_card
-                      </span>
+                      <img
+                        src="/assets/payment/credit_card.png"
+                        alt="Credit Card"
+                        className="checkout-method-img"
+                        width="28"
+                        height="28"
+                      />
                       <div className="checkout-method-text">
                         <h3>{t('Nhập thẻ thử nghiệm', 'Simulated Card Input')}</h3>
                         <p>{t('Mô phỏng tức thì trên trình duyệt', 'Instant browser simulation')}</p>
@@ -490,50 +539,62 @@ export default function PremiumCheckoutPage() {
                   </div>
                 </div>
 
-                {/* Option 1: PayPal Sandbox Action Box */}
+                {/* Option 1: PayPal Action Box with 4:1 row layout */}
                 {paymentMethod === 'paypal' && (
                   <div className="checkout-paypal-action-box paypal-action-card">
-                    <div className="checkout-paypal-desc">
-                      <span className="material-symbols-outlined" aria-hidden="true">
-                        open_in_new
-                      </span>
-                      <span>
-                        {t(
-                          'Bạn sẽ được chuyển sang PayPal Sandbox để xác nhận thanh toán an toàn không dùng tiền thật.',
-                          'You will be redirected to PayPal Sandbox to authorize payment securely without real charges.'
-                        )}
-                      </span>
+                    <div className="checkout-paypal-btn-row">
+                      <button
+                        type="button"
+                        className="checkout-btn-paypal"
+                        disabled={isSpinning}
+                        onClick={() => {
+                          if (order.payment_url && !order.payment_url.includes('token=MOCK-')) {
+                            sessionStorage.setItem('am_checkout_order', order.order_code);
+                            window.location.assign(order.payment_url);
+                          } else {
+                            executeCapture();
+                          }
+                        }}
+                      >
+                        <img
+                          src="/assets/payment/paypal.png"
+                          alt=""
+                          aria-hidden="true"
+                          className="checkout-btn-paypal-icon"
+                          width="20"
+                          height="20"
+                        />
+                        <span>{t('Thanh toán ngay', 'Pay Now')}</span>
+                      </button>
+
+                      <div className="checkout-instant-wrapper">
+                        <button
+                          type="button"
+                          className={`checkout-btn-instant checkout-btn-secondary ${instantConfirmStep === 1 ? 'confirming' : ''}`}
+                          disabled={isSpinning}
+                          onClick={handleInstantCaptureClick}
+                          aria-label={
+                            instantConfirmStep === 1
+                              ? t('Bấm lại lần nữa để xác nhận', 'Click again to confirm')
+                              : t('Duyệt thanh toán thử nghiệm PayPal tức thì', 'Instant sandbox approval')
+                          }
+                          title={
+                            instantConfirmStep === 1
+                              ? t('Bấm lại lần nữa để xác nhận', 'Click again to confirm')
+                              : t('Duyệt thanh toán thử nghiệm PayPal tức thì', 'Instant sandbox approval')
+                          }
+                        >
+                          <span className="material-symbols-outlined checkout-instant-bolt">
+                            bolt
+                          </span>
+                        </button>
+                        <span className="checkout-instant-tooltip" role="tooltip">
+                          {instantConfirmStep === 1
+                            ? t('Bấm lại lần nữa để xác nhận', 'Click again to confirm')
+                            : t('Duyệt thanh toán thử nghiệm PayPal tức thì', 'Instant sandbox approval')}
+                        </span>
+                      </div>
                     </div>
-
-                    <button
-                      type="button"
-                      className="checkout-btn-paypal"
-                      disabled={isSpinning}
-                      onClick={() => {
-                        if (order.payment_url && !order.payment_url.includes('token=MOCK-')) {
-                          sessionStorage.setItem('am_checkout_order', order.order_code);
-                          window.location.assign(order.payment_url);
-                        } else {
-                          executeCapture();
-                        }
-                      }}
-                    >
-                      <span className="material-symbols-outlined">shopping_cart_checkout</span>
-                      <span>{t('Thanh toán với PayPal', 'Pay with PayPal')}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="checkout-btn-secondary"
-                      disabled={isSpinning}
-                      onClick={() => executeCapture()}
-                      title={t('Mô phỏng duyệt và capture đơn ngay lập tức', 'Simulate instant approval and capture')}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-                        bolt
-                      </span>
-                      <span>{t('Mô phỏng duyệt Sandbox tức thì', 'Quick Sandbox Capture')}</span>
-                    </button>
                   </div>
                 )}
               </>
