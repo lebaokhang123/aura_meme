@@ -23,7 +23,12 @@ test('crud text, category/search/Hot, emoji comment, reaction, edit, delete and 
  const card=page.locator('[data-post-id]').filter({hasText:'Social E2E Công nghệ'});await expect(card).toHaveCount(1);
  const id=await card.getAttribute('data-post-id');
  for(const kind of ['like','love','laugh','fire','sad','angry']){
-  await card.getByRole('button',{name:'Thả biểu cảm',exact:true}).click();await page.locator('[data-reaction='+kind+']').click();
+  await card.getByRole('button',{name:'Thả biểu cảm',exact:true}).click();
+  const mutation=page.waitForResponse(response=>response.request().method()==='PUT'
+   &&new URL(response.url()).pathname==='/api/v1/posts/'+id+'/reactions');
+  await page.locator('[data-reaction='+kind+']').click();
+  const result=await mutation;
+  expect(result.status(),kind+' reaction HTTP status').toBe(200);
   await expect(card.locator('[data-reaction-pill='+kind+']')).toContainText('1');await expect(card.locator('[data-reaction-pill]')).toHaveCount(1);
  }
  await card.locator('[data-reaction-pill=angry]').click();await expect(card.locator('[data-reaction-pill]')).toHaveCount(0);
