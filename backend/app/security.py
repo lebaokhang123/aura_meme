@@ -133,11 +133,12 @@ class AuthBoundaryMiddleware:
             runtime.limiter.check("ip:" + peer, 600, 60)
             limit = {"register": 5, "login": 10, "contact": 5, "forgot-password": 5, "reset-password": 5}.get(scope["path"].rsplit("/", 1)[-1], 300)
             runtime.limiter.check(scope["path"] + ":" + peer, limit, 60)
-            if scope["path"] == "/api/v1/media" and scope["method"] == "POST":
+            if scope["path"] in ("/api/v1/media", "/api/v1/admin/assets/upload") and scope["method"] == "POST":
                 from app.media import MAX_REQUEST_BYTES
                 size = 0
                 lengths = [value for name, value in scope["headers"] if name == b"content-length"]
                 declared = None
+                max_upload = 15 * 1024 * 1024 if scope["path"] == "/api/v1/admin/assets/upload" else MAX_REQUEST_BYTES
 
                 async def bounded_receive():
                     nonlocal size, declared
@@ -145,12 +146,12 @@ class AuthBoundaryMiddleware:
                         if len(lengths) != 1 or not lengths[0].isdigit() or len(lengths[0]) > 10:
                             raise AuthError(422, "VALIDATION_ERROR", "Invalid Content-Length.")
                         declared = int(lengths[0])
-                        if declared > MAX_REQUEST_BYTES:
+                        if declared > max_upload:
                             raise AuthError(422, "VALIDATION_ERROR", "Request body too large.")
                     event = await receive()
                     if event["type"] == "http.request":
                         size += len(event.get("body", b""))
-                        if size > MAX_REQUEST_BYTES or (declared is not None and size > declared):
+                        if size > max_upload or (declared is not None and size > declared):
                             raise AuthError(422, "VALIDATION_ERROR", "Request body too large.")
                         if not event.get("more_body", False) and declared is not None and size != declared:
                             raise AuthError(422, "VALIDATION_ERROR", "Incomplete request body.")

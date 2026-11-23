@@ -1,5 +1,14 @@
 export class AuthError extends Error {
-  constructor(status,code,metadata={}){super(code);this.name='AuthError';this.status=status;this.code=code;if(Number.isSafeInteger(metadata.retryAfter)&&metadata.retryAfter>0&&metadata.retryAfter<=86400)this.retryAfter=metadata.retryAfter;if(typeof metadata.nextOpenAt==='string'&&/^\d{4}-\d{2}-\d{2}T/.test(metadata.nextOpenAt)&&Number.isFinite(Date.parse(metadata.nextOpenAt)))this.nextOpenAt=metadata.nextOpenAt;}
+  constructor(status,code,metadata={}){
+    super(code);
+    this.name='AuthError';
+    this.status=status;
+    this.code=code;
+    if(typeof metadata.serverMessage==='string')this.serverMessage=metadata.serverMessage;
+    if(metadata.details)this.details=metadata.details;
+    if(Number.isSafeInteger(metadata.retryAfter)&&metadata.retryAfter>0&&metadata.retryAfter<=86400)this.retryAfter=metadata.retryAfter;
+    if(typeof metadata.nextOpenAt==='string'&&/^\d{4}-\d{2}-\d{2}T/.test(metadata.nextOpenAt)&&Number.isFinite(Date.parse(metadata.nextOpenAt)))this.nextOpenAt=metadata.nextOpenAt;
+  }
 }
 function sessionUser(value){
   if(!value||!(/^[0-9a-f-]{36}$/i).test(value.id)||!(/^[a-z0-9_]{3,32}$/).test(value.username)
@@ -20,7 +29,12 @@ export function createAuthClient({fetch=globalThis.fetch,notify=()=>{}}={}){
       const response=await fetch('/api/v1'+path,{credentials:'include',cache:'no-store',redirect:'error',...options,signal:controller.signal,headers:{Accept:'application/json',...options.headers}});
       if(response.status===204)return null;
       let body;try{body=await response.json();}catch{throw new AuthError(response.status,'PROTOCOL_ERROR');}
-      if(!response.ok)throw new AuthError(response.status,typeof body?.error?.code==='string'?body.error.code:'API_ERROR',{retryAfter:Number(response.headers.get('Retry-After')),nextOpenAt:body?.error?.details?.next_open_at});
+      if(!response.ok)throw new AuthError(response.status,typeof body?.error?.code==='string'?body.error.code:'API_ERROR',{
+        retryAfter:Number(response.headers.get('Retry-After')),
+        nextOpenAt:body?.error?.details?.next_open_at,
+        serverMessage:typeof body?.error?.message==='string'?body.error.message:undefined,
+        details:body?.error?.details
+      });
       return body;
     }catch(error){if(error instanceof AuthError)throw error;throw new AuthError(0,'NETWORK_ERROR');}
     finally{clearTimeout(timer);}
@@ -71,7 +85,7 @@ export function authMessage(error,language='vi'){
     CONFLICT:['Tên đăng nhập hoặc email đã được sử dụng.','Username or email is already in use.'],
     USERNAME_EXISTS:['Tag này đã được sử dụng. Vui lòng chọn tag khác.','This tag is already in use. Please choose another one.'],
     EMAIL_EXISTS:['Email này đã được đăng ký. Vui lòng đăng nhập.','This email is already registered. Please sign in.'],
-    VALIDATION_ERROR:['Thông tin chưa hợp lệ. Mật khẩu cần 12–128 ký tự; tên đăng nhập dùng chữ thường, số hoặc dấu gạch dưới.','Invalid details. Use a 12–128 character password and lowercase letters, numbers or underscores for the username.'],
+    VALIDATION_ERROR:['Thông tin dữ liệu chưa hợp lệ. Vui lòng kiểm tra lại thông tin đã nhập.','Invalid request data. Please check your input.'],
     RATE_LIMITED:['Quá nhiều lần thử. Vui lòng thử lại sau.','Too many attempts. Please try again later.'],
     ACCOUNT_LINK_REQUIRED:['Email này đã thuộc về tài khoản hiện có. Vui lòng đăng nhập bằng mật khẩu trước rồi liên kết Google.','This email belongs to an existing account. Sign in with your password first to link Google safely.'],
     ACCOUNT_UNVERIFIED:['Tài khoản chưa được kích hoạt. Vui lòng kiểm tra hộp thư email để xác minh tài khoản trước khi đăng nhập.','Account is not verified yet. Please check your email to activate your account.'],
@@ -92,6 +106,7 @@ export function authMessage(error,language='vi'){
     ZIP_PATH_TRAVERSAL:['Phát hiện đường dẫn không an toàn trong gói ZIP.','Unsafe file path detected inside the ZIP archive.'],
     NESTED_ZIP_FORBIDDEN:['Không cho phép gói ZIP lồng nhau.','Nested ZIP archives are not permitted.'],
   };
+  if(error?.serverMessage&&error.serverMessage!=='Invalid request data.')return error.serverMessage;
   if(error?.code==='SESSION_EXPIRED')return messages.SESSION_EXPIRED[language==='en'?1:0];
   if(error?.status===401)return language==='en'?'Incorrect email or password.':'Email hoặc mật khẩu không đúng.';
   const pair=messages[error?.code]||['Không thể xác thực. Vui lòng thử lại.','Unable to authenticate. Please try again.'];

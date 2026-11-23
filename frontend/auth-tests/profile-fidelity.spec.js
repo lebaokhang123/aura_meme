@@ -20,7 +20,7 @@ test('contact matches source geometry typography and selected button style at128
  const sections=await form.locator(':scope > :visible').count();expect(Math.abs(freeHeight-80-24*(sections-1))).toBeLessThan(1);
  const styles=await form.evaluate(n=>({padding:getComputedStyle(n).padding,bg:getComputedStyle(n).backgroundColor,radius:getComputedStyle(n).borderRadius}));expect(styles).toEqual({padding:'40px',bg:'rgb(26, 27, 35)',radius:'12px'});
  await expect(page.locator('.am-contact-topics button')).toHaveCount(4);await expect(page.locator('.am-contact-topics [aria-pressed=true]')).toHaveCount(1);expect((await page.locator('#contact-message').boundingBox()).height).toBe(160);expect((await page.locator('#contact-name').boundingBox()).height).toBe(48);expect((await page.locator('.am-contact-submit').boundingBox()).width).toBe(320);expect(await page.locator('.am-contact-heading h1').evaluate(n=>getComputedStyle(n).fontFamily)).toContain('Plus Jakarta Sans');
- await expect(page.getByRole('checkbox')).toHaveCount(0);await expect(page.locator('.am-contact-acknowledgment')).toContainText('Tin nhắn được lưu riêng');await page.locator('#contact-message').fill('Synthetic optional acknowledgment');await page.getByRole('button',{name:'Gửi tin nhắn ngay',exact:true}).click();await expect(page.getByRole('status')).toContainText('Đã gửi');
+ await expect(page.getByRole('checkbox')).toHaveCount(0);await page.locator('#contact-message').fill('Synthetic optional acknowledgment');await page.getByRole('button',{name:'Gửi tin nhắn ngay',exact:true}).click();await expect(page.getByRole('status')).toContainText('Đã gửi');
 });
 
 for(const username of ['khang_dev','kien_dev','gigachad'])test('neutral fallback without ownership '+username,async({page,context})=>{

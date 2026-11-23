@@ -780,6 +780,7 @@ def orders(
 def admin_read_order_receipt_pdf(
     order_id: UUID,
     download: bool = Query(False),
+    format: Literal['pdf', 'png'] = 'pdf',
     account=Depends(require_role('ADMIN')),
 ):
     db = account.db
@@ -839,6 +840,21 @@ def admin_read_order_receipt_pdf(
     pdf_bytes = generate_receipt_pdf_bytes(order_dict, username=username, recent_successful_orders=recent_dicts)
     if not pdf_bytes:
         raise AuthError(500, 'RENDER_ERROR', 'Unable to generate receipt PDF.')
+
+    if format == 'png':
+        import fitz
+        doc = fitz.open(stream=pdf_bytes, filetype='pdf')
+        page = doc.load_page(0)
+        pix = page.get_pixmap(dpi=150)
+        png_bytes = pix.tobytes('png')
+        return Response(
+            content=png_bytes,
+            media_type='image/png',
+            headers={
+                'Cache-Control': 'no-store, must-revalidate',
+                'X-Content-Type-Options': 'nosniff',
+            },
+        )
 
     disposition = f'attachment; filename="AuraMeme-Receipt-{order.order_code}.pdf"' if download else 'inline'
     return Response(
