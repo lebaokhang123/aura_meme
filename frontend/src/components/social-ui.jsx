@@ -13,13 +13,14 @@ export function CategorySelect({label,categories,value,onChange,disabled=false,p
     <span className="social-category-select__arrow" aria-hidden="true">{icon('expand_more',16)}</span>
   </div>);
 }
-export function socialReadError(error) {
-  return ({
+function socialReadError(error) {
+  const message = ({
     NETWORK_ERROR:'Không kết nối được máy chủ. Vui lòng thử lại.',
     PROTOCOL_ERROR:'Phản hồi máy chủ không hợp lệ.',
     NOT_READY:'Tính năng hoặc dữ liệu tạm thời chưa sẵn sàng.',
     SERVICE_UNAVAILABLE:'Máy chủ tạm thời chưa sẵn sàng. Vui lòng thử lại.',
-  })[error]||'Không tải được dữ liệu. Vui lòng thử lại.';
+  })[error];
+  return typeof message==='string'?message:'Không tải được dữ liệu. Vui lòng thử lại.';
 }
 
 export function SocialMessage({error,read=false}) {
