@@ -8,7 +8,7 @@ test('real PostgreSQL registration, cookie login, reload, CSRF rejection and log
  await page.locator('#terms').check();await page.locator('#loginForm button[type=submit]').click();
  await expect(page).toHaveURL(/\/login\?registered=1$/);
  await page.locator('#identifier').fill(name+'@example.com');await page.locator('#password').fill('wrong-password');
- await page.locator('#loginForm button[type=submit]').click();await expect(page.getByRole('alert')).toContainText('không đúng');
+ await page.locator('#loginForm button[type=submit]').click();await expect(page.locator('#loginForm').getByRole('alert')).toContainText('không đúng');
  await page.locator('#password').fill(password);await page.locator('#loginForm button[type=submit]').click();
  await expect(page).toHaveURL(/\/$/);await expect(page.locator('.account-avatar')).toBeVisible();
  const me=await page.request.get('/api/v1/users/me');expect(me.status()).toBe(200);

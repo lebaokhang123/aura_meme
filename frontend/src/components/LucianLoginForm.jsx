@@ -62,7 +62,8 @@ export default function LucianLoginForm() {
 
     try {
       if (MOCK_AUTH) {
-        localStorage.setItem(USER_KEY, JSON.stringify(identifyDemoUser(trimmedId)));
+        const { username, displayName } = identifyDemoUser(trimmedId);
+        localStorage.setItem(USER_KEY, JSON.stringify({ username, displayName }));
       } else {
         await auth.login(trimmedId, password);
       }
