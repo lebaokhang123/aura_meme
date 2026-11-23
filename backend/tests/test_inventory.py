@@ -190,5 +190,6 @@ def test_public_collection_is_read_only_and_omits_quantity(inventory):
     client.cookies.clear()
     assert client.get(other_url).json()['items'] == [item]
     for status in ('locked', 'deleted'):
-        connection.execute(text("UPDATE users SET status=:status WHERE id=:id"), {'status': status, 'id': other})
+        connection.execute(text("UPDATE users SET status=:status, deleted_at=CASE WHEN :status='deleted' THEN now() END WHERE id=:id"),
+                           {'status': status, 'id': other})
         assert client.get(other_url).status_code == 404

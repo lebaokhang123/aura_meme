@@ -22,7 +22,7 @@ def upgrade():
         sa.Column("email_verified", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("provider IN ('google')", name="ck_user_oauth_identities_provider"),
+        sa.CheckConstraint("provider IN ('google')", name=op.f("ck_user_oauth_identities_provider")),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], name="fk_user_oauth_identities_user_id_users", ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id", name="pk_user_oauth_identities"),
         sa.UniqueConstraint("provider", "provider_sub", name="uq_user_oauth_identities_provider_sub"),
