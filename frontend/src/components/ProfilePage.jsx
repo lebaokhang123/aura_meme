@@ -32,13 +32,13 @@ export function ProfilePage(){
  const isProfilePlus = profileTier === 'plus';
  const hasProfileAura = isProfilePrime || isProfilePlus;
  React.useEffect(()=>{
-  if(mine)return;
+  if(!valid||profile.busy||profile.error)return;
   const targetEffect=p?.equipped_background_effect||null;
-  window.dispatchEvent(new CustomEvent('aurameme-profile-background-override',{detail:{effect:targetEffect,username}}));
+  window.dispatchEvent(new CustomEvent('aurameme-profile-background-override',{detail:{active:true,effect:targetEffect,username}}));
   return()=>{
-   window.dispatchEvent(new CustomEvent('aurameme-profile-background-override',{detail:{effect:null}}));
+   window.dispatchEvent(new CustomEvent('aurameme-profile-background-override',{detail:{active:false,effect:null}}));
   };
- },[mine,p?.equipped_background_effect,username]);
+ },[valid,profile.busy,profile.error,p?.equipped_background_effect,username]);
  return <main className="am-profile"><div className="am-profile-layout">{!valid?<p role="alert">{t('Không tìm thấy hồ sơ.','Profile not found.')}</p>:<LoadState state={profile}>{p&&<>
  <aside className="profile-rail am-profile-rail">
  <section className="am-profile-identity"><div className={`am-profile-avatar ${hasProfileAura ? (isProfilePrime ? 'has-aura-prime' : 'has-aura-plus') : ''}`}><div className="am-profile-avatar-glow"/><div className="am-profile-avatar-frame"><img className={`${isProfilePrime ? 'aura-avatar--prime' : isProfilePlus ? 'aura-avatar--plus' : ''}`} src={apiMedia(p.avatar_url)||'/assets/identity/default-avatar.svg'} alt={t('Ảnh đại diện ','Avatar of ')+p.display_name} width="112" height="112"/></div>{hasProfileAura && <span className={`aura-member-badge ${isProfilePrime ? 'aura-member-badge--prime' : 'aura-member-badge--plus'} w-6 h-6 bottom-[6px] right-[6px]`} title={isProfilePrime ? t('Hội viên Aura Prime', 'Aura Prime Member') : t('Hội viên Aura Plus', 'Aura Plus Member')}><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg></span>}</div>

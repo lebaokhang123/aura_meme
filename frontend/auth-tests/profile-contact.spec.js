@@ -83,12 +83,13 @@ test('owner edits name/bio with CSRF; owned inventory avatar uses existing equip
  await page.goto('/vault');await page.locator('.vault-item-card').click();await page.getByRole('button',{name:'Trang bị Avatar',exact:true}).click();await expect(page.locator('.vault-item-card')).toContainText('Đang trang bị');await expect(page.locator('.account-avatar')).toHaveAttribute('src','/api/v1/catalog/assets/'+owner.id);expect(s.requests.find(r=>r.p==='/inventory/equipment/avatar').body).toEqual({asset_id:owner.id});
  await page.getByRole('button',{name:'Dùng Avatar mặc định',exact:true}).click();await expect.poll(()=>s.requests.filter(r=>r.p==='/inventory/equipment/avatar').at(-1).body).toEqual({asset_id:null});await expect(page.locator('.account-avatar')).toHaveAttribute('src','/assets/identity/default-avatar.svg');
 });
-test('VI EN and keyboard preserve Contact draft, native validity prevents invalid email submits',async({page,context})=>{
+test('VI EN and keyboard preserve Contact draft, read-only identity fields are locked to account',async({page,context})=>{
  const s=await api(context);await page.goto('/contact');await page.locator('#contact-message').fill('Draft retained');
  await page.locator('.u267-gb').click();await page.getByRole('option',{name:'English',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Contact AuraMeme'})).toBeVisible();await expect(page.locator('#contact-message')).toHaveValue('Draft retained');
+ await expect(page.locator('#contact-name')).toHaveAttribute('readonly','');
+ await expect(page.locator('#contact-email')).toHaveAttribute('readonly','');
  await page.locator('#contact-name').focus();await page.keyboard.press('Tab');await expect(page.locator('#contact-email')).toBeFocused();
- await page.locator('#contact-email').fill('bad');await page.getByRole('button',{name:'Send message',exact:true}).click();expect(s.contact).toBeNull();
 });
 test('expired protected GET refreshes session before redirect',async({page,context})=>{
  const s=await api(context);await context.route('**/api/v1/inventory/me*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items:[],pagination:{page:1,page_size:20,total:21,total_pages:2}})}));await page.goto('/vault');await expect(page.getByRole('heading',{name:'Bảo Khố',exact:true})).toBeVisible();await page.getByRole('button',{name:'Kho của tôi',exact:true}).click();await expect(page.getByRole('button',{name:'Sau',exact:true})).toBeVisible();

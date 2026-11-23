@@ -64,13 +64,15 @@ def guest_guard(request: Request):
     return raw
 
 
-def current_session(db, runtime, raw):
+def current_session(db, runtime, raw, *, lock_user=True):
     if not raw or not TOKEN.fullmatch(raw):
         raise AuthError(401, "UNAUTHORIZED", "Invalid or expired session.")
     user_id = db.scalar(select(AuthSession.user_id).where(AuthSession.token_hash == digest(raw)))
     # Login/password changes lock user first; use that order everywhere to avoid lock inversion.
-    user = db.scalar(select(User).where(User.id == user_id).with_for_update()
-                     .execution_options(populate_existing=True)) if user_id else None
+    user_stmt = select(User).where(User.id == user_id).execution_options(populate_existing=True)
+    if lock_user:
+        user_stmt = user_stmt.with_for_update()
+    user = db.scalar(user_stmt) if user_id else None
     if user is None or user.status != "active":
         raise AuthError(401, "UNAUTHORIZED", "Invalid or expired session.")
     record = db.scalars(select(AuthSession).where(AuthSession.token_hash == digest(raw))

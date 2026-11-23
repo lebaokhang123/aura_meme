@@ -42,9 +42,13 @@ const effectsFiles=import.meta.glob('./generated/*.effects.json');
 function EquippedBackground(){
  const session=useSyncExternalStore(auth.subscribe,auth.snapshot),owner=session.user?.id;
  const [equipment,setEquipment]=React.useState({owner:null,effect:null});
- const [override,setOverride]=React.useState(null);
+ const [override,setOverride]=React.useState({active:false,effect:null});
  useEffect(()=>{
-  const onOverride=(e)=>setOverride(e.detail?.effect??null);
+  const onOverride=(e)=>{
+   const detail=e.detail||{};
+   const isActive=typeof detail.active==='boolean'?detail.active:detail.effect!==undefined&&detail.effect!==null;
+   setOverride({active:isActive,effect:detail.effect??null});
+  };
   window.addEventListener('aurameme-profile-background-override',onOverride);
   return()=>window.removeEventListener('aurameme-profile-background-override',onOverride);
  },[]);
@@ -58,7 +62,8 @@ function EquippedBackground(){
   return()=>{active=false;channel?.close();window.removeEventListener('aurameme-equipment-changed',changed);window.removeEventListener('focus',refresh)};
  },[owner]);
  const effect=!MOCK_AUTH&&session.status==='authenticated'&&equipment.owner===owner?equipment.effect:null;
- const activeEffect=override!==null?override:effect;
+ const isProfileRoute=location.pathname.startsWith('/profile')||location.pathname.startsWith('/u/');
+ const activeEffect=override.active?override.effect:(isProfileRoute?null:effect);
  useEffect(()=>{const root=document.getElementById('root');if(activeEffect)root.dataset.vaultBackground=activeEffect;else delete root.dataset.vaultBackground;return()=>{delete root.dataset.vaultBackground}},[activeEffect]);
  return <GlobalBackground effect={activeEffect}/>;
 }

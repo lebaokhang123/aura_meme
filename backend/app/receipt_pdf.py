@@ -194,8 +194,8 @@ def generate_receipt_pdf_bytes(
 
     # 1. HEADER
     _draw_text(page, "AURAMEME", 20, 26, bold=True, size=22, color=(17, 24, 39))
-    _draw_text(page, "AuraMeme Sandbox", 20, 31.5, bold=False, size=8.5, color=(107, 114, 128))
-    _draw_text(page, "thothayvtv38@gmail.com", 20, 36, bold=False, size=8.5, color=(107, 114, 128))
+    _draw_text(page, "AuraMeme Community", 20, 31.5, bold=False, size=8.5, color=(107, 114, 128))
+    _draw_text(page, "https://aurameme.com", 20, 36, bold=False, size=8.5, color=(107, 114, 128))
 
     _draw_text(page, "BIÊN LAI THANH TOÁN", 190, 25, bold=True, size=18, color=(17, 24, 39), align="right")
     _draw_text(page, "PAYMENT RECEIPT", 190, 30, bold=False, size=8.5, color=(107, 114, 128), align="right")
@@ -209,10 +209,10 @@ def generate_receipt_pdf_bytes(
 
     # 2. METADATA SECTION
     _draw_text(page, "ĐƠN VỊ PHÁT HÀNH / ISSUED BY", 20, 49.5, bold=True, size=7.5, color=(156, 163, 175))
-    _draw_text(page, "AuraMeme Project", 20, 56, bold=True, size=9.5, color=(31, 41, 55))
-    _draw_text(page, "AuraMeme Education & Sandbox", 20, 61.5, bold=False, size=8.5, color=(75, 85, 99))
-    _draw_text(page, "Hỗ trợ: thothayvtv38@gmail.com", 20, 67, bold=False, size=8.5, color=(75, 85, 99))
-    _draw_text(page, "Dự án học tập phi thương mại (Sandbox/Educational)", 20, 73, bold=False, size=7.5, color=(156, 163, 175))
+    _draw_text(page, "AuraSpark Global Inc.", 20, 56, bold=True, size=9.5, color=(31, 41, 55))
+    _draw_text(page, "AuraMeme Community", 20, 61.5, bold=False, size=8.5, color=(75, 85, 99))
+    _draw_text(page, "Hỗ trợ / Support: thothayvtv38@gmail.com", 20, 67, bold=False, size=8.5, color=(75, 85, 99))
+    _draw_text(page, "Dự án phi thương mại", 20, 73, bold=False, size=7.5, color=(156, 163, 175))
 
     _draw_text(page, "THÔNG TIN GIAO DỊCH / TRANSACTION DETAILS", 105, 49.5, bold=True, size=7.5, color=(156, 163, 175))
     meta_rows = [

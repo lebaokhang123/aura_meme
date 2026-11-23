@@ -11,7 +11,7 @@ from app.auth import CSRF_HEADER, ERRORS
 from app.auth_schemas import ErrorResponse
 from app.blog import page_rows
 from app.blog_schemas import Pagination, StrictInput
-from app.models import AdminAuditLog, ContactMessage
+from app.models import AdminAuditLog, ContactMessage, Profile
 from app.permissions import require_account_csrf, require_role
 from app.security import AuthError
 
@@ -19,15 +19,15 @@ router=APIRouter(prefix="/api/v1",tags=["Contact"])
 
 
 class ContactInput(StrictInput):
-    name:str=Field(min_length=1,max_length=100)
-    email:EmailStr
+    name:str|None=Field(None,min_length=1,max_length=100)
+    email:EmailStr|None=None
     subject:str=Field(min_length=1,max_length=160)
     body:str=Field(min_length=1,max_length=4000)
 
     @field_validator("name","subject","body")
     @classmethod
     def nonblank(cls,value):
-        if not value.strip():raise ValueError("Contact fields must not be blank.")
+        if value is not None and not value.strip():raise ValueError("Contact fields must not be blank.")
         return value
 
 
@@ -61,15 +61,28 @@ def send_contact(payload:ContactInput,request:Request,account=Depends(require_ac
     db,user_id=account.db,account.user.id
     request.app.state.auth.limiter.check(f"contact:{user_id}", 5, 600)
     now=request.app.state.auth.now()
-    row=ContactMessage(id=uuid4(),user_id=user_id,**payload.model_dump(),status="new",created_at=now,updated_at=now)
+    profile=db.get(Profile,user_id)
+    sender_name=(profile.display_name if profile and profile.display_name else account.user.username).strip()[:100]
+    sender_email=str(account.user.email).strip()
+    row=ContactMessage(
+        id=uuid4(),
+        user_id=user_id,
+        name=sender_name,
+        email=sender_email,
+        subject=payload.subject,
+        body=payload.body,
+        status="new",
+        created_at=now,
+        updated_at=now,
+    )
     db.add(row);db.flush()
     email_service = getattr(request.app.state, "email_service", None)
     if email_service is not None:
         try:
             email_service.send_contact_emails(
                 contact_id=str(row.id),
-                sender_name=payload.name,
-                sender_email=str(payload.email),
+                sender_name=sender_name,
+                sender_email=sender_email,
                 subject_line=payload.subject,
                 message_body=payload.body,
             )

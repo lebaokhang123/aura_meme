@@ -125,8 +125,8 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
   doc.setFont('Roboto', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(107, 114, 128);
-  doc.text('AuraMeme Sandbox', 20, 31.5);
-  doc.text('thothayvtv38@gmail.com', 20, 36);
+  doc.text('AuraMeme Community', 20, 31.5);
+  doc.text('https://aurameme.com', 20, 36);
 
   // Right: Document Title & Status
   doc.setFont('Roboto', 'bold');
@@ -164,17 +164,17 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
   doc.setFont('Roboto', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(31, 41, 55);
-  doc.text('AuraMeme Project', 20, 56);
+  doc.text('AuraSpark Global Inc.', 20, 56);
 
   doc.setFont('Roboto', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(75, 85, 99);
-  doc.text('AuraMeme Education & Sandbox', 20, 61.5);
-  doc.text('Hỗ trợ: thothayvtv38@gmail.com', 20, 67);
+  doc.text('AuraMeme Community', 20, 61.5);
+  doc.text('Hỗ trợ / Support: thothayvtv38@gmail.com', 20, 67);
 
   doc.setFontSize(7.5);
   doc.setTextColor(156, 163, 175);
-  doc.text('Dự án học tập phi thương mại (Sandbox/Educational)', 20, 73);
+  doc.text('Dự án phi thương mại', 20, 73);
 
   // Right Column: Thông tin giao dịch / Transaction Details
   doc.setFont('Roboto', 'bold');

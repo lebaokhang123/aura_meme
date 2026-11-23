@@ -206,7 +206,17 @@ def list_posts(request: Request, page: int = Query(1, ge=1), page_size: int = Qu
         raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
     statement = public_posts(request.app.state.auth.now())
     if search is not None:
-        statement = statement.where(or_(searchable(Post.title).contains(search_text(search), autoescape=True), searchable(Post.content).contains(search_text(search), autoescape=True)))
+        q_norm = search_text(search.lstrip("@#"))
+        statement = statement.where(
+            or_(
+                searchable(Post.title).contains(q_norm, autoescape=True),
+                searchable(Post.content).contains(q_norm, autoescape=True),
+                searchable(User.username).contains(q_norm, autoescape=True),
+                searchable(Profile.display_name).contains(q_norm, autoescape=True),
+                searchable(Category.name).contains(q_norm, autoescape=True),
+                searchable(Category.slug).contains(q_norm, autoescape=True),
+            )
+        )
     if category is not None:
         statement = statement.where(Category.slug == category)
     if author is not None:

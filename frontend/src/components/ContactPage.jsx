@@ -10,8 +10,9 @@ export function ContactPage() {
   const {language} = usePreferences();
   const t = (vi, en) => language === 'en' ? en : vi;
   const user = useSyncExternalStore(auth.subscribe, auth.snapshot).user;
-  const [name, setName] = useState(user?.display_name || '');
-  const [email, setEmail] = useState(user?.email || '');
+  const name = user?.display_name || user?.username || '';
+  const email = user?.email || '';
+  const identityReady = Boolean(name && email);
   const [subject, setSubject] = useState('Góp ý tính năng');
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
@@ -21,7 +22,7 @@ export function ContactPage() {
 
   async function submit(event) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || !identityReady) return;
     setBusy(true);
     setError(null);
     setSent(false);
@@ -55,11 +56,11 @@ export function ContactPage() {
         <div className="am-contact-fields">
           <div className="am-contact-field">
             <label htmlFor="contact-name">{t('Họ và tên / Nickname', 'Full name / Nickname')} <span className="am-contact-required">*</span></label>
-            <div className="am-contact-input">{icon('badge')}<input id="contact-name" name="name" required maxLength={100} value={name} onChange={event => setName(event.target.value)} autoComplete="name" placeholder={t('Ví dụ: KhangDev, KienDev', 'For example: KhangDev, KienDev')}/></div>
+            <div className="am-contact-input am-contact-input--locked">{icon('badge')}<input id="contact-name" name="name" required maxLength={100} value={name} readOnly aria-readonly="true" autoComplete="name" placeholder={t('Ví dụ: KhangDev, KienDev', 'For example: KhangDev, KienDev')}/><span className="material-symbols-outlined am-contact-lock-icon" aria-hidden="true" title={t('Liên kết cố định với tài khoản', 'Locked to your account')}>lock</span></div>
           </div>
           <div className="am-contact-field">
             <label htmlFor="contact-email">{t('Email phản hồi', 'Reply email')} <span className="am-contact-required">*</span></label>
-            <div className="am-contact-input">{icon('mail')}<input id="contact-email" name="email" type="email" required maxLength={254} value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" placeholder="name@example.com"/></div>
+            <div className="am-contact-input am-contact-input--locked">{icon('mail')}<input id="contact-email" name="email" type="email" required maxLength={254} value={email} readOnly aria-readonly="true" autoComplete="email" placeholder="name@example.com"/><span className="material-symbols-outlined am-contact-lock-icon" aria-hidden="true" title={t('Liên kết cố định với tài khoản', 'Locked to your account')}>lock</span></div>
           </div>
         </div>
         <fieldset className="am-contact-topics">
@@ -70,10 +71,10 @@ export function ContactPage() {
           <div className="am-contact-message-label"><label htmlFor="contact-message">{t('Nội dung tin nhắn', 'Message')} <span className="am-contact-required">*</span></label><span id="contact-counter">{body.length} / 4000 {t('ký tự', 'characters')}</span></div>
           <textarea id="contact-message" name="body" rows={5} required maxLength={4000} aria-describedby="contact-counter" value={body} onChange={event => setBody(event.target.value)} placeholder={t('Mô tả ngắn gọn điều bạn muốn gửi gắm tới AuraMeme (ý tưởng meme mới, lỗi font, giao diện, ý tưởng BXH...)...', 'Briefly describe what you would like to share with AuraMeme (new meme ideas, font or interface bugs, leaderboard ideas...)...')}/>
         </div>
-        <p className="am-contact-acknowledgment">{t('Tin nhắn được lưu riêng để ban quản trị xử lý, không gửi email tự động.', 'Messages are stored privately for administrators, without automatic email replies.')}</p>
+        <p className="am-contact-acknowledgment">{t('Tin nhắn sẽ được gửi tới ban quản trị và một email xác nhận tiếp nhận tự động sẽ được gửi về địa chỉ email tài khoản của bạn.', 'Messages are sent to administrators and an automatic confirmation email will be sent to your account email address.')}</p>
         {error && <p className="am-contact-error" role="alert">{errorText}</p>}
         <div className="am-contact-actions">
-          <button type="submit" className="am-contact-submit" disabled={busy}><span>{busy ? t('Đang gửi...', 'Sending...') : t('Gửi tin nhắn ngay', 'Send message')}</span>{icon('send')}</button>
+          <button type="submit" className="am-contact-submit" disabled={busy || !identityReady}><span>{busy ? t('Đang gửi...', 'Sending...') : t('Gửi tin nhắn ngay', 'Send message')}</span>{icon('send')}</button>
           <div className="am-contact-channels"><a href="https://github.com/lebaokhang123/aura_meme" target="_blank" rel="noopener noreferrer" aria-label="GitHub AuraMeme" title="GitHub"><GithubIcon/></a></div>
         </div>
         {sent && <div role="status" className="am-contact-success">{icon('task_alt')}<p>{t('Đã gửi tin nhắn tới ban quản trị.', 'Message sent to the administrators.')}</p></div>}

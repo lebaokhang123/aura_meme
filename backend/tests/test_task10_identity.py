@@ -306,7 +306,60 @@ def test_email_polish_subjects_cid_logo_contact_and_pdf_receipt():
     assert "@user_one_tag" in pdf_text
     assert "Aura Prime" in pdf_text
     assert "Thẻ mô phỏng nội bộ" in pdf_text
-    assert "thothayvtv38@gmail.com" in pdf_text
-    assert "AuraSpark" not in pdf_text
+    assert "AuraMeme Community" in pdf_text
+    assert "https://aurameme.com" in pdf_text
+    assert "AuraSpark Global Inc." in pdf_text
+    assert "Hỗ trợ / Support: thothayvtv38@gmail.com" in pdf_text
+    assert "Dự án phi thương mại" in pdf_text
+    assert "AuraMeme Sandbox" not in pdf_text
+    assert "AuraMeme Project" not in pdf_text
+    assert "AuraMeme Education & Sandbox" not in pdf_text
     assert "sammybkhang" not in pdf_text
+
+
+def test_contact_identity_lock_overrides_spoofed_client_fields():
+    from uuid import uuid4
+    from app.contact import ContactInput, send_contact
+
+    user_id = uuid4()
+    fake_user = SimpleNamespace(id=user_id, username="real_cultivator", email="real.user@aurameme.com")
+    fake_profile = SimpleNamespace(display_name="Real Cultivator Name")
+    added_rows = []
+    fake_db = SimpleNamespace(
+        get=lambda model, pk: fake_profile if pk == user_id else None,
+        add=lambda row: added_rows.append(row),
+        flush=lambda: None,
+    )
+    fake_account = SimpleNamespace(db=fake_db, user=fake_user)
+    sent_contacts = []
+    fake_request = SimpleNamespace(
+        app=SimpleNamespace(
+            state=SimpleNamespace(
+                auth=SimpleNamespace(
+                    limiter=SimpleNamespace(check=lambda *a, **kw: None),
+                    now=lambda: datetime(2026, 11, 23, 12, 0, 0, tzinfo=timezone.utc),
+                ),
+                email_service=SimpleNamespace(
+                    send_contact_emails=lambda **kw: sent_contacts.append(kw),
+                ),
+            )
+        )
+    )
+
+    payload = ContactInput(
+        name="Spoofed Attacker Name",
+        email="victim@otherdomain.com",
+        subject="Báo lỗi kỹ thuật",
+        body="Testing identity lock on contact submission.",
+    )
+    res = send_contact(payload, fake_request, fake_account)
+    assert res.status == "new"
+    assert len(added_rows) == 1
+    saved = added_rows[0]
+    assert saved.name == "Real Cultivator Name"
+    assert saved.email == "real.user@aurameme.com"
+    assert len(sent_contacts) == 1
+    assert sent_contacts[0]["sender_name"] == "Real Cultivator Name"
+    assert sent_contacts[0]["sender_email"] == "real.user@aurameme.com"
+
 

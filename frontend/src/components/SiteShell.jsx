@@ -90,6 +90,10 @@ export function SiteHeader() {
     const outside = event => { if (!event.target.closest('[data-header-popup]')) setOpen(null); };
     const keys = event => {
       if (event.key === 'Escape') {
+        if (document.activeElement?.closest('.site-search')) {
+          document.activeElement.blur();
+          return;
+        }
         header.current?.querySelector('[aria-expanded="true"]')?.focus();
         setOpen(null);
       }
@@ -109,7 +113,7 @@ export function SiteHeader() {
       <div className="site-header-inner">
         <a href="/" data-path="trang-chu" className="site-brand" aria-label="AuraMeme — Trang chủ"><img src="/assets/brand/favicon-64.png" alt="" width="32" height="32" /><span>Aura<span>Meme</span></span></a>
         <nav className="site-nav" aria-label="Điều hướng chính">{links}</nav>
-        <form className="site-search" role="search" onSubmit={event => { event.preventDefault(); update({ q: query.trim() }); }}>{symbol('search')}<input type="search" maxLength={100} value={query} onChange={event => { setQuery(event.target.value); if (!event.target.value) update({ q: '' }); }} aria-label="Tìm kiếm meme, tác giả, thẻ" placeholder="Tìm kiếm meme, tác giả, thẻ..." /><kbd>Ctrl K</kbd></form>
+        <form className="site-search" role="search" onSubmit={event => { event.preventDefault(); const trimmed = query.trim(); if (!trimmed && !['/', '/explore'].includes(path) && !filters.q) return; update({ q: trimmed }); }}><button type="submit" className="site-search-submit" aria-label={t('Tìm kiếm', 'Search')} title={t('Tìm kiếm', 'Search')} style={{ background: 'none', border: 'none', padding: 0, margin: 0, display: 'inline-flex', alignItems: 'center', color: 'inherit', cursor: 'pointer' }}>{symbol('search')}</button><input type="search" maxLength={100} value={query} onChange={event => { setQuery(event.target.value); }} aria-label="Tìm kiếm meme, tác giả, thẻ" placeholder="Tìm kiếm meme, tác giả, thẻ..." /><kbd>Ctrl K</kbd></form>
         <div className="site-tools">
           <ThemeSwitch />
           <LanguageSwitch open={open === 'language'} onToggle={() => toggle('language')} onClose={() => setOpen(null)} />
@@ -187,7 +191,7 @@ export function SiteHeader() {
           </> : <div className="site-auth">{auth}</div>}
           <div className="site-menu" data-header-popup="navigation"><button type="button" className="site-icon-button compact-menu-trigger" aria-label="Mở menu điều hướng" aria-expanded={open === 'navigation'} aria-controls="compact-navigation" onClick={() => toggle('navigation')}>{symbol(open === 'navigation' ? 'close' : 'menu')}</button>
             <nav id="compact-navigation" className="compact-navigation" aria-label="Điều hướng thu gọn" hidden={open !== 'navigation'}>
-              <div className="md:hidden"><form className="site-search" style={{ display: 'flex', minWidth: 0, margin: '4px 0 8px', width: '100%' }} role="search" onSubmit={event => { event.preventDefault(); update({ q: query.trim() }); setOpen(null); }}>{symbol('search')}<input type="search" maxLength={100} value={query} onChange={event => { setQuery(event.target.value); if (!event.target.value) update({ q: '' }); }} aria-label="Tìm kiếm meme, tác giả, thẻ" placeholder="Tìm kiếm bài viết..." /></form></div>
+              <div className="md:hidden"><form className="site-search" style={{ display: 'flex', minWidth: 0, margin: '4px 0 8px', width: '100%' }} role="search" onSubmit={event => { event.preventDefault(); const trimmed = query.trim(); if (!trimmed && !['/', '/explore'].includes(path) && !filters.q) { setOpen(null); return; } update({ q: trimmed }); setOpen(null); }}><button type="submit" className="site-search-submit" aria-label={t('Tìm kiếm', 'Search')} title={t('Tìm kiếm', 'Search')} style={{ background: 'none', border: 'none', padding: 0, margin: 0, display: 'inline-flex', alignItems: 'center', color: 'inherit', cursor: 'pointer' }}>{symbol('search')}</button><input type="search" maxLength={100} value={query} onChange={event => { setQuery(event.target.value); }} aria-label="Tìm kiếm meme, tác giả, thẻ" placeholder="Tìm kiếm bài viết..." /></form></div>
               {links}{!user && <div className="compact-auth">{auth}</div>}</nav>
           </div>
         </div>
