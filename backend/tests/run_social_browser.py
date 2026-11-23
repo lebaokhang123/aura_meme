@@ -2,7 +2,8 @@
 from pathlib import Path
 import os,sys,json,secrets,socket,subprocess,tempfile,time,urllib.request,io
 from contextlib import redirect_stdout
-from uuid import UUID
+from datetime import datetime, timezone
+from uuid import UUID, uuid4
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 from dotenv import dotenv_values
 from sqlalchemy import create_engine,select,text
@@ -10,7 +11,8 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 from run_browser import inventory
-from app.models import Base,User,Role,MediaUpload
+from app.models import Base, User, Profile, Role, UserRole, MediaUpload
+from app.admin_users import KHANG_DEV_ID, KIEN_DEV_ID
 from app.demo import bootstrap_admin
 from app.demo_accounts import ACCOUNTS,CONFIRMATION,account_plan,apply_accounts,api_mutation
 
@@ -21,7 +23,7 @@ def browser_target(config,e2e=False):
     url=dotenv_values(Path(config),interpolate=False).get("E2E_DATABASE_URL" if e2e else "TEST_DATABASE_URL","")
     assert url,"Explicit target URL required; no fallback"
     target=make_url(url)
-    assert (target.database,target.username)==(database,role) and target.host in {"localhost","127.0.0.1"} and target.port in {None,5432} and not target.query
+    assert (target.database,target.username)==(database,role) and target.host in {"localhost","127.0.0.1","::1"} and target.port in {None,5432} and not target.query
     return url,database,role
 
 
@@ -49,6 +51,7 @@ def main():
         image.save(fixtures/"fixture.gif",format="GIF",save_all=True,append_images=[Image.new("RGB",(24,24),(220,80,120))],duration=100,loop=0)
         env=os.environ|{"DATABASE_URL":url,"TEST_DATABASE_URL":"" if e2e else url,"E2E_DATABASE_URL":url if e2e else "","AUTH_SIGNING_KEY":secrets.token_hex(32),
           "AUTH_ENVIRONMENT":"development","AUTH_ALLOWED_ORIGINS":json.dumps(["http://localhost:4187"]),
+          "EMAIL_MODE":"disabled","EMAIL_VERIFICATION_REQUIRED":"false",
           "MEDIA_STORAGE_ROOT":str(media),"CATALOG_STORAGE_ROOT":str(Path(private)/"catalog"),
           "AURAMEME_API_TARGET":"http://127.0.0.1:8001","AURA_SOCIAL_E2E":"1","AURA_SOCIAL_FIXTURES":str(fixtures)}
         os.environ.update(env)
@@ -58,7 +61,24 @@ def main():
             def first_admin(ident):
                 with Session(engine) as db,db.begin(),redirect_stdout(io.StringIO()):bootstrap_admin(db,UUID(ident),lambda prompt:CONFIRMATION)
             with TestClient(app,base_url="http://localhost:8001") as client:
-                ids=apply_accounts(client,account_plan([],0),{a["username"]:PASSWORD for a in ACCOUNTS},first_admin,origin="http://localhost:4187")
+                records = [
+                    {**account, "id": ident, "status": "active", "roles": ["USER"]}
+                    for account, ident in zip(ACCOUNTS, (KHANG_DEV_ID, KIEN_DEV_ID))
+                ]
+                now = datetime.now(timezone.utc)
+                with Session(engine) as database_session, database_session.begin():
+                    role = Role(id=uuid4(), code="USER", description="Synthetic Social E2E role")
+                    database_session.add(role)
+                    database_session.flush()
+                    for row in records:
+                        database_session.add(User(
+                            id=row["id"], username=row["username"], email=row["email"], status="active",
+                            password_hash=app.state.auth.hasher.hash(PASSWORD), created_at=now, updated_at=now))
+                        database_session.flush()
+                        database_session.add(Profile(
+                            user_id=row["id"], display_name=row["display_name"], updated_at=now))
+                        database_session.add(UserRole(user_id=row["id"], role_id=role.id, granted_at=now))
+                ids=apply_accounts(client,account_plan(records,0),{a["username"]:PASSWORD for a in ACCOUNTS},first_admin,origin="http://localhost:4187")
                 api_mutation(client,"POST","/auth/login",{"email":ACCOUNTS[0]["email"],"password":PASSWORD},origin="http://localhost:4187")
                 for slug in ("gaming","anime","cong-nghe","truong-hoc","random"):
                     api_mutation(client,"POST","/admin/categories",{"slug":slug,"name":slug},origin="http://localhost:4187")

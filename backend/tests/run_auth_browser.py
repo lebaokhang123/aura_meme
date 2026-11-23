@@ -25,7 +25,7 @@ def main():
     config=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/'e2e.local/.env'
     values={k:v for k,v in dotenv_values(config).items() if v is not None}
     url=make_url(values.get('DATABASE_URL',''))
-    assert url.database=='aurameme_e2e' and url.username=='aurameme_e2e_app' and url.host in {'127.0.0.1','localhost'} and not url.query
+    assert url.database=='aurameme_e2e' and url.username=='aurameme_e2e_app' and url.host in {'127.0.0.1','localhost','::1'} and not url.query
     engine=create_db_engine(Settings(_env_file=None,database_url=values['DATABASE_URL']))
     with engine.connect() as connection:
         connection.exec_driver_sql('SET TRANSACTION READ ONLY')
@@ -41,6 +41,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix='aurameme-auth-e2e-') as private:
             environment=os.environ|values|{
                 'AUTH_ENVIRONMENT':'development','AUTH_ALLOWED_ORIGINS':json.dumps(['http://localhost:4187']),
+                'EMAIL_MODE':'disabled','EMAIL_VERIFICATION_REQUIRED':'false',
                 'MEDIA_STORAGE_ROOT':private,'AURAMEME_API_TARGET':'http://127.0.0.1:8001','AURA_AUTH_E2E_PREFIX':prefix,
             }
             api=subprocess.Popen([sys.executable,'-m','uvicorn','app.main:app','--host','127.0.0.1','--port','8001'],cwd=ROOT,env=environment,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
