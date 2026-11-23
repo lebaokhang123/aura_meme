@@ -8,6 +8,7 @@ for (const role of ['guest', 'user']) for (const width of [375, 768, 1440]) for 
     await page.addInitScript(user => { if (user) localStorage.setItem('aurameme-stitch-demo-user', JSON.stringify({ displayName:'Khang Dev',username:'Khang_dev' })); }, role === 'user');
     const errors=[]; page.on('pageerror', e=>errors.push(e.message));
     await page.goto(route);
+    await page.locator('[data-cookie-ess]').click();
     await expect(visiblePosts(page)).toHaveCount(3);
     expect(await ids(page)).toEqual(['khang','kien','gigachad']);
     if (route === '/') {

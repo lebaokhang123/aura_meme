@@ -120,7 +120,7 @@ export function DemoFeed({ variant }) {
         </button>
       </div>
     )}
-    {filters.q && <UserSearchSection query={filters.q} />}
+    {!MOCK_AUTH && filters.q && <UserSearchSection query={filters.q} />}
     {filters.q && (
       <div className="col-span-full mb-2">
         <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold flex items-center gap-2">

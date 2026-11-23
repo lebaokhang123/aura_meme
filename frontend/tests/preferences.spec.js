@@ -108,6 +108,8 @@ test('switching both preferences preserves filters, demo identity and native pos
 test('checked agreement remains visible in light mode and keeps user edits across languages', async ({page}) => {
   await page.goto('/register');
   const terms=page.locator('#terms');
+  await expect(terms).not.toBeChecked();
+  await terms.check();
   await expect(terms).toBeChecked();
   await page.locator('.u219-tg').click();
   await expect(page.locator('#root')).toHaveAttribute('data-theme','light');
