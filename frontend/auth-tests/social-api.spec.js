@@ -6,7 +6,7 @@ const kinds=['like','love','laugh','fire','sad','angry'],counts=()=>Object.fromE
 const user={id:uid,username:'constructor',display_name:'New Author',email:'new@example.com',roles:['USER'],status:'active',avatar_url:null};
 async function server(context,{roles=['USER']}={}){
  const categories=[['gaming','Gaming'],['anime','Anime'],['cong-nghe','Công nghệ'],['truong-hoc','Trường học'],['random','Random']].map(([slug,name],i)=>({slug,name,id:'00000000-0000-4000-8000-'+String(i+2).padStart(12,'0'),status:'active'}));
- const state={user:null,posts:[],comments:[],requests:[],dropReplyOnce:false,failFeedOnce:false,paginate:false,categories};
+ const state={user:null,posts:[],comments:[],requests:[],dropReplyOnce:false,failFeedOnce:false,paginate:false,loginUser:null,categories};
  await context.route('**/api/v1/**',async route=>{
   const req=route.request(),url=new URL(req.url()),p=url.pathname.replace('/api/v1',''),method=req.method();
   let body;try{body=req.postDataJSON()}catch{}
@@ -19,7 +19,7 @@ async function server(context,{roles=['USER']}={}){
   if(p==='/aura/progress')return state.user?send(200,auraProgressFixture):fail(401,'UNAUTHORIZED');
   if(p==='/users/me')return state.user?send(200,state.user):fail(401,'UNAUTHORIZED');
   if(p==='/auth/csrf')return send(200,{csrf_token:'bound-csrf'});
-  if(p==='/auth/login'){state.user={...user,roles};return send(200,state.user)}
+  if(p==='/auth/login'){state.user={...(state.loginUser||user),roles};return send(200,state.user)}
   if(p==='/auth/logout'){state.user=null;return send(204)}
   if(p==='/categories')return send(200,page(categories.map(c=>({...c,post_count:state.posts.filter(p=>(p.category_id||cid)===c.id).length}))));
   if(method==='GET'&&p==='/posts'){
@@ -36,7 +36,14 @@ async function server(context,{roles=['USER']}={}){
   }
   const post=state.posts.find(v=>p==='/posts/'+v.id||p.startsWith('/posts/'+v.id+'/'));
   if(method==='GET'&&p.endsWith('/interactions')&&post)return send(200,interactions(post));
-  if(method==='GET'&&p.endsWith('/comments'))return send(200,page(state.comments.filter(c=>c.post_id===post?.id).map(c=>({...c,author:c.author||user,created_at:'2026-11-13T00:00:00Z'}))));
+  if(method==='GET'&&p.endsWith('/comments')){
+   const rows=state.comments.filter(c=>c.post_id===post?.id).map(c=>({...c,author:c.author||user,created_at:'2026-11-13T00:00:00Z'}));
+   if(!state.paginate)return send(200,page(rows));
+   const number=Number(url.searchParams.get('page'));
+   const size=Number(url.searchParams.get('page_size'));
+   return send(200,{items:rows.slice((number-1)*size,number*size),
+    pagination:{page:number,page_size:size,total:rows.length,total_pages:Math.ceil(rows.length/size)}});
+  }
   if(method==='GET'&&post)return send(200,dto(post));
   const comment=state.comments.find(c=>p==='/comments/'+c.id+'/interactions');
   if(comment)return send(200,{comment_id:comment.id,reaction_counts:counts(),viewer_reaction:null});
@@ -248,4 +255,59 @@ test('Explore keeps loaded API results when retrying the next page',async({page,
  await page.getByRole('alert').getByRole('button',{name:'Thử lại'}).click();
  await expect(page.locator('article[data-post-id]:visible')).toHaveCount(21);
  expect(api.requests.filter(request=>request.p==='/posts').map(request=>request.query.page)).toEqual(['1','2','2']);
+});
+
+test('reopening paginated comments keeps both pages and a write refreshes them',async({page,context})=>{
+ const api=await server(context);
+ api.paginate=true;
+ const postId='00000000-0000-4000-8000-000000000040';
+ api.posts=[{id:postId,title:'Paged comments',content:'Fixture',counts:counts(),reaction:null}];
+ api.comments=Array.from({length:12},(_,i)=>({
+  id:'00000000-0000-4000-8000-'+String(i+100).padStart(12,'0'),
+  post_id:postId,body:'Comment '+i,
+ }));
+ await login(page);
+ const card=page.locator('[data-post-id="'+postId+'"]');
+ const toggle=card.getByRole('button',{name:'Bình luận',exact:true});
+ const reads=()=>api.requests.filter(r=>r.method==='GET'&&r.p==='/posts/'+postId+'/comments').map(r=>r.query.page);
+ await toggle.click();
+ await expect(card.locator('[data-comment-id]')).toHaveCount(10);
+ await card.getByRole('button',{name:'Xem thêm bình luận'}).click();
+ await expect(card.locator('[data-comment-id]')).toHaveCount(12);
+ await toggle.click();
+ await toggle.click();
+ await expect(card.locator('[data-comment-id]')).toHaveCount(12);
+ expect(reads()).toEqual(['1','2']);
+ await card.getByLabel('Nội dung bình luận').fill('New comment in page two');
+ await card.getByRole('button',{name:'Gửi',exact:true}).click();
+ await expect(card.locator('[data-comment-id]')).toHaveCount(13);
+ expect(reads()).toEqual(['1','2','1','2']);
+});
+
+test('switching accounts updates Composer without changing another author',async({page,context})=>{
+ const api=await server(context);
+ const avatar=id=>'/api/v1/catalog/assets/'+id;
+ const first={...user,avatar_url:avatar(uid)};
+ const second={...user,id:cid,username:'second_author',display_name:'Second Author',avatar_url:avatar(cid)};
+ const postId='00000000-0000-4000-8000-000000000040';
+ api.posts=[{id:postId,title:'First author post',content:'Fixture',author:first,counts:counts(),reaction:null}];
+ api.loginUser=first;
+ await login(page);
+ const composer=page.locator('form').filter({has:page.getByLabel('Nội dung bài mới')});
+ const currentAvatar=composer.locator('[data-current-user-avatar]');
+ await expect(currentAvatar).toHaveAttribute('src',avatar(uid));
+ await expect(currentAvatar).toHaveAttribute('alt',/New Author/);
+ await page.getByRole('button',{name:'Mở menu tài khoản'}).click();
+ await Promise.all([
+  page.waitForEvent('framenavigated',frame=>frame===page.mainFrame()),
+  page.getByRole('button',{name:'Đăng xuất',exact:true}).click(),
+ ]);
+ await expect(currentAvatar).toHaveCount(0);
+ api.loginUser=second;
+ await login(page);
+ await expect(currentAvatar).toHaveAttribute('src',avatar(cid));
+ await expect(currentAvatar).toHaveAttribute('alt',/Second Author/);
+ const post=page.locator('[data-post-id="'+postId+'"]');
+ await expect(post.getByRole('link',{name:'New Author',exact:true})).toBeVisible();
+ await expect(post.locator('img').first()).toHaveAttribute('src',avatar(uid));
 });

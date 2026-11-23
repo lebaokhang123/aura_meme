@@ -18,10 +18,12 @@ import path from 'node:path';
 
 test.setTimeout(120000);
 
-const TEST_EMAIL = 'khang_dev@example.com';
-const TEST_PASSWORD = 'QA-Owner-Password-2026!';
+const TEST_EMAIL = process.env.AURAMEME_VAULT_SMOKE_EMAIL;
+const TEST_PASSWORD = process.env.AURAMEME_VAULT_SMOKE_PASSWORD;
 
 test('Vault Real Smoke: 2 chests, 75 catalog assets, real open, receipt, +2 EXP, equip and reload persistence', async ({ page }) => {
+  expect(TEST_EMAIL, 'Set the isolated Vault smoke email').toBeTruthy();
+  expect(Boolean(TEST_PASSWORD), 'Set the isolated Vault smoke password').toBe(true);
   // Use reduced motion for deterministic animations
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1440, height: 960 });
