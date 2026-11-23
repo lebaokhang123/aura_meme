@@ -37,7 +37,7 @@ test('comment composer uses the full Stitch picker without casting a reaction',a
 test('Hall of Fame shows real display name, handle, level and nickname instead of drops',async({page})=>{
  await page.setViewportSize({width:1440,height:900});await page.goto('/explore');await ready(page);
  const identities=page.locator('.hall-identity');await expect(identities).toHaveCount(3);
- const first=identities.first();for(const text of ['Khang Dev','@Khang_dev','Lvl 79','Bá chủ thiên lôi'])await expect(first.getByText(text,{exact:true})).toBeVisible();
+ const first=identities.first();for(const text of ['Khang Dev','@Khang_dev','LVL 79','Bá chủ thiên lôi'])await expect(first.getByText(text,{exact:true})).toBeVisible();
  const centers=await first.locator(':scope > span').evaluateAll(nodes=>nodes.map(el=>{const r=el.getBoundingClientRect();return r.y+r.height/2}));
  expect(Math.max(...centers)-Math.min(...centers)).toBeLessThan(1);
  await expect(page.getByText(/\d+ drops/)).toHaveCount(0);

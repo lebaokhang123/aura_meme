@@ -49,7 +49,8 @@ for (const width of [375, 768, 1024, 1280, 1920]) {
 test('footer is shared, omitted on Home and opens the privacy policy', async ({ page, context }) => {
   await page.goto('/');
   await expect(page.locator('footer')).toHaveCount(0);
-  await expect(page.getByText('Chính sách bảo mật', { exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-cookie-banner]').getByRole('link', {name:'Chính sách bảo mật'})).toBeVisible();
+  await page.locator('[data-cookie-ess]').click();
   let baseline;
   for (const route of routes.slice(1)) {
     await page.goto(route);
@@ -176,6 +177,7 @@ test('header and content reveal together when a page chunk is delayed', async ({
 test('compact navigation remains usable in a short landscape viewport', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 844, height: 320 });
   await page.goto('/', { waitUntil: 'networkidle' });
+  await page.locator('[data-cookie-ess]').click();
   await page.getByRole('button', { name: 'Mở menu điều hướng', exact: true }).click();
   const menu = page.locator('#compact-navigation');
   const box = await menu.boundingBox();

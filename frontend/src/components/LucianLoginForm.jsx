@@ -3,7 +3,8 @@
  * Ported for AuraMeme (Task 7 Polish + Lucian #401 Google Button).
  */
 import React, { useState, useRef } from 'react';
-import { auth } from '../auth.js';
+import { auth, MOCK_AUTH } from '../auth.js';
+import { identifyDemoUser, USER_KEY } from '../demo.js';
 import { authMessage } from '../auth-client.js';
 import { usePreferences } from '../PreferencesContext.jsx';
 import { safeReturnUrl } from '../return-url.js';
@@ -60,7 +61,11 @@ export default function LucianLoginForm() {
     const rm = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     try {
-      await auth.login(trimmedId, password);
+      if (MOCK_AUTH) {
+        localStorage.setItem(USER_KEY, JSON.stringify(identifyDemoUser(trimmedId)));
+      } else {
+        await auth.login(trimmedId, password);
+      }
       setIsBusy(false);
       setIsOk(true);
       setTimeout(() => {
