@@ -75,7 +75,12 @@ test('admin hides another author post; USER cannot edit or moderate it',async({p
  const other=page.locator('[data-post-id="'+id+'"]');await other.getByRole('button',{name:'Tùy chọn bài viết'}).click();await expect(page.getByRole('menuitem',{name:'Sửa bài',exact:true})).toHaveCount(0);
  await page.getByRole('menuitem',{name:'Ẩn bài (Admin)'}).click();
  const confirmation=page.getByRole('alertdialog',{name:'Xác nhận ẩn bài'});await expect(confirmation).toBeVisible();
- await confirmation.getByRole('button',{name:'Xác nhận ẩn',exact:true}).click();await expect(page.locator('[data-post-id="'+id+'"]')).toHaveCount(0);
+ const confirm=confirmation.getByRole('button',{name:'Xác nhận ẩn',exact:true});
+ await confirm.click();
+ await expect(confirmation.getByRole('alert')).toContainText('Vui lòng nhập lý do');
+ await confirmation.getByRole('textbox',{name:/Lý do kiểm duyệt/}).fill('Nội dung fixture cần kiểm duyệt');
+ await confirm.click();
+ await expect(page.locator('[data-post-id="'+id+'"]')).toHaveCount(0);
  expect((await page.request.get('/api/v1/posts/'+id)).status()).toBe(404);
 });
 
