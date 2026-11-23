@@ -35,7 +35,7 @@ test('language option badges say VI and EN instead of unsupported flag letters',
 });
 for(const width of [375,768,1440])test(`Explore badges and reaction controls stay intact at ${width}px`,async({page},info)=>{
  await page.setViewportSize({width,height:900});await page.goto('/explore');await ready(page);await page.evaluate(()=>document.fonts.ready);
- const post=page.locator('#post-khang'),level=post.getByText('Lvl 79',{exact:true}),nickname=post.getByText('Bá chủ thiên lôi',{exact:true});
+ const post=page.locator('#post-khang'),level=post.getByText('LVL 79',{exact:true}),nickname=post.getByText('Bá chủ thiên lôi',{exact:true});
  const a=await level.boundingBox(),b=await nickname.boundingBox();
  for(const badge of [level,nickname])expect(await badge.evaluate(el=>{const s=getComputedStyle(el);return el.getBoundingClientRect().height<=parseFloat(s.lineHeight)+parseFloat(s.paddingTop)+parseFloat(s.paddingBottom)+parseFloat(s.borderTopWidth)+parseFloat(s.borderBottomWidth)+.1})).toBe(true);
  if(width===1440)expect(Math.abs((a.y+a.height/2)-(b.y+b.height/2))).toBeLessThan(1);

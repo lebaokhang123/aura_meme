@@ -90,7 +90,7 @@ for (const [username, name, avatar] of [['Khang_dev', 'Khang Dev', 'khang.jpg'],
     await page.locator('#identifier').fill(`${username}@example.com`);
     await page.locator('#password').fill('demo-only');
     await page.locator('#submitBtn').click();
-    await expect(page).toHaveURL('http://127.0.0.1:4186/');
+    await expect(page).toHaveURL('/');
     await expect(page.locator('.site-header .account-avatar')).toHaveAttribute('src', `/assets/demo/${avatar}`);
     await expect(page.locator('.site-header .account-avatar')).toHaveAttribute('alt', `Ảnh đại diện ${name}`);
     await expect(page.locator('[data-current-user-avatar]').first()).toHaveAttribute('src', `/assets/demo/${avatar}`);
