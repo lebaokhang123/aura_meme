@@ -31,6 +31,7 @@ def upgrade():
             UPDATE asset_items
             SET source_rights = jsonb_set(COALESCE(source_rights, '{}'::jsonb), '{canonical_filename}', :fn)
             WHERE kind = 'background' AND effect_key = :ekey
+              AND NOT (COALESCE(source_rights, '{}'::jsonb) ? 'canonical_filename')
         """), {'fn': f'"{fn}"', 'ekey': ekey})
 
     # 2. 70 Memes by deterministic order per rarity
@@ -47,14 +48,11 @@ def upgrade():
             conn.execute(sa.text("""
                 UPDATE asset_items
                 SET source_rights = jsonb_set(COALESCE(source_rights, '{}'::jsonb), '{canonical_filename}', :fn)
-                WHERE id = :id AND (source_rights->>'canonical_filename' IS NULL)
+                WHERE id = :id AND NOT (COALESCE(source_rights, '{}'::jsonb) ? 'canonical_filename')
             """), {'fn': f'"{fn}"', 'id': asset_id})
 
 
 def downgrade():
-    op.execute("SET LOCAL lock_timeout = '5s'")
-    op.execute("""
-        UPDATE asset_items
-        SET source_rights = source_rights - 'canonical_filename'
-        WHERE source_rights ? 'canonical_filename'
-    """)
+    raise RuntimeError(
+        "0018 cannot identify pre-existing canonical filenames. Restore a verified pre-0018 backup."
+    )
