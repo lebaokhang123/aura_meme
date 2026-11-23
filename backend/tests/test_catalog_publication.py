@@ -27,12 +27,9 @@ def fixture_manifest():
 
 
 @pytest.fixture
-def catalog_auth(auth, monkeypatch):
-    # Catalog publication is explicitly restricted to the reviewed demo-era schema.
-    from test_social_reaction_migration import migrate
-    client, c = auth
-    migrate(c, "downgrade", "0012_aura_v1", monkeypatch)
-    return client, c
+def catalog_auth(auth):
+    # The auth fixture already verifies the reviewed candidate head.
+    return auth
 
 
 @pytest.mark.integration

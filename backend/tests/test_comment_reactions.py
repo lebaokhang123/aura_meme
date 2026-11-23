@@ -39,7 +39,7 @@ def test_comment_guest_counts_private_viewer_and_active_actors_only(target_comme
     assert mutation(client,"PUT",path,{"reaction_type":"love"}).status_code==200
     client.cookies.clear()
     dto=client.get(read).json()
-    assert dto=={"comment_id":str(comment_id),"reaction_counts":{k:int(k=="love") for k in KINDS},"viewer_reaction":None}
+    assert dto=={"comment_id":str(comment_id),"reaction_counts":{k:int(k=="love") for k in KINDS},"viewer_reaction":None,"meme_reactions":[]}
     assert str(owner) not in str(dto)
     result=register(client,username="another_actor",email="actor@example.com");assert result.status_code==201
     second=UUID(result.json()["id"]);assert login(client,email="actor@example.com").status_code==200

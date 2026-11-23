@@ -27,80 +27,69 @@ from sqlalchemy.orm import Session
 
 pytestmark = pytest.mark.integration
 
-# Configure isolated environment from environment variables (never hardcode credentials in Git)
-ROOT_DIR = Path(__file__).resolve().parents[1]
-CATALOG_ROOT = str(ROOT_DIR / "demo.local" / "catalog")
-MEDIA_ROOT = str(ROOT_DIR / "demo.local" / "media")
+from sqlalchemy import text
+from sqlalchemy.engine import make_url
+from app.models import AuraLedger, UserProgress
 
 
-@pytest.fixture(scope="module")
-def isolated_client():
-    isolated_db_url = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
-    if not isolated_db_url:
-        pytest.skip("TEST_DATABASE_URL is required for isolated Vault acceptance integration tests")
-    old_env = dict(os.environ)
-    os.environ["DATABASE_URL"] = isolated_db_url
-    os.environ["CATALOG_STORAGE_ROOT"] = os.environ.get("CATALOG_STORAGE_ROOT", CATALOG_ROOT)
-    os.environ["MEDIA_STORAGE_ROOT"] = os.environ.get("MEDIA_STORAGE_ROOT", MEDIA_ROOT)
-    os.environ["VAULT_RUNTIME_ENABLED"] = "true"
-    os.environ["AURAMEME_OWNER_MEME_DEMO"] = "1"
-    os.environ["AUTH_ENVIRONMENT"] = "development"
-    os.environ["AUTH_ALLOWED_ORIGINS"] = '["http://localhost:5173"]'
-    os.environ["AUTH_SIGNING_KEY"] = secrets.token_urlsafe(48)
+@pytest.fixture
+def isolated_client(monkeypatch, tmp_path):
+    database_url = os.environ.get("VAULT_ACCEPTANCE_DATABASE_URL")
+    catalog_root = os.environ.get("VAULT_ACCEPTANCE_CATALOG_ROOT")
+    if not database_url or not catalog_root:
+        pytest.fail("Vault acceptance requires an explicit isolated clone and a catalog copy.")
+    target = make_url(database_url)
+    assert target.get_backend_name() == "postgresql"
+    assert target.host in {"localhost", "127.0.0.1", "::1"}
+    assert target.database in {"aurameme_test", "aurameme_qa"} and target.username == "aurameme_test"
+    assert target.port not in {None, 5432} and not target.query
+    assert Path(catalog_root).is_dir()
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("CATALOG_STORAGE_ROOT", catalog_root)
+    monkeypatch.setenv("MEDIA_STORAGE_ROOT", str(tmp_path / "media"))
+    monkeypatch.setenv("VAULT_RUNTIME_ENABLED", "true")
+    monkeypatch.setenv("AURAMEME_OWNER_MEME_DEMO", "1")
+    monkeypatch.setenv("AUTH_ENVIRONMENT", "development")
+    monkeypatch.setenv("AUTH_ALLOWED_ORIGINS", '["http://localhost:5173"]')
+    monkeypatch.setenv("AUTH_SIGNING_KEY", secrets.token_urlsafe(48))
+    monkeypatch.setenv("EMAIL_MODE", "disabled")
+    monkeypatch.setenv("EMAIL_VERIFICATION_REQUIRED", "false")
 
     from app.main import app
-    from app.models import AuraLedger, UserProgress
 
-    test_username = f"user_{secrets.token_hex(4)}"
-    password_clear = "TestPass123!Secure"
-    email = f"{test_username}@example.com"
-
+    username = "vault_test_" + secrets.token_hex(4)
+    email = username + "@example.com"
+    password = secrets.token_urlsafe(32)
+    engine = create_engine(database_url, hide_parameters=True)
     try:
-        with TestClient(app, base_url="http://localhost:5173") as client:
-            client.headers.update({"Origin": "http://localhost:5173"})
-            yield client
+        with engine.connect() as connection, connection.begin() as transaction:
+            identity = connection.execute(text("SELECT current_database(), current_user")).one()
+            assert tuple(identity) == (target.database, target.username)
+            assert connection.scalar(text("SELECT count(*) FROM asset_items")) == 75
+            with TestClient(app, base_url="http://localhost:5173") as client:
+                client.app.state.auth_session_factory = lambda: Session(
+                    bind=connection, join_transaction_mode="create_savepoint")
+                client.headers.update({"Origin": "http://localhost:5173"})
+                def csrf_header():
+                    return {"X-CSRF-Token": client.get("/api/v1/auth/csrf").json()["csrf_token"]}
+                response = client.post("/api/v1/auth/register", headers=csrf_header(), json={
+                    "username": username, "email": email, "password": password, "display_name": "Vault test",
+                })
+                assert response.status_code == 201
+                user_id = response.json()["id"]
+                response = client.post("/api/v1/auth/login", headers=csrf_header(), json={
+                    "email": email, "password": password,
+                })
+                assert response.status_code == 200
+                client.headers.update(csrf_header())
+                yield client, user_id, connection
+            transaction.rollback()
     finally:
-        os.environ.clear()
-        os.environ.update(old_env)
-
-    with TestClient(app, base_url="http://localhost:5173") as client:
-        client.headers.update({"Origin": "http://localhost:5173"})
-        # Step 0: Get CSRF token for guest registration
-        csrf_res = client.get("/api/v1/auth/csrf")
-        assert csrf_res.status_code == 200
-        guest_csrf = csrf_res.json()["csrf_token"]
-
-        # Step 1a: Register
-        reg_res = client.post(
-            "/api/v1/auth/register",
-            json={
-                "username": test_username,
-                "email": email,
-                "password": password_clear,
-                "display_name": f"Tester {test_username}",
-            },
-            headers={"X-CSRF-Token": guest_csrf},
-        )
-        assert reg_res.status_code == 201, f"Registration failed: {reg_res.text}"
-        user_id = reg_res.json()["id"]
-
-        # Step 1b: Login
-        login_res = client.post(
-            "/api/v1/auth/login",
-            json={
-                "email": email,
-                "password": password_clear,
-            },
-            headers={"X-CSRF-Token": guest_csrf},
-        )
-        assert login_res.status_code == 200, f"Login failed: {login_res.text}"
-        csrf_token = client.get("/api/v1/auth/csrf").json()["csrf_token"]
-        client.headers.update({"X-CSRF-Token": csrf_token})
-        yield client, user_id
+        engine.dispose()
 
 
 def test_vault_acceptance_all_12_points(isolated_client):
-    client, user_id = isolated_client
+    client, user_id, connection = isolated_client
     csrf_token = client.headers["X-CSRF-Token"]
 
     # STEP 2: Both cases visible: Rương Meme and Rương Background
@@ -208,8 +197,7 @@ def test_vault_acceptance_all_12_points(isolated_client):
     assert retry_receipt["reward"]["id"] == rewarded_meme_id
 
     # STEP 9: Check +2 EXP award per open (+4 EXP total for 2 opens) in AuraLedger
-    engine = create_engine(ISOLATED_DB_URL)
-    with Session(engine) as db:
+    with Session(bind=connection) as db:
         ledger_entries = list(db.scalars(
             select(AuraLedger)
             .where(AuraLedger.user_id == user_id, AuraLedger.event_key.startswith("vault-v1:case:"))
