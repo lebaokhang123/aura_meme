@@ -23,7 +23,8 @@ def browser_target(config,e2e=False):
     url=dotenv_values(Path(config),interpolate=False).get("E2E_DATABASE_URL" if e2e else "TEST_DATABASE_URL","")
     assert url,"Explicit target URL required; no fallback"
     target=make_url(url)
-    assert (target.database,target.username)==(database,role) and target.host in {"localhost","127.0.0.1","::1"} and target.port in {None,5432} and not target.query
+    ports = {None, 5432, 55434, 55435} if e2e else {None, 5432}
+    assert (target.database,target.username)==(database,role) and target.host in {"localhost","127.0.0.1","::1"} and target.port in ports and not target.query
     return url,database,role
 
 
