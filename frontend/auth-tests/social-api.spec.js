@@ -239,7 +239,7 @@ test('Explore keeps loaded API results when retrying the next page',async({page,
  api.paginate=true;
  api.posts=Array.from({length:21},(_,i)=>({
   id:'00000000-0000-4000-8000-'+String(i+100).padStart(12,'0'),
-  content:'Explore fixture '+i,counts:counts()
+  title:'Explore fixture '+i,content:'Synthetic post '+i,counts:counts(),reaction:null
  }));
  await page.goto('/explore');
  await expect(page.locator('article[data-post-id]:visible')).toHaveCount(20);
