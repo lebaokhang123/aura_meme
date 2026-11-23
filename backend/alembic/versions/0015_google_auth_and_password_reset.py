@@ -10,6 +10,8 @@ depends_on = None
 
 def upgrade():
     op.execute("SET LOCAL lock_timeout = '5s'")
+    # Alembic's default VARCHAR(32) cannot store this revision identifier.
+    op.execute("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE text")
     op.create_table(
         "user_oauth_identities",
         sa.Column("id", sa.Uuid(), nullable=False),

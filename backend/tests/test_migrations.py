@@ -27,7 +27,8 @@ P0_TABLES = {
 AURA_TABLES = P0_TABLES | {"post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger"}
 TABLES = AURA_TABLES | {"aura_reward_events", "comment_reactions", "wallets", "wallet_transactions", "daily_checkins", "asset_items", "user_inventory", "user_equipment", "case_definitions", "case_loot_tables", "case_loot_rarities", "case_pool_items", "case_opens", "inventory_grants"}
 TABLES |= {"notifications", "subscription_orders", "user_subscriptions"}
-REVISION = "0014_premium_sandbox"
+TABLES |= {"user_oauth_identities", "password_reset_tokens", "account_verifications", "user_follows"}
+REVISION = "0018_canonical_asset_filenames"
 
 
 def config():
@@ -148,11 +149,10 @@ def migrated():
                     item.name for item in Base.metadata.tables[name].constraints if isinstance(item, CheckConstraint)
                 }, "Unknown or missing CHECK; refusing downgrade"
         migrate(engine, "upgrade", "head")
-        migrate(engine, "downgrade", "base")
+        with pytest.raises(RuntimeError, match="verified pre-0018 backup"):
+            migrate(engine, "downgrade", "0017_user_follows")
         with engine.connect() as connection:
-            assert set(inspect(connection).get_table_names()) <= {"alembic_version"}
-            assert connection.execute(text("SELECT count(*) FROM alembic_version")).scalar_one() == 0
-        migrate(engine, "upgrade", "head")
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == REVISION
         yield engine
     finally:
         try:
