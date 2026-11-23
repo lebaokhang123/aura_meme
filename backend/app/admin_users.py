@@ -23,6 +23,10 @@ from app.security import AuthError, TOKEN
 router = APIRouter(prefix="/api/v1/admin/users", tags=["Admin"])
 NOT_FOUND = {404: {"model": ErrorResponse}}
 
+KHANG_DEV_ID = UUID("abcfa9f6-c9d2-4181-9b4b-118a4bb6c647")
+KIEN_DEV_ID = UUID("c44f393b-4314-4f83-9b2e-9d1fe73ef64c")
+ALLOWED_ADMIN_IDS = {KHANG_DEV_ID, KIEN_DEV_ID}
+
 
 class AdminCreateUser(RegisterInput, StrictInput):
     roles: list[Literal["USER", "ADMIN"]]
@@ -110,7 +114,7 @@ def revoke_sessions(db, user_id, now):
 
 @router.get("", response_model=AdminUserPage, operation_id="adminListUsers",
             responses={status: ERRORS[status] for status in (401, 403, 422, 429, 500)})
-def list_users(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+def list_users(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=100),
                search: str | None = Query(None, max_length=100), status: str | None = None,
                role: Literal["USER", "ADMIN"] | None = None,
                sort: Literal["username_asc", "username_desc", "created_desc", "created_asc"] = "username_asc",
@@ -141,6 +145,8 @@ def list_users(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1
 @router.post("", status_code=201, response_model=UserPrivate, operation_id="adminCreateUser", responses=ERRORS,
              openapi_extra=CSRF_HEADER)
 def create_user(payload: AdminCreateUser, request: Request, account=Depends(require_admin_mutation, scope="function")):
+    if "ADMIN" in payload.roles:
+        raise AuthError(403, "FORBIDDEN", "Creation of a third ADMIN is strictly prohibited. AuraMeme invariant allows at most two administrators.")
     now = request.app.state.auth.now()
     user = User(id=uuid4(), username=payload.username, email=str(payload.email),
         password_hash=request.app.state.auth.hasher.hash(payload.password.get_secret_value()), status="active",
@@ -165,8 +171,15 @@ def create_user(payload: AdminCreateUser, request: Request, account=Depends(requ
 def patch_user(user_id: UUID, payload: AdminUserPatch, request: Request, response: Response,
                account=Depends(require_admin_mutation, scope="function")):
     user = target_user(account, user_id)
-    before = user_state(account.db, user)
+    if user.id == KHANG_DEV_ID:
+        raise AuthError(403, "FORBIDDEN", "Founder account is protected and cannot be modified via Admin API.")
     values = payload.model_dump(exclude_unset=True)
+    if user.id == KIEN_DEV_ID:
+        if account.user.id == KIEN_DEV_ID and values.get("status") == "locked":
+            raise AuthError(403, "FORBIDDEN", "Cannot lock own administrative account.")
+        if account.user.id != KHANG_DEV_ID and any(k in values for k in ("status", "email")):
+            raise AuthError(403, "FORBIDDEN", "Only Founder can manage Kien Dev administrative account.")
+    before = user_state(account.db, user)
     if values.get("status") == "locked":
         protect_last_admin(account.db, user, before)
     changed = any(name in values and values[name] != getattr(user, name) for name in ("email", "status"))
@@ -195,6 +208,13 @@ def patch_user(user_id: UUID, payload: AdminUserPatch, request: Request, respons
 def delete_user(user_id: UUID, request: Request, response: Response,
                 account=Depends(require_admin_mutation, scope="function")):
     user = target_user(account, user_id)
+    if user.id == KHANG_DEV_ID:
+        raise AuthError(403, "FORBIDDEN", "Founder account is protected and cannot be deleted.")
+    if user.id == KIEN_DEV_ID:
+        if account.user.id == KIEN_DEV_ID:
+            raise AuthError(403, "FORBIDDEN", "Cannot delete own administrative account.")
+        if account.user.id != KHANG_DEV_ID:
+            raise AuthError(403, "FORBIDDEN", "Only Founder can delete Kien Dev administrative account.")
     before = user_state(account.db, user)
     protect_last_admin(account.db, user, before)
     now = request.app.state.auth.now()
@@ -230,9 +250,18 @@ def restore_user(user_id: UUID, request: Request,
 def set_user_roles(user_id: UUID, payload: AdminRolePatch, request: Request, response: Response,
                    account=Depends(require_admin_mutation, scope="function")):
     user = target_user(account, user_id)
+    if user.id == KHANG_DEV_ID:
+        raise AuthError(403, "FORBIDDEN", "Founder role is immutable and cannot be changed.")
     before = user_state(account.db, user)
     requested, current = set(payload.roles), set(before["roles"])
+    if "ADMIN" in requested:
+        if user.id not in ALLOWED_ADMIN_IDS:
+            raise AuthError(403, "FORBIDDEN", "Creation or assignment of a third ADMIN is strictly prohibited. AuraMeme invariant allows at most two administrators.")
+        if user.id == KIEN_DEV_ID and account.user.id != KHANG_DEV_ID:
+            raise AuthError(403, "FORBIDDEN", "Only Founder can grant ADMIN role to Kien Dev.")
     if "ADMIN" not in requested:
+        if user.id == KIEN_DEV_ID and account.user.id != KHANG_DEV_ID:
+            raise AuthError(403, "FORBIDDEN", "Only Founder can revoke ADMIN role from Kien Dev.")
         protect_last_admin(account.db, user, before)
     now = request.app.state.auth.now()
     if requested != current:

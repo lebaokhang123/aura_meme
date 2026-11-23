@@ -73,6 +73,7 @@ class AdminAsset(BaseModel):
     rarity: RarityCode
     active: bool
     review_status: ReviewStatus
+    filename: str | None = None
 
 
 class AdminAssetPage(BaseModel):
@@ -120,11 +121,21 @@ class AdminOrderPage(BaseModel):
 
 
 def _admin_asset_dto(asset: AssetItem, *, include_display: bool = True) -> AdminAsset:
-    rev = asset.source_rights.get('review_status') if isinstance(asset.source_rights, dict) else 'unknown'
+    rights = asset.source_rights if isinstance(asset.source_rights, dict) else {}
+    rev = rights.get('review_status', 'unknown')
     if rev not in ('pending', 'approved', 'rejected'):
         rev = 'unknown'
     dname = getattr(asset, 'display_name', None) if include_display else None
     ekey = getattr(asset, 'effect_key', None) if include_display else None
+
+    fn = rights.get('uploaded_filename') or rights.get('canonical_filename')
+    if not fn:
+        ext = 'png' if asset.kind == 'background' or asset.media_key.endswith('.png') else 'jpg'
+        if asset.kind == 'background':
+            fn = f"{asset.rarity}_background_{asset.effect_key or 'violet_base'}.{ext}"
+        else:
+            fn = f"{asset.rarity}_{asset.slug.replace('-', '_')}.{ext}"
+
     return AdminAsset(
         id=asset.id,
         slug=asset.slug,
@@ -134,6 +145,7 @@ def _admin_asset_dto(asset: AssetItem, *, include_display: bool = True) -> Admin
         rarity=asset.rarity,
         active=bool(asset.active),
         review_status=rev,
+        filename=fn,
     )
 
 
@@ -342,7 +354,7 @@ async def _receive_admin_upload_multipart(request: Request) -> tuple[str, bytes]
 @router.get('/comments', response_model=AdminCommentPage, operation_id='adminListComments', responses={s: ERRORS[s] for s in (401, 403, 422, 429, 500)})
 def comments(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     search: str | None = Query(None, max_length=100),
     status: Literal['visible', 'hidden', 'deleted'] | None = None,
     post_id: UUID | None = None,
@@ -364,7 +376,7 @@ def comments(
 @router.get('/assets', response_model=AdminAssetPage, operation_id='adminListAssets', responses={s: ERRORS[s] for s in (401, 403, 422, 429, 500)})
 def assets(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     search: str | None = Query(None, max_length=100),
     kind: AssetKind | None = None,
     rarity: RarityCode | None = None,
@@ -602,6 +614,17 @@ def admin_update_asset(
         new_rarity = values['rarity']
         pool_refs = list(db.scalars(select(CasePoolItem).where(CasePoolItem.asset_id == asset.id).with_for_update()))
         for pool_ref in pool_refs:
+            from sqlalchemy import func
+            rem_count = db.scalar(
+                select(func.count(CasePoolItem.asset_id)).where(
+                    CasePoolItem.loot_table_id == pool_ref.loot_table_id,
+                    CasePoolItem.rarity == asset.rarity,
+                    CasePoolItem.asset_id != asset.id,
+                )
+            )
+            if rem_count == 0:
+                raise AuthError(409, 'CONFLICT', f'Không thể đổi hạng: bậc {asset.rarity} trong rương sẽ bị rỗng.')
+        for pool_ref in pool_refs:
             db.delete(pool_ref)
         db.flush()
         asset.rarity = new_rarity
@@ -700,7 +723,7 @@ def post_image(post_id: UUID, still: bool = False, account=Depends(require_role(
 @router.get('/orders', response_model=AdminOrderPage, operation_id='adminListOrders', responses={s: ERRORS[s] for s in (401, 403, 422, 429, 500)})
 def orders(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     status: Literal['pending', 'success', 'failed', 'cancelled', 'expired'] | None = None,
     search: str | None = Query(None, max_length=100),
     account=Depends(require_role('ADMIN')),
@@ -742,3 +765,88 @@ def orders(
         )
     except ValidationError as exc:
         raise AuthError(500, 'INTERNAL_ERROR', 'Invalid transaction data.') from exc
+
+
+@router.get(
+    '/orders/{order_id}/receipt.pdf',
+    response_class=Response,
+    operation_id='adminReadOrderReceiptPdf',
+    responses={
+        200: {'content': {'application/pdf': {'schema': {'type': 'string', 'format': 'binary'}}}},
+        404: {'model': ErrorResponse},
+        **{s: ERRORS[s] for s in (401, 403, 409, 422, 500)},
+    },
+)
+def admin_read_order_receipt_pdf(
+    order_id: UUID,
+    download: bool = Query(False),
+    account=Depends(require_role('ADMIN')),
+):
+    db = account.db
+    order = db.scalar(select(SubscriptionOrder).where(SubscriptionOrder.id == order_id))
+    if order is None:
+        raise AuthError(404, 'NOT_FOUND', 'Order not found.')
+    if order.status != 'success':
+        raise AuthError(409, 'CONFLICT', 'Receipt is only available for successful orders.')
+
+    owner_user = db.scalar(select(User).where(User.id == order.user_id))
+    username = owner_user.username if owner_user else 'user'
+
+    from app.receipt_pdf import generate_receipt_pdf_bytes
+
+    order_dict = {
+        'id': str(order.id),
+        'order_code': order.order_code,
+        'tier': order.tier,
+        'provider': order.provider,
+        'amount_vnd': order.amount_vnd,
+        'amount_vnd_formatted': order.amount_vnd_formatted,
+        'amount_usd_cents': order.amount_cents,
+        'currency': order.currency,
+        'status': order.status,
+        'provider_txn_id': order.provider_txn_id,
+        'created_at': order.created_at,
+        'completed_at': order.completed_at,
+        'duration_days': order.duration_days,
+    }
+
+    recent = list(db.scalars(
+        select(SubscriptionOrder)
+        .where(
+            SubscriptionOrder.user_id == order.user_id,
+            SubscriptionOrder.status == 'success',
+            SubscriptionOrder.id != order.id,
+        )
+        .order_by(SubscriptionOrder.created_at.desc())
+        .limit(10)
+    ))
+    recent_dicts = [
+        {
+            'order_code': r.order_code,
+            'tier': r.tier,
+            'provider': r.provider,
+            'amount_vnd': r.amount_vnd,
+            'amount_vnd_formatted': r.amount_vnd_formatted,
+            'amount_usd_cents': r.amount_cents,
+            'currency': r.currency,
+            'status': r.status,
+            'created_at': r.created_at,
+            'completed_at': r.completed_at,
+        }
+        for r in recent
+    ]
+
+    pdf_bytes = generate_receipt_pdf_bytes(order_dict, username=username, recent_successful_orders=recent_dicts)
+    if not pdf_bytes:
+        raise AuthError(500, 'RENDER_ERROR', 'Unable to generate receipt PDF.')
+
+    disposition = f'attachment; filename="AuraMeme-Receipt-{order.order_code}.pdf"' if download else 'inline'
+    return Response(
+        content=pdf_bytes,
+        media_type='application/pdf',
+        headers={
+            'Content-Disposition': disposition,
+            'Cache-Control': 'no-store, must-revalidate',
+            'X-Content-Type-Options': 'nosniff',
+        },
+    )

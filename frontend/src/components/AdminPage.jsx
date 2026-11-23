@@ -3,7 +3,29 @@ import {auth,MOCK_AUTH} from '../auth.js';
 import {authMessage} from '../auth-client.js';
 import {usePreferences} from '../PreferencesContext.jsx';
 import {adminPage,canAdmin} from '../admin-api.js';
+import {mountBackground} from '../background-effects.js';
 import '../workspace.css';
+
+function BackgroundPreviewStage({effectKey,t}){
+ const containerRef=useRef(null);
+ useEffect(()=>{
+  if(!containerRef.current)return;
+  const cleanup=mountBackground(containerRef.current,effectKey);
+  return()=>{if(typeof cleanup==='function')cleanup();};
+ },[effectKey]);
+ return (
+  <div ref={containerRef} className="admin-bg-preview-canvas-box" data-effect={effectKey||'violet-base'}>
+   <canvas className="admin-bg-preview-canvas"/>
+   <div className="admin-bg-preview-overlay-info">
+    <div>
+     <span className="admin-bg-effect-name">{t('Hiệu ứng động: ','Live Animated Effect: ')}<code>{effectKey||'violet-base'}</code></span>
+     <p className="admin-bg-effect-sub">{t('Background hệ thống cao cấp (Chế độ chỉ xem)','Original system background (Read-only)')}</p>
+    </div>
+    <span className="workspace-badge admin-live-badge">Live Engine</span>
+   </div>
+  </div>
+ );
+}
 
 const sections=[['users','Người dùng','Users',['users']],['content','Nội dung','Content',['posts','comments','categories']],['contacts','Liên hệ','Contacts',['contacts']],['moderation','Kiểm duyệt','Moderation',['audit-logs','assets','orders']],['notifications','Thông báo','Notifications',['announcements']]];
 const labels={users:['Người dùng','Users'],posts:['Bài viết','Posts'],comments:['Bình luận','Comments'],categories:['Danh mục','Categories'],contacts:['Hộp thư liên hệ','Contact inbox'],'audit-logs':['Nhật ký quản trị','Admin activity'],assets:['Trạng thái vật phẩm','Asset status'],orders:['Giao dịch','Transactions'],announcements:['Thông báo hệ thống','System announcements']};
@@ -75,7 +97,7 @@ export default function AdminPage(){
  function choose(value){setResource(value);setPage(1);setQuery('');setSearch('');setFilter('');setRole('');setAssetKind('');setAssetRarity('');setError('');setSuccess('');}
  function confirm(row,body,label,path='/admin/'+resource+'/'+row.id,method='PATCH'){setError('');setEdit({type:'confirm',row,body,label,path,method})}
  async function save(event){
-  event.preventDefault();if(edit?.type==='content-preview'||edit?.type==='announcement-preview'||(edit?.type==='asset-preview'&&!edit.pendingAction)){setEdit(null);return;}if(inflight.current||!edit)return;inflight.current=true;setBusy(true);setError('');setSuccess('');const requestOwner=owner;
+  event.preventDefault();if(edit?.type==='content-preview'||edit?.type==='announcement-preview'||edit?.type==='receipt-preview'||(edit?.type==='asset-preview'&&!edit.pendingAction)){setEdit(null);return;}if(inflight.current||!edit)return;inflight.current=true;setBusy(true);setError('');setSuccess('');const requestOwner=owner;
   let method=edit.method||'PATCH',path=edit.path||'/admin/'+resource+'/'+(edit.row?.id||''),body=edit.body;
   if(edit.type==='roles'){method='PUT';path='/admin/users/'+edit.row.id+'/roles';body={roles:edit.roles}}
   if(edit.type==='category'){method=edit.row?'PATCH':'POST';path='/admin/categories'+(edit.row?'/'+edit.row.id:'');body=edit.row?{name:edit.name,status:edit.status}:{name:edit.name,slug:edit.slug};}
@@ -143,13 +165,17 @@ export default function AdminPage(){
     {resource==='contacts'&&<><h3>{row.subject}</h3><p>{row.name}</p><p className="workspace-meta">{stamp(row.created_at)}</p></>}
     {resource==='assets'&&<div className="admin-asset-row-main">
       <h3 translate="no">{row.display_name||row.slug}</h3>
+      <p className="workspace-meta admin-asset-filename">
+        <Icon name="image" style={{fontSize:14,verticalAlign:'text-bottom',marginRight:4}}/>
+        <code>{row.filename||row.slug}</code>
+      </p>
       <p className="workspace-meta admin-asset-id-line">
+        <span>{formatKind(row.kind)} · {t(`Hạng ${row.rarity}`,`Rank ${row.rarity}`)} · </span>
         <code>ID: {row.id}</code>
         <button type="button" className="admin-copy-btn" onClick={()=>copyTargetId(row.id)} aria-label={t('Sao chép ID vật phẩm','Copy asset ID')} title={t('Sao chép ID vật phẩm','Copy asset ID')}>
           <Icon name={copiedId===row.id?'check':'content_copy'}/>
         </button>
       </p>
-      <p className="workspace-meta">{formatKind(row.kind)} · {t(`Hạng ${row.rarity}`,`Rank ${row.rarity}`)} · {status(row.review_status)}</p>
     </div>}
     {resource==='audit-logs'&&<div className="admin-audit-entry">
       <div className="admin-audit-entry-header">
@@ -195,11 +221,24 @@ export default function AdminPage(){
     {resource==='audit-logs'&&<time className="workspace-meta" dateTime={row.created_at}>{stamp(row.created_at)}</time>}
     {resource==='orders'&&<span className="workspace-badge" data-status={row.status} style={{fontWeight:600}}>{status(row.status)}</span>}
     {row.status&&resource!=='orders'&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='users'&&row.status==='deleted'&&(()=>{const days=restoreDaysLeft(row);return <span className="workspace-meta" style={{marginTop:4}}>{days>0?t(`Còn ${days} ngày khôi phục`,`${days} days left to restore`):t('Hết hạn khôi phục','Restore expired')}</span>;})()}{resource==='assets'&&<span className="workspace-badge" data-status={row.active?'active':'hidden'}>{row.active?t('Đang bật','Active'):t('Đang tắt','Inactive')}</span>}
-    </div><div className="workspace-row-actions">{resource==='users'&&<div className="admin-action-icons">{row.status!=='deleted'?<>
-      <button type="button" className="admin-icon-btn" disabled={busy} aria-label={row.status==='active'?t('Khóa tài khoản','Lock account'):t('Mở khóa tài khoản','Unlock account')} title={row.status==='active'?t('Khóa tài khoản','Lock account'):t('Mở khóa tài khoản','Unlock account')} onClick={()=>confirm(row,{status:row.status==='active'?'locked':'active'},row.status==='active'?t('Khóa tài khoản này?','Lock this account?'):t('Mở khóa tài khoản này?','Unlock this account?'))}><Icon name={row.status==='active'?'lock':'lock_open'}/></button>
-      <button type="button" className="admin-icon-btn" disabled={busy} aria-label={t('Sửa vai trò','Edit roles')} title={t('Sửa vai trò','Edit roles')} onClick={()=>{setError('');setEdit({type:'roles',row,roles:[...row.roles]})}}><Icon name="edit"/></button>
-      <button type="button" className="admin-icon-btn text-error" disabled={busy} aria-label={t('Xóa tài khoản','Delete account')} title={t('Xóa tài khoản (lưu 30 ngày)','Delete account (30-day retention)')} onClick={()=>confirm(row,null,t('Xóa tài khoản này? Tài khoản sẽ bị vô hiệu hóa ngay lập tức và có thể khôi phục trong vòng 30 ngày.','Delete this account? The account will be deactivated immediately and can be restored within 30 days.'),'/admin/users/'+row.id,'DELETE')}><Icon name="delete"/></button>
-    </>:(()=>{const days=restoreDaysLeft(row);return <button type="button" className="admin-icon-btn" disabled={busy||days<=0} aria-label={t('Khôi phục tài khoản','Restore account')} title={days>0?t(`Khôi phục tài khoản (còn ${days} ngày)`,`Restore account (${days} days left)`):t('Đã hết hạn 30 ngày khôi phục','30-day restore window expired')} onClick={()=>confirm(row,{},t('Khôi phục tài khoản này về trạng thái hoạt động?','Restore this account to active status?'),'/admin/users/'+row.id+'/restore','POST')}><Icon name="restore_from_trash"/></button>;})()}</div>}
+    </div><div className="workspace-row-actions">{resource==='users'&&<div className="admin-action-icons">{(row.username==='khang_dev'||row.id==='abcfa9f6-c9d2-4181-9b4b-118a4bb6c647')?(
+      <span className="workspace-badge admin-immutable-badge" title={t('Tài khoản Super Admin bất biến','Immutable Super Admin')}>{t('Bất biến','Immutable')}</span>
+    ):row.status!=='deleted'?(
+      <>
+        <button type="button" className="admin-icon-btn" disabled={busy||(session.user?.username==='kien_dev'&&row.username==='kien_dev')} aria-label={row.status==='active'?t('Khóa tài khoản','Lock account'):t('Mở khóa tài khoản','Unlock account')} title={row.status==='active'?t('Khóa tài khoản','Lock account'):t('Mở khóa tài khoản','Unlock account')} onClick={()=>confirm(row,{status:row.status==='active'?'locked':'active'},row.status==='active'?t('Khóa tài khoản này?','Lock this account?'):t('Mở khóa tài khoản này?','Unlock this account?'))}><Icon name={row.status==='active'?'lock':'lock_open'}/></button>
+        <button type="button" className="admin-icon-btn" disabled={busy||(session.user?.username==='kien_dev'&&row.username==='kien_dev')} aria-label={t('Sửa vai trò','Edit roles')} title={t('Sửa vai trò','Edit roles')} onClick={()=>{setError('');setEdit({type:'roles',row,roles:[...row.roles]})}}><Icon name="edit"/></button>
+        <button type="button" className="admin-icon-btn text-error" disabled={busy||(session.user?.username==='kien_dev'&&row.username==='kien_dev')} aria-label={t('Xóa tài khoản','Delete account')} title={t('Xóa tài khoản (lưu 30 ngày)','Delete account (30-day retention)')} onClick={()=>confirm(row,null,t('Xóa tài khoản này? Tài khoản sẽ bị vô hiệu hóa ngay lập tức và có thể khôi phục trong vòng 30 ngày.','Delete this account? The account will be deactivated immediately and can be restored within 30 days.'),'/admin/users/'+row.id,'DELETE')}><Icon name="delete"/></button>
+      </>
+    ):(
+      (()=>{const days=restoreDaysLeft(row);return <button type="button" className="admin-icon-btn" disabled={busy||days<=0} aria-label={t('Khôi phục tài khoản','Restore account')} title={days>0?t(`Khôi phục tài khoản (còn ${days} ngày)`,`Restore account (${days} days left)`):t('Đã hết hạn 30 ngày khôi phục','30-day restore window expired')} onClick={()=>confirm(row,{},t('Khôi phục tài khoản này về trạng thái hoạt động?','Restore this account to active status?'),'/admin/users/'+row.id+'/restore','POST')}><Icon name="restore_from_trash"/></button>;})()
+    )}</div>}
+    {resource==='orders'&&<div className="admin-action-icons">
+      {row.status==='success'?(
+        <button type="button" className="admin-icon-btn" disabled={busy} aria-label={t('Xem biên lai PDF','View PDF receipt')} title={t('Xem biên lai PDF','View PDF receipt')} onClick={()=>{setError('');setEdit({type:'receipt-preview',row})}}><Icon name="receipt_long"/></button>
+      ):(
+        <button type="button" className="admin-icon-btn is-disabled" disabled aria-label={t('Chỉ đơn thành công mới có biên lai','Receipt only available for successful orders')} title={t('Chỉ đơn thành công mới có biên lai','Receipt only available for successful orders')}><Icon name="receipt_long"/></button>
+      )}
+    </div>}
     {resource==='assets'&&<div className="admin-action-icons">
       <button type="button" className="admin-icon-btn" disabled={busy} aria-label={t('Xem vật phẩm','View asset')} title={t('Xem vật phẩm','View asset')} onClick={()=>{setError('');setPreviewTab('avatar');setEdit({type:'asset-preview',row})}}><Icon name="visibility"/></button>
       <button type="button" className="admin-icon-btn" disabled={busy||row.kind==='background'} aria-label={t('Sửa vật phẩm','Edit asset')} title={row.kind==='background'?t('Background hệ thống không thể chỉnh sửa','System backgrounds cannot be edited'):t('Sửa tên hiển thị & hạng','Edit display name & rank')} onClick={()=>{setError('');setEdit({type:'asset-edit',row,display_name:row.display_name||row.slug,rarity:row.rarity})}}><Icon name="edit"/></button>
@@ -237,10 +276,10 @@ export default function AdminPage(){
       {row.status==='published'&&<button type="button" className="admin-icon-btn text-error" disabled={busy} aria-label={t('Thu hồi thông báo','Withdraw announcement')} title={t('Thu hồi thông báo','Withdraw announcement')} onClick={()=>confirm(row,{},t('Thu hồi thông báo này? Người dùng sẽ không thấy thông báo này nữa.','Withdraw this announcement? Users will no longer see it as active.'),'/admin/announcements/'+row.id+'/withdraw','POST')}><Icon name="undo"/></button>}
     </div>}
    </div></article>)}</div>}
-   {data&&<nav className="workspace-pagination" aria-label={t('Phân trang quản trị','Admin pagination')}><button type="button" disabled={loading||page<=1} onClick={()=>setPage(n=>n-1)}>{t('Trước','Previous')}</button><span>{page} / {Math.max(1,data.pagination.total_pages)} · {data.pagination.total} {t('mục','records')}</span><button type="button" disabled={loading||page>=data.pagination.total_pages} onClick={()=>setPage(n=>n+1)}>{t('Sau','Next')}</button></nav>}
+   {data&&<nav className="workspace-pagination" aria-label={t('Phân trang quản trị','Admin pagination')}><button type="button" disabled={loading||page<=1} onClick={()=>setPage(n=>n-1)}>{t('Trước','Previous')}</button><span>{(()=>{const fromIndex=data.pagination.total===0?0:(page-1)*data.pagination.page_size+1;const toIndex=Math.min(page*data.pagination.page_size,data.pagination.total);return t(`Tổng cộng: ${data.pagination.total} mục · Đang hiển thị ${fromIndex}–${toIndex} · Trang ${page}/${Math.max(1,data.pagination.total_pages)}`,`Total: ${data.pagination.total} records · Showing ${fromIndex}–${toIndex} · Page ${page}/${Math.max(1,data.pagination.total_pages)}`);})()}</span><button type="button" disabled={loading||page>=data.pagination.total_pages} onClick={()=>setPage(n=>n+1)}>{t('Sau','Next')}</button></nav>}
   </section>
   </div>
-  <dialog ref={dialog} className="workspace-dialog" aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='announcement-preview'?t('Chi tiết thông báo hệ thống','Announcement details'):edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='asset-preview'?t('Chi tiết & Xem trước vật phẩm','Asset details & preview'):edit.type==='asset-edit'?t('Chỉnh sửa vật phẩm','Edit asset'):edit.type==='asset-upload'?t('Thêm vật phẩm Meme vào Bảo Khố','Upload Meme asset to Vault'):edit.type==='announcement'?t('Soạn thông báo hệ thống','Compose system announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Chi tiết & Xử lý liên hệ','Contact details & processing'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>
+  <dialog ref={dialog} className={`workspace-dialog ${edit?.type==='receipt-preview'?'admin-receipt-dialog':''}`} aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='receipt-preview'?t('Biên lai thu tiền điện tử','Electronic payment receipt'):edit.type==='announcement-preview'?t('Chi tiết thông báo hệ thống','Announcement details'):edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='asset-preview'?t('Chi tiết & Xem trước vật phẩm','Asset details & preview'):edit.type==='asset-edit'?t('Chỉnh sửa vật phẩm','Edit asset'):edit.type==='asset-upload'?t('Thêm vật phẩm Meme vào Bảo Khố','Upload Meme asset to Vault'):edit.type==='announcement'?t('Soạn thông báo hệ thống','Compose system announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Chi tiết & Xử lý liên hệ','Contact details & processing'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>
    {edit.type==='asset-preview'&&<div className="admin-asset-preview-modal">
       <div className="admin-content-preview-header">
         <div className="admin-content-preview-meta">
@@ -253,10 +292,7 @@ export default function AdminPage(){
         </div>
       </div>
       {edit.row.kind==='background'?(
-        <div className="admin-bg-preview-box" data-effect={edit.row.effect_key||'violet-base'}>
-          <span>{t('Hiệu ứng nền: ','Background effect: ')}<code>{edit.row.effect_key||'violet-base'}</code></span>
-          <small>{t('Background gốc của hệ thống (Chế độ chỉ xem)','Original system background (Read-only)')}</small>
-        </div>
+        <BackgroundPreviewStage effectKey={edit.row.effect_key} t={t} />
       ):(
         <>
           <div className="admin-asset-context-tabs" role="tablist">
@@ -307,12 +343,50 @@ export default function AdminPage(){
         </>
       )}
    </div>}
-   {edit.type==='asset-edit'&&<>
-      <p className="workspace-meta"><code>ID: {edit.row.id}</code> ({formatKind(edit.row.kind)})</p>
-      <label>{t('Tên hiển thị (display_name)','Display name')}<input value={edit.display_name} maxLength={80} required disabled={busy} onChange={e=>setEdit({...edit,display_name:e.target.value})}/></label>
-      <label>{t('Hạng vật phẩm (Rank)','Asset Rank')}<select value={edit.rarity} disabled={busy} onChange={e=>setEdit({...edit,rarity:e.target.value})}>{['D','C','B','A','S'].map(r=><option key={r} value={r}>{t(`Hạng ${r}`,`Rank ${r}`)}</option>)}</select></label>
-      <p className="workspace-meta">{t('Chỉ cho phép chỉnh sửa tên hiển thị và hạng. ID và mã băm file gốc được khóa cố định.','Only display name and rank can be modified. Asset ID and media hash are immutable.')}</p>
-   </>}
+   {edit.type==='asset-edit'&&<div className="admin-asset-edit-fields">
+      <label>
+        <span>{t('1. Tên file (Chỉ đọc)','1. Filename (Read-only)')}</span>
+        <input value={edit.row.filename||edit.row.slug} readOnly disabled className="is-readonly"/>
+      </label>
+      <div className="admin-asset-id-field">
+        <label><span>{t('2. ID vật phẩm (Chỉ đọc)','2. Asset ID (Read-only)')}</span></label>
+        <div className="admin-copy-field-wrap">
+          <input value={edit.row.id} readOnly disabled className="is-readonly"/>
+          <button type="button" className="admin-copy-btn" onClick={()=>copyTargetId(edit.row.id)} aria-label={t('Sao chép ID vật phẩm','Copy asset ID')} title={t('Sao chép ID vật phẩm','Copy asset ID')}>
+            <Icon name={copiedId===edit.row.id?'check':'content_copy'}/>
+          </button>
+        </div>
+      </div>
+      <label>
+        <span>{t('3. Tên ảnh (Hiển thị)','3. Display Name')}</span>
+        <input value={edit.display_name} maxLength={80} required disabled={busy} onChange={e=>setEdit({...edit,display_name:e.target.value})}/>
+      </label>
+      <label>
+        <span>{t('4. Hạng vật phẩm (Rank)','4. Asset Rank')}</span>
+        <select value={edit.rarity} disabled={busy} onChange={e=>setEdit({...edit,rarity:e.target.value})}>
+          {['D','C','B','A','S'].map(r=><option key={r} value={r}>{t(`Hạng ${r}`,`Rank ${r}`)}</option>)}
+        </select>
+      </label>
+   </div>}
+   {edit.type==='receipt-preview'&&<div className="admin-receipt-preview-modal">
+      <div className="admin-receipt-header">
+        <div>
+          <h3 className="admin-receipt-title">{t('Mã hóa đơn: ','Order code: ')}<code className="text-secondary">{edit.row.order_code}</code></h3>
+          <p className="workspace-meta">
+            <span>{edit.row.owner_username&&('@'+edit.row.owner_username+' · ')}</span>
+            <span>{edit.row.amount_vnd_formatted||(edit.row.amount_vnd?.toLocaleString('vi-VN')+' đ')} · </span>
+            <span style={{textTransform:'uppercase',fontWeight:600,color:edit.row.tier==='prime'?'#facc15':'#38bdf8'}}>{edit.row.tier==='prime'?'Aura Prime':'Aura Plus'}</span>
+          </p>
+        </div>
+        <a href={`/api/v1/admin/orders/${edit.row.id}/receipt.pdf`} download={`aurameme-receipt-${edit.row.order_code}.pdf`} className="workspace-primary admin-receipt-download-btn" target="_blank" rel="noopener noreferrer">
+          <Icon name="download"/>
+          <span>{t('Tải PDF','Download PDF')}</span>
+        </a>
+      </div>
+      <div className="admin-receipt-frame-wrap">
+        <iframe src={`/api/v1/admin/orders/${edit.row.id}/receipt.pdf`} title={`Receipt ${edit.row.order_code}`} className="admin-receipt-iframe"/>
+      </div>
+   </div>}
    {edit.type==='asset-upload'&&<div className="admin-asset-upload-modal">
       <div className="admin-upload-guide">
         <strong>{t('Quy chuẩn đặt tên file bắt buộc:','Mandatory filename convention:')}</strong>
@@ -394,7 +468,7 @@ export default function AdminPage(){
        </div>
      )}
    </>}
-   {edit.type==='roles'&&<><p>@{edit.row.username}</p><fieldset><legend>{t('Vai trò từ DB','Database roles')}</legend>{['USER','ADMIN'].map(value=><label className="workspace-checkbox" key={value}><input type="checkbox" checked={edit.roles.includes(value)} disabled={busy} onChange={e=>setEdit({...edit,roles:e.target.checked?[...edit.roles,value]:edit.roles.filter(r=>r!==value)})}/>{value}</label>)}</fieldset><p className="workspace-meta">{t('Thay đổi vai trò sẽ kết thúc các phiên của tài khoản đó.','Changing roles ends that account’s sessions.')}</p></>}
+   {edit.type==='roles'&&<><p>@{edit.row.username}</p><fieldset><legend>{t('Vai trò từ DB','Database roles')}</legend>{['USER','ADMIN'].map(value=><label className="workspace-checkbox" key={value}><input type="checkbox" checked={edit.roles.includes(value)} disabled={busy||(value==='ADMIN'&&edit.row.username!=='khang_dev'&&edit.row.username!=='kien_dev')} onChange={e=>setEdit({...edit,roles:e.target.checked?[...edit.roles,value]:edit.roles.filter(r=>r!==value)})}/>{value}{value==='ADMIN'&&edit.row.username!=='khang_dev'&&edit.row.username!=='kien_dev'&&<span style={{fontSize:11,color:'var(--am-outline)',marginLeft:8}}>({t('Bảo vệ: Chỉ 2 Admin tối thượng','Protected: Max 2 Admins')})</span>}</label>)}</fieldset><p className="workspace-meta">{t('Thay đổi vai trò sẽ kết thúc các phiên của tài khoản đó.','Changing roles ends that account’s sessions.')}</p></>}
    {edit.type==='category'&&<><label>{t('Tên danh mục','Category name')}<input value={edit.name} maxLength={80} required disabled={busy} onChange={e=>setEdit({...edit,name:e.target.value})}/></label>{!edit.row?<label>Slug<input value={edit.slug} maxLength={80} pattern="[a-z0-9-]+" required disabled={busy} onChange={e=>setEdit({...edit,slug:e.target.value})}/></label>:<label>{t('Trạng thái','Status')}<select value={edit.status} disabled={busy} onChange={e=>setEdit({...edit,status:e.target.value})}>{states.categories.map(v=><option value={v} key={v}>{status(v)}</option>)}</select></label>}</>}
    {edit.type==='contact'&&<div className="admin-contact-detail">
       <div className="admin-contact-info-card">
@@ -425,7 +499,7 @@ export default function AdminPage(){
     {edit.type==='moderate'&&<><p className="admin-confirm-target" translate="no">{edit.row?.title||edit.row?.body||edit.row?.id}</p><p>{edit.action==='hidden'?t('Ẩn nội dung này khỏi cộng đồng?','Hide this content from the community?'):t('Xóa hoàn toàn nội dung này?','Permanently delete this content?')}</p><label>{t('Lý do kiểm duyệt (5-500 ký tự) *','Moderation reason (5-500 chars) *')}<textarea value={edit.reason||''} maxLength={500} required disabled={busy} rows={3} placeholder={t('Nhập lý do gửi thông báo tới tác giả…','Enter reason to notify author…')} onChange={e=>setEdit({...edit,reason:e.target.value})}/></label><p className="workspace-meta">{t('Lý do sẽ được ghi vào nhật ký và gửi thông báo tới tác giả.','Reason will be logged and dispatched to the author.')}</p></>}
    {error&&<p className="workspace-error" role="alert">{error}</p>}
    <div className="workspace-dialog-actions">
-      {edit.type==='content-preview'||edit.type==='announcement-preview'?(
+      {edit.type==='content-preview'||edit.type==='announcement-preview'||edit.type==='receipt-preview'?(
         <button type="button" className="workspace-primary" onClick={()=>{setEdit(null);setHoldingPreview(false);}}>{t('Đóng','Close')}</button>
       ):edit.type==='asset-preview'?(
         <>

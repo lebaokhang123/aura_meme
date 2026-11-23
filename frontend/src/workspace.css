@@ -598,4 +598,153 @@
   gap: 4px;
 }
 
+/* Immutable admin badge */
+.admin-immutable-badge {
+  font-size: 10px;
+  background: rgba(168, 85, 247, 0.15) !important;
+  color: #c084fc !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+  user-select: none;
+}
+
+/* Catalog 3-row layout */
+.admin-asset-filename {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--am-secondary);
+}
+
+/* Asset Edit Modal 4-Field Layout */
+.admin-asset-edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.admin-copy-field-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.admin-copy-field-wrap input {
+  width: 100%;
+  padding-right: 44px !important;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+.admin-copy-field-wrap .admin-copy-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.is-readonly {
+  opacity: 0.75;
+  background: var(--am-surface-container-high) !important;
+  cursor: default !important;
+}
+
+/* Live Animated Background Preview Stage */
+.admin-bg-preview-canvas-box {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0a0915;
+  border: 1px solid var(--am-outline-variant);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.6);
+}
+.admin-bg-preview-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.admin-bg-preview-overlay-info {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  background: rgba(10, 9, 21, 0.78);
+  backdrop-filter: blur(8px);
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 5;
+}
+.admin-bg-effect-name {
+  font-size: 12px;
+  color: #00f0ff;
+  font-weight: 600;
+}
+.admin-bg-effect-sub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+}
+.admin-live-badge {
+  background: rgba(34, 197, 94, 0.2) !important;
+  color: #4ade80 !important;
+  border-color: rgba(34, 197, 94, 0.4) !important;
+  font-weight: 700;
+}
+
+/* Receipt PDF Viewer Modal */
+.admin-receipt-dialog {
+  width: min(840px, calc(100vw - 32px)) !important;
+  max-width: 840px !important;
+}
+.admin-receipt-preview-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.admin-receipt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--am-outline-variant);
+}
+.admin-receipt-title {
+  margin: 0;
+  font-size: 16px;
+}
+.admin-receipt-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 8px;
+  text-decoration: none !important;
+  font-weight: 600;
+  font-size: 13px;
+}
+.admin-receipt-frame-wrap {
+  width: 100%;
+  height: 520px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--am-outline-variant);
+  background: #11121a;
+}
+.admin-receipt-iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+
 
