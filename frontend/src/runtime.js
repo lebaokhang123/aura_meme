@@ -5,7 +5,7 @@ import {auth,MOCK_AUTH} from './auth.js';
 import {authMessage} from './auth-client.js';
 import {safeReturnUrl} from './return-url.js';
 const ROUTES = {'trang-chu':'/','kham-pha':'/explore','gioi-thieu':'/about','lien-he':'/contact','xep-hang':'/rank','bao-kho':'/vault','dang-nhap':'/login','dang-ky':'/register'};
-const PAGE = {'/':'home','/explore':'explore','/about':'about','/contact':'contact','/rank':'rank','/vault':'vault','/admin':'about','/premium':'about','/premium/checkout':'about','/premium/history':'about','/forgot-password':'about','/reset-password':'about'};
+const PAGE = {'/':'home','/explore':'explore','/about':'about','/contact':'contact','/rank':'rank','/vault':'vault','/admin':'about','/premium':'about','/premium/checkout':'about','/premium/history':'about','/forgot-password':'about','/reset-password':'about','/verify-email':'about'};
 const PAGE_BODY_CLASS = {"guest-home": "bg-surface font-body-md text-on-surface antialiased selection:bg-secondary-container selection:text-on-secondary-container", "guest-explore": "bg-background font-body-md text-body-md text-on-surface antialiased", "guest-about": "bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-secondary-container selection:text-on-secondary-container", "guest-contact": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "guest-rank": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "guest-vault": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "user-home": "bg-surface font-body-md text-on-surface antialiased selection:bg-secondary-container selection:text-on-secondary-container", "user-explore": "bg-background font-body-md text-body-md text-on-surface antialiased", "user-about": "bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-secondary-container selection:text-on-secondary-container", "user-contact": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "user-rank": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "user-vault": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "login": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "register": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"};
 export function resolveScreen(){
  const path=location.pathname.replace(/\/$/,'')||'/';
@@ -140,7 +140,11 @@ export function prepareAuthForm(){
       nonce,
       callback:async(resp)=>{
        try{
-        await auth.googleLogin(resp.credential,nonce);
+        const res=await auth.googleLogin(resp.credential,nonce);
+        if(res?.status==='needs_onboarding'){
+         window.dispatchEvent(new CustomEvent('aurameme-google-onboarding',{detail:res}));
+         return;
+        }
         location.assign(safeReturnUrl(new URLSearchParams(location.search).get('next')));
        }catch(err){showDemoMessage(authMessage(err,readPreferences().language));}
       },
@@ -226,7 +230,11 @@ async function submitApiForm(form){
     return;
    }
    try{
-    await auth.register({email,password,username:cleanTag,display_name:displayName});
+    const regRes = await auth.register({email,password,username:cleanTag,display_name:displayName});
+    if(regRes?.status==='pending_verification'){
+     location.assign('/login?pending_verification='+encodeURIComponent(email));
+     return;
+    }
     location.assign('/login?registered=1');
    }catch(error){
     const msg=authMessage(error,lang);

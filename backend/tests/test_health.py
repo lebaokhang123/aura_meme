@@ -20,8 +20,10 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         contract = schema.json()
         assert set(contract["paths"]) == {"/health", "/api/v1/auth/csrf", "/api/v1/auth/register",
                                           "/api/v1/auth/login", "/api/v1/auth/logout",
+                                          "/api/v1/auth/verify-email",
                                           "/api/v1/auth/forgot-password", "/api/v1/auth/reset-password",
                                           "/api/v1/auth/google/config", "/api/v1/auth/google/login", "/api/v1/auth/google/link",
+                                          "/api/v1/auth/google/onboarding",
                                           "/api/v1/users/me",
                                           "/api/v1/users/me/password", "/api/v1/users/{username}", "/api/v1/users/{username}/comments", "/api/v1/users/{username}/activity", "/api/v1/users/{username}/inventory", "/api/v1/categories",
                                           "/api/v1/admin/categories", "/api/v1/admin/categories/{category_id}",

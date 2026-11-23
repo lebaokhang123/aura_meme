@@ -24,6 +24,11 @@ export default function LucianLoginForm() {
   const [isBusy, setIsBusy] = useState(false);
   const [isOk, setIsOk] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [onboarding, setOnboarding] = useState(null);
+  const [chosenTag, setChosenTag] = useState('');
+  const [tagError, setTagError] = useState('');
+  const [onboardingBusy, setOnboardingBusy] = useState(false);
+
 
   const identifierRef = useRef(null);
   const passwordRef = useRef(null);
@@ -109,7 +114,13 @@ export default function LucianLoginForm() {
         nonce,
         callback: async (resp) => {
           try {
-            await auth.googleLogin(resp.credential, nonce);
+            const res = await auth.googleLogin(resp.credential, nonce);
+            if (res?.status === 'needs_onboarding') {
+              setOnboarding(res);
+              setChosenTag(res.suggested_tag || '');
+              setTagError('');
+              return;
+            }
             const next = new URLSearchParams(location.search).get('next');
             location.assign(safeReturnUrl(next));
           } catch (err) {
@@ -124,6 +135,32 @@ export default function LucianLoginForm() {
       setGoogleBusy(false);
     }
   }
+
+  async function handleOnboardingSubmit(ev) {
+    ev.preventDefault();
+    if (!onboarding || onboardingBusy) return;
+    const cleanTag = chosenTag.trim().toLowerCase().replace(/^@/, '');
+    if (!cleanTag || !/^[a-z0-9_]{3,32}$/.test(cleanTag)) {
+      setTagError(
+        isEn
+          ? 'Tag must be 3–32 characters (a-z, 0-9, _).'
+          : 'Tag phải từ 3 đến 32 ký tự chữ thường, số hoặc gạch dưới (ví dụ: khang_dev).'
+      );
+      return;
+    }
+    setOnboardingBusy(true);
+    setTagError('');
+    try {
+      await auth.googleOnboarding(onboarding.onboarding_token, cleanTag);
+      const next = new URLSearchParams(location.search).get('next');
+      location.assign(safeReturnUrl(next));
+    } catch (err) {
+      setTagError(authMessage(err, language));
+    } finally {
+      setOnboardingBusy(false);
+    }
+  }
+
 
   const idUp = focusedField === 'identifier' || Boolean(identifier);
   const pwUp = focusedField === 'password' || Boolean(password);
@@ -305,6 +342,164 @@ export default function LucianLoginForm() {
           </p>
         </div>
       </form>
+
+      {onboarding && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.78)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              background: '#1a1b23',
+              border: '1px solid rgba(208,188,255,0.3)',
+              borderRadius: 16,
+              padding: '26px 28px',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.85), 0 0 35px rgba(208,188,255,0.25)',
+              position: 'relative',
+            }}
+          >
+            <div style={{ textAlign: 'center', marginBottom: 18 }}>
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  margin: '0 auto 12px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, rgba(84,36,175,0.35), rgba(76,215,246,0.35))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid rgba(208,188,255,0.4)',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 28, color: '#d0bcff' }}>
+                  alternate_email
+                </span>
+              </div>
+              <h2 style={{ fontSize: 18, fontWeight: 800, color: '#e3e1ed', margin: '0 0 6px' }}>
+                {t('Hoàn tất đăng ký với Google', 'Complete Google Sign Up')}
+              </h2>
+              <p style={{ fontSize: 13, color: '#cac4d0', margin: 0 }}>
+                {t('Chào mừng', 'Welcome')}{' '}
+                <strong style={{ color: '#d0bcff' }}>{onboarding.display_name}</strong>!{' '}
+                {t('Hãy chọn @tag người dùng duy nhất của bạn:', 'Choose your unique @tag:')}
+              </p>
+            </div>
+
+            <form onSubmit={handleOnboardingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label
+                  htmlFor="onboarding-tag"
+                  style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#cac4d0', marginBottom: 6 }}
+                >
+                  {t('@Tag người dùng', '@User tag')}
+                </label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: 12,
+                      color: '#948f9a',
+                      fontSize: 16,
+                      fontWeight: 700,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    @
+                  </span>
+                  <input
+                    id="onboarding-tag"
+                    type="text"
+                    value={chosenTag}
+                    onChange={(e) => {
+                      setChosenTag(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''));
+                      setTagError('');
+                    }}
+                    placeholder="khang_dev"
+                    maxLength={32}
+                    style={{
+                      width: '100%',
+                      height: 44,
+                      paddingLeft: 30,
+                      paddingRight: 12,
+                      background: '#12131b',
+                      border: tagError ? '1px solid #ea4335' : '1px solid rgba(208,188,255,0.25)',
+                      borderRadius: 10,
+                      color: '#e3e1ed',
+                      fontFamily: 'monospace',
+                      fontSize: 14,
+                      outline: 'none',
+                    }}
+                    autoFocus
+                  />
+                </div>
+                {tagError ? (
+                  <span style={{ display: 'block', color: '#ea4335', fontSize: 12, marginTop: 4 }}>
+                    {tagError}
+                  </span>
+                ) : (
+                  <span style={{ display: 'block', color: '#948f9a', fontSize: 11, marginTop: 4 }}>
+                    {t('3–32 ký tự chữ thường, số hoặc dấu gạch dưới', '3–32 lowercase letters, numbers or underscores')}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setOnboarding(null)}
+                  style={{
+                    flex: 1,
+                    height: 42,
+                    borderRadius: 10,
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#e3e1ed',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t('Hủy', 'Cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={onboardingBusy}
+                  style={{
+                    flex: 2,
+                    height: 42,
+                    borderRadius: 10,
+                    background: 'linear-gradient(135deg, #5424af 0%, #00d4ff 100%)',
+                    border: 'none',
+                    color: '#ffffff',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(84,36,175,0.4)',
+                    opacity: onboardingBusy ? 0.7 : 1,
+                  }}
+                >
+                  {onboardingBusy ? t('Đang xử lý...', 'Processing...') : t('Hoàn tất đăng ký', 'Finish Registration')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

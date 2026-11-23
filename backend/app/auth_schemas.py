@@ -53,6 +53,22 @@ class UserPrivate(BaseModel):
     status: Literal["active", "locked", "deleted"]
 
 
+class RegisterResponse(BaseModel):
+    status: Literal["pending_verification"] = "pending_verification"
+    email: EmailStr
+    message: str
+
+
+class VerifyEmailInput(BaseModel):
+    token: str = Field(min_length=16, max_length=128)
+
+
+class VerifyEmailResponse(BaseModel):
+    status: Literal["verified"] = "verified"
+    message: str
+
+
+
 class CsrfResponse(BaseModel):
     csrf_token: str
 

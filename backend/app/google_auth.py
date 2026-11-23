@@ -12,8 +12,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
+import base64
+import hashlib
+import hmac
+import json
 import re
 import secrets
+from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -23,9 +28,10 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
-from app.auth import CSRF_HEADER, ERRORS, guest_guard, set_cookie, user_private
+from app.auth import CSRF_HEADER, ERRORS, delete_cookie, guest_guard, set_cookie, user_private
 from app.auth_schemas import UserPrivate
 from app.config import GoogleAuthSettings
+
 from app.models import AuthSession, Profile, Role, User, UserOAuthIdentity, UserRole
 from app.password_reset import GOOGLE_ONLY_PASSWORD_PREFIX
 from app.permissions import require_account_csrf
@@ -55,6 +61,22 @@ class GoogleLoginInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id_token: SecretStr = Field(min_length=20, max_length=8192)
     nonce: str | None = Field(default=None, max_length=128)
+    username: str | None = Field(default=None, min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$")
+
+
+class GoogleOnboardingRequiredResponse(BaseModel):
+    status: Literal["needs_onboarding"] = "needs_onboarding"
+    onboarding_token: str
+    email: str
+    display_name: str
+    suggested_tag: str
+
+
+class GoogleOnboardingInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    onboarding_token: str = Field(min_length=20, max_length=2048)
+    username: str = Field(min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$")
+
 
 
 class GoogleLinkInput(BaseModel):
@@ -149,6 +171,44 @@ class GoogleTokenVerifier:
         )
 
 
+def suggest_tag(email: str) -> str:
+    prefix = re.sub(r"[^a-z0-9_]", "_", email.split("@", 1)[0].lower())
+    prefix = re.sub(r"_+", "_", prefix).strip("_")
+    if len(prefix) < 3:
+        prefix = "aura_user"
+    return prefix[:20]
+
+
+def create_onboarding_token(runtime, sub: str, email: str, name: str, expires_seconds: int = 900) -> str:
+    now = runtime.now()
+    exp = int(now.timestamp()) + expires_seconds
+    payload_obj = {"sub": sub, "email": email, "name": name, "exp": exp}
+    payload_bytes = json.dumps(payload_obj, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    payload_b64 = base64.urlsafe_b64encode(payload_bytes).decode("ascii").rstrip("=")
+    sig = hmac.new(runtime.key, f"google_onboarding:{payload_b64}".encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload_b64}.{sig}"
+
+
+def verify_onboarding_token(runtime, token: str) -> dict:
+    parts = token.split(".")
+    if len(parts) != 2:
+        raise AuthError(400, "INVALID_ONBOARDING_TOKEN", "Phiên đăng ký Google không hợp lệ.")
+    payload_b64, sig = parts
+    expected_sig = hmac.new(runtime.key, f"google_onboarding:{payload_b64}".encode("utf-8"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected_sig):
+        raise AuthError(400, "INVALID_ONBOARDING_TOKEN", "Phiên đăng ký Google không hợp lệ hoặc đã bị thay đổi.")
+    try:
+        padded = payload_b64 + "=" * (-len(payload_b64) % 4)
+        payload_bytes = base64.urlsafe_b64decode(padded.encode("ascii"))
+        data = json.loads(payload_bytes.decode("utf-8"))
+    except Exception:
+        raise AuthError(400, "INVALID_ONBOARDING_TOKEN", "Dữ liệu đăng ký Google không hợp lệ.") from None
+    now_ts = int(runtime.now().timestamp())
+    if data.get("exp", 0) < now_ts:
+        raise AuthError(400, "ONBOARDING_TOKEN_EXPIRED", "Phiên đăng ký Google đã hết hạn. Vui lòng đăng nhập lại.")
+    return data
+
+
 def _generate_username(db, email: str) -> str:
     prefix = re.sub(r"[^a-z0-9_]", "_", email.split("@", 1)[0].lower())
     prefix = re.sub(r"_+", "_", prefix).strip("_")
@@ -174,7 +234,7 @@ def get_google_config(request: Request):
 
 @router.post(
     "/login",
-    response_model=UserPrivate,
+    response_model=UserPrivate | GoogleOnboardingRequiredResponse,
     operation_id="googleLogin",
     responses={status: ERRORS[status] for status in (401, 403, 409, 422, 429, 500)} | {503: ERRORS[500]},
     openapi_extra=CSRF_HEADER,
@@ -192,7 +252,6 @@ def google_login(payload: GoogleLoginInput, request: Request, response: Response
         expected_nonce=payload.nonce,
     )
 
-    raw_session = secrets.token_urlsafe(32)
     with request.app.state.auth_session_factory() as db, db.begin():
         identity = db.scalar(
             select(UserOAuthIdentity)
@@ -216,17 +275,29 @@ def google_login(payload: GoogleLoginInput, request: Request, response: Response
                     "Email này đã thuộc về một tài khoản hiện có. Vui lòng đăng nhập bằng mật khẩu trước rồi liên kết Google.",
                 )
 
+            # If brand new user and no username provided -> return onboarding token
+            if payload.username is None:
+                return GoogleOnboardingRequiredResponse(
+                    status="needs_onboarding",
+                    onboarding_token=create_onboarding_token(runtime, claims.sub, claims.email, claims.name),
+                    email=claims.email,
+                    display_name=claims.name,
+                    suggested_tag=suggest_tag(claims.email),
+                )
+
+            # If username is provided, validate uniqueness
+            if db.scalar(select(User.id).where(User.username == payload.username)) is not None:
+                raise AuthError(409, "USERNAME_EXISTS", "Tag đã được sử dụng, vui lòng chọn tag khác.")
+
             from app.aura_lock import lock_aura_mutation
             from app.aura_runtime import initialize_progress
 
             lock_aura_mutation(db)
             user_id = uuid4()
-            username = _generate_username(db, claims.email)
-            # Non-loginable password sentinel for Google-only accounts
             sentinel_hash = GOOGLE_ONLY_PASSWORD_PREFIX + secrets.token_hex(24)
             user = User(
                 id=user_id,
-                username=username,
+                username=payload.username,
                 email=claims.email,
                 password_hash=sentinel_hash,
                 status="active",
@@ -235,7 +306,6 @@ def google_login(payload: GoogleLoginInput, request: Request, response: Response
             )
             db.add(user)
             db.add(Profile(user_id=user_id, display_name=claims.name, updated_at=now))
-            # Always grant standard USER role ONLY — never ADMIN!
             db.execute(
                 insert(Role)
                 .values(id=uuid4(), code="USER", description="Standard AuraMeme user")
@@ -261,6 +331,7 @@ def google_login(payload: GoogleLoginInput, request: Request, response: Response
                 raise AuthError(409, "CONFLICT", "Tài khoản Google này đang được xử lý. Vui lòng thử lại.") from None
             initialize_progress(db, user_id, now)
 
+        raw_session = secrets.token_urlsafe(32)
         db.add(
             AuthSession(
                 id=uuid4(),
@@ -273,9 +344,108 @@ def google_login(payload: GoogleLoginInput, request: Request, response: Response
         )
         db.flush()
         user_dto = user_private(db, user)
+        runtime.consume_pre(pre)
 
     set_cookie(response, runtime, "am_session", raw_session, IDLE_SECONDS)
+    delete_cookie(response, runtime, runtime.pre_cookie)
     return user_dto
+
+
+@router.post(
+    "/onboarding",
+    response_model=UserPrivate,
+    operation_id="googleOnboarding",
+    responses={status: ERRORS[status] for status in (400, 401, 403, 409, 422, 429, 500)},
+    openapi_extra=CSRF_HEADER,
+)
+def google_onboarding(payload: GoogleOnboardingInput, request: Request, response: Response, pre=Depends(guest_guard)):
+    runtime = request.app.state.auth
+    client_ip = request.client.host if request.client else "unknown"
+    runtime.limiter.check(f"google:onboarding:{client_ip}", 15, 600)
+
+    data = verify_onboarding_token(runtime, payload.onboarding_token)
+    sub = data["sub"]
+    email = data["email"]
+    name = (data.get("name") or "Aura User").strip()[:25] or "Aura User"
+    username = payload.username.strip().lower()
+
+    now = runtime.now()
+    raw_session = secrets.token_urlsafe(32)
+
+    with request.app.state.auth_session_factory() as db, db.begin():
+        existing_identity = db.scalar(
+            select(UserOAuthIdentity).where(UserOAuthIdentity.provider == "google", UserOAuthIdentity.provider_sub == sub)
+        )
+        if existing_identity is not None:
+            user = db.scalar(select(User).where(User.id == existing_identity.user_id).with_for_update())
+            if user is None or user.status != "active":
+                raise AuthError(403, "ACCOUNT_INACTIVE", "Tài khoản không còn hoạt động.")
+        else:
+            if db.scalar(select(User.id).where(User.email == email)) is not None:
+                raise AuthError(409, "ACCOUNT_LINK_REQUIRED", "Email này đã thuộc về một tài khoản hiện có.")
+            if db.scalar(select(User.id).where(User.username == username)) is not None:
+                raise AuthError(409, "USERNAME_EXISTS", "Tag đã được sử dụng, vui lòng chọn tag khác.")
+
+            from app.aura_lock import lock_aura_mutation
+            from app.aura_runtime import initialize_progress
+
+            lock_aura_mutation(db)
+            user_id = uuid4()
+            sentinel_hash = GOOGLE_ONLY_PASSWORD_PREFIX + secrets.token_hex(24)
+            user = User(
+                id=user_id,
+                username=username,
+                email=email,
+                password_hash=sentinel_hash,
+                status="active",
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(user)
+            db.add(Profile(user_id=user_id, display_name=name, updated_at=now))
+            db.execute(
+                insert(Role)
+                .values(id=uuid4(), code="USER", description="Standard AuraMeme user")
+                .on_conflict_do_nothing(index_elements=["code"])
+            )
+            role_id = db.scalar(select(Role.id).where(Role.code == "USER"))
+            db.add(UserRole(user_id=user_id, role_id=role_id, granted_at=now))
+            db.add(
+                UserOAuthIdentity(
+                    id=uuid4(),
+                    user_id=user_id,
+                    provider="google",
+                    provider_sub=sub,
+                    email=email,
+                    email_verified=True,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            try:
+                db.flush()
+            except IntegrityError:
+                raise AuthError(409, "CONFLICT", "Tài khoản Google hoặc tag này đang được xử lý. Vui lòng thử lại.") from None
+            initialize_progress(db, user_id, now)
+
+        db.add(
+            AuthSession(
+                id=uuid4(),
+                user_id=user.id,
+                token_hash=digest(raw_session),
+                created_at=now,
+                expires_at=now + timedelta(seconds=IDLE_SECONDS),
+                revoked_at=None,
+            )
+        )
+        db.flush()
+        user_dto = user_private(db, user)
+        runtime.consume_pre(pre)
+
+    set_cookie(response, runtime, "am_session", raw_session, IDLE_SECONDS)
+    delete_cookie(response, runtime, runtime.pre_cookie)
+    return user_dto
+
 
 
 @router.post(

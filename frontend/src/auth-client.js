@@ -57,7 +57,9 @@ export function createAuthClient({fetch=globalThis.fetch,notify=()=>{}}={}){
     async forgotPassword(email){return mutation('forgot-password',{email});},
     async resetPassword(token,new_password){return mutation('reset-password',{token,new_password});},
     async googleConfig(){return request('/auth/google/config');},
-    async googleLogin(id_token,nonce){await mutation('google/login',{id_token,...(nonce?{nonce}:{})});if(!await refresh())throw new AuthError(401,'SESSION_EXPIRED');notify();},
+    async googleLogin(id_token,nonce,username){const res=await mutation('google/login',{id_token,...(nonce?{nonce}:{}),...(username?{username}:{})});if(res?.status==='needs_onboarding')return res;if(!await refresh())throw new AuthError(401,'SESSION_EXPIRED');notify();return res;},
+    async googleOnboarding(onboarding_token,username){const res=await mutation('google/onboarding',{onboarding_token,username});if(!await refresh())throw new AuthError(401,'SESSION_EXPIRED');notify();return res;},
+    async verifyEmail(token){return mutation('verify-email',{token});},
   };
 }
 export function authMessage(error,language='vi'){
@@ -72,6 +74,11 @@ export function authMessage(error,language='vi'){
     VALIDATION_ERROR:['Thông tin chưa hợp lệ. Mật khẩu cần 12–128 ký tự; tên đăng nhập dùng chữ thường, số hoặc dấu gạch dưới.','Invalid details. Use a 12–128 character password and lowercase letters, numbers or underscores for the username.'],
     RATE_LIMITED:['Quá nhiều lần thử. Vui lòng thử lại sau.','Too many attempts. Please try again later.'],
     ACCOUNT_LINK_REQUIRED:['Email này đã thuộc về tài khoản hiện có. Vui lòng đăng nhập bằng mật khẩu trước rồi liên kết Google.','This email belongs to an existing account. Sign in with your password first to link Google safely.'],
+    ACCOUNT_UNVERIFIED:['Tài khoản chưa được kích hoạt. Vui lòng kiểm tra hộp thư email để xác minh tài khoản trước khi đăng nhập.','Account is not verified yet. Please check your email to activate your account.'],
+    INVALID_VERIFICATION_TOKEN:['Liên kết xác minh không hợp lệ hoặc đã hết hạn.','Verification link is invalid or has expired.'],
+    ALREADY_REGISTERED:['Tài khoản đã được kích hoạt trước đó. Vui lòng đăng nhập.','Account has already been verified. Please sign in.'],
+    INVALID_ONBOARDING_TOKEN:['Phiên đăng ký Google không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.','Google onboarding session is invalid or expired. Please sign in again.'],
+    ONBOARDING_TOKEN_EXPIRED:['Phiên đăng ký Google đã hết hạn. Vui lòng đăng nhập lại.','Google onboarding session has expired. Please sign in again.'],
     INVALID_RESET_TOKEN:['Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.','This password reset link is invalid or has expired.'],
     GOOGLE_ONLY_ACCOUNT:['Tài khoản này đăng nhập bằng Google và không dùng mật khẩu cục bộ.','This account signs in with Google and does not have a local password.'],
     GOOGLE_AUTH_NOT_CONFIGURED:['Đăng nhập Google chưa được cấu hình trên máy chủ.','Google sign-in is not configured on this server yet.'],

@@ -33,6 +33,8 @@ import PremiumCheckoutPage from './components/PremiumCheckoutPage.jsx';
 import PaymentHistoryPage from './components/PaymentHistoryPage.jsx';
 import ForgotPasswordPage from './components/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './components/ResetPasswordPage.jsx';
+import VerifyEmailPage from './components/VerifyEmailPage.jsx';
+
 const pages=import.meta.glob('./generated/*.js');
 const cssFiles=import.meta.glob('./generated/*.css',{query:'?raw',import:'default'});
 const effectsFiles=import.meta.glob('./generated/*.effects.json');
@@ -73,7 +75,8 @@ function App() {
     document.body.className=page.bodyClass;
     document.body.dataset.screen=page.key;
     const style=document.createElement('style');style.id='stitch-active-styles';
-    const custom={'/admin':AdminPage,'/premium':PremiumPage,'/premium/checkout':PremiumCheckoutPage,'/premium/history':PaymentHistoryPage,'/forgot-password':ForgotPasswordPage,'/reset-password':ResetPasswordPage}[page.path]||(!MOCK_AUTH&&((page.path.startsWith('/profile')||page.path.startsWith('/u/'))?ProfilePage:page.path==='/contact'?ContactPage:page.path==='/vault'?VaultPage:page.path==='/admin/contacts'?ContactInbox:null));
+    const custom={'/admin':AdminPage,'/premium':PremiumPage,'/premium/checkout':PremiumCheckoutPage,'/premium/history':PaymentHistoryPage,'/forgot-password':ForgotPasswordPage,'/reset-password':ResetPasswordPage,'/verify-email':VerifyEmailPage}[page.path]||(!MOCK_AUTH&&((page.path.startsWith('/profile')||page.path.startsWith('/u/'))?ProfilePage:page.path==='/contact'?ContactPage:page.path==='/vault'?VaultPage:page.path==='/admin/contacts'?ContactInbox:null));
+
     const maintenance=page.path==='/rank'||MOCK_AUTH&&['/contact','/vault'].includes(page.path);
     const pageLoader=custom?Promise.resolve(custom):maintenance ? Promise.resolve(MaintenancePage) : pages[`./generated/${page.key}.js`]().then(mod=>mod.default);
     const cssLoader=cssFiles[`./generated/${page.key}.css`]();
@@ -87,7 +90,8 @@ function App() {
   useEffect(() => {
     if(!screen)return;
     applyDemoIdentity();
-    if(['/admin','/premium','/premium/checkout','/premium/history','/forgot-password','/reset-password'].includes(page.path)||!MOCK_AUTH&&!['/','/explore','/about','/login','/register','/rank'].includes(page.path))return;
+    if(['/admin','/premium','/premium/checkout','/premium/history','/forgot-password','/reset-password','/verify-email'].includes(page.path)||!MOCK_AUTH&&!['/','/explore','/about','/login','/register','/rank'].includes(page.path))return;
+
     let stopped=false;let cleanup=()=>{};
     const loader=effectsFiles[`./generated/${page.key}.effects.json`]; if(loader&&!['/','/explore'].includes(page.path))loader().then(mod=>{
       if(stopped)return;cleanup=initLegacyEffects(mod.default);
@@ -95,7 +99,20 @@ function App() {
     return()=>{stopped=true;cleanup()};
   },[page.key,screen]);
   useEffect(()=>attachNavigation(),[]);
-  useEffect(()=>{if(!MOCK_AUTH&&screen&&page.path==='/login'&&new URLSearchParams(location.search).has('registered'))showDemoMessage(language==='en'?'Account created. Please sign in.':'Đăng ký thành công. Vui lòng đăng nhập.');},[screen]);
+  useEffect(()=>{
+    if(!MOCK_AUTH&&screen&&page.path==='/login'){
+      const params=new URLSearchParams(location.search);
+      if(params.has('registered')){
+        showDemoMessage(language==='en'?'Account created. Please sign in.':'Đăng ký thành công. Vui lòng đăng nhập.');
+      }else if(params.has('verified')){
+        showDemoMessage(language==='en'?'Account activated successfully! Please sign in.':'Kích hoạt tài khoản thành công! Vui lòng đăng nhập.');
+      }else if(params.has('pending_verification')){
+        const em=params.get('pending_verification');
+        showDemoMessage(language==='en'?`Verification email sent to ${em}. Please check your inbox.`:`Email xác minh đã được gửi đến ${em}. Vui lòng kiểm tra hộp thư để kích hoạt tài khoản.`);
+      }
+    }
+  },[screen]);
+
   useEffect(()=>{if(screen)prepareAuthForm();},[screen,language]);
   useEffect(()=>{if(!MOCK_AUTH&&authState.error)showDemoMessage(authMessage(authState.error,language));},[authState.error]);
   const protectedPage=['/admin','/contact','/vault','/admin/contacts','/profile','/premium','/premium/checkout','/premium/history'].includes(page.path);

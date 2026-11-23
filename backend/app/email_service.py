@@ -226,6 +226,38 @@ class EmailService:
         html_body = _html_shell("Khôi phục mật khẩu", "Liên kết đặt lại mật khẩu AuraMeme (hiệu lực 30 phút)", body_html, self.settings.app_public_url)
         return self.send(to_email=to_email, subject=subject, text_body=text_body, html_body=html_body, dedupe_key=dedupe_key)
 
+    def send_account_verification_email(
+        self,
+        *,
+        to_email: str,
+        display_name: str,
+        verify_url: str,
+        expires_hours: int = 24,
+        dedupe_key: str | None = None,
+    ) -> EmailResult:
+        subject = "AuraMeme — Xác minh tài khoản của bạn"
+        text_body = (
+            f"Xin chào {display_name},\n\n"
+            f"Cảm ơn bạn đã đăng ký tài khoản tại AuraMeme — Cyberpunk Cultivation Meme Community Platform.\n"
+            f"Vui lòng mở liên kết sau để kích hoạt tài khoản của bạn (có hiệu lực trong {expires_hours} giờ):\n"
+            f"{verify_url}\n\n"
+            f"Nếu bạn không thực hiện đăng ký tài khoản này, vui lòng bỏ qua email.\n"
+        )
+        safe_name = escape(display_name)
+        safe_link = escape(verify_url)
+        body_html = f"""
+          <p style="margin:0 0 14px;">Xin chào <strong>{safe_name}</strong>,</p>
+          <p style="margin:0 0 18px;">Cảm ơn bạn đã gia nhập thế giới tu chân AuraMeme. Vui lòng bấm nút bên dưới để <strong>kích hoạt tài khoản</strong> (liên kết có hiệu lực trong <strong>{expires_hours} giờ</strong>):</p>
+          <p style="margin:0 0 22px;text-align:center;">
+            <a href="{safe_link}" style="display:inline-block;padding:12px 28px;border-radius:10px;background:linear-gradient(135deg,#5424af 0%,#00d4ff 100%);color:#ffffff;font-weight:700;text-decoration:none;box-shadow:0 4px 14px rgba(84,36,175,0.4);">Kích hoạt tài khoản</a>
+          </p>
+          <p style="margin:0 0 12px;font-size:12px;color:#cac4d0;word-break:break-all;">Nếu nút không hoạt động, hãy sao chép liên kết sau vào trình duyệt:<br /><a href="{safe_link}" style="color:#4cd7f6;">{safe_link}</a></p>
+          <p style="margin:0;font-size:12.5px;color:#948f9a;">Nếu bạn không đăng ký tài khoản này, vui lòng bỏ qua email này.</p>
+        """
+        html_body = _html_shell("Xác minh tài khoản", "Kích hoạt tài khoản AuraMeme của bạn", body_html, self.settings.app_public_url)
+        return self.send(to_email=to_email, subject=subject, text_body=text_body, html_body=html_body, dedupe_key=dedupe_key)
+
+
     def send_contact_emails(
         self,
         *,

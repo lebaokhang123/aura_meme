@@ -87,6 +87,8 @@ class EmailSettings(BaseSettings):
     email_reply_to: str | None = None
     email_admin_inbox: str | None = None
     app_public_url: str = "http://localhost:5173"
+    email_verification_required: bool = False
+
 
 
 class AuthSettings(BaseSettings):
