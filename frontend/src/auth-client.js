@@ -106,7 +106,17 @@ export function authMessage(error,language='vi'){
     ZIP_PATH_TRAVERSAL:['Phát hiện đường dẫn không an toàn trong gói ZIP.','Unsafe file path detected inside the ZIP archive.'],
     NESTED_ZIP_FORBIDDEN:['Không cho phép gói ZIP lồng nhau.','Nested ZIP archives are not permitted.'],
   };
-  if(error?.serverMessage&&error.serverMessage!=='Invalid request data.')return error.serverMessage;
+  if(error?.serverMessage&&error.serverMessage!=='Invalid request data.'){
+    if(language!=='en'&&typeof error.serverMessage==='string'){
+      if(error.serverMessage.includes('corrupt')||error.serverMessage.includes('decoding limits')){
+        return 'File ảnh bị lỗi cấu trúc hoặc vượt giới hạn giải mã.';
+      }
+      if(error.serverMessage.includes('truncated')||error.serverMessage.includes('trailing bytes')){
+        return 'File ảnh bị cắt cụt hoặc thừa byte dữ liệu.';
+      }
+    }
+    return error.serverMessage;
+  }
   if(error?.code==='SESSION_EXPIRED')return messages.SESSION_EXPIRED[language==='en'?1:0];
   if(error?.status===401)return language==='en'?'Incorrect email or password.':'Email hoặc mật khẩu không đúng.';
   const pair=messages[error?.code]||['Không thể xác thực. Vui lòng thử lại.','Unable to authenticate. Please try again.'];

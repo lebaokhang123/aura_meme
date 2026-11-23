@@ -205,7 +205,16 @@ def _validate_static_meme_bytes(filename: str, data: bytes, ext_lower: str) -> t
             if getattr(img, 'n_frames', 1) != 1:
                 raise AuthError(422, 'VALIDATION_ERROR', f'File "{filename}" là ảnh động. Bảo Khố chỉ chấp nhận ảnh tĩnh .jpg hoặc .png.')
             img.load()
-    except AuthError:
+    except AuthError as e:
+        msg = str(e.message or '')
+        if 'corrupt' in msg.lower() or 'exceeds decoding limits' in msg.lower():
+            raise AuthError(422, 'VALIDATION_ERROR', f'File "{filename}" bị lỗi cấu trúc ảnh hoặc vượt giới hạn giải mã.') from None
+        if 'truncated' in msg.lower() or 'trailing bytes' in msg.lower():
+            raise AuthError(422, 'VALIDATION_ERROR', f'File "{filename}" bị cắt cụt hoặc thừa byte dữ liệu.') from None
+        if 'mime and signature' in msg.lower():
+            raise AuthError(422, 'VALIDATION_ERROR', f'Định dạng và chữ ký ảnh của file "{filename}" không khớp.') from None
+        if 'dimensions exceed' in msg.lower() or 'pixel budget' in msg.lower():
+            raise AuthError(422, 'VALIDATION_ERROR', f'File "{filename}" vượt quá giới hạn kích thước hoặc điểm ảnh.') from None
         raise
     except (OSError, ValueError, UnidentifiedImageError, Image.DecompressionBombError):
         raise AuthError(422, 'VALIDATION_ERROR', f'File "{filename}" bị lỗi cấu trúc ảnh hoặc vượt giới hạn điểm ảnh.') from None

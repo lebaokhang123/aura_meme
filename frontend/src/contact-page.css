@@ -36,10 +36,10 @@
 .am-contact-submit:hover{box-shadow:0 0 28px rgb(var(--am-rgb-tertiary-fixed) / .6);transform:scale(1.01)}
 .am-contact-submit:active{transform:scale(.99)}
 .am-contact-submit:disabled{opacity:.55;cursor:wait;transform:none}
-.am-contact-channels{display:flex;gap:12px;padding:4px;border-radius:12px;background:rgb(var(--am-rgb-surface-container) / .6);border:1px solid var(--am-surface-container-high)}
-.am-contact-channels a{width:44px;height:44px;border:1px solid rgb(var(--am-rgb-outline-variant) / .4);border-radius:8px;background:var(--am-surface-container);color:var(--am-on-surface-variant);display:flex;align-items:center;justify-content:center}
-.am-contact-channels a.am-contact-gmail-link, .am-contact-channels a.am-contact-gmail-link:hover, .am-contact-channels a.am-contact-gmail-link:focus{border:none!important;outline:none!important}
-.am-contact-channels a:hover{background:var(--am-surface-container-high);border-color:var(--am-secondary);color:var(--am-primary)}
+.am-contact-channels{display:flex;gap:12px;padding:4px;border-radius:12px;background:rgb(var(--am-rgb-surface-container) / .6);border:none!important}
+.am-contact-channels a{width:44px;height:44px;border:none!important;outline:none!important;border-radius:8px;background:var(--am-surface-container);color:var(--am-on-surface-variant);display:flex;align-items:center;justify-content:center}
+.am-contact-channels a:hover{background:var(--am-surface-container-high);border:none!important;outline:none!important;color:var(--am-primary)}
+.am-contact-channels a:focus{border:none!important;outline:none!important}
 .am-contact-channels svg{width:20px;height:20px}
 .am-contact-error{color:var(--am-error);margin:0}
 .am-contact-success{padding:16px;border-radius:8px;background:var(--am-surface-container-high);display:flex;align-items:center;gap:12px}
