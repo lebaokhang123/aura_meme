@@ -104,7 +104,7 @@ def public_user_inventory(request: Request, username: str = Path(min_length=3, m
         target_user = db.scalar(select(User.id).where(User.username == username, User.status == 'active'))
         if target_user is None:
             raise AuthError(404, 'NOT_FOUND', 'User not found.')
-        query = select(UserInventory, AssetItem, UserEquipment.asset_id).join(
+        query = select(AssetItem, UserEquipment.asset_id).select_from(UserInventory).join(
             AssetItem, AssetItem.id == UserInventory.asset_id
         ).outerjoin(
             UserEquipment, and_(UserEquipment.user_id == UserInventory.user_id, UserEquipment.asset_id == UserInventory.asset_id)
@@ -125,7 +125,7 @@ def public_user_inventory(request: Request, username: str = Path(min_length=3, m
         return PublicCollectionPage(items=[
             PublicCollectionItem(asset=asset_dto(asset, request, metadata=metadata),
                           equipped=equipped is not None)
-            for _, asset, equipped in rows
+            for asset, equipped in rows
         ], pagination=pagination)
 
 
