@@ -6,6 +6,7 @@ from pydantic import AwareDatetime, BaseModel, EmailStr, Field, SecretStr, field
 
 
 class LoginInput(BaseModel):
+    model_config = {"extra": "forbid"}
     email: EmailStr
     password: SecretStr
 
@@ -39,7 +40,7 @@ class RegisterInput(LoginInput):
     @field_validator("display_name")
     @classmethod
     def nonempty_name(cls, value):
-        if not value.strip():
+        if not value.strip() or "\x00" in value:
             raise ValueError("Display name must not be blank.")
         return value
 

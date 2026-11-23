@@ -363,3 +363,42 @@ def test_contact_identity_lock_overrides_spoofed_client_fields():
     assert sent_contacts[0]["sender_email"] == "real.user@aurameme.com"
 
 
+def test_register_input_strict_validation_matrix():
+    from pydantic import ValidationError
+
+    valid_base = {
+        "username": "valid_tag_01",
+        "email": "valid@example.com",
+        "display_name": "Valid Name",
+        "password": "StrongPassword123!",
+    }
+    parsed = RegisterInput(**valid_base)
+    assert parsed.username == "valid_tag_01"
+
+    # 1. Invalid username formats (<3, >32, uppercase, spaces, @ prefix, symbols)
+    for bad_tag in ("ab", "a" * 33, "Khang_Dev", "khang dev", "@khang_dev", "khang-dev", "khang$dev", ""):
+        with pytest.raises(ValidationError):
+            RegisterInput(**(valid_base | {"username": bad_tag}))
+
+    # 2. Invalid email formats
+    for bad_email in ("", "plainaddress", "a@", "@domain.com", "user@domain", "a b@example.com"):
+        with pytest.raises(ValidationError):
+            RegisterInput(**(valid_base | {"email": bad_email}))
+
+    # 3. Invalid password lengths (<12, >128)
+    for bad_pw in ("short123456", "x" * 129, ""):
+        with pytest.raises(ValidationError):
+            RegisterInput(**(valid_base | {"password": bad_pw}))
+
+    # 4. Invalid display_name (blank, >80 chars, NUL char)
+    for bad_dn in ("", "   ", "x" * 81, "bad\x00name"):
+        with pytest.raises(ValidationError):
+            RegisterInput(**(valid_base | {"display_name": bad_dn}))
+
+    # 5. Extra / privileged fields rejected (extra='forbid')
+    for extra_field in ({"roles": ["ADMIN"]}, {"status": "active"}, {"is_admin": True}):
+        with pytest.raises(ValidationError):
+            RegisterInput(**(valid_base | extra_field))
+
+
+

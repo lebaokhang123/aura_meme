@@ -92,3 +92,42 @@ for(const [status,code] of [[403,'CSRF_INVALID'],[409,'CONFLICT'],[422,'VALIDATI
   await expect(page.getByRole('button',{name:'Mở menu tài khoản'})).toHaveCount(0);
  });
 }
+test('Lucian #244 register validation summary, privacy checkbox default unchecked, live error fix, and Lucian #401 Google button',async({page,context})=>{
+ await api(context);await page.setViewportSize({width:1280,height:900});await page.goto('/register');
+ // 1. Privacy checkbox is unchecked by default and only links to /privacy.html
+ const terms=page.locator('#terms');
+ await expect(terms).not.toBeChecked();
+ const links=page.locator('.u244-ag a');
+ await expect(links).toHaveCount(1);
+ await expect(links).toHaveAttribute('href','/privacy.html');
+ // 2. Lucian #401 Google button is present on /register
+ await expect(page.locator('.u401-b')).toBeVisible();
+ await expect(page.locator('.u401-b .s0')).toContainText('Tiếp tục với Google');
+ // 3. Empty submit triggers Lucian #244 error summary box with 6 fields
+ await submit(page);
+ await expect(page.locator('.u244-register')).toHaveClass(/is-err/);
+ await expect(page.locator('.u244-ct')).toContainText('Có 6 trường cần kiểm tra');
+ await expect(page.locator('.u244-sb li')).toHaveCount(6);
+ // 4. Fixing fields updates summary live (strikethrough .is-fixed and green check .is-good)
+ await page.locator('#displayName').fill('Khang Test');
+ await expect(page.locator('.u244-sb li[data-field="displayName"]')).toHaveClass(/is-fixed/);
+ await expect(page.locator('.u244-ct')).toContainText('Có 5 trường cần kiểm tra');
+ await page.locator('#username').fill('bad tag!');
+ await expect(page.locator('#err-username')).toContainText('3 đến 32');
+ await page.locator('#username').fill('khang_test_01');
+ await expect(page.locator('.u244-sb li[data-field="username"]')).toHaveClass(/is-fixed/);
+ await page.locator('#identifier').fill('not-an-email');
+ await expect(page.locator('#err-identifier')).toContainText('Email không hợp lệ');
+ await page.locator('#identifier').fill('khang_test@example.com');
+ await expect(page.locator('.u244-sb li[data-field="identifier"]')).toHaveClass(/is-fixed/);
+ await page.locator('#password').fill('short');
+ await expect(page.locator('#err-password')).toContainText('12 đến 128');
+ await page.locator('#password').fill(password);
+ await page.locator('#confirmPassword').fill('mismatch123456');
+ await expect(page.locator('#err-confirmPassword')).toContainText('không khớp');
+ await page.locator('#confirmPassword').fill(password);
+ // Only terms remains unchecked (1 field needs attention)
+ await expect(page.locator('.u244-ct')).toContainText('Có 1 trường cần kiểm tra');
+ await terms.check();
+ await expect(page.locator('.u244-register')).not.toHaveClass(/is-err/);
+});
