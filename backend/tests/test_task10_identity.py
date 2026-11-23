@@ -488,5 +488,95 @@ def test_admin_user_restore_30_day_window():
     assert act_exc.value.code == "CONFLICT"
 
 
+def test_admin_catalog_filename_standard_and_zip_validation():
+    import io
+    import zipfile
+    from PIL import Image
+    from app.admin_workspace import extract_upload_files, parse_and_validate_meme_filename
+
+    # 1. Valid filename parsing (<Rank>_<ddmmyy>_<stt>.<ext>)
+    assert parse_and_validate_meme_filename("S_231126_01.jpg") == ("S", "231126", "01", "jpg")
+    assert parse_and_validate_meme_filename("d_010526_09.PNG") == ("D", "010526", "09", "png")
+
+    # 2. Invalid filename formats rejected
+    for bad_name in (
+        "random_meme.jpg",
+        "X_231126_01.jpg",  # Invalid rank X
+        "S_20261123_01.jpg",  # 8 digits instead of 6
+        "S_321126_01.jpg",  # Invalid day 32
+        "S_231326_01.jpg",  # Invalid month 13
+        "S_231126_00.jpg",  # stt < 1
+        "S_231126_abc.jpg",  # non-numeric stt
+    ):
+        with pytest.raises(AuthError) as fn_exc:
+            parse_and_validate_meme_filename(bad_name)
+        assert fn_exc.value.status == 422
+
+    # 3. Unsupported extensions rejected (.gif, .svg, .webp, .exe)
+    for bad_ext in ("S_231126_01.gif", "S_231126_01.svg", "S_231126_01.webp", "S_231126_01.exe"):
+        with pytest.raises(AuthError) as ext_exc:
+            parse_and_validate_meme_filename(bad_ext)
+        assert ext_exc.value.status == 422
+        assert ext_exc.value.code == "UNSUPPORTED_FILE_TYPE"
+
+    # Helper to generate valid PNG and JPG bytes
+    def make_image_bytes(fmt: str, color: tuple[int, int, int]) -> bytes:
+        buf = io.BytesIO()
+        Image.new("RGB", (64, 64), color).save(buf, format=fmt)
+        return buf.getvalue()
+
+    png_bytes_1 = make_image_bytes("PNG", (255, 0, 0))
+    jpg_bytes_2 = make_image_bytes("JPEG", (0, 255, 0))
+
+    # 4. Single valid PNG extraction
+    res_single = extract_upload_files("S_231126_01.png", png_bytes_1)
+    assert len(res_single) == 1
+    assert res_single[0][0] == "S_231126_01.png"
+    assert res_single[0][1] == "S"
+    assert res_single[0][2] == "231126"
+    assert res_single[0][3] == "01"
+    assert res_single[0][7] == "image/png"
+
+    # 5. Disguised extension (PNG bytes named .jpg) rejected
+    with pytest.raises(AuthError) as dis_exc:
+        extract_upload_files("S_231126_01.jpg", png_bytes_1)
+    assert dis_exc.value.status == 422
+
+    # 6. Valid ZIP batch extraction
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w") as zf:
+        zf.writestr("S_231126_01.png", png_bytes_1)
+        zf.writestr("A_231126_02.jpg", jpg_bytes_2)
+    res_zip = extract_upload_files("memes_batch.zip", zip_buf.getvalue())
+    assert len(res_zip) == 2
+    assert [r[0] for r in res_zip] == ["S_231126_01.png", "A_231126_02.jpg"]
+
+    # 7. ZIP with path traversal (../) rejected
+    trav_buf = io.BytesIO()
+    with zipfile.ZipFile(trav_buf, "w") as zf:
+        zf.writestr("../S_231126_01.png", png_bytes_1)
+    with pytest.raises(AuthError) as trav_exc:
+        extract_upload_files("traversal.zip", trav_buf.getvalue())
+    assert trav_exc.value.code == "ZIP_PATH_TRAVERSAL"
+
+    # 8. ZIP with nested .zip rejected
+    nested_buf = io.BytesIO()
+    with zipfile.ZipFile(nested_buf, "w") as zf:
+        zf.writestr("inner.zip", zip_buf.getvalue())
+    with pytest.raises(AuthError) as nest_exc:
+        extract_upload_files("nested.zip", nested_buf.getvalue())
+    assert nest_exc.value.code == "NESTED_ZIP_FORBIDDEN"
+
+    # 9. ZIP with duplicate image content hash rejected
+    dup_buf = io.BytesIO()
+    with zipfile.ZipFile(dup_buf, "w") as zf:
+        zf.writestr("S_231126_01.png", png_bytes_1)
+        zf.writestr("A_231126_02.png", png_bytes_1)
+    with pytest.raises(AuthError) as dup_exc:
+        extract_upload_files("dup.zip", dup_buf.getvalue())
+    assert dup_exc.value.code == "DUPLICATE_IMAGE_HASH"
+
+
+
 
 

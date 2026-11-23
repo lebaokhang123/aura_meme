@@ -83,6 +83,14 @@ export function authMessage(error,language='vi'){
     GOOGLE_ONLY_ACCOUNT:['Tài khoản này đăng nhập bằng Google và không dùng mật khẩu cục bộ.','This account signs in with Google and does not have a local password.'],
     GOOGLE_AUTH_NOT_CONFIGURED:['Đăng nhập Google chưa được cấu hình trên máy chủ.','Google sign-in is not configured on this server yet.'],
     RESTORE_WINDOW_EXPIRED:['Đã quá thời hạn 30 ngày khôi phục tài khoản.','The 30-day account restoration window has expired.'],
+    INVALID_FILENAME_FORMAT:['Tên file sai quy chuẩn <Rank>_<ddmmyy>_<stt>.jpg|.png (ví dụ: S_231126_01.jpg).','Filename violates the <Rank>_<ddmmyy>_<stt>.jpg|.png convention (e.g. S_231126_01.jpg).'],
+    INVALID_FILENAME_DATE:['Phần ngày tháng <ddmmyy> trong tên file không hợp lệ (ví dụ: 231126).','The <ddmmyy> date part in the filename is invalid (e.g. 231126).'],
+    INVALID_FILENAME_SEQUENCE:['Phần số thứ tự <stt> trong tên file không hợp lệ (ví dụ: 01).','The <stt> sequence number in the filename is invalid (e.g. 01).'],
+    UNSUPPORTED_FILE_TYPE:['Định dạng file không được hỗ trợ. Chỉ chấp nhận .jpg, .png hoặc .zip chứa .jpg/.png.','Unsupported file format. Only .jpg, .png or .zip containing .jpg/.png are allowed.'],
+    DUPLICATE_IMAGE_HASH:['Ảnh Meme này đã tồn tại trong danh mục (trùng mã băm SHA-256).','This Meme image already exists in the catalog (duplicate SHA-256 hash).'],
+    DUPLICATE_FILE_IN_BATCH:['Trùng tên file trong cùng gói ZIP tải lên.','Duplicate filename inside the uploaded ZIP archive.'],
+    ZIP_PATH_TRAVERSAL:['Phát hiện đường dẫn không an toàn trong gói ZIP.','Unsafe file path detected inside the ZIP archive.'],
+    NESTED_ZIP_FORBIDDEN:['Không cho phép gói ZIP lồng nhau.','Nested ZIP archives are not permitted.'],
   };
   if(error?.code==='SESSION_EXPIRED')return messages.SESSION_EXPIRED[language==='en'?1:0];
   if(error?.status===401)return language==='en'?'Incorrect email or password.':'Email hoặc mật khẩu không đúng.';

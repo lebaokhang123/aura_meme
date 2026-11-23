@@ -14,18 +14,21 @@ export function readCookieConsent(storage = typeof localStorage !== 'undefined' 
     if (
       !parsed ||
       parsed.version !== COOKIE_CONSENT_VERSION ||
-      parsed.essential !== true ||
-      typeof parsed.optional !== 'boolean' ||
-      typeof parsed.updatedAt !== 'string' ||
-      !Number.isFinite(Date.parse(parsed.updatedAt))
+      parsed.essential !== true
     ) {
       return null;
     }
+    const optional = typeof parsed.optional === 'boolean'
+      ? parsed.optional
+      : Boolean(parsed.preferences || parsed.analytics);
+    const updatedAt = (typeof parsed.updatedAt === 'string' && Number.isFinite(Date.parse(parsed.updatedAt)))
+      ? parsed.updatedAt
+      : new Date().toISOString();
     return {
       version: COOKIE_CONSENT_VERSION,
       essential: true,
-      optional: parsed.optional,
-      updatedAt: parsed.updatedAt,
+      optional,
+      updatedAt,
     };
   } catch {
     return null;
