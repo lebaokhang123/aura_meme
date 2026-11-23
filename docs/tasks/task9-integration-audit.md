@@ -137,4 +137,74 @@ npm.cmd run dev -- --host localhost --port 5173
 ```
 
 ---
-*Trạng thái hiện tại: Đã hoàn tất toàn bộ kiểm thử tự động và chụp bằng chứng nghiệm thu, sẵn sàng bàn giao Codex review và merge vào `dev`.*
+
+## 6. PRE-MERGE HOTFIX & ADMIN MVP (CHECKPOINTS A–E)
+
+### 6.1. Tổng quan các hạng mục đã hoàn thành
+Theo chỉ đạo của Owner trước khi bàn giao Codex nghiệm thu và merge vào `dev`, nhóm kỹ thuật Antigravity đã hoàn tất 5 Checkpoint tuần tự với độ phủ kiểm thử tự động toàn diện:
+
+1. **Checkpoint A — Sửa lỗi chức năng cấp bách (`e7addd3`):**
+   - **Thanh tìm kiếm Header (`SiteShell.jsx`):** Phím Backspace khi xóa rỗng ký tự giữ nguyên trang hiện tại, tuyệt đối không tự ý chuyển về Home hoặc reload; chỉ điều hướng khi nhấn Enter hoặc click nút tìm kiếm; phím tắt `Ctrl+K` kích hoạt ô tìm kiếm; phím `Escape` hủy focus an toàn.
+   - **Thương hiệu Biên nhận PDF (`receipt-pdf.js`, `receipt_pdf.py`):** Khôi phục đầy đủ nhận diện thương hiệu `AURAMEME`, `AuraMeme Community`, `https://aurameme.com`, `AuraSpark Global Inc.`, `thothayvtv38@gmail.com` và ghi chú pháp lý phi thương mại.
+   - **Khóa danh tính Contact (`contact.py`, `ContactPage.jsx`):** Loại bỏ hoàn toàn việc nhận tên/email giả mạo từ client. Hệ thống tự động đọc danh tính trực tiếp từ phiên đăng nhập backend; ô Họ tên và Email được khóa `readOnly` kèm biểu tượng ổ khóa bảo mật.
+   - **Tối ưu kết nối Database (`db.py`):** Ổn định connection pool với cấu hình `pool_size=10, max_overflow=20, pool_timeout=15, pool_recycle=1800, pool_pre_ping=True`, ngăn ngừa triệt để lỗi nghẽn connection khi kiểm thử tải.
+   - **Đồng bộ hiệu ứng nền Hồ sơ (`main.jsx`, `ProfilePage.jsx`):** Khi xem hồ sơ người dùng không trang bị hiệu ứng nền, hệ thống tự động hoàn nguyên về nền mặc định, không bị lưu đè hiệu ứng nền của tài khoản trước đó.
+
+2. **Checkpoint B — Lucian Auth UI & Đăng ký Chuẩn mực (`85a7f98`):**
+   - **Nút Google Sign-in Lucian #401 (`LucianGoogleButton.jsx`):** Chuẩn hóa 3 trạng thái (Chờ: logo Google chính thức + "Tiếp tục với Google"; Đang kết nối: vòng xoay 4 màu Google quay vô tận + "Đang kết nối…"; Thành công: dấu tích xanh + "Đã đăng nhập"). Modal Google Onboarding hiển thị logo chữ G chuẩn 4 màu.
+   - **Form Đăng ký Lucian #244 (`LucianRegisterForm.jsx`):** Khung tóm tắt lỗi tổng (`.u244-sm` / `.u244-sb`), hiệu ứng rung lắc `.is-shake` khi submit có lỗi, nhãn báo lỗi inline chi tiết từng ô (`.u244-ms`), huy hiệu kiểm tra hợp lệ live (`.u244-ok`).
+   - **Chính sách bảo mật:** Checkbox điều khoản mặc định chưa tick, liên kết duy nhất tới `/privacy.html`, thông báo lỗi rõ ràng nếu người dùng chưa đồng ý.
+
+3. **Checkpoint C — Admin UI & Quản trị Tài khoản 30 Ngày (`e1f2951`):**
+   - **Sidebar Quản trị viên (`AdminPage.jsx`):** Loại bỏ hoàn toàn mục "QUẢN LÝ CỘNG ĐỒNG" và card "Quyền quản trị" rườm rà; tinh chỉnh liên kết "Về trang chủ".
+   - **Nút Tìm kiếm Icon:** Tích hợp nút kính lúp dạng icon-only trực tiếp bên trong `.admin-search-input-wrap`.
+   - **Xóa mềm và Khôi phục 30 ngày (`admin_users.py`, `auth_schemas.py`):** Cung cấp API `POST /api/v1/admin/users/{user_id}/restore` cùng trường `deleted_at`; giao diện hiển thị huy hiệu đếm ngược số ngày còn lại trước khi xóa vĩnh viễn kèm các nút thao tác nhanh (Khóa/Mở khóa, Phân quyền, Xóa/Khôi phục).
+
+4. **Checkpoint D — Admin Catalog & Quản trị Tài sản Meme (`8303770`):**
+   - **Định dạng danh sách 3 dòng:** Dòng 1 Tên hiển thị (`display_name`), Dòng 2 UUID đầy đủ kèm nút sao chép tiện lợi, Dòng 3 Phân loại chi tiết (`Avatar · Hạng D · Đã duyệt`).
+   - **Bộ nút thao tác chuẩn:** 3 icon thao tác rõ ràng (Xem trước, Chỉnh sửa, Xóa/Lưu trữ).
+   - **Upload Meme Avatar Modal:** Nút (+) mở modal tải lên file `.jpg`, `.png`, hoặc `.zip` hàng loạt.
+   - **Quy chuẩn đặt tên tệp nghiêm ngặt:** Bắt buộc tuân thủ `<Rank>_<ddmmyy>_<stt>.<ext>` (`Rank` thuộc `D, C, B, A, S`, ngày tháng hợp lệ, số thứ tự tự nhiên).
+   - **Hàng đợi duyệt & Modal xem trước đa ngữ cảnh:** Hiển thị danh sách vật phẩm chờ duyệt (`pending`) với modal xem trước đồng thời 4 ngữ cảnh: Avatar 1:1, Khung hồ sơ, Biểu cảm bình luận, và Hộp rương bảo khố; hỗ trợ Duyệt (`approve`), Từ chối (`reject`) và Lưu trữ (`archive`).
+   - **Bảo vệ di sản:** Khóa bảo vệ tuyệt đối 70 Meme demo và 5 Background gốc, không cho phép xóa hay chuyển trạng thái từ chối.
+   - **Tương thích Cookie Consent:** Cập nhật bộ phân giải `cookie-consent.js` tương thích ngược linh hoạt, không chặn tương tác trình duyệt khi thiếu trường tùy chọn.
+
+5. **Checkpoint E — Hồi quy Kiểm thử & Chụp Bằng chứng Nghiệm thu (`2ff2a6c`, `7cdffc4`):**
+   - Đồng bộ hóa logic tìm kiếm client-side feed (`feed-data.js`), cách ly quyền riêng tư kho đồ hồ sơ (`ProfilePage.jsx`), chuẩn hóa văn bản xác nhận Contact và điều chỉnh nhịp đồng bộ của roulette rương bảo khố.
+   - Toàn bộ các suite kiểm thử tự động đạt 100% tỷ lệ pass.
+
+### 6.2. Nhật ký Commit (Branch: `fix/premerge-owner-hotfix-admin`)
+```text
+7cdffc4 test(qa): bo sung kich ban capture bang chung va xac minh giao dien checkpoint a-d
+2ff2a6c fix(regression): dong bo kiem thu bo loc, thong bao contact, privacy ho so va smoke bao kho
+8303770 feat(admin-catalog): quan ly vat pham meme, upload jpg png zip theo quy chuan ten va duyet pending
+e1f2951 feat(admin): tinh chinh sidebar, nut tim kiem icon va quan ly xoa khoi phuc tai khoan 30 ngay
+85a7f98 feat(auth-ui): tich hop nut google lucian #401, form dang ky lucian #244 va checkbox chinh sach bao mat
+e7addd3 fix(hotfix): sua tim kiem header, khoi phuc thuong hieu bien lai pdf, khoa danh tinh contact va nen ho so
+```
+
+### 6.3. Bảng Ma trận Kiểm thử Tự động (Verification Matrix)
+| Phạm vi kiểm thử | Lệnh thực thi | Kết quả | Trạng thái |
+| :--- | :--- | :--- | :--- |
+| **Backend Unit & Logic** | `pytest -m "not integration" -q` | **525 passed, 1 skipped** (0 failed) | **PASSED** |
+| **Frontend Unit Tests** | `node --test frontend/tests/*.test.mjs` | **84 passed** (0 failed) | **PASSED** |
+| **Frontend Production Build**| `cd frontend; npm run build` | **0 errors, build in 5.76s** | **PASSED** |
+| **Playwright Full Suite** | `npx playwright test (13 spec files)` | **172 passed** (0 failed) | **PASSED** |
+
+### 6.4. Ma trận Bằng chứng Nghiệm thu (Captured Screenshots)
+Toàn bộ 10 ảnh chụp màn hình bằng chứng nghiệm thu đã được lưu trữ bền vững tại thư mục artifact `C:\Users\sammy\.gemini\antigravity\brain\cc803197-d415-4eaf-80c2-1173a22c12aa`:
+
+1. `qa_17_search_header_fix.png` (255,481 bytes) — Thanh tìm kiếm header giữ nguyên trang khi xóa ký tự bằng Backspace.
+2. `qa_18_pdf_receipt_restored_branding.png` (137,761 bytes) — Biên nhận PDF hiển thị đầy đủ nhận diện thương hiệu AuraMeme và ghi chú pháp lý.
+3. `qa_19_contact_identity_locked.png` (109,709 bytes) — Form liên hệ tự động khóa danh tính người dùng theo session DB thật với icon ổ khóa.
+4. `qa_20_lucian_401_google_button.png` (254,225 bytes) — Nút Google Lucian #401 và modal Google Onboarding với chữ G 4 màu.
+5. `qa_21_lucian_244_register_validation.png` (244,281 bytes) — Form đăng ký Lucian #244 với khung báo lỗi tổng, hiệu ứng rung và inline message.
+6. `qa_22_register_privacy_checkbox.png` (274,284 bytes) — Checkbox Chính sách bảo mật mặc định chưa chọn, liên kết `/privacy.html`.
+7. `qa_23_admin_sidebar_cleaned.png` (100,767 bytes) — Sidebar Admin được dọn dẹp gọn gàng, bỏ mục thừa, có nút về trang chủ.
+8. `qa_24_admin_users_30day_restore.png` (95,072 bytes) — Bảng quản trị tài khoản với huy hiệu đếm ngược 30 ngày xóa mềm và nút khôi phục.
+9. `qa_25_admin_catalog_meme_upload.png` (185,594 bytes) — Modal upload Meme Avatar chuẩn hóa quy tắc tên file `<Rank>_<ddmmyy>_<stt>.<ext>`.
+10. `qa_26_admin_catalog_pending_preview.png` (137,580 bytes) — Hàng đợi duyệt tài sản Meme và modal xem trước đa ngữ cảnh (Avatar, Khung, Reaction, Hộp quà).
+
+---
+*Trạng thái kết luận bàn giao:* **READY FOR CODEX REVIEW**
+
