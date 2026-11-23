@@ -23,7 +23,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
                                           "/api/v1/auth/forgot-password", "/api/v1/auth/reset-password",
                                           "/api/v1/auth/google/config", "/api/v1/auth/google/login", "/api/v1/auth/google/link",
                                           "/api/v1/users/me",
-                                          "/api/v1/users/me/password", "/api/v1/users/{username}", "/api/v1/users/{username}/comments", "/api/v1/users/{username}/activity", "/api/v1/categories",
+                                          "/api/v1/users/me/password", "/api/v1/users/{username}", "/api/v1/users/{username}/comments", "/api/v1/users/{username}/activity", "/api/v1/users/{username}/inventory", "/api/v1/categories",
                                           "/api/v1/admin/categories", "/api/v1/admin/categories/{category_id}",
                                           "/api/v1/posts", "/api/v1/posts/{post_id}", "/api/v1/media", "/api/v1/media/{media_id}",
                                           "/api/v1/posts/{post_id}/interactions", "/api/v1/users/me/bookmarks",
@@ -59,7 +59,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         assert public["properties"]["avatar_url"]["format"] == "uri-reference"
         assert {"type": "string"} in public["properties"]["avatar_url"]["anyOf"]
         profile = contract["components"]["schemas"]["PublicProfile"]
-        assert set(profile["properties"]) == set(public["properties"])
+        assert set(profile["properties"]) == set(public["properties"]) | {"equipped_background_effect"}
         assert contract["components"]["schemas"]["PostResponse"]["properties"]["media_url"]["format"] == "uri-reference"
         upload_schema = contract["paths"]["/api/v1/media"]["post"]["responses"]["201"]["content"]["application/json"]["schema"]["$ref"].rsplit("/", 1)[-1]
         assert contract["components"]["schemas"][upload_schema]["properties"]["url"]["format"] == "uri-reference"

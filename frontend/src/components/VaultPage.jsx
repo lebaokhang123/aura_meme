@@ -93,7 +93,7 @@ export default function VaultPage() {
     setCollection(null); setLoadError('');
     if (!owner) return;
     let active = true; setLoading(true);
-    const params = new URLSearchParams({ kind, page: String(page), page_size: '12' });
+    const params = new URLSearchParams({ kind, page: String(page), page_size: '15' });
     if (scope === 'catalog') { if (rarity) params.set('rarity', rarity); if (search) params.set('q', search); }
     readVault(`${scope === 'catalog' ? '/catalog' : '/inventory/me'}?${params}`).then(scope === 'catalog' ? vaultCatalog : inventoryPage)
       .then(value => { if (active) setCollection(scope === 'catalog' ? { ...value, items: value.items.map(item => receiptOwnership.current.has(item.asset.id) ? { ...item, owned: true } : item) } : value); }).catch(() => { if (active) setLoadError(t('Không tải được bộ sưu tập. Hãy thử lại.', 'Could not load the collection. Please retry.')); })

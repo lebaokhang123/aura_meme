@@ -67,6 +67,8 @@ export function authMessage(error,language='vi'){
     SESSION_EXPIRED:['Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.','Your session has expired. Please sign in again.'],
     CSRF_INVALID:['Phiên xác thực đã thay đổi. Vui lòng thử lại.','The authentication session changed. Please try again.'],
     CONFLICT:['Tên đăng nhập hoặc email đã được sử dụng.','Username or email is already in use.'],
+    USERNAME_EXISTS:['Tag này đã được sử dụng. Vui lòng chọn tag khác.','This tag is already in use. Please choose another one.'],
+    EMAIL_EXISTS:['Email này đã được đăng ký. Vui lòng đăng nhập.','This email is already registered. Please sign in.'],
     VALIDATION_ERROR:['Thông tin chưa hợp lệ. Mật khẩu cần 12–128 ký tự; tên đăng nhập dùng chữ thường, số hoặc dấu gạch dưới.','Invalid details. Use a 12–128 character password and lowercase letters, numbers or underscores for the username.'],
     RATE_LIMITED:['Quá nhiều lần thử. Vui lòng thử lại sau.','Too many attempts. Please try again later.'],
     ACCOUNT_LINK_REQUIRED:['Email này đã thuộc về tài khoản hiện có. Vui lòng đăng nhập bằng mật khẩu trước rồi liên kết Google.','This email belongs to an existing account. Sign in with your password first to link Google safely.'],

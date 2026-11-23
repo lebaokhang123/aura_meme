@@ -135,6 +135,12 @@ def register(payload: RegisterInput, request: Request, pre=Depends(guest_guard))
             result = user_private(db, user)
         return result
     except IntegrityError as error:
+        diag = getattr(error.orig, "diag", None)
+        cname = getattr(diag, "constraint_name", "") if diag else ""
+        if "username" in cname:
+            raise AuthError(409, "USERNAME_EXISTS", "Tag đã được sử dụng, vui lòng chọn tag khác.") from None
+        if "email" in cname:
+            raise AuthError(409, "EMAIL_EXISTS", "Email đã được đăng ký, vui lòng đăng nhập.") from None
         if getattr(error.orig, "sqlstate", None) == "23505":
             raise AuthError(409, "CONFLICT", "Username or email already registered.") from None
         raise

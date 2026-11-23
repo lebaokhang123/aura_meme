@@ -22,7 +22,7 @@
 
 .social-profile-post .social-post-identity>div>div:first-child>span:not(:first-child){line-height:16px}.social-profile-post .social-post-identity>div>div:last-child{font:400 11px/14px "JetBrains Mono",monospace;gap:6px}.social-profile-post .social-post-identity>div>div:last-child>a:last-child{color:var(--am-tertiary);font-weight:600}
 
-.am-profile-collection-empty,.am-profile-backgrounds{padding:12px;min-height:0}.am-profile-collection-empty h2,.am-profile-backgrounds h2{margin-bottom:6px;text-align:left;font-size:12px;line-height:18px}.am-profile-collection-empty p,.am-profile-backgrounds p{margin:0;text-align:left}.am-profile-backgrounds .am-profile-vault-link{text-align:left;margin-top:8px}
+.am-profile-collection-empty,.am-profile-backgrounds{padding:12px;min-height:0}.am-profile-collection-empty h2,.am-profile-backgrounds h2{margin-bottom:6px;text-align:center;font-size:12px;line-height:18px}.am-profile-collection-empty p,.am-profile-backgrounds p{margin:0;text-align:center}.am-profile-backgrounds .am-profile-vault-link{text-align:center;margin-top:8px}
 .social-profile-post .social-post-identity>div>div:first-child>span:first-child>a.text-xs{margin-left:4px}.social-profile-post>.flex.flex-wrap>div:last-child>button:not(.profile-share){height:32px;gap:6px;padding:0 8px;font:400 11px/14px 'JetBrains Mono',monospace}.social-profile-post>.flex.flex-wrap>div:last-child>button:not(.profile-share)>.material-symbols-outlined{font-size:18px}.social-profile-post>.flex.flex-wrap>div:last-child>button:not(.profile-share)>span:last-child{font-size:11px;line-height:14px}
 
 /* Compact owned-collectibles preview (max 3 columns x 3 rows). */

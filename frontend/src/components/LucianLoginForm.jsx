@@ -258,7 +258,7 @@ export default function LucianLoginForm() {
         {/* Divider */}
         <div className="relative flex items-center justify-center my-3.5">
           <div className="w-full h-[1px] bg-surface-variant" />
-          <span className="absolute px-3 bg-surface-container font-mono-tag text-mono-tag text-outline uppercase tracking-wider text-[11px]">
+          <span className="absolute px-3 bg-surface-container u403-divider-text">
             {t('Hoặc tiếp tục với', 'Or continue with')}
           </span>
         </div>

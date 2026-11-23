@@ -44,7 +44,8 @@ class UserPublic(BaseModel):
 
 
 class PublicProfile(UserPublic):
-    pass
+    equipped_background_effect: str | None = Field(default=None, exclude_if=lambda value: value is None)
+
 
 
 class ProfilePatch(BaseModel):

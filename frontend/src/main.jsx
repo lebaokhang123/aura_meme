@@ -40,6 +40,12 @@ const effectsFiles=import.meta.glob('./generated/*.effects.json');
 function EquippedBackground(){
  const session=useSyncExternalStore(auth.subscribe,auth.snapshot),owner=session.user?.id;
  const [equipment,setEquipment]=React.useState({owner:null,effect:null});
+ const [override,setOverride]=React.useState(null);
+ useEffect(()=>{
+  const onOverride=(e)=>setOverride(e.detail?.effect??null);
+  window.addEventListener('aurameme-profile-background-override',onOverride);
+  return()=>window.removeEventListener('aurameme-profile-background-override',onOverride);
+ },[]);
  useEffect(()=>{
   if(MOCK_AUTH||!owner)return;
   let active=true,generation=0;const channel=typeof BroadcastChannel==='undefined'?null:new BroadcastChannel('aurameme-equipment');
@@ -50,8 +56,9 @@ function EquippedBackground(){
   return()=>{active=false;channel?.close();window.removeEventListener('aurameme-equipment-changed',changed);window.removeEventListener('focus',refresh)};
  },[owner]);
  const effect=!MOCK_AUTH&&session.status==='authenticated'&&equipment.owner===owner?equipment.effect:null;
- useEffect(()=>{const root=document.getElementById('root');if(effect)root.dataset.vaultBackground=effect;else delete root.dataset.vaultBackground;return()=>{delete root.dataset.vaultBackground}},[effect]);
- return <GlobalBackground effect={effect}/>;
+ const activeEffect=override!==null?override:effect;
+ useEffect(()=>{const root=document.getElementById('root');if(activeEffect)root.dataset.vaultBackground=activeEffect;else delete root.dataset.vaultBackground;return()=>{delete root.dataset.vaultBackground}},[activeEffect]);
+ return <GlobalBackground effect={activeEffect}/>;
 }
 
 function App() {

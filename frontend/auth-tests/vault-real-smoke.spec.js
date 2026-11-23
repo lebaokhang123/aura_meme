@@ -67,9 +67,9 @@ test('Vault Real Smoke: 2 chests, 75 catalog assets, real open, receipt, +2 EXP,
   await expect(memeTabBtn).toBeVisible();
   await expect(bgTabBtn).toBeVisible();
 
-  // 5. Inspect Rương Meme (first page shows 12 items out of 70)
+  // 5. Inspect Rương Meme (first page shows 15 items out of 70, 5 columns x 3 rows)
   await memeTabBtn.click();
-  await expect(page.locator('.vault-item-card')).toHaveCount(12);
+  await expect(page.locator('.vault-item-card')).toHaveCount(15);
   await page.screenshot({ path: 'vault_real_meme_tab.png' });
 
   // 6. Inspect Rương Background

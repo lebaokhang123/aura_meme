@@ -8,7 +8,7 @@ import stat
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Path, Query, Request, Response
 from PIL import Image, ImageOps
 from pydantic import AnyHttpUrl, BaseModel, Field, ValidationError
 from sqlalchemy import and_, select
@@ -82,6 +82,41 @@ def inventory(request: Request, page: int = Query(1, ge=1), page_size: int = Que
     rows, pagination = page_rows(account.db, query, page, page_size)
     return InventoryPage(items=[InventoryItem(asset=asset_dto(asset, request, metadata=metadata), quantity=item.quantity,
         equipped=equipped is not None) for item, asset, equipped in rows], pagination=pagination)
+
+
+@router.get('/users/{username}/inventory', response_model=InventoryPage, operation_id='getPublicUserInventory',
+            responses={status: {'model': ErrorResponse} for status in (404, 422, 429, 500)})
+def public_user_inventory(request: Request, username: str = Path(min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$"),
+                          page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+                          kind: Slot | None = None):
+    with request.app.state.auth_session_factory() as db:
+        from app.models import User
+        target_user = db.scalar(select(User.id).where(User.username == username, User.status == 'active'))
+        if target_user is None:
+            raise AuthError(404, 'NOT_FOUND', 'User not found.')
+        query = select(UserInventory, AssetItem, UserEquipment.asset_id).join(
+            AssetItem, AssetItem.id == UserInventory.asset_id
+        ).outerjoin(
+            UserEquipment, and_(UserEquipment.user_id == UserInventory.user_id, UserEquipment.asset_id == UserInventory.asset_id)
+        ).where(
+            UserInventory.user_id == target_user,
+            UserInventory.quantity > 0,
+            AssetItem.active.is_(True),
+            reviewed_source_rights_sql(AssetItem.source_rights)
+        ).order_by(UserInventory.acquired_at.desc(), AssetItem.id)
+        if kind is not None:
+            query = query.where(AssetItem.kind == kind)
+        from app.vault_runtime import runtime_enabled, require_schema
+        metadata = runtime_enabled(request)
+        if metadata:
+            require_schema(db)
+            query = query.options(undefer(AssetItem.display_name), undefer(AssetItem.effect_key))
+        rows, pagination = page_rows(db, query, page, page_size)
+        return InventoryPage(items=[
+            InventoryItem(asset=asset_dto(asset, request, metadata=metadata), quantity=item.quantity,
+                          equipped=equipped is not None)
+            for item, asset, equipped in rows
+        ], pagination=pagination)
 
 
 @router.put('/inventory/equipment/{slot_kind}', response_model=EquipmentResult, operation_id='equipItem',

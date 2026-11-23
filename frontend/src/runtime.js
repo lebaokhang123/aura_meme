@@ -175,15 +175,79 @@ export function prepareAuthForm(){
 async function submitApiForm(form){
  if(pendingForms.has(form))return;pendingForms.add(form);
  const button=form.querySelector('[type="submit"]');if(button)button.disabled=true;
+ const lang=readPreferences().language;
+ const isEn=lang==='en';
+ const setErr=(id,msg)=>{
+  const el=document.getElementById(id);
+  if(el)el.textContent=msg||'';
+ };
+ const clearErrors=()=>{
+  form.querySelectorAll('.error-hint').forEach(el=>el.textContent='');
+ };
  try{
-  const email=form.querySelector('#identifier').value.trim(),password=form.querySelector('#password').value;
+  clearErrors();
   if(location.pathname==='/register'){
-   if(form.querySelector('#confirmPassword').value!==password){showDemoMessage('Mật khẩu xác nhận không khớp.');return;}
-   const display_name=form.querySelector('#username').value.trim();
-   await auth.register({email,password,username:display_name.toLowerCase(),display_name});
-   location.assign('/login?registered=1');
-  }else{await auth.login(email,password);location.assign(safeReturnUrl(new URLSearchParams(location.search).get('next')));}
- }catch(error){showDemoMessage(authMessage(error,readPreferences().language));}
+   const displayNameEl=form.querySelector('#displayName')||form.querySelector('#username');
+   const usernameEl=form.querySelector('#username');
+   const emailEl=form.querySelector('#identifier');
+   const passEl=form.querySelector('#password');
+   const confirmEl=form.querySelector('#confirmPassword');
+
+   const displayName=(displayNameEl?.value||'').trim();
+   const rawTag=(usernameEl?.value||'').trim();
+   const cleanTag=rawTag.startsWith('@')?rawTag.slice(1).trim().toLowerCase():rawTag.toLowerCase();
+   const email=(emailEl?.value||'').trim().toLowerCase();
+   const password=passEl?.value||'';
+   const confirm=confirmEl?.value||'';
+
+   let hasErr=false;
+   if(!displayName){
+    setErr('err-displayName',isEn?'Display name is required.':'Vui lòng nhập tên hiển thị.');
+    if(!hasErr){displayNameEl?.focus();hasErr=true;}
+   }
+   if(!cleanTag||!/^[a-z0-9_]{3,32}$/.test(cleanTag)){
+    setErr('err-username',isEn?'Tag must be 3–32 letters, numbers or underscores.':'Tag phải từ 3 đến 32 ký tự chữ, số hoặc gạch dưới (ví dụ: @khang_dev).');
+    if(!hasErr){usernameEl?.focus();hasErr=true;}
+   }
+   if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    setErr('err-identifier',isEn?'Please enter a valid email address.':'Email không hợp lệ (ví dụ: user@example.com).');
+    if(!hasErr){emailEl?.focus();hasErr=true;}
+   }
+   if(password.length<12||password.length>128){
+    setErr('err-password',isEn?'Password must be 12–128 characters.':'Mật khẩu phải từ 12 đến 128 ký tự.');
+    if(!hasErr){passEl?.focus();hasErr=true;}
+   }
+   if(confirm!==password){
+    setErr('err-confirmPassword',isEn?'Passwords do not match.':'Mật khẩu xác nhận không khớp.');
+    if(!hasErr){confirmEl?.focus();hasErr=true;}
+   }
+   if(hasErr){
+    showDemoMessage(isEn?'Please fix the errors below.':'Vui lòng kiểm tra lại các thông tin bên dưới.');
+    return;
+   }
+   try{
+    await auth.register({email,password,username:cleanTag,display_name:displayName});
+    location.assign('/login?registered=1');
+   }catch(error){
+    const msg=authMessage(error,lang);
+    if(error.code==='USERNAME_EXISTS'||/tag|username/i.test(error.message||'')){
+     setErr('err-username',msg);
+     usernameEl?.focus();
+    }else if(error.code==='EMAIL_EXISTS'||/email/i.test(error.message||'')){
+     setErr('err-identifier',msg);
+     emailEl?.focus();
+    }else if(/password/i.test(error.message||'')){
+     setErr('err-password',msg);
+     passEl?.focus();
+    }
+    showDemoMessage(msg);
+   }
+  }else{
+   const email=form.querySelector('#identifier').value.trim(),password=form.querySelector('#password').value;
+   await auth.login(email,password);
+   location.assign(safeReturnUrl(new URLSearchParams(location.search).get('next')));
+  }
+ }catch(error){showDemoMessage(authMessage(error,lang));}
  finally{pendingForms.delete(form);if(button)button.disabled=false;}
 }
 export async function logoutAccount(button){

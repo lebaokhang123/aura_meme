@@ -517,3 +517,29 @@ html { --site-header-height: 65px; }
   }
 }
 
+/* Home Sticky Sidebars */
+@media (min-width: 1024px) {
+  .home-sidebar-sticky {
+    position: sticky !important;
+    top: calc(var(--site-header-height, 65px) + 16px) !important;
+    max-height: calc(100vh - var(--site-header-height, 65px) - 32px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(208, 188, 255, 0.2) transparent;
+  }
+  .home-sidebar-sticky::-webkit-scrollbar {
+    width: 4px;
+  }
+  .home-sidebar-sticky::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .home-sidebar-sticky::-webkit-scrollbar-thumb {
+    background: rgba(208, 188, 255, 0.2);
+    border-radius: 4px;
+  }
+  .home-sidebar-sticky::-webkit-scrollbar-thumb:hover {
+    background: rgba(208, 188, 255, 0.4);
+  }
+}
+
+

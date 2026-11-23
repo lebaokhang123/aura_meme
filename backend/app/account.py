@@ -71,9 +71,23 @@ def get_public_user(request: Request, username: str = Path(min_length=3, max_len
             raise AuthError(404, "NOT_FOUND", "Profile not found.")
         user, profile, level, is_admin = row
         from app.membership import read_users_membership_tiers
+        from app.models import UserEquipment, AssetItem
+        from app.catalog_rights import reviewed_source_rights_sql
+        from sqlalchemy.orm import undefer
         now = request.app.state.auth.now()
         tiers = read_users_membership_tiers(db, {user.id}, now)
         membership_tier = tiers.get(user.id, "free")
+        bg_effect = db.execute(
+            select(AssetItem.effect_key)
+            .join(UserEquipment, UserEquipment.asset_id == AssetItem.id)
+            .where(
+                UserEquipment.user_id == user.id,
+                UserEquipment.slot_kind == "background",
+                AssetItem.active.is_(True),
+                reviewed_source_rights_sql(AssetItem.source_rights)
+            ).options(undefer(AssetItem.effect_key))
+        ).scalar_one_or_none()
         return PublicProfile(id=user.id, username=user.username, display_name=profile.display_name,
                           created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url,
-                          level=level, membership_tier=membership_tier, is_admin_title=bool(is_admin))
+                          level=level, membership_tier=membership_tier, is_admin_title=bool(is_admin),
+                          equipped_background_effect=bg_effect)

@@ -49,6 +49,17 @@
   color: #16151B !important;
 }
 
+.u403-divider-text {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--ux-ink-3, #948f9a) !important;
+  line-height: 16px !important;
+}
+
+
 .u219[data-theme="light"] .u403-f input.u403-in:-webkit-autofill,
 .u219[data-theme="light"] .u405-f input.u405-in:-webkit-autofill {
   -webkit-box-shadow: 0 0 0 1000px #FFFFFF inset !important;
