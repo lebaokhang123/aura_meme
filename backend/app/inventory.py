@@ -43,6 +43,16 @@ class InventoryPage(BaseModel):
     pagination: Pagination
 
 
+class PublicCollectionItem(BaseModel):
+    asset: Asset
+    equipped: bool
+
+
+class PublicCollectionPage(BaseModel):
+    items: list[PublicCollectionItem]
+    pagination: Pagination
+
+
 class EquipmentInput(BaseModel):
     asset_id: UUID | None
 
@@ -84,7 +94,7 @@ def inventory(request: Request, page: int = Query(1, ge=1), page_size: int = Que
         equipped=equipped is not None) for item, asset, equipped in rows], pagination=pagination)
 
 
-@router.get('/users/{username}/inventory', response_model=InventoryPage, operation_id='getPublicUserInventory',
+@router.get('/users/{username}/inventory', response_model=PublicCollectionPage, operation_id='getPublicUserInventory',
             responses={status: {'model': ErrorResponse} for status in (404, 422, 429, 500)})
 def public_user_inventory(request: Request, username: str = Path(min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$"),
                           page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
@@ -112,10 +122,10 @@ def public_user_inventory(request: Request, username: str = Path(min_length=3, m
             require_schema(db)
             query = query.options(undefer(AssetItem.display_name), undefer(AssetItem.effect_key))
         rows, pagination = page_rows(db, query, page, page_size)
-        return InventoryPage(items=[
-            InventoryItem(asset=asset_dto(asset, request, metadata=metadata), quantity=item.quantity,
+        return PublicCollectionPage(items=[
+            PublicCollectionItem(asset=asset_dto(asset, request, metadata=metadata),
                           equipped=equipped is not None)
-            for item, asset, equipped in rows
+            for _, asset, equipped in rows
         ], pagination=pagination)
 
 

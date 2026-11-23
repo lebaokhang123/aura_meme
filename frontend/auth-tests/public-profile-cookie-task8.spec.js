@@ -168,7 +168,8 @@ test('Task 8: User B navigates from Home/Comment to User A Public Profile (read-
 
   // Verify strict read-only boundary for viewer B: NO edit button, NO private inventory calls, NO private email
   await expect(page.locator('.am-profile-edit')).toHaveCount(0);
-  await expect(page.locator('.am-profile-collection')).toHaveCount(0);
+  await expect(page.locator('.am-profile-collection')).toHaveCount(2);
+  await expect(page.locator('.am-profile-quantity')).toHaveCount(0);
   expect(state.getPrivateInventoryCalls()).toBe(0);
   expect(await page.locator('main').innerText()).not.toContain('viewer_b@example.com');
 
