@@ -78,7 +78,7 @@ export default function AdminPage(){
  // Never render a previous resource or account while the next read is pending.
  const data=result?.resource===resource&&result.owner===owner?result:null;
  const section=sections.find(row=>row[3].includes(resource));
- const explain=e=>e.serverMessage||(e.code==='RESTORE_WINDOW_EXPIRED'?t('Đã quá thời hạn 30 ngày khôi phục tài khoản.','The 30-day account restoration window has expired.'):e.status===409&&resource==='users'?t('Thay đổi bị từ chối. Phải giữ ít nhất một Admin đang hoạt động.','Change refused. At least one active Admin must remain.'):e.status===409&&resource==='assets'&&e.code!=='DUPLICATE_IMAGE_HASH'?t('Không thể xóa hoặc sửa vật phẩm hệ thống gốc được bảo vệ.','Protected original system assets cannot be modified or deleted.'):authMessage(e,language));
+ const explain=e=>(e.code==='RESTORE_WINDOW_EXPIRED'?t('Đã quá thời hạn 30 ngày khôi phục tài khoản.','The 30-day account restoration window has expired.'):e.status===409&&resource==='users'?t('Thay đổi bị từ chối. Phải giữ ít nhất một Admin đang hoạt động.','Change refused. At least one active Admin must remain.'):e.status===409&&resource==='assets'&&e.code!=='DUPLICATE_IMAGE_HASH'?t('Không thể xóa hoặc sửa vật phẩm hệ thống gốc được bảo vệ.','Protected original system assets cannot be modified or deleted.'):e.serverMessage||authMessage(e,language));
  useEffect(()=>{setDenied(false);setData(null);setEdit(null);setHoldingPreview(false);setError('');setSuccess('');},[owner]);
  useEffect(()=>{
   setData(null);setError('');if(!allowed)return;let active=true;setLoading(true);
@@ -213,6 +213,7 @@ export default function AdminPage(){
    </div><div className="admin-row-status">
     {resource==='audit-logs'&&<time className="workspace-meta" dateTime={row.created_at}>{stamp(row.created_at)}</time>}
     {resource==='orders'&&<span className="workspace-badge" data-status={row.status} style={{fontWeight:600}}>{status(row.status)}</span>}
+    {resource==='assets'&&row.review_status&&<span className="workspace-badge" data-status={row.review_status}>{status(row.review_status)}</span>}
     {row.status&&resource!=='orders'&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='users'&&row.status==='deleted'&&(()=>{const days=restoreDaysLeft(row);return <span className="workspace-meta" style={{marginTop:4}}>{days>0?t(`Còn ${days} ngày khôi phục`,`${days} days left to restore`):t('Hết hạn khôi phục','Restore expired')}</span>;})()}{resource==='assets'&&<span className="workspace-badge" data-status={row.active?'active':'hidden'}>{row.active?t('Đang bật','Active'):t('Đang tắt','Inactive')}</span>}
     </div><div className="workspace-row-actions">{resource==='users'&&<div className="admin-action-icons">{(row.username==='khang_dev'||row.id==='abcfa9f6-c9d2-4181-9b4b-118a4bb6c647')?(
       null

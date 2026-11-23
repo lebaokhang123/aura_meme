@@ -106,6 +106,9 @@ export function authMessage(error,language='vi'){
     ZIP_PATH_TRAVERSAL:['Phát hiện đường dẫn không an toàn trong gói ZIP.','Unsafe file path detected inside the ZIP archive.'],
     NESTED_ZIP_FORBIDDEN:['Không cho phép gói ZIP lồng nhau.','Nested ZIP archives are not permitted.'],
   };
+  const locale=language==='en'?1:0;
+  if(error?.code==='SESSION_EXPIRED'||error?.code==='INVALID_RESET_TOKEN')return messages[error.code][locale];
+  if(error?.status===401)return locale?'Incorrect email or password.':'Email hoặc mật khẩu không đúng.';
   if(error?.serverMessage&&error.serverMessage!=='Invalid request data.'){
     if(language!=='en'&&typeof error.serverMessage==='string'){
       if(error.serverMessage.includes('corrupt')||error.serverMessage.includes('decoding limits')){
@@ -117,8 +120,6 @@ export function authMessage(error,language='vi'){
     }
     return error.serverMessage;
   }
-  if(error?.code==='SESSION_EXPIRED')return messages.SESSION_EXPIRED[language==='en'?1:0];
-  if(error?.status===401)return language==='en'?'Incorrect email or password.':'Email hoặc mật khẩu không đúng.';
   const pair=messages[error?.code]||['Không thể xác thực. Vui lòng thử lại.','Unable to authenticate. Please try again.'];
   return pair[language==='en'?1:0];
 }

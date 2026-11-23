@@ -45,7 +45,7 @@ def test_admin_assets_are_status_only_not_private_source_or_storage(admin):
         c.execute(AssetItem.__table__.insert().values(id=uuid4(),slug='review-'+str(n),kind='avatar',collection='synthetic',rarity='D',media_key='catalog/private-path',source_rights={'review_status':review,'source':'private-source','license':'private-license'},active=active,created_at=now,updated_at=now))
     response=client.get('/api/v1/admin/assets?review_status=pending&search=review')
     assert response.status_code==200;result=response.json();assert result['pagination']['total']==1
-    assert set(result['items'][0])=={'id','slug','kind','rarity','active','review_status'}
+    assert set(result['items'][0])=={'id','slug','kind','rarity','active','review_status','filename'}
     assert result['items'][0]['active'] is False
     assert all(s not in response.text for s in ['private-path','private-source','private-license','media_key','source_rights'])
     assert client.get('/api/v1/admin/assets?active=true').json()['pagination']['total']==1
