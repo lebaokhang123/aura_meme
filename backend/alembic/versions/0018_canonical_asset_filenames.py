@@ -53,6 +53,14 @@ def upgrade():
 
 
 def downgrade():
-    raise RuntimeError(
-        "0018 cannot identify pre-existing canonical filenames. Restore a verified pre-0018 backup."
-    )
+    op.execute("SET LOCAL lock_timeout = '5s'")
+    op.execute("LOCK TABLE asset_items IN SHARE ROW EXCLUSIVE MODE")
+    has_filenames = op.get_bind().scalar(sa.text("""
+        SELECT EXISTS (
+            SELECT 1 FROM asset_items WHERE source_rights ? 'canonical_filename'
+        )
+    """))
+    if has_filenames:
+        raise RuntimeError(
+            "0018 cannot identify pre-existing canonical filenames. Restore a verified pre-0018 backup."
+        )

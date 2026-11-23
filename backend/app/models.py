@@ -681,8 +681,13 @@ class UserFollow(Base):
     )
 
 
+DEMO_SCHEMA_HEAD = "0018_canonical_asset_filenames"
+
+
 def reviewed_metadata(revision):
     """Exact reviewed predecessor shapes; never mutate mapped runtime metadata."""
+    if revision == DEMO_SCHEMA_HEAD:
+        return Base.metadata
     if revision not in {'0009_vault_open','0010_social_reactions','0011_vault_v1','0012_aura_v1'}:
         raise ValueError('Unknown reviewed schema revision')
     metadata = MetaData(naming_convention=Base.metadata.naming_convention)

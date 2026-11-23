@@ -13,10 +13,10 @@ from sqlalchemy.orm import Session
 
 from app.config import AuthSettings, CatalogSettings, ConfigurationError, MediaSettings, Settings
 from app.db import create_db_engine
-from app.models import AdminAuditLog, Role, User, UserRole
+from app.models import DEMO_SCHEMA_HEAD, AdminAuditLog, Role, User, UserRole
 
 DEMO_ROOT = Path(__file__).resolve().parents[1] / 'demo.local'
-DEMO_REVISION = '0012_aura_v1'
+DEMO_REVISION = DEMO_SCHEMA_HEAD
 FIELDS = {'DATABASE_URL', 'DB_CONNECT_TIMEOUT', 'AUTH_SIGNING_KEY', 'AUTH_ENVIRONMENT',
           'AUTH_ALLOWED_ORIGINS', 'MEDIA_STORAGE_ROOT', 'CATALOG_STORAGE_ROOT'}
 OPTIONAL_FIELDS = {'VAULT_RUNTIME_ENABLED', 'AURAMEME_OWNER_MEME_DEMO'}
@@ -97,7 +97,7 @@ def reviewed_demo_schema(connection, *, allow_previous=False):
     from alembic.migration import MigrationContext
     from app.models import reviewed_metadata
     revision = connection.scalar(text('SELECT version_num FROM alembic_version'))
-    previous = allow_previous and revision in {'0009_vault_open','0010_social_reactions','0011_vault_v1'}
+    previous = allow_previous and revision in {'0009_vault_open','0010_social_reactions','0011_vault_v1','0012_aura_v1'}
     if revision != DEMO_REVISION and not previous:
         raise ConfigurationError('Demo schema is not at the reviewed revision.')
     metadata = reviewed_metadata(revision)
@@ -105,7 +105,7 @@ def reviewed_demo_schema(connection, *, allow_previous=False):
     if set(inspector.get_table_names()) != set(metadata.tables) | {'alembic_version'}:
         raise ConfigurationError('Unexpected demo schema tables.')
     kinds = ('like','laugh','fire') if revision == '0009_vault_open' else ('like','love','laugh','fire','sad','angry')
-    vault = revision in {'0011_vault_v1','0012_aura_v1'}
+    vault = revision in {'0011_vault_v1','0012_aura_v1',DEMO_REVISION}
     if vault:
         kinds += ('meme',)
     expression = "reaction_type = ANY (ARRAY[" + ', '.join("'"+kind+"'::text" for kind in kinds) + '])'
@@ -117,7 +117,7 @@ def reviewed_demo_schema(connection, *, allow_previous=False):
         if vault:
             expected[table]['ck_'+table+'_meme_reference'] = "(reaction_type = 'meme'::text) = (meme_asset_id IS NOT NULL)"
     expected['daily_checkins'] = {'ck_daily_checkins_effective_day':"effective_day = ((claimed_at AT TIME ZONE 'Asia/Ho_Chi_Minh'::text) - '07:00:00'::interval)::date"}
-    if revision == '0012_aura_v1':
+    if revision in {'0012_aura_v1',DEMO_REVISION}:
         expected['daily_checkins']['ck_daily_checkins_reward_mode'] = "reward_mode = 'legacy'::text AND wallet_transaction_id IS NOT NULL OR reward_mode = 'aura_v1'::text AND wallet_transaction_id IS NULL"
         expected['aura_reward_events'] = {
             'ck_aura_reward_events_kind':"kind = ANY (ARRAY['post'::text, 'reaction'::text, 'comment'::text])",
