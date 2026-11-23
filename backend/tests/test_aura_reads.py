@@ -164,7 +164,10 @@ def test_leaderboard_earned_only_stable_global_rank_and_private_whitelist(ready)
         assert dto['pagination']['total'] == 3
         item = dto['items'][0]
         assert item['rank'] == page and item['user']['id'] == str(ident) and item['earned_xp'] == 7
-        assert set(item['user']) == {'id','username','display_name','created_at','bio','avatar_url','membership_tier','level','realm','title'}
+        allowed_fields = {'id','username','display_name','created_at','bio','avatar_url','membership_tier'}
+        if ident == owner:
+            allowed_fields |= {'level','realm','title'}
+        assert set(item['user']) == allowed_fields
         assert 'Private address' not in response.text and '@example.com' not in response.text
     assert client.get('/api/v1/leaderboard?page='+str(10**80)).json()['items'] == []
 
