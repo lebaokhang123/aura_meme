@@ -110,7 +110,7 @@ test('checked agreement remains visible in light mode and keeps user edits acros
   const terms=page.locator('#terms');
   await expect(terms).not.toBeChecked();
   const indicator=page.locator('#terms + i');
-  await indicator.click();
+  await terms.check();
   await expect(terms).toBeChecked();
   await page.locator('.u219-tg').click();
   await expect(page.locator('#root')).toHaveAttribute('data-theme','light');
@@ -121,6 +121,6 @@ test('checked agreement remains visible in light mode and keeps user edits acros
   expect(glyph.color).toBe('rgb(255, 255, 255)');
   expect(glyph.width).toBeGreaterThan(0);
   await expect(page.locator('html')).not.toHaveClass(/u219-reveal/);
-  await indicator.click();await choose(page,'en');
+  await terms.uncheck();await choose(page,'en');
   await expect(terms).not.toBeChecked();
 });
