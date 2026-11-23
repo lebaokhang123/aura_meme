@@ -116,8 +116,8 @@
 .admin-session-badge { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; font-size:10px; padding:5px 9px; border:1px solid var(--am-outline-variant); border-radius:99px; color:var(--am-on-surface-variant); }
 .admin-session-badge>span { width:5px; height:5px; border-radius:50%; background:var(--am-tertiary); }
 .admin-main .workspace-subtabs { gap:20px; border-bottom:1px solid var(--am-outline-variant); }
-.admin-main .workspace-subtabs button { border:0; border-radius:0; padding:6px 0 10px; background:none; border-bottom:2px solid transparent; font-size:13px; color:var(--am-on-surface-variant); }
-.admin-main .workspace-subtabs button[aria-pressed=true] { color:var(--am-secondary); border-bottom-color:var(--am-secondary); }
+.admin-main .workspace-subtabs button { border:0!important; border-radius:0!important; padding:6px 0 10px; background:transparent!important; border-bottom:2px solid transparent!important; font-size:13px; color:var(--am-on-surface-variant); box-shadow:none!important; }
+.admin-main .workspace-subtabs button[aria-pressed=true] { background:transparent!important; color:var(--am-secondary)!important; border-bottom:2px solid var(--am-secondary)!important; box-shadow:none!important; font-weight:650; }
 .admin-list-panel { padding:0; background:var(--am-surface-container-lowest); border-radius:16px; overflow:hidden; }
 .admin-list-panel>.workspace-panel-heading { padding:24px 24px 20px; margin:0; align-items:flex-start; }
 .admin-list-title { display:flex; align-items:center; gap:10px; }.admin-list-title h2 { font-size:20px; letter-spacing:-.035em; }.admin-count { padding:1px 8px; background:var(--am-surface-container-high); border:1px solid var(--am-outline-variant); border-radius:6px; font:500 11px/20px 'JetBrains Mono',monospace; }
@@ -744,6 +744,182 @@
   height: 100%;
   border: 0;
   display: block;
+}
+
+.admin-receipt-sheet-wrap {
+  width: 100%;
+  max-height: 540px;
+  overflow-y: auto;
+  border-radius: 12px;
+  border: 1px solid var(--am-outline-variant);
+  background: var(--am-surface-container-lowest);
+  padding: 20px;
+}
+.admin-receipt-bill-card {
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: var(--am-surface-container-low);
+  border: 1px solid var(--am-outline-variant);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+.bill-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px dashed var(--am-outline-variant);
+  padding-bottom: 14px;
+  gap: 16px;
+}
+.bill-card-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bill-logo-img {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.bill-brand-name {
+  display: block;
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+.bill-brand-sub {
+  display: block;
+  font-size: 10px;
+  color: var(--am-on-surface-variant);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.bill-status-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.bill-status-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  font: 700 11px/1.4 'JetBrains Mono', monospace;
+  letter-spacing: 0.06em;
+}
+.bill-date {
+  font-size: 11px;
+  color: var(--am-on-surface-variant);
+}
+.bill-card-headline {
+  text-align: center;
+  padding: 2px 0;
+}
+.bill-card-headline h2 {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+  color: var(--am-on-surface);
+}
+.bill-card-headline p {
+  font-size: 12px;
+  color: var(--am-on-surface-variant);
+  margin: 0;
+}
+.bill-grid-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+  background: var(--am-surface-container);
+  border: 1px solid var(--am-outline-variant);
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+.bill-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bill-meta-item span {
+  font-size: 11px;
+  color: var(--am-on-surface-variant);
+}
+.bill-meta-item strong, .bill-meta-item code {
+  font-size: 12px;
+  color: var(--am-on-surface);
+}
+.bill-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 4px;
+}
+.bill-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 650;
+  color: var(--am-on-surface-variant);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--am-outline-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.bill-table td {
+  padding: 12px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--am-outline-variant);
+  vertical-align: middle;
+}
+.bill-subdesc {
+  font-size: 10px;
+  color: var(--am-on-surface-variant);
+  margin: 2px 0 0;
+}
+.bill-num {
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+.bill-grand-total {
+  font-size: 15px;
+  color: var(--am-secondary);
+}
+.bill-footer-seal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px dashed var(--am-outline-variant);
+  padding-top: 14px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.bill-seal-verified {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bill-seal-verified strong {
+  display: block;
+  font-size: 11px;
+  color: #4cd7f6;
+  letter-spacing: 0.04em;
+}
+.bill-seal-verified p {
+  font-size: 10px;
+  color: var(--am-on-surface-variant);
+  margin: 1px 0 0;
+}
+.bill-qr-hash {
+  font-size: 10px;
+  color: var(--am-on-surface-variant);
 }
 
 
