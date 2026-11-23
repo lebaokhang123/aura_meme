@@ -2,7 +2,7 @@
  * Lucian UX/UI Prompt #403 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#403
  * Ported for AuraMeme (Task 7 Polish).
  */
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { auth } from '../auth.js';
 import { authMessage } from '../auth-client.js';
 import { usePreferences } from '../PreferencesContext.jsx';
@@ -32,6 +32,19 @@ export default function LucianLoginForm() {
 
   const identifierRef = useRef(null);
   const passwordRef = useRef(null);
+
+  useEffect(() => {
+    const onOnboarding = (ev) => {
+      const detail = ev.detail;
+      if (detail && detail.status === 'needs_onboarding') {
+        setOnboarding(detail);
+        setChosenTag(detail.suggested_tag || '');
+        setTagError('');
+      }
+    };
+    window.addEventListener('aurameme-google-onboarding', onOnboarding);
+    return () => window.removeEventListener('aurameme-google-onboarding', onOnboarding);
+  }, []);
 
   function triggerShake(field) {
     setIsShake(field);

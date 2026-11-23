@@ -293,6 +293,12 @@ def google_login(payload: GoogleLoginInput, request: Request, response: Response
             from app.aura_runtime import initialize_progress
 
             lock_aura_mutation(db)
+            db.execute(
+                insert(Role)
+                .values(id=uuid4(), code="USER", description="Standard AuraMeme user")
+                .on_conflict_do_nothing(index_elements=["code"])
+            )
+            role_id = db.scalar(select(Role.id).where(Role.code == "USER"))
             user_id = uuid4()
             sentinel_hash = GOOGLE_ONLY_PASSWORD_PREFIX + secrets.token_hex(24)
             user = User(
@@ -304,28 +310,23 @@ def google_login(payload: GoogleLoginInput, request: Request, response: Response
                 created_at=now,
                 updated_at=now,
             )
-            db.add(user)
-            db.add(Profile(user_id=user_id, display_name=claims.name, updated_at=now))
-            db.execute(
-                insert(Role)
-                .values(id=uuid4(), code="USER", description="Standard AuraMeme user")
-                .on_conflict_do_nothing(index_elements=["code"])
-            )
-            role_id = db.scalar(select(Role.id).where(Role.code == "USER"))
-            db.add(UserRole(user_id=user_id, role_id=role_id, granted_at=now))
-            db.add(
-                UserOAuthIdentity(
-                    id=uuid4(),
-                    user_id=user_id,
-                    provider="google",
-                    provider_sub=claims.sub,
-                    email=claims.email,
-                    email_verified=claims.email_verified,
-                    created_at=now,
-                    updated_at=now,
-                )
-            )
             try:
+                db.add(user)
+                db.flush()
+                db.add_all([
+                    Profile(user_id=user_id, display_name=claims.name, updated_at=now),
+                    UserRole(user_id=user_id, role_id=role_id, granted_at=now),
+                    UserOAuthIdentity(
+                        id=uuid4(),
+                        user_id=user_id,
+                        provider="google",
+                        provider_sub=claims.sub,
+                        email=claims.email,
+                        email_verified=claims.email_verified,
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                ])
                 db.flush()
             except IntegrityError:
                 raise AuthError(409, "CONFLICT", "Tài khoản Google này đang được xử lý. Vui lòng thử lại.") from None
@@ -390,6 +391,12 @@ def google_onboarding(payload: GoogleOnboardingInput, request: Request, response
             from app.aura_runtime import initialize_progress
 
             lock_aura_mutation(db)
+            db.execute(
+                insert(Role)
+                .values(id=uuid4(), code="USER", description="Standard AuraMeme user")
+                .on_conflict_do_nothing(index_elements=["code"])
+            )
+            role_id = db.scalar(select(Role.id).where(Role.code == "USER"))
             user_id = uuid4()
             sentinel_hash = GOOGLE_ONLY_PASSWORD_PREFIX + secrets.token_hex(24)
             user = User(
@@ -401,28 +408,23 @@ def google_onboarding(payload: GoogleOnboardingInput, request: Request, response
                 created_at=now,
                 updated_at=now,
             )
-            db.add(user)
-            db.add(Profile(user_id=user_id, display_name=name, updated_at=now))
-            db.execute(
-                insert(Role)
-                .values(id=uuid4(), code="USER", description="Standard AuraMeme user")
-                .on_conflict_do_nothing(index_elements=["code"])
-            )
-            role_id = db.scalar(select(Role.id).where(Role.code == "USER"))
-            db.add(UserRole(user_id=user_id, role_id=role_id, granted_at=now))
-            db.add(
-                UserOAuthIdentity(
-                    id=uuid4(),
-                    user_id=user_id,
-                    provider="google",
-                    provider_sub=sub,
-                    email=email,
-                    email_verified=True,
-                    created_at=now,
-                    updated_at=now,
-                )
-            )
             try:
+                db.add(user)
+                db.flush()
+                db.add_all([
+                    Profile(user_id=user_id, display_name=name, updated_at=now),
+                    UserRole(user_id=user_id, role_id=role_id, granted_at=now),
+                    UserOAuthIdentity(
+                        id=uuid4(),
+                        user_id=user_id,
+                        provider="google",
+                        provider_sub=sub,
+                        email=email,
+                        email_verified=True,
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                ])
                 db.flush()
             except IntegrityError:
                 raise AuthError(409, "CONFLICT", "Tài khoản Google hoặc tag này đang được xử lý. Vui lòng thử lại.") from None

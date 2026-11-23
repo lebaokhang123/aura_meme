@@ -248,7 +248,7 @@ def test_email_service_templates_and_receipt_idempotency():
         )
     )
 
-    # Contact sends both admin notification & sender acknowledgement
+    # Contact sends a SINGLE confirmation email to sender (no duplicate admin email)
     contact_res = svc.send_contact_emails(
         contact_id="cnt-001",
         sender_name="Minh",
@@ -256,8 +256,15 @@ def test_email_service_templates_and_receipt_idempotency():
         subject_line="Góp ý giao diện",
         message_body="Giao diện Sáng Thế Thần rất đẹp!",
     )
-    assert contact_res["admin"].status == "sandbox_captured"
+    assert "admin" not in contact_res
     assert contact_res["ack"].status == "sandbox_captured"
+    assert len(svc.sandbox_outbox) == 1
+    contact_mail = svc.sandbox_outbox[0]
+    assert contact_mail["subject"] == "[AuraMeme] - Tiếp nhận góp ý"
+    assert "cid:aurameme-logo" in contact_mail["html"]
+    assert contact_mail["inline_logo_size"] > 1000
+    # Order: Mã tham chiếu -> Chủ đề -> Nội dung
+    assert contact_mail["text"].index("cnt-001") < contact_mail["text"].index("Góp ý giao diện") < contact_mail["text"].index("Giao diện Sáng Thế Thần rất đẹp!")
 
     # Premium receipt sends ONCE per order_code; duplicate webhook callback is deduplicated
     r1 = svc.send_premium_receipt_email(
@@ -269,6 +276,7 @@ def test_email_service_templates_and_receipt_idempotency():
         amount_usd_formatted="$50",
         provider="paypal_sandbox",
         completed_at_iso="2026-11-22T12:00:00+00:00",
+        username="buyer_tag",
     )
     r2 = svc.send_premium_receipt_email(
         to_email="buyer@example.com",
@@ -279,13 +287,19 @@ def test_email_service_templates_and_receipt_idempotency():
         amount_usd_formatted="$50",
         provider="paypal_sandbox",
         completed_at_iso="2026-11-22T12:00:00+00:00",
+        username="buyer_tag",
     )
     assert r1.status == "sandbox_captured"
     assert r2.status == "duplicate_skipped"
     receipt_mail = svc.sandbox_outbox[-1]
+    assert receipt_mail["subject"] == "[AuraMeme] - Biên nhận thanh toán Aura Prime"
     assert "AM-PRIME-001" in receipt_mail["html"]
     assert "PayPal Sandbox" in receipt_mail["text"]
     assert "<script" not in receipt_mail["html"].lower()
+    assert len(receipt_mail["attachments"]) == 1
+    assert receipt_mail["attachments"][0]["filename"] == "AuraMeme-Receipt-AM-PRIME-001.pdf"
+    assert receipt_mail["attachments"][0]["content_type"] == "application/pdf"
+    assert receipt_mail["attachments"][0]["size"] > 10000
 
 
 def test_email_disabled_mode_is_safe_noop():

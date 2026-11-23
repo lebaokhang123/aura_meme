@@ -545,12 +545,54 @@ def _dispatch_receipt_email_safe(request: Request | None, db, order: Subscriptio
         return
     try:
         user = db.get(User, order.user_id)
-        if user is None or not getattr(user, "email", None):
+        if user is None or user.id != order.user_id or not getattr(user, "email", None):
             return
         profile = db.get(Profile, order.user_id)
         display_name = (profile.display_name if profile and getattr(profile, "display_name", None) else user.username)
         amount_vnd_fmt = f"{order.amount_vnd:,} VNĐ".replace(",", ".")
         amount_usd_fmt = "$50" if order.tier == "prime" else "$5"
+
+        recent_rows = list(
+            db.scalars(
+                select(SubscriptionOrder)
+                .where(
+                    SubscriptionOrder.user_id == order.user_id,
+                    SubscriptionOrder.status == "success",
+                )
+                .order_by(SubscriptionOrder.created_at.desc(), SubscriptionOrder.id.desc())
+                .limit(10)
+            ).all()
+        )
+        recent_orders = [
+            {
+                "order_code": r.order_code,
+                "tier": r.tier,
+                "duration_days": r.duration_days,
+                "amount_usd_cents": r.amount_cents,
+                "amount_vnd": r.amount_vnd,
+                "status": r.status,
+                "provider": r.provider,
+                "provider_txn_id": r.provider_txn_id,
+                "completed_at": (r.completed_at or r.created_at or now).isoformat(),
+                "created_at": (r.created_at or now).isoformat(),
+            }
+            for r in recent_rows
+            if r.user_id == order.user_id and r.status == "success"
+        ]
+        order_data = {
+            "order_code": order.order_code,
+            "tier": order.tier,
+            "duration_days": order.duration_days,
+            "amount_usd_cents": order.amount_cents,
+            "amount_vnd": order.amount_vnd,
+            "status": order.status,
+            "provider": order.provider,
+            "provider_txn_id": order.provider_txn_id,
+            "completed_at": (order.completed_at or now).isoformat(),
+            "created_at": (order.created_at or now).isoformat(),
+            "owner_username": user.username,
+        }
+
         email_service.send_premium_receipt_email(
             to_email=user.email,
             display_name=display_name,
@@ -560,6 +602,11 @@ def _dispatch_receipt_email_safe(request: Request | None, db, order: Subscriptio
             amount_usd_formatted=amount_usd_fmt,
             provider=order.provider,
             completed_at_iso=(order.completed_at or now).isoformat(),
+            provider_txn_id=order.provider_txn_id,
+            username=user.username,
+            order_status=order.status,
+            order_data=order_data,
+            recent_orders=recent_orders,
         )
     except Exception:
         pass

@@ -1,13 +1,12 @@
 # BÁO CÁO NGHIỆM THU VÀ BÀN GIAO KỸ THUẬT — TASK 9: TÍCH HỢP HỆ THỐNG & AUDIT TOÀN DIỆN
 
 **Dự án:** AuraMeme (Cyberpunk Cultivation Meme Community Platform)  
-**Nhánh tích hợp:** `feat/task9-integration-audit`  
+**Nhánh tích hợp cuối:** `fix/task10-email-polish-qa` (kế thừa liền mạch `feat/task9-integration-audit` → `fix/task9-owner-qa-polish` → `feat/task10-email-identity`)  
 **Repository:** `lebaokhang123/aura_meme`  
 **Baseline tích hợp:** `origin/dev@8b22c29` (nơi Codex đã hoàn tất nghiệm thu và tích hợp Task 1–5)  
-**HEAD Commit:** `feat/task9-integration-audit` (Ahead dev by 20 commits, clean)  
 **Ngày thực hiện:** 23/11/2026  
 **Kỹ sư thực hiện:** Antigravity (Senior Full-stack & QA Engineer)  
-**Bên tiếp nhận:** Owner (QA Review) & Codex  
+**Bên tiếp nhận:** Owner & Codex (Final Review & Merge)  
 
 ---
 
@@ -67,25 +66,28 @@ Toàn bộ các tính năng từ Task 6 đến Task 8, đợt UI polish Lucian (
 ## 3. MA TRẬN KẾT QUẢ KIỂM THỬ (TEST VERIFICATION MATRIX)
 
 ### 3.1. Backend Unit Tests & Security Negative Suite
-- **Pytest (Non-Integration):** `516 passed, 1 skipped, 798 deselected, 0 failed` (35.71s).
+- **Pytest (Non-Integration):** `521 passed, 1 skipped, 798 deselected, 0 failed` (31.10s).
+- **Email, Identity & MIME PDF Receipt Suite (`test_task7_google_email_reset.py` + `test_task10_identity.py`):** `12 passed, 0 failed` (2.55s).
 - **Vault Negative Security Suite:** `17 passed, 0 failed` (1.51s), bao gồm toàn bộ negative tests chống lừa URL guard.
 
 ### 3.2. Frontend Unit Tests & Build
-- **Node Test Runner:** `84 passed, 0 failed` (1.42s).
-- **Production Build (`npm run build`):** `397 modules transformed, built in 5.45s` (0 syntax errors).
+- **Node Test Runner:** `84 passed, 0 failed` (0.88s).
+- **Production Build (`npm run build`):** `398 modules transformed, built in 4.66s` (0 syntax errors).
 
-### 3.3. Browser E2E Thật (Real Backend + PostgreSQL Clone `aurameme_qa`)
-- **File test:** `auth-tests/vault-real-smoke.spec.js` (không dùng `route.fulfill()` cho Vault).
-- **Kết quả:** **1 PASSED (10.0s)**.
-  * Đăng nhập tài khoản thật.
-  * Xác minh 2 rương (Meme & Background).
-  * Xác minh Catalog đủ 75 vật phẩm thật (70 Meme + 5 Background).
-  * Mở rương thật qua API: nhận biên lai `status 200`.
-  * Nhận **+2 EXP** thật trên tiến trình Aura.
-  * Vật phẩm ghi nhận vào túi đồ (`/inventory/me`).
-  * Trang bị vật phẩm thành công (`/inventory/equipment/background`).
-  * Reload trang web: trạng thái trang bị nền tồn tại bền vững trong DOM (`#root[data-vault-background]`).
-  * Bằng chứng screenshot: `vault_real_meme_tab.png`, `vault_real_bg_tab.png`, `vault_real_receipt_modal.png`, `vault_real_equipped.png`.
+### 3.3. Browser E2E Thật & Autonomous QA Suite (Real Backend + PostgreSQL Clone `aurameme_qa`)
+- **File test:** `auth-tests/vault-real-smoke.spec.js` (không dùng `route.fulfill()` cho Vault) — **1 PASSED (10.5s)**.
+- **Autonomous Full QA Suite (Real Backend + Real Frontend + Real DB Clone):**
+  * **Home Desktop & Mobile:** Sticky sidebars trái/phải (`position: sticky`), ảnh bài viết demo load thật HTTP 200 (`naturalWidth > 0`), không tràn ngang mobile (375×812).
+  * **Vault Desktop & Mobile:** 15 vật phẩm/trang (5 cột × 3 hàng), đủ 70 Meme (5 trang) và 5 Background (1 trang), mở rương thật cộng +2 EXP, trang bị nền lưu bền vững sau reload.
+  * **Public Profile (`/u/:username` & `/profile/:username`):** Hiển thị bộ sưu tập Meme đã sở hữu và Background đã sở hữu (tiêu đề căn giữa), tự động áp dụng hiệu ứng nền đã trang bị của chủ hồ sơ đang xem và khôi phục nền của người xem khi rời hồ sơ, đồng thời tải đầy đủ danh sách bài viết công khai của chủ hồ sơ.
+  * **About (`/about`):** Liên kết email (`mailto:`) và GitHub (`target="_blank" rel="noopener noreferrer"`) chính xác cho Khang Dev và Kien Dev.
+  * **Register, Verify Email & Reset Password:** Form 5 trường rõ ràng với báo lỗi inline theo từng ô; cho phép trùng tên hiển thị (`display_name`) nhưng bắt buộc `@tag` (`username`) duy nhất; chặn đăng nhập trước khi xác minh email (`403 ACCOUNT_UNVERIFIED`); kích hoạt tài khoản qua `/verify-email?token=...`; token đặt lại mật khẩu chỉ dùng 1 lần (`400 INVALID_RESET_TOKEN` khi dùng lại).
+  * **Google Onboarding Modal:** Khi tài khoản Google mới chưa có `@tag`, hiển thị modal chọn `@tag` duy nhất với token ký HMAC-SHA256 thời hạn 15 phút (`POST /api/v1/auth/google/onboarding`).
+  * **Email Design Polish & Live Gmail SMTP (`thothayvtv38@gmail.com`):**
+    - Nhúng logo AuraMeme chính thức dạng inline CID PNG (`cid:aurameme-logo`, `image/png`) bên trái tên thương hiệu trong header mọi email.
+    - Chuẩn hóa tiêu đề `[AuraMeme] - <Tiêu đề>` qua helper chống thiếu/trùng prefix.
+    - Contact chỉ gửi **1 email xác nhận duy nhất** tới người gửi (`[AuraMeme] - Tiếp nhận góp ý`) theo bố cục `Mã tham chiếu → Chủ đề → Nội dung` (tự động xuống dòng, chống XSS), trong khi dữ liệu vẫn lưu đầy đủ trong DB và hiển thị tại `/admin/contacts`.
+    - Biên nhận Premium phân biệt rõ nhãn phương thức (`Thẻ mô phỏng nội bộ`, `PayPal mô phỏng nội bộ`, `PayPal Sandbox`), giữ nút xem lịch sử và **đính kèm trực tiếp file PDF thật** (`AuraMeme-Receipt-AM-xxxx.pdf`, `application/pdf`) khớp 100% với bản tải từ website.
 
 ### 3.4. Browser UI Mocked Suites (Playwright Chrome)
 *Các bộ test dưới đây sử dụng mock/stub mạng có chủ đích để kiểm thử giao diện, animation và phản hồi client:*
@@ -100,46 +102,34 @@ Toàn bộ các tính năng từ Task 6 đến Task 8, đợt UI polish Lucian (
 
 ---
 
-## 4. DANH SÁCH GIỚI HẠN & MỤC CHƯA XÁC MINH (NOT VERIFIED STATUS)
+## 4. PHÂN LOẠI TRẠNG THÁI XÁC MINH (VERIFIED / MOCKED / NOT VERIFIED)
 
-Để bảo đảm tính trung thực tuyệt đối, dưới đây là các giới hạn và phân hệ **NOT VERIFIED**:
-
-1. **Google OAuth thực tế (`NOT VERIFIED`):** Giao diện và API stub đã hoàn thiện; việc đăng nhập thực tế với tài khoản Google thật yêu cầu Google Client ID/Secret chính thức từ Google Cloud Console và màn hình cấp quyền thực tế của người dùng.
-2. **Hệ thống gửi Email SMTP thực tế (`NOT VERIFIED`):** Logic sinh token, mã hóa, hết hạn 15 phút, rate limit 3 lần/giờ và giao diện đã hoàn thiện; việc gửi email thực tế đến hộp thư người dùng yêu cầu cấu hình SMTP server (SendGrid / Postmark / Gmail SMTP) với tài khoản có thật.
-3. **PayPal Real Buyer Sandbox trọn vòng (`NOT VERIFIED`):** Luồng tạo đơn hàng, đối soát mã đơn, giao diện thẻ mô phỏng và webhook đã được kiểm thử; luồng người mua thật đăng nhập vào popup PayPal Sandbox và duyệt thanh toán thật chưa thực hiện (do thiếu tài khoản buyer sandbox từ PayPal).
-4. **Database Production / Demo gốc (`PRESERVED / UNTOUCHED`):** Theo quy tắc an toàn nghiêm ngặt, database `aurameme_demo` và `aurameme_dev` được giữ nguyên vẹn 100%, không chạy migration hoặc seed đè. Môi trường QA sử dụng database clone riêng `aurameme_qa`.
+1. **Hệ thống gửi Email Gmail SMTP thực tế (`VERIFIED LIVE`):** Đã kết nối và gửi nhận thực tế qua `smtp.gmail.com:587` (STARTTLS) với tài khoản `AuraMeme - No Reply <thothayvtv38@gmail.com>`, xác nhận đầy đủ logo inline CID, tiêu đề `[AuraMeme] - <Tiêu đề>`, Contact 1 chiều và file đính kèm PDF biên nhận mở được, đầy đủ dấu tiếng Việt.
+2. **Luồng Xác minh Email đăng ký, Đặt lại mật khẩu 1 lần & Google Onboarding chọn `@tag` (`VERIFIED E2E ON QA CLONE`):** Đã kiểm thử trọn vòng trên backend FastAPI thật, trình duyệt Chromium thật và PostgreSQL clone `aurameme_qa` tại revision `0016_account_email_verifications`.
+3. **Google OAuth Popup với Google Cloud Client ID thật (`MOCKED TOKEN / LIVE OAUTH NOT VERIFIED`):** Luồng xác thực chữ ký onboarding token, kiểm tra trùng `@tag`, khởi tạo tài khoản và cấp session cookie đã kiểm thử thật trên DB; bước người dùng đăng nhập qua popup Google Identity Services bên ngoài cần `GOOGLE_CLIENT_ID` từ Google Cloud Console.
+4. **PayPal Real Buyer Sandbox Popup (`MOCKED ADAPTER / LIVE POPUP NOT VERIFIED`):** Luồng tạo đơn hàng, đối soát mã đơn, thẻ mô phỏng nội bộ, tạo & đính kèm PDF biên nhận đã kiểm thử thật; bước đăng nhập tài khoản buyer trên trang `sandbox.paypal.com` cần buyer credentials của PayPal Developer.
+5. **Database Production / Demo gốc (`PRESERVED / UNTOUCHED`):** Database `aurameme_demo` được giữ nguyên vẹn 100% tại revision `0012_aura_v1`. Toàn bộ migration `0013`–`0016` và kiểm thử QA chỉ chạy trên database clone độc lập `aurameme_qa` với role riêng `aurameme_qa`.
 
 ---
 
-## 5. HƯỚNG DẪN DÀNH CHO OWNER REVIEW
+## 5. HƯỚNG DẪN KHỞI ĐỘNG MÔI TRƯỜNG QA
 
 ### 5.1. Thông tin truy cập website QA
 - **URL Website:** `http://localhost:5173`
 - **Backend API:** `http://127.0.0.1:8000`
-- **Database:** PostgreSQL clone `aurameme_qa` trên port 5432 (dữ liệu được giữ bền vững, không mất khi restart).
-- **Tài khoản kiểm thử:**
-  * **Admin (Sáng Thế Thần):** Email `khang_dev@example.com` | Password: `QA-Owner-Password-2026!`
-  * **Member (Người dùng thường):** Email `gigachad@example.com` | Password: `QA-Owner-Password-2026!`
+- **Database:** PostgreSQL clone `aurameme_qa` trên port 5432.
+- **File cấu hình cục bộ (đã gitignore):** `.env.qa` (không chứa bất kỳ secret nào trong Git).
 
-### 5.2. Lệnh khởi động lại (Restart Command)
-Khi cần dừng hoặc khởi động lại môi trường QA, Owner có thể chạy file launcher tự động:
+### 5.2. Lệnh khởi động một bước (One-Step Launcher)
 ```powershell
 cd D:\Big\du_an_lon\aura_meme_p2_task9
 .\run_qa.bat
 ```
-Hoặc khởi động thủ công:
+Hoặc khởi động từng dịch vụ nạp cấu hình từ `.env.qa`:
 ```powershell
 # Terminal 1 - Backend:
 cd D:\Big\du_an_lon\aura_meme_p2_task9\backend
-$env:DATABASE_URL = "postgresql+psycopg://aurameme_demo:not-a-real-test-password@127.0.0.1:5432/aurameme_qa"
-$env:AUTH_ENVIRONMENT = "development"
-$env:AUTH_ALLOWED_ORIGINS = '["http://localhost:5173"]'
-$env:AUTH_SIGNING_KEY = "not-a-real-archived-signing-key"
-$env:CATALOG_STORAGE_ROOT = "D:\Big\du_an_lon\aura_meme_p2_task9\backend\demo.local\catalog"
-$env:MEDIA_STORAGE_ROOT = "D:\Big\du_an_lon\aura_meme_p2_task9\backend\demo.local\media"
-$env:VAULT_RUNTIME_ENABLED = "true"
-$env:AURAMEME_OWNER_MEME_DEMO = "1"
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --env-file ..\.env.qa
 
 # Terminal 2 - Frontend:
 cd D:\Big\du_an_lon\aura_meme_p2_task9\frontend
@@ -147,4 +137,4 @@ npm.cmd run dev -- --host localhost --port 5173
 ```
 
 ---
-*Trạng thái hiện tại: Đã dừng tại **OWNER REVIEW** để Owner tự trải nghiệm và nghiệm thu trực tiếp trên trình duyệt trước khi giao Codex.*
+*Trạng thái hiện tại: Đã hoàn tất toàn bộ kiểm thử tự động và chụp bằng chứng nghiệm thu, sẵn sàng bàn giao Codex review và merge vào `dev`.*

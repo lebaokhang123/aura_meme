@@ -271,7 +271,7 @@ export default function CookieConsent() {
       <div className={`ux u409 ${stateClass}`} data-cookie-banner="1">
         <div className={`u409-wrap ${isIn ? 'is-in' : ''} ${flyTuckClass}`}>
           <section className="u409-card" ref={cardRef} style={cardStyle} aria-label="Cookie consent">
-            <div className="u409-main" inert={busy ? '' : undefined}>
+            <div className="u409-main" inert={busy || undefined}>
               <b className="u409-t">{t('Cho phép AuraMeme dùng Cookie?', 'Mind if we use cookies?')}</b>
               <span className="u409-s">
                 {t(

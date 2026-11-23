@@ -9,7 +9,7 @@ import {apiId,apiCategory,apiPost,apiComment,apiPage,apiInteractions,apiOwnedMem
 const SocialContext=createContext(null);
 export const useSocial=()=>useContext(SocialContext);
 export function SocialProvider({children}) {
-  const profileRoute=/^\/profile(?:\/([a-z0-9_]{3,32}))?\/?$/.exec(location.pathname);
+  const profileRoute=/^\/(?:profile|u)(?:\/([a-z0-9_]{3,32}))?\/?$/.exec(location.pathname);
   const profileUsername=profileRoute?(profileRoute[1]||readDemoUser()?.username):null;
   const [snapshot,setSnapshot]=useState(()=>({state:emptyState(),media:{}}));
   const [ready,setReady]=useState(false),[error,setError]=useState('');
@@ -40,7 +40,7 @@ export function SocialProvider({children}) {
   };
   const loadFeed=async(filters=query.current,append=false)=>{
     if(MOCK_AUTH)return;
-    if(!profileUsername&&!['/','/explore'].includes(location.pathname)){setReady(true);return;}
+    if(!profileUsername&&!['/','/explore'].includes(location.pathname)){setLoading(false);setReady(true);return;}
     query.current=filters;const token=++generation.current,next=append?page.current+1:1;
     setLoading(true);setError('');
     try{

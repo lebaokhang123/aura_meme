@@ -41,6 +41,29 @@ function formatDateObj(d) {
   return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
 }
 
+export function resolvePaymentMethodLabel(provider, txnRef = '', paymentMethod = '') {
+  const prov = String(provider || '').trim();
+  const txn = String(txnRef || '').trim();
+  const method = String(paymentMethod || '').trim();
+  if (!prov || prov === 'unselected') return 'Chưa chọn';
+  if (prov === 'sandbox_simulated' || method === 'card' || txn.startsWith('SIM-CARD-')) {
+    return 'Thẻ mô phỏng nội bộ';
+  }
+  if (prov === 'paypal_sandbox') {
+    if (txn.startsWith('SIM-') || txn.startsWith('MOCK-')) {
+      return 'PayPal mô phỏng nội bộ';
+    }
+    return 'PayPal Sandbox';
+  }
+  if (prov === 'vnpay_sandbox') {
+    if (txn.startsWith('SIM-') || txn.startsWith('MOCK-')) {
+      return 'VNPAY mô phỏng nội bộ';
+    }
+    return 'VNPAY Sandbox';
+  }
+  return prov;
+}
+
 /**
  * Generates an authentic, clean, SaaS-style A4 jsPDF instance for AuraMeme memberships.
  * Pure vector/text primitives via jsPDF with embedded Unicode Roboto font:
@@ -73,20 +96,7 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
   const txnRef = order.paypal_order_id || order.provider_txn_id || orderCode;
 
   // Payment provider name
-  let providerName = 'Chưa xác định';
-  if (!order.provider || order.provider === 'unselected') {
-    providerName = 'Chưa chọn';
-  } else if (order.provider === 'sandbox_simulated' || order.payment_method === 'card' || txnRef.startsWith('SIM-CARD-')) {
-    providerName = 'Thẻ';
-  } else if (order.provider === 'paypal_sandbox') {
-    if (txnRef.startsWith('SIM-') || txnRef.startsWith('MOCK-')) {
-      providerName = 'Mô phỏng';
-    } else {
-      providerName = 'PayPal';
-    }
-  } else if (order.provider === 'vnpay_sandbox') {
-    providerName = 'VNPAY';
-  }
+  const providerName = resolvePaymentMethodLabel(order.provider, txnRef, order.payment_method);
   const username = order.owner_username || user?.username || user?.displayName || '—';
 
   const rawDate = order.completed_at || order.activatedAt || order.created_at;
@@ -318,7 +328,7 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
     doc.setFontSize(6.8);
     doc.setTextColor(107, 114, 128);
     doc.text('PHƯƠNG THỨC / METHOD', 23, startY + 7.2);
-    doc.text('NGÀY / DATE', 58, startY + 7.2);
+    doc.text('NGÀY / DATE', 62, startY + 7.2);
     doc.text('SỐ TIỀN / AMOUNT', 113, startY + 7.2, { align: 'right' });
     doc.text('TRẠNG THÁI / STATUS', 132, startY + 7.2, { align: 'center' });
     doc.text('MÃ THAM CHIẾU / REF', 188, startY + 7.2, { align: 'right' });
@@ -365,20 +375,7 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
     for (let idx = 0; idx < historyList.length; idx++) {
       const histItem = historyList[idx];
       const hTxn = histItem.provider_txn_id || histItem.order_code || '';
-      let hProvider = 'Chưa xác định';
-      if (!histItem.provider || histItem.provider === 'unselected') {
-        hProvider = 'Chưa chọn';
-      } else if (histItem.provider === 'sandbox_simulated' || histItem.payment_method === 'card' || hTxn.startsWith('SIM-CARD-')) {
-        hProvider = 'Thẻ';
-      } else if (histItem.provider === 'paypal_sandbox') {
-        if (hTxn.startsWith('SIM-') || hTxn.startsWith('MOCK-')) {
-          hProvider = 'Mô phỏng';
-        } else {
-          hProvider = 'PayPal';
-        }
-      } else if (histItem.provider === 'vnpay_sandbox') {
-        hProvider = 'VNPAY';
-      }
+      const hProvider = resolvePaymentMethodLabel(histItem.provider, hTxn, histItem.payment_method);
       const hDate = formatReceiptDate(histItem.completed_at || histItem.created_at);
       const hAmount = Number.isInteger(histItem.amount_usd_cents)
         ? (histItem.amount_usd_cents / 100).toFixed(2) + ' USD'
@@ -407,10 +404,12 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
 
       const textY = curY + 4.2;
       doc.setFont('Roboto', 'normal');
-      doc.setFontSize(7.5);
+      doc.setFontSize(7.0);
       doc.setTextColor(55, 65, 81);
       doc.text(hProvider, 23, textY);
-      doc.text(hDate, 58, textY);
+      doc.setFontSize(7.2);
+      doc.text(hDate, 62, textY);
+      doc.setFontSize(7.5);
       doc.text(hAmount, 113, textY, { align: 'right' });
 
       doc.setFont('Roboto', 'bold');
@@ -439,7 +438,7 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
     doc.setFont('Roboto', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(156, 163, 175);
-    doc.text('Biên lai giao dịch thử nghiệm — Không phát sinh thanh toán tiền thật.', 20, 273.5);
+    doc.text('Biên lai giao dịch thử nghiệm/mô phỏng — Không có giá trị xác nhận thanh toán thực tế.', 20, 273.5);
     doc.text('Sandbox transaction receipt — For development and verification purposes only.', 20, 277.5);
     doc.text(`Trang ${p} / ${totalPages}  (Page ${p} of ${totalPages})`, 190, 273.5, { align: 'right' });
   }

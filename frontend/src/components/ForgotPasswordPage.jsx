@@ -156,7 +156,7 @@ export default function ForgotPasswordPage() {
       <div className={`ux u405 ${isSent ? 'is-sent' : ''}`}>
         <div className="u405-box" ref={boxRef}>
           {/* STATE A: Nhập email */}
-          <form className="u405-a" onSubmit={handleSubmit} noValidate inert={isSent ? '' : undefined}>
+          <form className="u405-a" onSubmit={handleSubmit} noValidate inert={isSent || undefined}>
             <h1 className="u405-title">{t('Quên mật khẩu?', 'Forgot password?')}</h1>
             <p className="u405-sub">{t('Nhập email để nhận liên kết đặt lại mật khẩu.', 'Enter your email to receive a password reset link.')}</p>
 
@@ -199,7 +199,7 @@ export default function ForgotPasswordPage() {
           </form>
 
           {/* STATE B: Kiểm tra email */}
-          <div className="u405-b" role="status" aria-live="polite" inert={!isSent ? '' : undefined}>
+          <div className="u405-b" role="status" aria-live="polite" inert={!isSent || undefined}>
             <svg className="u405-env" viewBox="0 0 72 60" aria-hidden="true">
               <rect className="bk" x="6" y="16" width="60" height="40" rx="6" />
               <g className="letter">
