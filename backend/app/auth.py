@@ -93,7 +93,8 @@ def user_private(db, user):
         raise AuthError(500, "INTERNAL_ERROR", "Account data is unavailable.")
     roles = db.scalars(select(Role.code).join(UserRole).where(UserRole.user_id == user.id).order_by(Role.code)).all()
     return UserPrivate(id=user.id, username=user.username, email=user.email,
-                       display_name=profile.display_name, roles=roles, status=user.status)
+                       display_name=profile.display_name, roles=roles, status=user.status,
+                       deleted_at=user.deleted_at)
 
 
 @router.get("/csrf", response_model=CsrfResponse, operation_id="getCsrf",

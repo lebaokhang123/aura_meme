@@ -82,6 +82,7 @@ export function authMessage(error,language='vi'){
     INVALID_RESET_TOKEN:['Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.','This password reset link is invalid or has expired.'],
     GOOGLE_ONLY_ACCOUNT:['Tài khoản này đăng nhập bằng Google và không dùng mật khẩu cục bộ.','This account signs in with Google and does not have a local password.'],
     GOOGLE_AUTH_NOT_CONFIGURED:['Đăng nhập Google chưa được cấu hình trên máy chủ.','Google sign-in is not configured on this server yet.'],
+    RESTORE_WINDOW_EXPIRED:['Đã quá thời hạn 30 ngày khôi phục tài khoản.','The 30-day account restoration window has expired.'],
   };
   if(error?.code==='SESSION_EXPIRED')return messages.SESSION_EXPIRED[language==='en'?1:0];
   if(error?.status===401)return language==='en'?'Incorrect email or password.':'Email hoặc mật khẩu không đúng.';

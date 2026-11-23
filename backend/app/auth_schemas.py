@@ -52,6 +52,7 @@ class UserPrivate(BaseModel):
     display_name: str
     roles: list[Literal["USER", "ADMIN"]]
     status: Literal["active", "locked", "deleted"]
+    deleted_at: AwareDatetime | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class RegisterResponse(BaseModel):

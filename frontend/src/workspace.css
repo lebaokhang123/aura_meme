@@ -104,7 +104,11 @@
 .admin-access-note { display:flex; gap:10px; padding:14px 10px; background:var(--am-surface-container-low); border:1px solid var(--am-outline-variant); border-radius:12px; }
 .admin-access-note>.material-symbols-outlined { font-size:18px; color:var(--am-tertiary); }
 .admin-access-note strong { display:block; font-size:11px; }.admin-access-note p { margin:6px 0 0; font-size:11px; line-height:1.7; color:var(--am-on-surface-variant); }
-.admin-home-link { display:flex; align-items:center; gap:10px; min-height:44px; margin:16px 0 0; font-size:12px; text-decoration:none; }.admin-home-link .material-symbols-outlined{font-size:18px}
+.admin-home-link { display:flex; align-items:center; gap:10px; min-height:44px; margin:16px 0 0; padding:10px 14px; border:1px solid var(--am-outline-variant); border-radius:10px; background:var(--am-surface-container-low); color:var(--am-on-surface); font-size:12.5px; font-weight:600; text-decoration:none; transition:background .18s,border-color .18s,color .18s,transform .15s,box-shadow .18s; }
+.admin-home-link .material-symbols-outlined { font-size:18px; color:var(--am-secondary); transition:transform .18s; }
+.admin-home-link:hover, .admin-home-link:focus-visible { background:var(--am-surface-container-high); border-color:var(--am-secondary); color:var(--am-primary); text-decoration:none; box-shadow:0 4px 14px color-mix(in srgb,var(--am-secondary) 15%,transparent); }
+.admin-home-link:hover .material-symbols-outlined { transform:translateX(-2px); }
+.admin-home-link:active { transform:scale(.98); }
 .admin-main { min-width:0; display:flex; flex-direction:column; gap:24px; }
 .admin-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 0 4px; }
 .admin-breadcrumb { display:flex; align-items:center; gap:8px; margin:0 0 10px; color:var(--am-on-surface-variant); font-size:11px; }.admin-breadcrumb .material-symbols-outlined{font-size:14px}
@@ -120,7 +124,11 @@
 .admin-list-note { font-size:12px; color:var(--am-on-surface-variant); margin:8px 0 0; }
 .admin-toolbar-actions { display:flex; align-items:center; gap:8px; }.admin-toolbar-actions button { display:inline-flex; align-items:center; gap:6px; font-size:12px; white-space:nowrap; }.admin-refresh { display:grid; place-items:center; padding:10px!important; }.admin-toolbar-actions .material-symbols-outlined { font-size:19px; }
 .admin-list-panel .workspace-filters { padding:0 24px 24px; margin:0; gap:10px; }.admin-list-panel .workspace-filters label { font-size:11px; gap:6px; }.admin-list-panel .workspace-filters input { width:100%; }.admin-list-panel .workspace-filters select { min-width:120px; }.admin-list-panel .workspace-filters :is(input,select) { background:var(--am-surface); border-radius:9px; font-size:12px; }
-.admin-search-button { display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:12px!important; }.admin-search-button .material-symbols-outlined{font-size:19px}
+.admin-search-input-wrap { position:relative; display:flex; align-items:center; width:100%; }
+.admin-search-input-wrap input { padding-right:44px!important; }
+.admin-search-button { position:absolute; right:4px; top:4px; bottom:4px; width:36px; min-width:36px!important; min-height:36px!important; height:36px; padding:0!important; border:0!important; border-radius:7px!important; background:transparent!important; color:var(--am-on-surface-variant)!important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s,color .15s; }
+.admin-search-button:hover:not(:disabled) { background:var(--am-surface-container-high)!important; color:var(--am-secondary)!important; }
+.admin-search-button .material-symbols-outlined { font-size:19px; }
 .admin-column-head,.admin-list-panel .workspace-row { display:grid; grid-template-columns:minmax(0,1fr) 100px 200px; gap:16px; padding:16px 24px; align-items:center; }
 .admin-column-head { padding-top:10px; padding-bottom:10px; background:var(--am-surface-container-low); border-top:1px solid var(--am-outline-variant); border-bottom:1px solid var(--am-outline-variant); color:var(--am-on-surface-variant); font:600 10px/20px Inter,sans-serif; }
 .admin-column-head>span:last-child { text-align:right; }

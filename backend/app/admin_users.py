@@ -1,4 +1,5 @@
 """Admin-only account lifecycle; serialize role mutations before actor/target user locks."""
+from datetime import datetime, timedelta
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -133,7 +134,8 @@ def list_users(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1
                 UserRole.user_id.in_(roles)).order_by(Role.code)):
             roles[user_id].append(code)
     return AdminUserPage(items=[UserPrivate(id=user.id, username=user.username, email=user.email,
-        display_name=profile.display_name, status=user.status, roles=roles[user.id]) for user, profile in rows], pagination=pagination)
+        display_name=profile.display_name, status=user.status, roles=roles[user.id],
+        deleted_at=user.deleted_at) for user, profile in rows], pagination=pagination)
 
 
 @router.post("", status_code=201, response_model=UserPrivate, operation_id="adminCreateUser", responses=ERRORS,
@@ -202,6 +204,25 @@ def delete_user(user_id: UUID, request: Request, response: Response,
     reverse_user(account.db, user.id, now)
     audit_user(account, user, "user.delete", before, now)
     if user.id == account.user.id: delete_cookie(response, request.app.state.auth, "am_session")
+
+
+@router.post("/{user_id}/restore", response_model=UserPrivate, operation_id="adminRestoreUser",
+             responses=ERRORS | NOT_FOUND, openapi_extra=CSRF_HEADER)
+def restore_user(user_id: UUID, request: Request,
+                 account=Depends(require_admin_mutation, scope="function")):
+    user = account.db.scalar(select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True))
+    if user is None:
+        raise AuthError(404, "NOT_FOUND", "User not found.")
+    if user.status != "deleted" or user.deleted_at is None:
+        raise AuthError(409, "CONFLICT", "Account is not in deleted state.")
+    now = request.app.state.auth.now()
+    if now - user.deleted_at > timedelta(days=30):
+        raise AuthError(409, "RESTORE_WINDOW_EXPIRED", "The 30-day account restoration window has expired.")
+    before = user_state(account.db, user)
+    user.status, user.deleted_at, user.updated_at = "active", None, now
+    flush_identity(account.db)
+    audit_user(account, user, "user.restore", before, now)
+    return user_private(account.db, user)
 
 
 @router.put("/{user_id}/roles", response_model=UserPrivate, operation_id="adminSetUserRoles",

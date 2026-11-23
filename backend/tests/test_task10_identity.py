@@ -401,4 +401,92 @@ def test_register_input_strict_validation_matrix():
             RegisterInput(**(valid_base | extra_field))
 
 
+def test_admin_user_restore_30_day_window():
+    from app.admin_users import restore_user
+    from app.models import Profile
+
+    now = datetime(2026, 11, 23, 12, 0, 0, tzinfo=timezone.utc)
+    user_id = uuid4()
+
+    # 1. Within 30 days (e.g. 15 days ago) -> restores to active, clears deleted_at, logs user.restore
+    deleted_user = SimpleNamespace(
+        id=user_id,
+        username="deleted_cultivator",
+        email="deleted@example.com",
+        status="deleted",
+        deleted_at=now - timedelta(days=15),
+        updated_at=now - timedelta(days=15),
+    )
+    fake_profile = SimpleNamespace(display_name="Deleted Cultivator")
+    audits = []
+
+    class FakeScalars(list):
+        def all(self):
+            return list(self)
+
+    class FakeDb:
+        def scalar(self, stmt):
+            return deleted_user
+
+        def scalars(self, stmt):
+            return FakeScalars(["USER"])
+
+        def get(self, model, pk):
+            if model is Profile and pk == user_id:
+                return fake_profile
+            return None
+
+        def add(self, obj):
+            audits.append(obj)
+
+        def flush(self):
+            pass
+
+    req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(auth=SimpleNamespace(now=lambda: now))))
+    account = SimpleNamespace(db=FakeDb(), user=SimpleNamespace(id=uuid4()))
+
+    res = restore_user(user_id, req, account=account)
+    assert res.status == "active"
+    assert deleted_user.status == "active"
+    assert deleted_user.deleted_at is None
+    assert len(audits) == 1
+    assert audits[0].action == "user.restore"
+
+    # 2. Expired window (> 30 days, e.g. 31 days ago) -> raises 409 RESTORE_WINDOW_EXPIRED
+    expired_user = SimpleNamespace(
+        id=user_id,
+        username="expired_cultivator",
+        email="expired@example.com",
+        status="deleted",
+        deleted_at=now - timedelta(days=31),
+        updated_at=now - timedelta(days=31),
+    )
+    account_exp = SimpleNamespace(
+        db=SimpleNamespace(scalar=lambda stmt: expired_user),
+        user=SimpleNamespace(id=uuid4()),
+    )
+    with pytest.raises(AuthError) as exp_exc:
+        restore_user(user_id, req, account=account_exp)
+    assert exp_exc.value.status == 409
+    assert exp_exc.value.code == "RESTORE_WINDOW_EXPIRED"
+
+    # 3. Non-deleted user -> raises 409 CONFLICT
+    active_user = SimpleNamespace(
+        id=user_id,
+        username="active_cultivator",
+        email="active@example.com",
+        status="active",
+        deleted_at=None,
+    )
+    account_act = SimpleNamespace(
+        db=SimpleNamespace(scalar=lambda stmt: active_user),
+        user=SimpleNamespace(id=uuid4()),
+    )
+    with pytest.raises(AuthError) as act_exc:
+        restore_user(user_id, req, account=account_act)
+    assert act_exc.value.status == 409
+    assert act_exc.value.code == "CONFLICT"
+
+
+
 
