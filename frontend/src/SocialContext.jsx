@@ -63,12 +63,17 @@ export function SocialProvider({children}) {
     }catch(e){if(active.current&&token===generation.current){setError(e.message);setReady(true);if(e.status===401)auth.refresh().catch(()=>{});}throw e;}
     finally{if(active.current&&token===generation.current)setLoading(false)}
   };
-  const loadComments=async(postId,append=false)=>{
+  const loadComments=async(postId,append=false,pages=1)=>{
     if(MOCK_AUTH)return;
     apiId(postId);const next=append?(commentPages[postId]?.page||1)+1:1;
     try{
-      const result=apiPage(await auth.read('/posts/'+postId+'/comments?page_size=10&page='+next));
-      const mapped=result.items.map(apiComment);
+      let result;
+      const mapped=[];
+      for(let page=next;page<next+pages;page++){
+        result=apiPage(await auth.read('/posts/'+postId+'/comments?page_size=10&page='+page));
+        mapped.push(...result.items.map(apiComment));
+        if(page>=result.pagination.total_pages)break;
+      }
       const values=await Promise.all(mapped.map(async row=>{
         try{return [row.id,apiInteractions(await auth.read('/comments/'+row.id+'/interactions'),row.id,'comment')]}catch(e){if(e.status===404)return null;throw e;}
       }));
@@ -77,7 +82,7 @@ export function SocialProvider({children}) {
       setSnapshot(v=>({...v,state:{...v.state,api:true,comments:[...new Map([...v.state.comments.filter(c=>append||c.postId!==postId),...mapped.filter(c=>interactions[c.id])].map(c=>[c.id,c])).values()],
         apiInteractions:{...v.state.apiInteractions,comment:{...v.state.apiInteractions?.comment,...interactions}}}}));
       setCommentPages(v=>({...v,[postId]:result.pagination}));
-    }catch(e){setError(e.message);if(e.status===401)auth.refresh().catch(()=>{});throw e;}
+    }catch(e){if(e.status===401)auth.refresh().catch(()=>{});throw e;}
   };
   const apiCommit=async(action,file)=>{
     if(!readDemoUser())throw Error('LOGIN_REQUIRED');
@@ -119,7 +124,19 @@ export function SocialProvider({children}) {
     try{
       if(['comment','delete-comment','moderate-comment'].includes(action.type)){
         const postId=action.postId||snapshot.state.comments.find(c=>c.id===action.id)?.postId;
-        if(postId){await loadComments(postId);await readInteraction('post',postId);}
+        if(postId){
+          const loaded=commentPages[postId];
+          const pages=action.type==='comment'
+            ? Math.max(loaded?.page||1,Math.ceil(((loaded?.total||0)+1)/10))
+            : loaded?.page||1;
+          setCommentPages(previous=>{
+            const next={...previous};
+            delete next[postId];
+            return next;
+          });
+          await loadComments(postId,false,pages);
+          await readInteraction('post',postId);
+        }
       }else{await loadCategories();await loadFeed();}
     }catch{setError('Đã lưu thay đổi, nhưng chưa đồng bộ được dữ liệu hiển thị. Vui lòng tải lại.');}
     return result;
