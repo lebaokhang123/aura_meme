@@ -90,7 +90,7 @@ export default function VaultPage() {
     return () => { active = false; channel?.close(); window.removeEventListener('aurameme-equipment-changed', changed); window.removeEventListener('focus', refreshEquipment); };
   }, [owner]);
   useEffect(() => {
-    setCollection(null); setLoadError('');
+    setLoadError('');
     if (!owner) return;
     let active = true; setLoading(true);
     const params = new URLSearchParams({ kind, page: String(page), page_size: '15' });

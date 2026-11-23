@@ -45,6 +45,20 @@ class UserPublic(BaseModel):
 
 class PublicProfile(UserPublic):
     equipped_background_effect: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    follower_count: int = Field(default=0, ge=0)
+    is_following: bool = False
+
+
+class SearchPagination(BaseModel):
+    page: int = Field(ge=1)
+    page_size: int = Field(ge=1)
+    total: int = Field(ge=0)
+    total_pages: int = Field(ge=0)
+
+
+class PublicUserSearchPage(BaseModel):
+    items: list[UserPublic]
+    pagination: SearchPagination
 
 
 

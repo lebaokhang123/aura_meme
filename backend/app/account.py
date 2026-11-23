@@ -1,8 +1,8 @@
 """Account profile and password APIs; schema and admin CRUD are outside M2.2."""
-from fastapi import APIRouter, Depends, Path, Request
-from sqlalchemy import select, update
+from fastapi import APIRouter, Depends, Path, Query, Request
+from sqlalchemy import case, or_, select, update
 
-from app.account_schemas import AccountPrivate, PasswordChange, ProfilePatch, PublicProfile
+from app.account_schemas import AccountPrivate, PasswordChange, ProfilePatch, PublicProfile, PublicUserSearchPage, SearchPagination, UserPublic
 from app.auth import CSRF_HEADER, ERRORS, user_private
 from app.auth_schemas import ErrorResponse
 from app.models import AuthSession, Profile, User
@@ -58,6 +58,67 @@ def change_password(payload: PasswordChange, request: Request, account=Depends(r
     account.db.execute(update(AuthSession).where(
         AuthSession.user_id == account.user.id, AuthSession.id != account.session.id,
         AuthSession.revoked_at.is_(None)).values(revoked_at=runtime.now()))
+
+
+@router.get("", response_model=PublicUserSearchPage, operation_id="searchUsersRoot",
+            responses={status: {"model": ErrorResponse} for status in (422, 429, 500)})
+@router.get("/search", response_model=PublicUserSearchPage, operation_id="searchPublicUsers",
+            responses={status: {"model": ErrorResponse} for status in (422, 429, 500)})
+def search_public_users(request: Request, q: str | None = Query(None, max_length=100),
+                        search: str | None = Query(None, max_length=100),
+                        page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=50)):
+    query_str = q if q is not None else search
+    if query_str is not None and "\x00" in query_str:
+        raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
+    clean_q = (query_str or "").strip()
+    from app.blog_schemas import Pagination
+    if not clean_q:
+        return PublicUserSearchPage(items=[], pagination=Pagination(page=page, page_size=page_size, total=0, total_pages=0))
+
+    username_query = clean_q.lstrip("@").lower()
+    from app.blog import search_text, searchable, page_rows
+    from app.aura_runtime import public_is_admin_column, public_level_column
+    from app.membership import read_users_membership_tiers
+
+    now = request.app.state.auth.now()
+    term = search_text(clean_q)
+
+    with request.app.state.auth_session_factory() as db:
+        statement = (
+            select(User, Profile, public_level_column(now), public_is_admin_column())
+            .join(Profile, Profile.user_id == User.id)
+            .where(
+                User.status == "active",
+                or_(
+                    User.username.contains(username_query),
+                    searchable(Profile.display_name).contains(term, autoescape=True),
+                ),
+            )
+            .order_by(
+                case((User.username == username_query, 1), else_=2),
+                User.created_at.desc(),
+                User.id.desc(),
+            )
+        )
+        rows, pagination = page_rows(db, statement, page, page_size)
+        user_ids = {u.id for u, p, lvl, adm in rows}
+        tiers = read_users_membership_tiers(db, user_ids, now) if user_ids else {}
+
+        items = [
+            UserPublic(
+                id=u.id,
+                username=u.username,
+                display_name=p.display_name,
+                created_at=u.created_at,
+                bio=p.bio,
+                avatar_url=p.avatar_url,
+                level=lvl,
+                membership_tier=tiers.get(u.id, "free"),
+                is_admin_title=bool(adm),
+            )
+            for u, p, lvl, adm in rows
+        ]
+        return PublicUserSearchPage(items=items, pagination=SearchPagination(**pagination.model_dump()))
 
 
 @router.get("/{username}", response_model=PublicProfile, operation_id="getPublicUser",

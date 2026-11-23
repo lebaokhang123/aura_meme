@@ -123,15 +123,15 @@ class AuthBoundaryMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or not scope["path"].startswith(("/api/v1/auth/", "/api/v1/users/", "/api/v1/posts", "/api/v1/categories", "/api/v1/admin/", "/api/v1/contact", "/api/v1/media", "/api/v1/comments/", "/api/v1/aura/", "/api/v1/leaderboard", "/api/v1/inventory/", "/api/v1/catalog/", "/api/v1/vault/", "/api/v1/notifications")):
+        if scope["type"] != "http" or not scope["path"].startswith(("/api/v1/auth/", "/api/v1/users", "/api/v1/posts", "/api/v1/categories", "/api/v1/admin/", "/api/v1/contact", "/api/v1/media", "/api/v1/comments/", "/api/v1/aura/", "/api/v1/leaderboard", "/api/v1/inventory/", "/api/v1/catalog/", "/api/v1/vault/", "/api/v1/notifications")):
             return await self.app(scope, receive, send)
         runtime = scope["app"].state.auth
         try:
             if runtime.secure and scope["scheme"] != "https":
                 raise AuthError(403, "FORBIDDEN", "Authentication requires HTTPS.")
             peer = scope.get("client", ("unknown",))[0]
-            runtime.limiter.check("ip:" + peer, 120, 60)
-            limit = {"register": 5, "login": 10, "contact": 5}.get(scope["path"].rsplit("/", 1)[-1], 60)
+            runtime.limiter.check("ip:" + peer, 600, 60)
+            limit = {"register": 5, "login": 10, "contact": 5, "forgot-password": 5, "reset-password": 5}.get(scope["path"].rsplit("/", 1)[-1], 300)
             runtime.limiter.check(scope["path"] + ":" + peer, limit, 60)
             if scope["path"] == "/api/v1/media" and scope["method"] == "POST":
                 from app.media import MAX_REQUEST_BYTES
