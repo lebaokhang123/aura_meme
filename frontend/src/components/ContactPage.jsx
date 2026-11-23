@@ -6,6 +6,17 @@ import {icon} from './social-ui.jsx';
 import {GithubIcon} from './SiteShell.jsx';
 import '../contact-page.css';
 
+function GmailIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" style={{display:'block'}}>
+      <path fill="#EA4335" d="M12 12.713L2.4 5.51c.36-.316.837-.51 1.358-.51h16.484c.52 0 .997.194 1.358.51L12 12.713z"/>
+      <path fill="#4285F4" d="M22 6.55v11.45c0 .828-.672 1.5-1.5 1.5H19v-9.45l3-2.5z"/>
+      <path fill="#FBBC05" d="M2 6.55l3 2.5V19.5H3.5c-.828 0-1.5-.672-1.5-1.5V6.55z"/>
+      <path fill="#34A853" d="M5 19.5h14v-8.5l-7 5.25-7-5.25z"/>
+    </svg>
+  );
+}
+
 export function ContactPage() {
   const {language} = usePreferences();
   const t = (vi, en) => language === 'en' ? en : vi;
@@ -74,7 +85,10 @@ export function ContactPage() {
         {error && <p className="am-contact-error" role="alert">{errorText}</p>}
         <div className="am-contact-actions">
           <button type="submit" className="am-contact-submit" disabled={busy || !identityReady}><span>{busy ? t('Đang gửi...', 'Sending...') : t('Gửi tin nhắn ngay', 'Send message')}</span>{icon('send')}</button>
-          <div className="am-contact-channels"><a href="https://github.com/lebaokhang123/aura_meme" target="_blank" rel="noopener noreferrer" aria-label="GitHub AuraMeme" title="GitHub"><GithubIcon/></a></div>
+          <div className="am-contact-channels">
+            <a href="https://github.com/lebaokhang123/aura_meme" target="_blank" rel="noopener noreferrer" aria-label="GitHub AuraMeme" title="GitHub"><GithubIcon/></a>
+            <a href="mailto:thothayvtv38@gmail.com" className="am-contact-gmail-link" style={{border:'none'}} aria-label="Gmail: thothayvtv38@gmail.com" title="thothayvtv38@gmail.com"><GmailIcon/></a>
+          </div>
         </div>
         {sent && <div role="status" className="am-contact-success">{icon('task_alt')}<p>{t('Đã gửi tin nhắn tới ban quản trị.', 'Message sent to the administrators.')}</p></div>}
       </form>

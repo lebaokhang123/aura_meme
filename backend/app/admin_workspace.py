@@ -479,7 +479,7 @@ async def admin_upload_assets(request: Request, account=Depends(require_admin_mu
     for base_name, _, _, _, _, _, digest_hex, _ in extracted:
         existing_id = db.scalar(select(AssetItem.id).where(AssetItem.source_rights['sha256'].astext == digest_hex))
         if existing_id is not None:
-            raise AuthError(409, 'DUPLICATE_IMAGE_HASH', f'Ảnh "{base_name}" đã tồn tại trong danh mục Bảo Khố (trùng mã băm SHA-256).')
+            raise AuthError(409, 'DUPLICATE_IMAGE_HASH', f'Ảnh "{base_name}" đã tồn tại trong danh mục Bảo Khố.')
 
     root = CatalogSettings().catalog_storage_root
     root.mkdir(parents=True, exist_ok=True)
@@ -845,7 +845,7 @@ def admin_read_order_receipt_pdf(
         import fitz
         doc = fitz.open(stream=pdf_bytes, filetype='pdf')
         page = doc.load_page(0)
-        pix = page.get_pixmap(dpi=150)
+        pix = page.get_pixmap(dpi=180)
         png_bytes = pix.tobytes('png')
         return Response(
             content=png_bytes,

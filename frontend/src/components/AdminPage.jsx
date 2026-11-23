@@ -271,7 +271,7 @@ export default function AdminPage(){
    {data&&<nav className="workspace-pagination" aria-label={t('Phân trang quản trị','Admin pagination')}><button type="button" disabled={loading||page<=1} onClick={()=>setPage(n=>n-1)}>{t('Trước','Previous')}</button><span>{(()=>{const fromIndex=data.pagination.total===0?0:(page-1)*data.pagination.page_size+1;const toIndex=Math.min(page*data.pagination.page_size,data.pagination.total);return t(`Tổng cộng: ${data.pagination.total} mục · Đang hiển thị ${fromIndex}–${toIndex} · Trang ${page}/${Math.max(1,data.pagination.total_pages)}`,`Total: ${data.pagination.total} records · Showing ${fromIndex}–${toIndex} · Page ${page}/${Math.max(1,data.pagination.total_pages)}`);})()}</span><button type="button" disabled={loading||page>=data.pagination.total_pages} onClick={()=>setPage(n=>n+1)}>{t('Sau','Next')}</button></nav>}
   </section>
   </div>
-  <dialog ref={dialog} className={`workspace-dialog ${edit?.type==='receipt-preview'?'admin-receipt-dialog':''}`} aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='receipt-preview'?t('Biên lai thu tiền điện tử','Electronic payment receipt'):edit.type==='announcement-preview'?t('Chi tiết thông báo hệ thống','Announcement details'):edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='asset-preview'?t('Chi tiết & Xem trước vật phẩm','Asset details & preview'):edit.type==='asset-edit'?t('Chỉnh sửa vật phẩm','Edit asset'):edit.type==='asset-upload'?t('Thêm vật phẩm Meme vào Bảo Khố','Upload Meme asset to Vault'):edit.type==='announcement'?t('Soạn thông báo hệ thống','Compose system announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Chi tiết & Xử lý liên hệ','Contact details & processing'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>
+  <dialog ref={dialog} className={`workspace-dialog ${edit?.type==='receipt-preview'?'admin-receipt-dialog':''}`} aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='receipt-preview'?t('Biên lai thu tiền điện tử','Electronic payment receipt'):edit.type==='announcement-preview'?t('Chi tiết thông báo hệ thống','Announcement details'):edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='asset-preview'?t('Chi tiết & Xem trước vật phẩm','Asset details & preview'):edit.type==='asset-edit'?t('Chỉnh sửa vật phẩm','Edit asset'):edit.type==='asset-upload'?t('Thêm Meme vào Bảo Khố','Add Meme to Vault'):edit.type==='announcement'?t('Soạn thông báo hệ thống','Compose system announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Chi tiết & Xử lý liên hệ','Contact details & processing'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>
    {edit.type==='asset-preview'&&<div className="admin-asset-preview-modal">
       <div className="admin-content-preview-header">
         <div className="admin-content-preview-meta">
@@ -370,8 +370,8 @@ export default function AdminPage(){
           <span>{t('Tải PDF chính thức','Download Official PDF')}</span>
         </a>
       </div>
-      <div className="admin-receipt-frame-wrap" style={{overflowY:'auto',display:'flex',justifyContent:'center',background:'#0d0e15',padding:'16px'}}>
-        <img src={`/api/v1/admin/orders/${edit.row.id}/receipt.pdf?format=png`} alt={t('Xem trước file PDF biên lai','Electronic PDF Receipt Preview')} style={{maxWidth:'100%',height:'auto',borderRadius:'6px',boxShadow:'0 8px 30px rgba(0,0,0,0.5)'}}/>
+      <div className="admin-receipt-frame-wrap">
+        <img src={`/api/v1/admin/orders/${edit.row.id}/receipt.pdf?format=png`} alt={t('Xem trước file PDF biên lai','Electronic PDF Receipt Preview')} className="admin-receipt-preview-img"/>
       </div>
    </div>}
    {edit.type==='asset-upload'&&<div className="admin-asset-upload-modal">
@@ -507,7 +507,7 @@ export default function AdminPage(){
               <button type="submit" className="workspace-primary" disabled={busy||!edit.title.trim()||!edit.body.trim()}>{busy?t('Đang phát…','Broadcasting…'):t('Phát thông báo','Broadcast')}</button>
             </>
           ):(
-            <button type="submit" className="workspace-primary" disabled={busy}>{busy?t('Đang lưu…','Saving…'):edit.type==='contact'?t('Lưu trạng thái','Save status'):edit.type==='asset-upload'?t('Tải lên hàng chờ duyệt','Upload to Pending'):t('Xác nhận','Confirm')}</button>
+            <button type="submit" className="workspace-primary" disabled={busy}>{busy?t('Đang lưu…','Saving…'):edit.type==='contact'?t('Lưu trạng thái','Save status'):edit.type==='asset-upload'?t('Tải lên','Upload'):t('Xác nhận','Confirm')}</button>
           )}
         </>
       )}

@@ -101,7 +101,7 @@ export function authMessage(error,language='vi'){
     INVALID_FILENAME_DATE:['Phần ngày tháng <ddmmyy> trong tên file không hợp lệ (ví dụ: 231126).','The <ddmmyy> date part in the filename is invalid (e.g. 231126).'],
     INVALID_FILENAME_SEQUENCE:['Phần số thứ tự <stt> trong tên file không hợp lệ (ví dụ: 01).','The <stt> sequence number in the filename is invalid (e.g. 01).'],
     UNSUPPORTED_FILE_TYPE:['Định dạng file không được hỗ trợ. Chỉ chấp nhận .jpg, .png hoặc .zip chứa .jpg/.png.','Unsupported file format. Only .jpg, .png or .zip containing .jpg/.png are allowed.'],
-    DUPLICATE_IMAGE_HASH:['Ảnh Meme này đã tồn tại trong danh mục (trùng mã băm SHA-256).','This Meme image already exists in the catalog (duplicate SHA-256 hash).'],
+    DUPLICATE_IMAGE_HASH:['Ảnh Meme này đã tồn tại trong danh mục.','This Meme image already exists in the catalog.'],
     DUPLICATE_FILE_IN_BATCH:['Trùng tên file trong cùng gói ZIP tải lên.','Duplicate filename inside the uploaded ZIP archive.'],
     ZIP_PATH_TRAVERSAL:['Phát hiện đường dẫn không an toàn trong gói ZIP.','Unsafe file path detected inside the ZIP archive.'],
     NESTED_ZIP_FORBIDDEN:['Không cho phép gói ZIP lồng nhau.','Nested ZIP archives are not permitted.'],
