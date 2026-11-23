@@ -138,7 +138,7 @@ export function CommentSection({postId,active=true}) {
       </div>
     </form>
     <SocialMessage error={error}/>
-    {readError&&<div role="alert">Không tải được bình luận. <button type="button" onClick={()=>readPage(Boolean(commentPages[postId]))}>Thử lại</button></div>}
+    {readError&&<div role="alert"><SocialMessage error={readError} read/><button type="button" onClick={()=>readPage(Boolean(commentPages[postId]))}>Thử lại</button></div>}
     {commentsFor(state,postId).map(comment=><CommentRow key={comment.id} comment={comment}/>)}{!MOCK_AUTH&&commentPages[postId]?.page<commentPages[postId]?.total_pages&&<button type="button" disabled={busy} onClick={async()=>{setBusy(true);try{await readPage(true)}finally{setBusy(false)}}}>Xem thêm bình luận</button>}
   </div>);
 }
