@@ -1,11 +1,12 @@
 """Account profile and password APIs; schema and admin CRUD are outside M2.2."""
+from uuid import uuid4
 from fastapi import APIRouter, Depends, Path, Query, Request
-from sqlalchemy import case, or_, select, update
+from sqlalchemy import case, delete, exists, func, or_, select, update
 
-from app.account_schemas import AccountPrivate, PasswordChange, ProfilePatch, PublicProfile, PublicUserSearchPage, SearchPagination, UserPublic
-from app.auth import CSRF_HEADER, ERRORS, user_private
+from app.account_schemas import AccountPrivate, FollowResult, PasswordChange, ProfilePatch, PublicProfile, PublicUserSearchPage, SearchPagination, UserPublic
+from app.auth import CSRF_HEADER, ERRORS, session_cookie, user_private
 from app.auth_schemas import ErrorResponse
-from app.models import AuthSession, Profile, User
+from app.models import AuthSession, Profile, User, UserFollow
 from app.permissions import require_account_csrf, require_authenticated_user
 from app.security import AuthError
 from app.media import media_url
@@ -123,7 +124,8 @@ def search_public_users(request: Request, q: str | None = Query(None, max_length
 
 @router.get("/{username}", response_model=PublicProfile, operation_id="getPublicUser",
             responses={status: {"model": ErrorResponse} for status in (404, 422, 429, 500)})
-def get_public_user(request: Request, username: str = Path(min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$")):
+def get_public_user(request: Request, username: str = Path(min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$"),
+                    raw: str | None = Depends(session_cookie)):
     with request.app.state.auth_session_factory() as db:
         from app.aura_runtime import public_is_admin_column, public_level_column
         row = db.execute(select(User, Profile, public_level_column(request.app.state.auth.now()), public_is_admin_column()).join(
@@ -158,7 +160,126 @@ def get_public_user(request: Request, username: str = Path(min_length=3, max_len
                 reviewed_source_rights_sql(AssetItem.source_rights),
             )
         )
+
+        follower_count = int(db.scalar(
+            select(func.count(UserFollow.follower_id)).where(UserFollow.followee_id == user.id)
+        ) or 0)
+
+        viewer_id = None
+        if raw:
+            try:
+                from app.auth import current_session
+                sess_record = current_session(db, request.app.state.auth, raw)
+                viewer_id = sess_record.user_id
+            except Exception:
+                viewer_id = None
+
+        is_following = bool(
+            db.scalar(
+                select(
+                    exists().where(
+                        UserFollow.follower_id == viewer_id,
+                        UserFollow.followee_id == user.id,
+                    )
+                )
+            )
+        ) if viewer_id else False
+
         return PublicProfile(id=user.id, username=user.username, display_name=profile.display_name,
                           created_at=user.created_at, bio=profile.bio, avatar_url=profile.avatar_url,
                           level=level, membership_tier=membership_tier, is_admin_title=bool(is_admin),
-                          equipped_background_effect=bg_effect)
+                          equipped_background_effect=bg_effect,
+                          follower_count=follower_count, is_following=is_following)
+
+
+@router.post("/{username}/follow", response_model=FollowResult, operation_id="followUser",
+             responses=ERRORS | {404: {"model": ErrorResponse}}, openapi_extra=CSRF_HEADER)
+def follow_user(request: Request, username: str = Path(min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$"),
+                account=Depends(require_account_csrf)):
+    now = request.app.state.auth.now()
+    db = account.db
+    target_user = db.scalar(
+        select(User).where(User.username == username, User.status == "active").with_for_update()
+    )
+    if target_user is None:
+        raise AuthError(404, "NOT_FOUND", "User not found.")
+    if target_user.id == account.user.id:
+        raise AuthError(400, "INVALID_ACTION", "You cannot follow yourself.")
+
+    # Idempotent follow insertion
+    existing = db.scalar(
+        select(UserFollow).where(
+            UserFollow.follower_id == account.user.id,
+            UserFollow.followee_id == target_user.id,
+        ).with_for_update()
+    )
+    if existing is None:
+        db.add(UserFollow(follower_id=account.user.id, followee_id=target_user.id, created_at=now))
+        db.flush()
+
+        # Award +10 EXP to target_user once in history (anti-farm)
+        event_key = f"follow-v1:{account.user.id}"
+        from app.models import AuraLedger, RewardPolicyVersion
+        already_rewarded = db.scalar(
+            select(AuraLedger.id).where(
+                AuraLedger.user_id == target_user.id,
+                AuraLedger.event_key == event_key,
+            )
+        )
+        if already_rewarded is None:
+            policy = db.scalar(
+                select(RewardPolicyVersion)
+                .where(RewardPolicyVersion.status == "published", RewardPolicyVersion.effective_at <= now)
+                .order_by(RewardPolicyVersion.effective_at.desc())
+            )
+            if policy is not None:
+                from app.aura_runtime import _state, _updated
+                state = _state(db, target_user.id, now, initialize=True, locked=True)
+                db.add(AuraLedger(
+                    id=uuid4(),
+                    user_id=target_user.id,
+                    event_key=event_key,
+                    event_type="adjustment",
+                    source_actor_id=account.user.id,
+                    source_post_id=None,
+                    source_comment_id=None,
+                    policy_id=policy.id,
+                    base_xp=10,
+                    bonus_xp=0,
+                    tier_at_event="FREE",
+                    multiplier_at_event=1,
+                    reverses_id=None,
+                    occurred_at=now,
+                ))
+                db.flush()
+                _updated(db, state, 10, 0, now)
+
+    count = int(db.scalar(
+        select(func.count(UserFollow.follower_id)).where(UserFollow.followee_id == target_user.id)
+    ) or 0)
+    return FollowResult(follower_count=count, is_following=True)
+
+
+@router.delete("/{username}/follow", response_model=FollowResult, operation_id="unfollowUser",
+               responses=ERRORS | {404: {"model": ErrorResponse}}, openapi_extra=CSRF_HEADER)
+def unfollow_user(request: Request, username: str = Path(min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$"),
+                  account=Depends(require_account_csrf)):
+    db = account.db
+    target_user = db.scalar(
+        select(User).where(User.username == username, User.status == "active").with_for_update()
+    )
+    if target_user is None:
+        raise AuthError(404, "NOT_FOUND", "User not found.")
+
+    db.execute(
+        delete(UserFollow).where(
+            UserFollow.follower_id == account.user.id,
+            UserFollow.followee_id == target_user.id,
+        )
+    )
+    db.flush()
+
+    count = int(db.scalar(
+        select(func.count(UserFollow.follower_id)).where(UserFollow.followee_id == target_user.id)
+    ) or 0)
+    return FollowResult(follower_count=count, is_following=False)

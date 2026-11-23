@@ -669,13 +669,25 @@ class AccountVerification(Base):
     )
 
 
+class UserFollow(Base):
+    __tablename__ = "user_follows"
+    follower_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    followee_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("follower_id != followee_id", name="ck_user_follows_no_self"),
+        Index("ix_user_follows_followee_id", "followee_id"),
+    )
+
+
 def reviewed_metadata(revision):
     """Exact reviewed predecessor shapes; never mutate mapped runtime metadata."""
     if revision not in {'0009_vault_open','0010_social_reactions','0011_vault_v1','0012_aura_v1'}:
         raise ValueError('Unknown reviewed schema revision')
     metadata = MetaData(naming_convention=Base.metadata.naming_convention)
     for table in Base.metadata.sorted_tables:
-        if table.name in {'notifications', 'subscription_orders', 'user_subscriptions', 'user_oauth_identities', 'password_reset_tokens', 'account_verifications'}:
+        if table.name in {'notifications', 'subscription_orders', 'user_subscriptions', 'user_oauth_identities', 'password_reset_tokens', 'account_verifications', 'user_follows'}:
             continue
         if revision != '0012_aura_v1' and table.name == 'aura_reward_events':
             continue

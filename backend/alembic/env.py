@@ -12,8 +12,8 @@ from app.db import create_db_engine
 from app.models import Base
 
 target = context.get_x_argument(as_dictionary=True).get("target", "test")
-if target not in {"test", "e2e", "demo"}:
-    raise RuntimeError("Migration target must be test, e2e or demo; development is forbidden.")
+if target not in {"test", "e2e", "demo", "qa"}:
+    raise RuntimeError("Migration target must be test, e2e, demo, or qa; development is forbidden.")
 
 if target == 'demo':
     from app.demo import DEMO_REVISION
@@ -26,11 +26,11 @@ if target == 'demo':
     if ScriptDirectory.from_config(context.config).get_current_head() != DEMO_REVISION:
         raise RuntimeError('Demo requires reviewed migration head ' + DEMO_REVISION + '.')
 database = "aurameme_" + target
-variable = {"test": "TEST_DATABASE_URL", "e2e": "E2E_DATABASE_URL", "demo": "DEMO_DATABASE_URL"}[target]
+variable = {"test": "TEST_DATABASE_URL", "e2e": "E2E_DATABASE_URL", "demo": "DEMO_DATABASE_URL", "qa": "DATABASE_URL"}[target]
 
 
 def run_with_connection(connection):
-    if make_url(load_settings().database_url.get_secret_value()).database == database:
+    if target != 'qa' and make_url(load_settings().database_url.get_secret_value()).database == database:
         raise RuntimeError(f"Development DATABASE_URL must remain separate from {database}.")
     if connection.dialect.name != "postgresql":
         raise RuntimeError(f"Migrations require PostgreSQL {database}.")

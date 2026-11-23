@@ -924,3 +924,20 @@ Table account_verifications {
   Note: 'Task 10 | Xác minh tài khoản email qua Gmail SMTP trước khi kích hoạt'
 }
 
+Table user_follows {
+  follower_id uuid [not null]
+  followee_id uuid [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (follower_id, followee_id) [pk]
+    followee_id
+  }
+
+  Note: 'Checkpoint B | Quan hệ theo dõi người dùng và thưởng EXP'
+}
+
+Ref: user_follows.follower_id > users.id [delete: cascade]
+Ref: user_follows.followee_id > users.id [delete: cascade]
+
+

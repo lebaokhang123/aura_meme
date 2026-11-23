@@ -37,3 +37,45 @@
 .am-profile-background-mini[data-effect="lucian-352-deep-sea"]{background:repeating-radial-gradient(ellipse at 30% 85%,#0b263b,#103452 8px,#071726 18px)}
 .am-profile-background-mini[data-effect="lucian-226"]{background-image:linear-gradient(120deg,transparent 40%,#9f66ff88,transparent 60%),linear-gradient(#ffffff10 1px,transparent 1px),linear-gradient(90deg,#ffffff10 1px,transparent 1px);background-size:100% 100%,12px 12px,12px 12px}
 .am-profile-background-mini[data-effect="lucian-330"]{background-color:#050718;background-image:radial-gradient(1px 1px at 19% 33%,#fff 99%,transparent),radial-gradient(1px 1px at 73% 51%,#88e5ff 99%,transparent),radial-gradient(1px 1px at 55% 82%,#ffdcff 99%,transparent)}
+
+/* Follow button styling */
+.am-profile-follow-wrap{margin-top:14px;width:100%}
+.am-follow-btn{
+  display:flex;
+  width:100%;
+  height:36px;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  border:1px solid #00f0ff;
+  border-radius:8px;
+  background:linear-gradient(135deg,rgba(0,240,255,0.15),rgba(168,85,247,0.15));
+  color:#00f0ff;
+  font:600 13px/18px 'Plus Jakarta Sans',sans-serif;
+  letter-spacing:.02em;
+  box-shadow:0 0 12px rgba(0,240,255,0.35);
+  cursor:pointer;
+  transition:all .2s ease;
+}
+.am-follow-btn:hover:not(:disabled){
+  background:linear-gradient(135deg,rgba(0,240,255,0.25),rgba(168,85,247,0.25));
+  box-shadow:0 0 18px rgba(0,240,255,0.55);
+}
+.am-follow-btn--active{
+  border-color:var(--am-outline-variant);
+  background:var(--am-surface-container);
+  color:var(--am-on-surface-variant);
+  box-shadow:none;
+}
+.am-follow-btn--active:hover:not(:disabled){
+  border-color:#f43f5e;
+  background:rgba(244,63,94,0.12);
+  color:#f43f5e;
+  box-shadow:0 0 12px rgba(244,63,94,0.25);
+}
+.am-follow-btn .am-follow-text--hover{display:none}
+.am-follow-btn--active:hover:not(:disabled) .am-follow-text--idle{display:none}
+.am-follow-btn--active:hover:not(:disabled) .am-follow-text--hover{display:inline}
+.am-follow-btn:disabled{opacity:0.6;cursor:not-allowed}
+.am-follow-btn .am-follow-icon{font-size:18px}
+

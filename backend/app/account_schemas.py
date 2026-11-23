@@ -49,6 +49,11 @@ class PublicProfile(UserPublic):
     is_following: bool = False
 
 
+class FollowResult(BaseModel):
+    follower_count: int = Field(ge=0)
+    is_following: bool
+
+
 class SearchPagination(BaseModel):
     page: int = Field(ge=1)
     page_size: int = Field(ge=1)
