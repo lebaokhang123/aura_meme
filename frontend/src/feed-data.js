@@ -17,7 +17,7 @@ const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, ''
 export function selectPosts({ category, q, sort }, posts = POSTS) {
   const query = normalize((q || '').replace(/^[@#]+/, ''));
   const total = post => post.reactions.reduce((sum, count) => sum + count, 0);
-  return posts.filter(post => (!category || post.category === category) && normalize(`${post.title} ${post.content} ${post.authorName || ''} ${post.authorUsername || ''} ${post.category || ''}`).includes(query))
+  return posts.filter(post => (!category || post.category === category) && normalize(`${post.title} ${post.content}`).includes(query))
     .sort((a, b) => (sort === 'hot' ? total(b) - total(a) : 0) || a.ageMinutes - b.ageMinutes || a.id.localeCompare(b.id));
 }
 export function filterUrl(path, filters, hash = '') {

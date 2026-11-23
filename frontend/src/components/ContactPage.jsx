@@ -71,7 +71,7 @@ export function ContactPage() {
           <div className="am-contact-message-label"><label htmlFor="contact-message">{t('Nội dung tin nhắn', 'Message')} <span className="am-contact-required">*</span></label><span id="contact-counter">{body.length} / 4000 {t('ký tự', 'characters')}</span></div>
           <textarea id="contact-message" name="body" rows={5} required maxLength={4000} aria-describedby="contact-counter" value={body} onChange={event => setBody(event.target.value)} placeholder={t('Mô tả ngắn gọn điều bạn muốn gửi gắm tới AuraMeme (ý tưởng meme mới, lỗi font, giao diện, ý tưởng BXH...)...', 'Briefly describe what you would like to share with AuraMeme (new meme ideas, font or interface bugs, leaderboard ideas...)...')}/>
         </div>
-        <p className="am-contact-acknowledgment">{t('Tin nhắn sẽ được gửi tới ban quản trị và một email xác nhận tiếp nhận tự động sẽ được gửi về địa chỉ email tài khoản của bạn.', 'Messages are sent to administrators and an automatic confirmation email will be sent to your account email address.')}</p>
+        <p className="am-contact-acknowledgment">{t('Tin nhắn được lưu riêng, gửi tới ban quản trị và một email xác nhận tiếp nhận tự động sẽ được gửi về địa chỉ email tài khoản của bạn.', 'Messages are stored privately, sent to administrators, and an automatic confirmation email will be sent to your account email address.')}</p>
         {error && <p className="am-contact-error" role="alert">{errorText}</p>}
         <div className="am-contact-actions">
           <button type="submit" className="am-contact-submit" disabled={busy || !identityReady}><span>{busy ? t('Đang gửi...', 'Sending...') : t('Gửi tin nhắn ngay', 'Send message')}</span>{icon('send')}</button>

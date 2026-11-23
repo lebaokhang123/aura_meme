@@ -216,12 +216,12 @@ test('Vault Browser Smoke Test: 70 memes, 5 bgs, roulette, receipt, inventory pe
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/vault');
 
-  // Step 1: Check Meme tab active by default and 70 meme items present (paginated 12 per page, 6 pages)
+  // Step 1: Check Meme tab active by default and 70 meme items present (paginated 15 per page, 5 pages)
   const memeTabBtn = page.getByRole('button', { name: 'Rương Meme', exact: true });
   await expect(memeTabBtn).toHaveAttribute('aria-pressed', 'true');
   const memeCards = page.locator('.vault-item-card');
-  await expect(memeCards).toHaveCount(12);
-  await expect(page.locator('.vault-pagination')).toContainText('1 / 6');
+  await expect(memeCards).toHaveCount(15);
+  await expect(page.locator('.vault-pagination')).toContainText('1 / 5');
   await page.screenshot({ path: `${ARTIFACTS_DIR}/vault_browser_smoke_meme_tab.png` });
 
   // Step 2: Switch to Background tab and check 5 backgrounds present
@@ -245,7 +245,7 @@ test('Vault Browser Smoke Test: 70 memes, 5 bgs, roulette, receipt, inventory pe
   // Equip Background
   const equipBgBtn = receiptDialog.getByRole('button', { name: 'Trang bị Background', exact: true });
   await equipBgBtn.click();
-  await page.keyboard.press('Escape');
+  await expect(receiptDialog).toBeHidden();
 
   // Step 4: Switch back to Meme tab and open Meme chest
   await memeTabBtn.click();
@@ -259,7 +259,7 @@ test('Vault Browser Smoke Test: 70 memes, 5 bgs, roulette, receipt, inventory pe
   // Equip Avatar
   const equipAvatarBtn = memeReceiptDialog.getByRole('button', { name: 'Trang bị Avatar', exact: true });
   await equipAvatarBtn.click();
-  await page.keyboard.press('Escape');
+  await expect(memeReceiptDialog).toBeHidden();
 
   // Step 5: Reload page and verify inventory & equipment persistence
   await page.reload();
