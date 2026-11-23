@@ -14,7 +14,7 @@
 .workspace-tabs,.workspace-subtabs { display:flex; gap:8px; flex-wrap:wrap; }.workspace-tabs button[aria-current],.workspace-subtabs button[aria-pressed="true"] { background:var(--am-secondary-container); color:var(--am-on-secondary-container); border-color:var(--am-secondary-container); }
 .workspace-panel { padding:24px; border:1px solid var(--am-outline-variant); border-radius:16px; background:var(--am-surface-container-low); min-width:0; }.workspace-panel h2 { font-size:20px; }
 .workspace-panel-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:20px; }.workspace-panel-heading h2 { font-size:20px; }
-.workspace-filters { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; margin-bottom:24px; }.workspace-filters label:first-child,.workspace-filters .admin-search-field { flex:1 1 200px; display:flex; flex-direction:column; gap:6px; }
+.workspace-filters { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; margin-bottom:24px; }.workspace-filters > label:first-child,.workspace-filters > .admin-search-field { flex:1 1 200px; display:flex; flex-direction:column; gap:6px; }.admin-search-field > label { flex:0 0 auto; height:auto; }
 .workspace-filters label,.workspace-dialog label { display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--am-on-surface-variant); }
 .workspace-page :is(input,select,textarea),.workspace-dialog :is(input,select,textarea) { min-height:44px; padding:10px 12px; border:1px solid var(--am-outline-variant); border-radius:8px; background:var(--am-surface-container-lowest); color:var(--am-on-surface); max-width:100%; }
 .workspace-dialog textarea { resize:vertical; min-height:100px; font-family:inherit; line-height:1.5; }

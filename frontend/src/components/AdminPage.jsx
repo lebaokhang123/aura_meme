@@ -16,13 +16,6 @@ function BackgroundPreviewStage({effectKey,t}){
  return (
   <div ref={containerRef} className="admin-bg-preview-canvas-box" data-effect={effectKey||'violet-base'}>
    <canvas className="admin-bg-preview-canvas"/>
-   <div className="admin-bg-preview-overlay-info">
-    <div>
-     <span className="admin-bg-effect-name">{t('Hiệu ứng động: ','Live Animated Effect: ')}<code>{effectKey||'violet-base'}</code></span>
-     <p className="admin-bg-effect-sub">{t('Background hệ thống cao cấp (Chế độ chỉ xem)','Original system background (Read-only)')}</p>
-    </div>
-    <span className="workspace-badge admin-live-badge">Live Engine</span>
-   </div>
   </div>
  );
 }
@@ -345,11 +338,11 @@ export default function AdminPage(){
    </div>}
    {edit.type==='asset-edit'&&<div className="admin-asset-edit-fields">
       <label>
-        <span>{t('1. Tên file (Chỉ đọc)','1. Filename (Read-only)')}</span>
+        <span>{t('1. Tên file','1. Filename')}</span>
         <input value={edit.row.filename||edit.row.slug} readOnly disabled className="is-readonly"/>
       </label>
       <div className="admin-asset-id-field">
-        <label><span>{t('2. ID vật phẩm (Chỉ đọc)','2. Asset ID (Read-only)')}</span></label>
+        <label><span>{t('2. ID vật phẩm','2. Asset ID')}</span></label>
         <div className="admin-copy-field-wrap">
           <input value={edit.row.id} readOnly disabled className="is-readonly"/>
           <button type="button" className="admin-copy-btn" onClick={()=>copyTargetId(edit.row.id)} aria-label={t('Sao chép ID vật phẩm','Copy asset ID')} title={t('Sao chép ID vật phẩm','Copy asset ID')}>
@@ -358,11 +351,11 @@ export default function AdminPage(){
         </div>
       </div>
       <label>
-        <span>{t('3. Tên ảnh (Hiển thị)','3. Display Name')}</span>
+        <span>{t('3. Tên ảnh','3. Image name')}</span>
         <input value={edit.display_name} maxLength={80} required disabled={busy} onChange={e=>setEdit({...edit,display_name:e.target.value})}/>
       </label>
       <label>
-        <span>{t('4. Hạng vật phẩm (Rank)','4. Asset Rank')}</span>
+        <span>{t('4. Hạng vật phẩm','4. Asset rank')}</span>
         <select value={edit.rarity} disabled={busy} onChange={e=>setEdit({...edit,rarity:e.target.value})}>
           {['D','C','B','A','S'].map(r=><option key={r} value={r}>{t(`Hạng ${r}`,`Rank ${r}`)}</option>)}
         </select>
