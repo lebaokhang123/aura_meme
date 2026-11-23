@@ -119,11 +119,13 @@ test('Home expands evenly on a wide screen and ends the three-post demo without 
 });
 
 test('Contact, Rank and Vault share the supplied maintenance art and layout', async ({ page }) => {
+  await page.emulateMedia({reducedMotion:'reduce'});
   let baseline;
   for (const route of ['/contact', '/rank', '/vault']) {
     await page.goto(route, { waitUntil: 'networkidle' });
     await expect(page.locator('.maintenance-art')).toHaveAttribute('src', '/assets/brand/baotri.png');
     await expect(page.getByRole('heading', { name: 'Tính năng đang phát triển...' })).toBeVisible();
+    await page.evaluate(async()=>{await document.fonts.ready});
     const box = await page.locator('.maintenance-content').boundingBox();
     if (!baseline) baseline = box;
     expect(box).toEqual(baseline);

@@ -1,6 +1,7 @@
 """Social browser on explicitly selected empty test/E2E only; never migrate/reset."""
 from pathlib import Path
 import os,sys,json,secrets,socket,subprocess,tempfile,time,urllib.request,io
+from contextlib import nullcontext
 from contextlib import redirect_stdout
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
@@ -85,7 +86,9 @@ def main():
                     api_mutation(client,"POST","/admin/categories",{"slug":slug,"name":slug},origin="http://localhost:4187")
                 api_mutation(client,"POST","/auth/logout",origin="http://localhost:4187")
             for flow in ("identity","crud","media","admin","pagination","profile-contact"):
-                api=subprocess.Popen([sys.executable,"-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8001"],cwd=ROOT,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                log_dir = os.environ.get("AURAMEME_E2E_API_LOG_DIR")
+                with (Path(log_dir, f"api-{flow}.log").open("wb") if log_dir else nullcontext(subprocess.DEVNULL)) as log:
+                    api=subprocess.Popen([sys.executable,"-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8001"],cwd=ROOT,env=env,stdout=log,stderr=log)
                 for _ in range(100):
                     if api.poll() is not None:raise RuntimeError("Owned API stopped")
                     try:
