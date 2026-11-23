@@ -206,8 +206,8 @@ def test_new_read_boundaries_require_https_and_keep_rate_limits(auth,path,expect
     insecure=TestClient(app,base_url='http://testserver')
     try: assert insecure.get(path).status_code == 403
     finally: insecure.close()
-    responses=[client.get(path).status_code for _ in range(61)]
-    assert responses[:60] == [expected]*60 and responses[-1] == 429
+    responses=[client.get(path).status_code for _ in range(301)]
+    assert responses[:300] == [expected]*300 and responses[-1] == 429
 
 
 def test_runtime_contract_only_adds_two_read_endpoints_with_503():

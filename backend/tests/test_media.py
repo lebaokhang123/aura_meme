@@ -316,6 +316,6 @@ def test_storage_configuration_rejects_unsafe_roots(root):
 @pytest.mark.integration
 def test_media_reuses_rate_limiter_without_receiving_body(media):
     client, connection, root = media
-    statuses = [raw_upload(client, [b"must-not-parse"], authenticated=False)[0] for _ in range(61)]
-    assert statuses[:60] == [401] * 60 and statuses[-1] == 429
+    statuses = [raw_upload(client, [b"must-not-parse"], authenticated=False)[0] for _ in range(301)]
+    assert statuses[:300] == [401] * 300 and statuses[-1] == 429
     assert not root.exists()

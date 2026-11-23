@@ -9,11 +9,14 @@ from app.models import User,Profile,Role,UserRole,AdminAuditLog,AuthSession
 from test_auth import auth,migrated,ORIGIN
 
 def existing_accounts():
-    return [{**row,"id":UUID(int=index+1),"status":"active"} for index,row in enumerate(setup.ACCOUNTS)]
+    ids = (setup.KHANG_DEV_ID, setup.KIEN_DEV_ID, UUID(int=3))
+    return [{**row, "id": ident, "status": "active"} for row, ident in zip(setup.ACCOUNTS, ids)]
 
-def test_empty_plan_creates_only_named_users_and_requires_first_admin_bootstrap():
+def test_empty_plan_refuses_to_create_protected_accounts():
     plan=setup.account_plan([],0)
-    assert plan["bootstrap"] and plan["writes"] and not plan["conflicts"]
+    assert plan["conflicts"] and "approved IDs" in plan["conflicts"][0]
+    with pytest.raises(ValueError):
+        setup.apply_accounts(None, plan, {}, None)
     assert [row["username"] for row in plan["accounts"]]==["khang_dev","kien_dev","gigachad"]
 
 def test_existing_complete_plan_is_idempotent_and_preserves_ids():
@@ -48,7 +51,7 @@ def test_cli_read_only_cancel_and_mismatch_never_write(monkeypatch,capsys,apply,
     engine=Mock();values=iter(inputs)
     monkeypatch.setattr(setup,"demo_environment",lambda root:{"DATABASE_URL":"postgresql+psycopg://aurameme_demo:synthetic@127.0.0.1:5432/aurameme_demo"})
     monkeypatch.setattr(setup,"create_db_engine",lambda url:engine)
-    monkeypatch.setattr(setup,"read_plan",lambda engine:setup.account_plan([],0))
+    monkeypatch.setattr(setup,"read_plan",lambda engine:setup.account_plan(existing_accounts()[:2],2))
     monkeypatch.setattr(setup,"activate_demo",lambda root:pytest.fail("Must not activate/write"))
     assert setup.main(["--apply"] if apply else [],ask=lambda prompt:confirmation,password=lambda prompt:next(values))==expected
     engine.dispose.assert_called_once()
@@ -56,13 +59,25 @@ def test_cli_read_only_cancel_and_mismatch_never_write(monkeypatch,capsys,apply,
     assert "Synthetic-password!" not in output and "different-synthetic-password!" not in output
 
 @pytest.mark.integration
-def test_real_registration_bootstrap_audited_second_admin_and_idempotency(auth):
+def test_real_bootstrap_audited_second_admin_and_idempotency(auth):
     client,connection=auth
     passwords={r["username"]:"Synthetic-"+r["username"]+"-password!" for r in setup.ACCOUNTS}
     def bootstrap(ident):
         with Session(bind=connection,join_transaction_mode="create_savepoint") as db,db.begin():
             bootstrap_admin(db,UUID(ident),lambda prompt:setup.CONFIRMATION)
-    ids=setup.apply_accounts(client,setup.account_plan([],0),passwords,bootstrap,origin=ORIGIN)
+    now = client.app.state.auth.now()
+    role_id = UUID(int=42)
+    connection.execute(Role.__table__.insert().values(id=role_id, code="USER", description="Fixture user"))
+    records = [row | {"roles": ["USER"]} for row in existing_accounts()[:2]]
+    for row in records:
+        connection.execute(User.__table__.insert().values(
+            id=row["id"], username=row["username"], email=row["email"], status="active",
+            password_hash=client.app.state.auth.hasher.hash(passwords[row["username"]]),
+            created_at=now, updated_at=now))
+        connection.execute(Profile.__table__.insert().values(
+            user_id=row["id"], display_name=row["display_name"], updated_at=now))
+        connection.execute(UserRole.__table__.insert().values(user_id=row["id"], role_id=role_id, granted_at=now))
+    ids=setup.apply_accounts(client,setup.account_plan(records,0),passwords,bootstrap,origin=ORIGIN)
     assert connection.scalar(select(func.count()).select_from(User))==3
     audits=connection.execute(select(AdminAuditLog.action,AdminAuditLog.actor_id,AdminAuditLog.target_id)).all()
     assert {a.action for a in audits}=={"demo.bootstrap_admin","user.roles"}
@@ -89,6 +104,10 @@ def test_real_registration_bootstrap_audited_second_admin_and_idempotency(auth):
 def test_registration_cannot_choose_admin(auth):
     client,_=auth
     account={"username":"ordinary_user","email":"ordinary@example.com","display_name":"Ordinary","password":"Synthetic-ordinary-password!","roles":["ADMIN"]}
+    with pytest.raises(RuntimeError, match="422"):
+        setup.api_mutation(client,"POST","/auth/register",account,origin=ORIGIN)
+    assert client.get("/api/v1/users/me").status_code == 401
+    account.pop("roles")
     response=setup.api_mutation(client,"POST","/auth/register",account,origin=ORIGIN)
     assert response["roles"]==["USER"]
     setup.api_mutation(client,"POST","/auth/login",{"email":account["email"],"password":account["password"]},origin=ORIGIN)
