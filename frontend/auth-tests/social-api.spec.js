@@ -6,7 +6,7 @@ const kinds=['like','love','laugh','fire','sad','angry'],counts=()=>Object.fromE
 const user={id:uid,username:'constructor',display_name:'New Author',email:'new@example.com',roles:['USER'],status:'active',avatar_url:null};
 async function server(context,{roles=['USER']}={}){
  const categories=[['gaming','Gaming'],['anime','Anime'],['cong-nghe','Công nghệ'],['truong-hoc','Trường học'],['random','Random']].map(([slug,name],i)=>({slug,name,id:'00000000-0000-4000-8000-'+String(i+2).padStart(12,'0'),status:'active'}));
- const state={user:null,posts:[],comments:[],requests:[],dropReplyOnce:false,failFeedOnce:false,categories};
+ const state={user:null,posts:[],comments:[],requests:[],dropReplyOnce:false,failFeedOnce:false,paginate:false,categories};
  await context.route('**/api/v1/**',async route=>{
   const req=route.request(),url=new URL(req.url()),p=url.pathname.replace('/api/v1',''),method=req.method();
   let body;try{body=req.postDataJSON()}catch{}
@@ -24,6 +24,14 @@ async function server(context,{roles=['USER']}={}){
   if(p==='/categories')return send(200,page(categories.map(c=>({...c,post_count:state.posts.filter(p=>(p.category_id||cid)===c.id).length}))));
   if(method==='GET'&&p==='/posts'){
    if(state.failFeedOnce){state.failFeedOnce=false;return fail(503,'SERVICE_UNAVAILABLE')}
+   if(state.paginate){
+    const requested=Number(url.searchParams.get('page'));
+    const size=Number(url.searchParams.get('page_size'));
+    return send(200,{
+     items:state.posts.slice((requested-1)*size,requested*size).map(dto),
+     pagination:{page:requested,page_size:size,total:state.posts.length,total_pages:Math.ceil(state.posts.length/size)}
+    });
+   }
    return send(200,page(state.posts.map(dto)));
   }
   const post=state.posts.find(v=>p==='/posts/'+v.id||p.startsWith('/posts/'+v.id+'/'));
@@ -224,4 +232,20 @@ test('PostCard and CommentRow display validated Level and Chức danh for Admin 
  await expect(kienComment).toContainText('@kien_dev');
  await expect(kienComment).toContainText('LVL 9');
  await expect(kienComment).toContainText('Sáng Thế Thần');
+});
+
+test('Explore keeps loaded API results when retrying the next page',async({page,context})=>{
+ const api=await server(context);
+ api.paginate=true;
+ api.posts=Array.from({length:21},(_,i)=>({
+  id:'00000000-0000-4000-8000-'+String(i+100).padStart(12,'0'),
+  content:'Explore fixture '+i,counts:counts()
+ }));
+ await page.goto('/explore');
+ await expect(page.locator('article[data-post-id]:visible')).toHaveCount(20);
+ api.failFeedOnce=true;
+ await page.getByRole('button',{name:'Xem thêm bài viết'}).click();
+ await page.getByRole('alert').getByRole('button',{name:'Thử lại'}).click();
+ await expect(page.locator('article[data-post-id]:visible')).toHaveCount(21);
+ expect(api.requests.filter(request=>request.p==='/posts').map(request=>request.query.page)).toEqual(['1','2','2']);
 });
