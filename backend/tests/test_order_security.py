@@ -329,11 +329,21 @@ def test_active_pending_order_reuse_for_same_intent():
     mock_request.app.state.premium = None
     mock_request.app.state.vnpay = None
 
+    mock_request.headers = {"origin": "http://127.0.0.1:5189"}
+    mock_request.app.state.auth.settings.auth_allowed_origins = ["http://127.0.0.1:5189"]
+    paypal = mock_request.app.state.paypal
+    paypal.mode = "sandbox"
+    paypal.merchant_id = "AURAMEME_MERCHANT"
+    paypal.create_order.return_value = {
+        "id": "PP-EXISTING",
+        "approve_url": "https://www.sandbox.paypal.com/checkoutnow?token=PP-EXISTING",
+    }
     payload = CreateOrderInput(plan_tier="plus", provider="paypal_sandbox")
     dto = create_subscription_order(payload=payload, request=mock_request, account=account)
 
     assert dto.order_code == "AM-PLUS-1795330000-EXISTING1"
     assert dto.status == "pending"
+    assert dto.provider_txn_id == "PP-EXISTING"
     # No new order inserted to db
     account.db.add.assert_not_called()
 
@@ -746,10 +756,12 @@ def test_pending_order_expiry_checks_paypal_capture_first():
 
     mock_paypal = MagicMock()
     mock_paypal.is_configured.return_value = True
-    mock_paypal.merchant_id = None
+    mock_paypal.merchant_id = "AURAMEME_MERCHANT"
+    mock_paypal.mode = "sandbox"
     mock_paypal.get_order_details.return_value = {
         "id": "PP-ORD-CAPTURED",
         "status": "COMPLETED",
+        "purchase_units": [{"payments": {"captures": [{"id": "PP-CAPTURED"}]}}],
     }
     mock_paypal.verify_capture.return_value = (True, "Capture verified successfully.")
 
@@ -981,6 +993,8 @@ def test_paypal_return_uses_the_authorized_checkout_origin():
     request.app.state.premium = PremiumSettings(_env_file=None)
     request.app.state.paypal = MagicMock()
     request.app.state.paypal.is_configured.return_value = True
+    request.app.state.paypal.mode = "sandbox"
+    request.app.state.paypal.merchant_id = "AURAMEME_MERCHANT"
     request.app.state.paypal.create_order.return_value = {"id":"PP-TEST", "approve_url":"https://www.sandbox.paypal.com/checkoutnow?token=PP-TEST"}
     request.app.state.vnpay = None
     account = MagicMock()

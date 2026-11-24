@@ -226,7 +226,7 @@ def wait_ready(children,api,job):
 
 def open_browser():
     # A breakaway helper keeps the user's browser outside the server cleanup job.
-    environment = {k:v for k,v in os.environ.items() if not k.startswith('AUTH_') and not k.endswith('DATABASE_URL')}
+    environment = {k:v for k,v in os.environ.items() if not k.startswith(('AUTH_', 'PAYPAL_', 'SMTP_', 'EMAIL_')) and not k.endswith('DATABASE_URL')}
     try:
         subprocess.run([sys.executable,'-I','-c',"import sys,webbrowser; sys.exit(0 if webbrowser.open('http://localhost:5173') else 1)"],
             env=environment,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
@@ -262,7 +262,7 @@ def main():
             ('Frontend',[node,str(FRONTEND/'node_modules/vite/bin/vite.js'),'--host','localhost','--port','5173','--strictPort','--mode','development'],FRONTEND),
         ]:
             environment = os.environ.copy() if name == 'Backend' else {
-                k:v for k,v in os.environ.items() if not k.startswith('AUTH_') and not k.endswith('DATABASE_URL')
+                k:v for k,v in os.environ.items() if not k.startswith(('AUTH_', 'PAYPAL_', 'SMTP_', 'EMAIL_')) and not k.endswith('DATABASE_URL')
                 and k not in {'MEDIA_STORAGE_ROOT','CATALOG_STORAGE_ROOT'}}
             children.append((name,subprocess.Popen(command,cwd=cwd,env=environment,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)))

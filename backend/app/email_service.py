@@ -21,6 +21,7 @@ import logging
 from pathlib import Path
 import re
 import smtplib
+import ssl
 import threading
 from typing import Any, Literal
 
@@ -305,13 +306,13 @@ class EmailService:
         for attempt in range(2):
             try:
                 if self.settings.smtp_use_ssl:
-                    with smtplib.SMTP_SSL(self.settings.smtp_host, self.settings.smtp_port, timeout=10) as client:
+                    with smtplib.SMTP_SSL(self.settings.smtp_host, self.settings.smtp_port, timeout=10, context=ssl.create_default_context()) as client:
                         self._smtp_auth_and_send(client, msg)
                 else:
                     with smtplib.SMTP(self.settings.smtp_host, self.settings.smtp_port, timeout=10) as client:
                         client.ehlo()
                         if self.settings.smtp_use_tls:
-                            client.starttls()
+                            client.starttls(context=ssl.create_default_context())
                             client.ehlo()
                         self._smtp_auth_and_send(client, msg)
                 logger.info("email_sent status=sent attempt=%d", attempt + 1)
@@ -493,6 +494,8 @@ class EmailService:
         tier_label = "Aura Prime" if is_prime else "Aura Plus"
         effective_txn_id = provider_txn_id or (order_data or {}).get("provider_txn_id")
         provider_label = resolve_payment_method_label(provider, effective_txn_id)
+        paypal_simulated = provider == "paypal_sandbox" and (effective_txn_id or "").startswith(("SIM-", "MOCK-"))
+        simulation_note = "Mô phỏng PayPal nội bộ. " if paypal_simulated else ""
 
         history_url = f"{self.settings.app_public_url.rstrip('/')}/premium/history"
         subject = format_email_subject(f"Biên nhận thanh toán {tier_label}")
@@ -539,7 +542,7 @@ class EmailService:
             f"- Thời gian: {completed_at_iso}\n\n"
             f"Biên lai PDF đã được đính kèm trực tiếp trong email này (AuraMeme-Receipt-{order_code}.pdf).\n"
             f"Xem lại lịch sử giao dịch và tải biên lai PDF tại: {history_url}\n\n"
-            f"Lưu ý: Đây là giao dịch thử nghiệm/mô phỏng trong môi trường Sandbox giáo dục, không có giá trị xác nhận thanh toán thực tế.\n"
+            f"Lưu ý: {simulation_note}Đây là giao dịch thử nghiệm/mô phỏng trong môi trường Sandbox giáo dục, không có giá trị xác nhận thanh toán thực tế.\n"
         )
         body_html = f"""
           <p style="margin:0 0 14px;">Xin chào <strong>{escape(display_name)}</strong>,</p>
@@ -552,7 +555,7 @@ class EmailService:
             <tr><td style="color:#948f9a;">Thời gian xác nhận</td><td align="right">{escape(completed_at_iso)}</td></tr>
           </table>
           <p style="margin:0 0 18px;padding:10px 14px;border-radius:8px;background-color:#15161f;border:1px solid #292932;font-size:12px;color:#948f9a;line-height:1.5;">
-            Lưu ý: Đây là biên nhận giao dịch <strong>thử nghiệm/mô phỏng</strong> trong môi trường Sandbox giáo dục, <strong>không có giá trị xác nhận thanh toán thực tế</strong>.
+            Lưu ý: {simulation_note}Đây là biên nhận giao dịch <strong>thử nghiệm/mô phỏng</strong> trong môi trường Sandbox giáo dục, <strong>không có giá trị xác nhận thanh toán thực tế</strong>.
           </p>
           <p style="margin:0;text-align:center;">
             <a href="{escape(history_url)}" style="display:inline-block;padding:11px 22px;border-radius:10px;background-color:#5424af;color:#ffffff;font-weight:700;text-decoration:none;">Xem lịch sử &amp; tải biên lai PDF</a>

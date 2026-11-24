@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { usePreferences } from '../PreferencesContext.jsx';
 import { usePremium } from '../PremiumContext.jsx';
 import { auth } from '../auth.js';
-import { downloadReceiptPdf } from '../receipt-pdf.js';
+import { downloadOwnReceipt } from '../receipt-pdf.js';
 import '../payment-ring-081.css';
 
 const COUNTRIES = [
@@ -57,6 +57,7 @@ export default function PremiumCheckoutPage() {
   const [receipt, setReceipt] = useState(null);
   const [instantConfirmStep, setInstantConfirmStep] = useState(0);
   const instantTimerRef = useRef(null);
+  const paymentInFlight = useRef(false);
 
   const handleInstantCaptureClick = () => {
     if (instantConfirmStep === 0) {
@@ -68,7 +69,7 @@ export default function PremiumCheckoutPage() {
     } else {
       if (instantTimerRef.current) clearTimeout(instantTimerRef.current);
       setInstantConfirmStep(0);
-      executeCapture();
+      executeCapture('simulate');
     }
   };
 
@@ -137,7 +138,6 @@ export default function PremiumCheckoutPage() {
             activatedAt: data.completed_at
               ? new Date(data.completed_at).toLocaleString(language === 'en' ? 'en-US' : 'vi-VN')
               : new Date().toLocaleString(language === 'en' ? 'en-US' : 'vi-VN'),
-            status: 'ACTIVE',
             provider: data.provider,
             provider_txn_id: data.provider_txn_id,
             isExistingSuccess: true,
@@ -157,8 +157,13 @@ export default function PremiumCheckoutPage() {
 
         // If returned from PayPal approval with token, automatically capture
         const token = params.get('token');
-        if (token && data.status === 'pending') {
-          executeCapture(token, data);
+        if (data.status === 'pending' && params.get('cancelled') === 'true') {
+          setCheckoutError(t('Bạn đã hủy xác nhận PayPal. Có thể thử lại.', 'PayPal approval was cancelled. You can retry.'));
+        } else if (token && data.status === 'pending' && data.provider === 'paypal_sandbox' &&
+                   token === data.provider_txn_id && !/^(MOCK|SIM)-/.test(token)) {
+          executeCapture('paypal', token, data);
+        } else if (token && data.status === 'pending') {
+          setCheckoutError(t('Mã xác nhận PayPal không khớp đơn hàng.', 'PayPal approval does not match this order.'));
         }
       })
       .catch((err) => {
@@ -238,28 +243,29 @@ export default function PremiumCheckoutPage() {
     return Object.keys(errs).length === 0;
   }
 
-  async function executeCapture(paypalToken = null, targetOrder = null) {
+  async function executeCapture(intent, paypalToken = null, targetOrder = null) {
     const currentOrder = targetOrder || order;
-    if (!currentOrder) return;
-    if (checkoutState === 'processing' || checkoutState === 'verifying') return;
+    if (!currentOrder || paymentInFlight.current) return;
+    paymentInFlight.current = true;
 
     setCheckoutState('processing');
     setCheckoutError('');
     setStatusText(
-      paymentMethod === 'card'
+      intent === 'card'
         ? t('Đang xử lý thanh toán bằng Thẻ...', 'Processing Card payment...')
         : t('Đang xử lý thanh toán PayPal...', 'Processing PayPal payment...')
     );
 
     try {
       let captureRes;
-      if (paymentMethod === 'card') {
+      if (intent === 'card') {
         captureRes = await auth.write('POST', `/premium/orders/${currentOrder.order_code}/simulate`, {
           action: 'pay_success',
         });
       } else {
         captureRes = await auth.write('POST', `/premium/orders/${currentOrder.order_code}/capture`, {
-          paypal_order_id: paypalToken || currentOrder.provider_txn_id || 'MOCK_SANDBOX_TOKEN',
+          intent,
+          ...(paypalToken ? { paypal_order_id: paypalToken } : {}),
         });
       }
 
@@ -285,18 +291,18 @@ export default function PremiumCheckoutPage() {
           amountVnd: `${Number(currentOrder.amount_vnd).toLocaleString('vi-VN')} VNĐ`,
           amountUsd: currentOrder.amount_usd_formatted || (currentOrder.tier === 'prime' ? '$50' : '$5'),
           durationDays: currentOrder.duration_days,
-          activatedAt: new Date().toLocaleString(language === 'en' ? 'en-US' : 'vi-VN'),
-          status: 'ACTIVE',
-          provider: orderStatus?.provider || (paymentMethod === 'card' ? 'sandbox_simulated' : 'paypal_sandbox'),
+          activatedAt: new Date(orderStatus.completed_at || captureRes.completed_at || Date.now()).toLocaleString(language === 'en' ? 'en-US' : 'vi-VN'),
+          provider: orderStatus.provider,
           provider_txn_id: orderStatus?.provider_txn_id || captureRes?.provider_txn_id,
         });
       } else {
         throw new Error(t('Máy chủ chưa thể xác nhận kích hoạt gói.', 'Server could not confirm activation.'));
       }
     } catch (err) {
-      console.error('[PremiumCheckoutPage] Capture failed:', err);
       setCheckoutState('failed');
       setCheckoutError(t('Thanh toán thất bại. Vui lòng thử lại.', 'Payment failed. Please try again.'));
+    } finally {
+      paymentInFlight.current = false;
     }
   }
 
@@ -304,7 +310,7 @@ export default function PremiumCheckoutPage() {
     e.preventDefault();
     if (checkoutState === 'processing' || checkoutState === 'verifying') return;
     if (!validateForm()) return;
-    await executeCapture();
+    await executeCapture('card');
   }
 
   if (loading) {
@@ -493,7 +499,7 @@ export default function PremiumCheckoutPage() {
             )}
 
             {/* Error Banner */}
-            {isFailed && checkoutError && (
+            {checkoutError && (
               <div className="u081-error-banner" role="alert">
                 <span className="material-symbols-outlined" aria-hidden="true">error</span>
                 <span>{checkoutError}</span>
@@ -567,15 +573,12 @@ export default function PremiumCheckoutPage() {
                       type="button"
                       className="checkout-btn-download-receipt"
                       onClick={async () => {
-                        const activeUser = auth.snapshot().user;
-                        let historyList = null;
+                        setCheckoutError('');
                         try {
-                          if (receipt?.owner_username === activeUser?.username) historyList = await auth.read('/premium/orders/successful');
+                          await downloadOwnReceipt(auth, orderCode);
                         } catch {
-                          setCheckoutError(t('Không thể tải lịch sử thanh toán. Vui lòng thử lại.', 'Unable to load payment history. Please retry.'));
-                          return;
+                          setCheckoutError(t('Không thể tải biên lai và lịch sử đầy đủ. Vui lòng thử lại.', 'Unable to load receipt and payment history. Please retry.'));
                         }
-                        downloadReceiptPdf(receipt || order, activeUser, historyList);
                       }}
                       title={t('Tải về biên lai PDF', 'Download PDF Receipt')}
                     >
@@ -691,23 +694,34 @@ export default function PremiumCheckoutPage() {
                         className="checkout-btn-paypal"
                         disabled={isSpinning}
                         onClick={async () => {
+                          if (paymentInFlight.current) return;
+                          paymentInFlight.current = true;
+                          setCheckoutError('');
+                          setCheckoutState('processing');
                           try {
-                            let current = order;
-                            if (!current.payment_url || current.provider !== 'paypal_sandbox') {
-                              const initRes = await auth.write('POST', `/premium/orders/${current.order_code}/init-paypal`);
-                              if (initRes) {
-                                current = initRes;
-                                setOrder(initRes);
-                              }
+                            const current = await auth.write('POST', `/premium/orders/${order.order_code}/init-paypal`);
+                            if (current?.status === 'success') {
+                              window.location.reload();
+                              return;
                             }
-                            if (current.payment_url && !current.payment_url.includes('token=MOCK-')) {
-                              sessionStorage.setItem('am_checkout_order', current.order_code);
-                              window.location.assign(current.payment_url);
-                            } else {
-                              executeCapture(null, current);
+                            const approval = new URL(current?.payment_url);
+                            if (current.order_code !== order.order_code || current.provider !== 'paypal_sandbox' ||
+                                current.status !== 'pending' ||
+                                !['https://www.sandbox.paypal.com', 'https://sandbox.paypal.com'].includes(approval.origin) ||
+                                approval.username || approval.password || approval.pathname !== '/checkoutnow' ||
+                                !current.provider_txn_id || /^(MOCK|SIM)-/.test(current.provider_txn_id) ||
+                                approval.searchParams.getAll('token').length !== 1 ||
+                                approval.searchParams.get('token') !== current.provider_txn_id) {
+                              throw new Error('Invalid PayPal approval');
                             }
-                          } catch (err) {
+                            setOrder(current);
+                            sessionStorage.setItem('am_checkout_order', current.order_code);
+                            window.location.assign(approval.href);
+                          } catch {
+                            setCheckoutState('failed');
                             setCheckoutError(t('Chưa thể khởi tạo hoặc đối soát PayPal. Vui lòng thử lại.', 'Unable to initialize or verify PayPal. Please retry.'));
+                          } finally {
+                            paymentInFlight.current = false;
                           }
                         }}
                       >

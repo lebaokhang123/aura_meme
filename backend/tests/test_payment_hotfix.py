@@ -74,3 +74,73 @@ def test_admin_orders_all_statuses_search_pagination_and_errors(admin, monkeypat
     monkeypatch.setattr(admin_workspace, "AdminOrder", original_dto)
     monkeypatch.setattr(admin_workspace, "page_rows", failure)
     assert client.get("/api/v1/admin/orders").status_code == 500
+
+
+@pytest.mark.integration
+def test_paypal_intent_binding_and_idempotent_capture(blog, monkeypatch):
+    from app.paypal_adapter import PaypalAdapter
+    from app.models import UserSubscription
+
+    client, db, owner, *_ = blog
+    auth = client.app.state.auth
+    monkeypatch.setattr(auth.settings, "auth_environment", "development")
+    paypal = PaypalAdapter("fixture-client", "fixture-secret", merchant_id="FIXTURE-MERCHANT")
+    monkeypatch.setattr(client.app.state, "paypal", paypal)
+    monkeypatch.setattr(client.app.state.premium, "premium_sandbox_enabled", True)
+
+    def post(order, op, body=None):
+        return mutation(client, "POST", f"/premium/orders/{order['order_code']}/{op}", body)
+
+    order = mutation(client, "POST", "/premium/orders", {"plan_tier": "plus"}).json()
+    # Legacy mock references must never be queried as real PayPal orders.
+    db.execute(SubscriptionOrder.__table__.update().where(SubscriptionOrder.order_code == order["order_code"]).values(
+        provider="paypal_sandbox", provider_txn_id="MOCK-PP-OLD",
+        payment_url="https://www.sandbox.paypal.com/checkoutnow?token=MOCK-PP-OLD",
+    ))
+    assert post(order, "capture", {"paypal_order_id": "MOCK-PP-OLD"}).status_code == 400
+    monkeypatch.setattr(paypal, "merchant_id", None)
+    assert post(order, "init-paypal").status_code == 503
+    monkeypatch.setattr(paypal, "merchant_id", "FIXTURE-MERCHANT")
+    monkeypatch.setattr(paypal, "create_order", lambda **kw: {"id": "REAL-ORDER"})
+    assert post(order, "init-paypal").status_code == 502
+    assert db.scalar(select(SubscriptionOrder.provider_txn_id).where(SubscriptionOrder.order_code == order["order_code"])) == "MOCK-PP-OLD"
+
+    url = "https://www.sandbox.paypal.com/checkoutnow?token=REAL-ORDER"
+    monkeypatch.setattr(paypal, "create_order", lambda **kw: {"id": "REAL-ORDER", "approve_url": url})
+    result = post(order, "init-paypal")
+    assert result.status_code == 200
+    assert result.json()["payment_url"] == url
+    assert post(order, "capture", {"intent": "simulate"}).status_code == 409
+    assert post(order, "simulate", {"action": "pay_success"}).status_code == 409
+    assert post(order, "capture", {"intent": "paypal", "paypal_order_id": "OTHER-ORDER"}).status_code == 400
+
+    calls = []
+    receipt = []
+    from app import premium
+    monkeypatch.setattr(premium, "_dispatch_receipt_email_safe", lambda *args: receipt.append(args[2].order_code))
+
+    def capture(paypal_order_id, *, idempotency_key):
+        calls.append((paypal_order_id, idempotency_key))
+        return {"id": paypal_order_id, "status": "COMPLETED", "purchase_units": [{
+            "reference_id": idempotency_key, "payee": {"merchant_id": "FIXTURE-MERCHANT"},
+            "payments": {"captures": [{"id": "REAL-CAPTURE", "status": "COMPLETED",
+                                       "amount": {"currency_code": "USD", "value": "5.00"}}]},
+        }]}
+
+    monkeypatch.setattr(paypal, "capture_order", capture)
+    payload = {"intent": "paypal", "paypal_order_id": "REAL-ORDER"}
+    paid = post(order, "capture", payload)
+    assert paid.status_code == 200
+    assert paid.json()["provider_txn_id"] == "REAL-CAPTURE"
+    expiry = db.scalar(select(UserSubscription.expires_at).where(UserSubscription.user_id == owner))
+    duplicate = post(order, "capture", payload)
+    assert duplicate.json()["provider_txn_id"] == "REAL-CAPTURE"
+    assert db.scalar(select(UserSubscription.expires_at).where(UserSubscription.user_id == owner)) == expiry
+    assert calls == [("REAL-ORDER", order["order_code"])]
+    assert receipt == [order["order_code"]]
+
+    instant = mutation(client, "POST", "/premium/orders", {"plan_tier": "prime"}).json()
+    simulated = post(instant, "capture", {"intent": "simulate"})
+    assert simulated.status_code == 200
+    assert simulated.json()["provider_txn_id"].startswith("SIM-PP-")
+    assert calls == [("REAL-ORDER", order["order_code"])]

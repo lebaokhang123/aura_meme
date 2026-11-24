@@ -309,3 +309,63 @@ def test_email_disabled_mode_is_safe_noop():
     )
     assert res.status == "disabled"
     assert len(svc.sandbox_outbox) == 0
+
+def test_smtp_starttls_receipt_and_transactional_templates(monkeypatch):
+    from io import BytesIO
+    from pypdf import PdfReader
+
+    sent = []
+    calls = []
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout):
+            assert (host, port, timeout) == ("smtp.example.test", 587, 10)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            pass
+
+        def ehlo(self):
+            calls.append("ehlo")
+
+        def starttls(self, *, context):
+            assert context.check_hostname
+            calls.append("starttls")
+
+        def login(self, username, password):
+            assert (username, password) == ("fixture-user", "fixture-credential")
+            calls.append("login")
+
+        def send_message(self, message):
+            assert calls[-4:] == ["ehlo", "starttls", "ehlo", "login"]
+            sent.append(message)
+
+    monkeypatch.setattr("app.email_service.smtplib.SMTP", FakeSMTP)
+    svc = EmailService(EmailSettings(
+        _env_file=None, email_mode="smtp", smtp_host="smtp.example.test",
+        smtp_username="fixture-user", smtp_password="fixture-credential",
+        email_from_address="sender@example.test",
+    ))
+    receipt = dict(to_email="buyer@example.test", display_name="Buyer", order_code="AM-PLUS-SMTPFIX",
+                   tier="plus", amount_vnd_formatted="130.000 VNĐ", amount_usd_formatted="$5",
+                   provider="paypal_sandbox", provider_txn_id="SIM-PP-TEST123",
+                   completed_at_iso="2026-11-24T00:00:00+00:00")
+    assert svc.send_premium_receipt_email(**receipt).status == "sent"
+    assert svc.send_premium_receipt_email(**receipt).status == "duplicate_skipped"
+    assert svc.send_password_reset_email(to_email="buyer@example.test", display_name="Buyer",
+                                         reset_url="https://example.test/reset").status == "sent"
+    assert svc.send_account_verification_email(to_email="buyer@example.test", display_name="Buyer",
+                                       verify_url="https://example.test/verify").status == "sent"
+    assert svc.send_contact_emails(contact_id="contact-smoke", sender_name="Buyer", sender_email="buyer@example.test",
+                                   subject_line="Fixture", message_body="Hello")["ack"].status == "sent"
+
+    assert len(sent) == 4
+    plain = sent[0].get_body(preferencelist=("plain",)).get_content()
+    assert "PayPal Sandbox" in plain and "Mô phỏng PayPal nội bộ." in plain
+    attachment, = sent[0].iter_attachments()
+    assert attachment.get_filename() == "AuraMeme-Receipt-AM-PLUS-SMTPFIX.pdf"
+    text = "".join(page.extract_text() for page in PdfReader(BytesIO(attachment.get_payload(decode=True))).pages)
+    for expected in ("AM-PLUS-SMTPFIX", "SIM-PP-TEST123", "PayPal Sandbox"):
+        assert expected in text
