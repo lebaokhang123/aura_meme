@@ -105,9 +105,11 @@ Frontend có unit tests và browser regression cho14màn, Guest/3user demo,375/7
 
 Nguồn/license và xác nhận của Owner đối với asset được ghi riêng trong [asset ledger](frontend/ASSET_SOURCES.md); license mã nguồn không tự áp dụng cho mọi ảnh bên thứ ba.
 
-## CI trên GitHub Actions
+## Nhánh sản phẩm và CI trên GitHub Actions
 
-Một workflow `.github/workflows/ci.yml` chạy khi mở/cập nhật PR vào `dev` và khi push `dev`, với quyền `contents: read`, không deploy hoặc dùng secrets. Các action được pin theo commit SHA; Node/Python có phiên bản cụ thể, frontend dùng `npm ci`, backend dùng `backend/requirements-ci.txt` khóa dependency runtime/test (cập nhật cùng `pyproject.toml`).
+`main` là nhánh mặc định của sản phẩm. Tạo nhánh công việc từ `dev` và tích hợp qua PR có CI xanh. Checkout nghiệm thu local theo `origin/dev`. Khi phát hành, mở PR từ `dev` vào `main` để giữ lịch sử phát triển.
+
+Một workflow `.github/workflows/ci.yml` chạy khi mở/cập nhật PR hoặc push vào `main` hay `dev`, với quyền `contents: read`, không deploy hoặc dùng secrets. Các action được pin theo commit SHA; Node/Python có phiên bản cụ thể, frontend dùng `npm ci`, backend dùng `backend/requirements-ci.txt` khóa dependency runtime/test (cập nhật cùng `pyproject.toml`).
 
 - **Backend non-DB (Windows):** chạy các test không mang marker integration, gồm filesystem/launcher Windows. Loại module migration và các ca gọi Alembic demo; không có PostgreSQL service hoặc URL DB thật.
 - **Frontend build and unit (Ubuntu):** cài lockfile, build và chạy các test Node hiện có.
