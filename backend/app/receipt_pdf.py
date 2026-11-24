@@ -48,8 +48,6 @@ def resolve_payment_method_label(
     if prov == "sandbox_simulated" or method == "card" or txn.startswith("SIM-CARD-"):
         return "Thẻ mô phỏng nội bộ"
     if prov == "paypal_sandbox":
-        if txn.startswith(("SIM-", "MOCK-")):
-            return "PayPal mô phỏng nội bộ"
         return "PayPal Sandbox"
     if prov == "vnpay_sandbox":
         if txn.startswith(("SIM-", "MOCK-")):
@@ -169,7 +167,7 @@ def generate_receipt_pdf_bytes(
     else:
         amount_vnd_formatted = str(order.get("amount_vnd_formatted") or ("1.250.000 VNĐ" if is_prime else "130.000 VNĐ"))
 
-    txn_ref = str(order.get("paypal_order_id") or order.get("provider_txn_id") or order_code)
+    txn_ref = str(order.get("provider_txn_id") or order.get("paypal_order_id") or order_code)
     provider_name = resolve_payment_method_label(
         order.get("provider"),
         order.get("provider_txn_id"),
@@ -357,7 +355,11 @@ def generate_receipt_pdf_bytes(
         p.draw_line(fitz.Point(20 * MM, 268 * MM), fitz.Point(190 * MM, 268 * MM), color=_rgb(229, 231, 235), width=0.2 * MM)
         _draw_text(
             p,
-            "Biên lai giao dịch thử nghiệm/mô phỏng — Không có giá trị xác nhận thanh toán thực tế.",
+            (
+                "Mô phỏng PayPal nội bộ — Không có giá trị xác nhận thanh toán thực tế."
+                if order.get("provider") == "paypal_sandbox" and txn_ref.startswith(("SIM-", "MOCK-"))
+                else "Biên lai giao dịch thử nghiệm/mô phỏng — Không có giá trị xác nhận thanh toán thực tế."
+            ),
             20,
             273.5,
             bold=False,

@@ -205,8 +205,8 @@ def test_email_polish_subjects_cid_logo_contact_and_pdf_receipt():
 
     # 2. Payment method label differentiation
     assert resolve_payment_method_label("sandbox_simulated", "SIM-CARD-123") == "Thẻ mô phỏng nội bộ"
-    assert resolve_payment_method_label("paypal_sandbox", "SIM-PP-123") == "PayPal mô phỏng nội bộ"
-    assert resolve_payment_method_label("paypal_sandbox", "MOCK-PP-123") == "PayPal mô phỏng nội bộ"
+    assert resolve_payment_method_label("paypal_sandbox", "SIM-PP-123") == "PayPal Sandbox"
+    assert resolve_payment_method_label("paypal_sandbox", "MOCK-PP-123") == "PayPal Sandbox"
     assert resolve_payment_method_label("paypal_sandbox", "78B98765ABC12345") == "PayPal Sandbox"
 
     svc = EmailService(

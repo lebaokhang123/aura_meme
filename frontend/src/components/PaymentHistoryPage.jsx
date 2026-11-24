@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth } from '../auth.js';
 import { readPreferences } from '../preferences.js';
-import { downloadReceiptPdf } from '../receipt-pdf.js';
+import { downloadOwnReceipt } from '../receipt-pdf.js';
 import '../payment-ring-081.css';
 
 export default function PaymentHistoryPage() {
@@ -170,11 +170,7 @@ export default function PaymentHistoryPage() {
   const handleDownloadPdf = async (order, e) => {
     if (e) e.stopPropagation();
     try {
-      const detail = await auth.read('/premium/orders/' + encodeURIComponent(order.order_code));
-      const historyList = await auth.read('/premium/orders/successful');
-      if (!Array.isArray(historyList)) throw new Error('Invalid payment history');
-      const success = downloadReceiptPdf(detail, auth.snapshot().user, historyList);
-      if (!success) throw new Error(t('Đơn chưa thanh toán thành công.', 'Order is not completed.'));
+      await downloadOwnReceipt(auth, order.order_code);
       setDownloadSuccess(order.order_code);
       setTimeout(() => setDownloadSuccess(null), 3000);
     } catch {
@@ -237,12 +233,7 @@ export default function PaymentHistoryPage() {
     if (provider === 'sandbox_simulated' || provider === 'simulated' || txnId.startsWith('SIM-CARD-')) {
       return t('Thẻ', 'Card');
     }
-    if (provider === 'paypal_sandbox') {
-      if (txnId.startsWith('SIM-') || txnId.startsWith('MOCK-')) {
-        return t('Mô phỏng', 'Simulated');
-      }
-      return 'PayPal';
-    }
+    if (provider === 'paypal_sandbox') return 'PayPal';
     if (provider === 'vnpay_sandbox') {
       return 'VNPAY';
     }

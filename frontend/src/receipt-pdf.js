@@ -49,12 +49,7 @@ export function resolvePaymentMethodLabel(provider, txnRef = '', paymentMethod =
   if (prov === 'sandbox_simulated' || method === 'card' || txn.startsWith('SIM-CARD-')) {
     return 'Thẻ mô phỏng nội bộ';
   }
-  if (prov === 'paypal_sandbox') {
-    if (txn.startsWith('SIM-') || txn.startsWith('MOCK-')) {
-      return 'PayPal mô phỏng nội bộ';
-    }
-    return 'PayPal Sandbox';
-  }
+  if (prov === 'paypal_sandbox') return 'PayPal Sandbox';
   if (prov === 'vnpay_sandbox') {
     if (txn.startsWith('SIM-') || txn.startsWith('MOCK-')) {
       return 'VNPAY mô phỏng nội bộ';
@@ -93,7 +88,7 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
   const amountVndFormatted = Number(order.amount_vnd).toLocaleString('vi-VN') + ' VNĐ';
 
   // Transaction reference (distinguish PayPal Order ID/Capture ID from AuraMeme order code)
-  const txnRef = order.paypal_order_id || order.provider_txn_id || orderCode;
+  const txnRef = order.provider_txn_id || order.paypal_order_id || orderCode;
 
   // Payment provider name
   const providerName = resolvePaymentMethodLabel(order.provider, txnRef, order.payment_method);
@@ -438,7 +433,10 @@ export function generateReceiptPdfDoc(order, user, recentSuccessfulOrders = null
     doc.setFont('Roboto', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(156, 163, 175);
-    doc.text('Biên lai giao dịch thử nghiệm/mô phỏng — Không có giá trị xác nhận thanh toán thực tế.', 20, 273.5);
+    const notice = order.provider === 'paypal_sandbox' && /^(SIM|MOCK)-/.test(txnRef)
+      ? 'Mô phỏng PayPal nội bộ — Không có giá trị xác nhận thanh toán thực tế.'
+      : 'Biên lai giao dịch thử nghiệm/mô phỏng — Không có giá trị xác nhận thanh toán thực tế.';
+    doc.text(notice, 20, 273.5);
     doc.text('Sandbox transaction receipt — For development and verification purposes only.', 20, 277.5);
     doc.text(`Trang ${p} / ${totalPages}  (Page ${p} of ${totalPages})`, 190, 273.5, { align: 'right' });
   }
@@ -460,4 +458,17 @@ export function downloadReceiptPdf(order, user, recentSuccessfulOrders = null) {
   const orderCode = order.order_code || order.orderCode || 'AM-ORDER';
   doc.save(`aurameme-receipt-${orderCode}.pdf`);
   return true;
+}
+
+export async function downloadOwnReceipt(auth, orderCode) {
+  const user = auth.snapshot().user;
+  const detail = await auth.read('/premium/orders/' + encodeURIComponent(orderCode));
+  if (!user?.username || detail?.owner_username !== user.username || detail.order_code !== orderCode) {
+    throw new Error('Receipt owner mismatch');
+  }
+  const history = await auth.read('/premium/orders/successful');
+  if (auth.snapshot().user?.id !== user.id || auth.snapshot().user?.username !== user.username ||
+      !Array.isArray(history) || !downloadReceiptPdf(detail, user, history)) {
+    throw new Error('Receipt download unavailable');
+  }
 }

@@ -269,3 +269,11 @@ Operator `python -m app.catalog_activation` nhận manifest có SHA duyệt chí
 ### Bộ sưu tập hồ sơ công khai
 
 `GET /api/v1/users/{username}/inventory` trả `items` và `pagination` cho Guest hoặc User đối với tài khoản đang hoạt động. Mỗi item chứa `asset` và `equipped`. Chỉ trả vật phẩm hoạt động có quyền hiển thị. Tài khoản khoá hoặc đã xoá trả 404. `GET /api/v1/inventory/me` xác thực chủ tài khoản và trả thêm `quantity`. Các quyền equip và dùng custom reaction vẫn kiểm tra sở hữu qua phiên xác thực.
+
+## Hotfix Owner Acceptance — PayPal và biên lai
+
+`POST /premium/orders/{order_code}/init-paypal` yêu cầu cấu hình PayPal Sandbox và merchant. Chỉ trả liên kết HTTPS Sandbox khớp mã PayPal đã gắn với đơn. Pending mock cũ có thể được khởi tạo lại trên cùng mã AuraMeme. Route không dùng mock URL làm approval.
+
+`POST /premium/orders/{order_code}/capture` dùng `intent: "paypal"` cùng `paypal_order_id` từ callback, hoặc `intent: "simulate"` không kèm mã PayPal. Capture mặc định là PayPal. Mô phỏng cần `AUTH_ENVIRONMENT=development` và cờ Sandbox, đồng thời từ chối đơn đang gắn với PayPal thật. Card tiếp tục dùng `/simulate`. Quyền chủ đơn, CSRF, khóa hàng và kiểm merchant, mã đơn, USD, số tiền vẫn áp dụng.
+
+Checkout và History lấy detail cùng lịch sử success của tài khoản trước khi tải PDF. Nhãn hiển thị PayPal hoặc Thẻ. PDF/email dùng PayPal Sandbox hoặc Thẻ mô phỏng nội bộ. Mã giao dịch mô phỏng PayPal giữ tiền tố `SIM-PP-` và ghi chú riêng trong disclaimer.

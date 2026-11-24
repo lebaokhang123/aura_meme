@@ -5,6 +5,7 @@ import logging
 import math
 import re
 from typing import Literal
+from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
 
 ORDER_CODE_REGEX = re.compile(r"^AM-(PLUS|PRIME)-\d{9,12}-[A-Z0-9]{4,12}$")
@@ -50,6 +51,7 @@ class SimulateOrderInput(BaseModel):
 class CaptureOrderInput(BaseModel):
     paypal_order_id: str | None = None
     mock_fail: bool = False
+    intent: Literal["paypal", "simulate"] = "paypal"
 
 
 class OrderDto(BaseModel):
@@ -271,6 +273,8 @@ def create_subscription_order(
         ).order_by(SubscriptionOrder.created_at.desc(), SubscriptionOrder.id.desc()).with_for_update()
     )
     if existing_active and isinstance(existing_active, SubscriptionOrder):
+        if payload.provider == "paypal_sandbox":
+            return init_paypal_order(existing_active.order_code, request, account)
         if payload.provider != "unselected" and existing_active.provider == "unselected":
             existing_active.provider = payload.provider
             existing_active.updated_at = now
@@ -316,33 +320,13 @@ def create_subscription_order(
     elif payload.provider == "paypal_sandbox":
         paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
         order_code = f"AM-{plan.tier.upper()}-{int(now.timestamp())}-{uuid4().hex[:8].upper()}"
-        from urllib.parse import urlsplit, urlunsplit
+        paypal = _require_paypal_sandbox(paypal)
         origin = request.headers.get("origin")
         if origin not in auth_runtime.settings.auth_allowed_origins:
             raise AuthError(403, "FORBIDDEN", "Invalid checkout origin.")
-        parsed = urlsplit(origin)
-        return_url = urlunsplit((parsed.scheme, parsed.netloc, "/premium/checkout", f"order={order_code}", ""))
-        cancel_url = return_url + "&cancelled=true"
-        if paypal and paypal.is_configured():
-            try:
-                pp_order = paypal.create_order(
-                    order_code=order_code,
-                    plan_tier=plan.tier,
-                    return_url=return_url,
-                    cancel_url=cancel_url,
-                )
-                payment_url = pp_order.get("approve_url")
-                provider_txn_id = pp_order.get("id")
-                provider_payload = pp_order
-            except PaypalError as exc:
-                logger.error("Failed to create PayPal order: %s", exc)
-                raise AuthError(502, "PAYPAL_ERROR", f"Không thể tạo đơn hàng PayPal: {str(exc)}")
-        else:
-            # Sandbox simulated token when PayPal credentials are not yet configured in local test
-            mock_id = f"MOCK-PP-{uuid4().hex[:12].upper()}"
-            provider_txn_id = mock_id
-            payment_url = f"https://www.sandbox.paypal.com/checkoutnow?token={mock_id}"
-            provider_payload = {"mock": True, "id": mock_id}
+        provider_payload = _create_paypal_order(paypal, order_code, plan.tier, origin)
+        payment_url = provider_payload["approve_url"]
+        provider_txn_id = provider_payload["id"]
     else:
         order_code = f"AM-{plan.tier.upper()}-{int(now.timestamp())}-{uuid4().hex[:8].upper()}"
 
@@ -392,6 +376,49 @@ def create_subscription_order(
     )
 
 
+def _real_paypal_order(order: SubscriptionOrder) -> bool:
+    txn = order.provider_txn_id
+    return bool(order.provider == "paypal_sandbox" and txn and not txn.startswith(("SIM-", "MOCK-")))
+
+
+def _require_paypal_sandbox(paypal: PaypalAdapter | None) -> PaypalAdapter:
+    if not paypal or paypal.mode != "sandbox" or not paypal.is_configured() or not paypal.merchant_id:
+        raise AuthError(503, "PAYPAL_NOT_CONFIGURED", "Thiếu cấu hình PayPal Sandbox hoặc merchant.")
+    return paypal
+
+
+def _valid_paypal_approval(url: str | None, txn: str | None) -> bool:
+    if not url or not txn or txn.startswith(("SIM-", "MOCK-")):
+        return False
+    try:
+        parsed = urlsplit(url)
+        return (
+            parsed.scheme == "https"
+            and parsed.netloc in {"www.sandbox.paypal.com", "sandbox.paypal.com"}
+            and parsed.path == "/checkoutnow"
+            and parse_qs(parsed.query).get("token") == [txn]
+        )
+    except ValueError:
+        return False
+
+
+def _create_paypal_order(paypal: PaypalAdapter, order_code: str, tier: str, origin: str) -> dict:
+    return_url = f"{origin}/premium/checkout?order={order_code}"
+    try:
+        result = paypal.create_order(
+            order_code=order_code,
+            plan_tier=tier,
+            return_url=return_url,
+            cancel_url=return_url + "&cancelled=true",
+        )
+    except PaypalError as exc:
+        logger.warning("PayPal order initialization failed: %s", type(exc).__name__)
+        raise AuthError(502, "PAYPAL_ERROR", "Không thể tạo đơn hàng PayPal Sandbox.") from exc
+    if not _valid_paypal_approval(result.get("approve_url"), result.get("id")):
+        raise AuthError(502, "PAYPAL_APPROVAL_UNAVAILABLE", "PayPal Sandbox chưa trả liên kết xác nhận hợp lệ.")
+    return result
+
+
 @router.post(
     "/orders/{order_code}/init-paypal",
     response_model=OrderDto,
@@ -416,7 +443,7 @@ def init_paypal_order(
     if not order:
         raise AuthError(404, "NOT_FOUND", "Đơn hàng không tồn tại.")
 
-    _check_and_expire_order(order, account.db, now, getattr(request.app.state, "paypal", None), reconcile=True)
+    _check_and_expire_order(order, account.db, now, getattr(request.app.state, "paypal", None), reconcile=True, request=request)
     plan = get_plan(order.tier)
     if order.status == "success":
         return OrderDto(
@@ -440,52 +467,23 @@ def init_paypal_order(
     if order.status in {"failed", "cancelled", "expired"}:
         raise AuthError(409, "ORDER_NOT_PAYABLE", "Đơn hàng không ở trạng thái có thể thanh toán.")
 
-    if order.provider == "paypal_sandbox" and order.payment_url:
-        return OrderDto(
-            id=order.id,
-            order_code=order.order_code,
-            tier=order.tier,
-            duration_days=order.duration_days,
-            amount_usd_cents=order.amount_cents,
-            amount_usd_formatted=plan.amount_usd_formatted,
-            amount_vnd=order.amount_vnd,
-            amount_vnd_formatted=f"{order.amount_vnd:,} VNĐ".replace(",", "."),
-            currency=order.currency,
-            status=order.status,
-            provider=order.provider,
-            provider_txn_id=order.provider_txn_id,
-            payment_url=order.payment_url,
-            created_at=order.created_at,
-            completed_at=order.completed_at,
-        )
+    if order.provider not in {"unselected", "sandbox_simulated", "paypal_sandbox"}:
+        raise AuthError(409, "ORDER_NOT_PAYABLE", "Đơn hàng thuộc cổng thanh toán khác.")
 
-    order.provider = "paypal_sandbox"
-    paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
+    paypal = _require_paypal_sandbox(getattr(request.app.state, "paypal", None))
     origin = request.headers.get("origin")
     if origin not in request.app.state.auth.settings.auth_allowed_origins:
         raise AuthError(403, "FORBIDDEN", "Invalid checkout origin.")
-    return_url = f"{origin}/premium/checkout?order={order.order_code}"
-    cancel_url = return_url + "&cancelled=true"
 
-    if paypal and paypal.is_configured():
-        try:
-            pp_order = paypal.create_order(
-                order_code=order.order_code,
-                plan_tier=order.tier,
-                return_url=return_url,
-                cancel_url=cancel_url,
-            )
-            order.payment_url = pp_order.get("approve_url")
-            order.provider_txn_id = pp_order.get("id")
-            order.provider_payload = pp_order
-        except PaypalError as exc:
-            logger.error("Failed to initialize PayPal order: %s", exc)
-            raise AuthError(502, "PAYPAL_ERROR", f"Không thể tạo đơn hàng PayPal: {str(exc)}")
+    if _real_paypal_order(order):
+        if not _valid_paypal_approval(order.payment_url, order.provider_txn_id):
+            raise AuthError(502, "PAYPAL_APPROVAL_UNAVAILABLE", "Liên kết xác nhận PayPal Sandbox không hợp lệ.")
     else:
-        mock_id = f"MOCK-PP-{uuid4().hex[:12].upper()}"
-        order.provider_txn_id = mock_id
-        order.payment_url = f"https://www.sandbox.paypal.com/checkoutnow?token={mock_id}"
-        order.provider_payload = {"mock": True, "id": mock_id}
+        pp_order = _create_paypal_order(paypal, order.order_code, order.tier, origin)
+        order.provider = "paypal_sandbox"
+        order.payment_url = pp_order["approve_url"]
+        order.provider_txn_id = pp_order["id"]
+        order.provider_payload = pp_order
 
     order.updated_at = now
     account.db.flush()
@@ -612,19 +610,18 @@ def _dispatch_receipt_email_safe(request: Request | None, db, order: Subscriptio
         pass
 
 
-def _check_and_expire_order(order: SubscriptionOrder, db, now: datetime, paypal: PaypalAdapter | None = None, *, reconcile: bool = False) -> bool:
+def _check_and_expire_order(order: SubscriptionOrder, db, now: datetime, paypal: PaypalAdapter | None = None, *, reconcile: bool = False, request: Request | None = None) -> bool:
     """Checks a stale pending order. Reconciles if captured on PayPal; otherwise transitions to expired.
     Never grants subscription without verified capture confirmation."""
     stale = order.created_at <= now - ORDER_EXPIRY_TIMEOUT
     if order.status != "pending" or (not stale and not reconcile):
         return False
-    real_paypal = (order.provider == "paypal_sandbox" and order.provider_txn_id
-                   and not order.provider_txn_id.startswith(("SIM-", "MOCK-")))
-    if real_paypal and (paypal is None or not paypal.is_configured()):
+    real_paypal = _real_paypal_order(order)
+    if real_paypal and (paypal is None or not paypal.is_configured() or not paypal.merchant_id or paypal.mode != "sandbox"):
         raise AuthError(503, "PAYPAL_UNAVAILABLE", "Chưa thể đối soát đơn PayPal.")
 
     is_captured = False
-    if order.provider == "paypal_sandbox" and paypal and paypal.is_configured() and order.provider_txn_id:
+    if real_paypal:
         try:
             pp_order = paypal.get_order_details(order.provider_txn_id)
             if pp_order.get("status") == "COMPLETED" and pp_order.get("id") == order.provider_txn_id:
@@ -638,7 +635,12 @@ def _check_and_expire_order(order: SubscriptionOrder, db, now: datetime, paypal:
                     order.status = "success"
                     order.completed_at = now
                     order.updated_at = now
+                    order.provider_txn_id = pp_order["purchase_units"][0]["payments"]["captures"][0]["id"]
+                    order.provider_payload = pp_order
+                    order.provider_response_code = "COMPLETED"
                     _activate_subscription(db, order, now)
+                    db.flush()
+                    _dispatch_receipt_email_safe(request, db, order, now)
                     is_captured = True
                     logger.info("Stale pending order %s reconciled to success via PayPal verification.", order.order_code)
                 else:
@@ -681,7 +683,7 @@ def list_subscription_orders(
         )
         stale_orders = stale_res.all() if hasattr(stale_res, "all") else list(stale_res or [])
         for st in stale_orders:
-            _check_and_expire_order(st, account.db, now, paypal)
+            _check_and_expire_order(st, account.db, now, paypal, request=request)
 
         stmt = select(SubscriptionOrder).where(SubscriptionOrder.user_id == account.user.id)
         if isinstance(status, str) and status and status != "all":
@@ -821,7 +823,7 @@ def get_subscription_order(
 
     now = datetime.now(timezone.utc)
     paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None) if (request and hasattr(request, "app")) else None
-    _check_and_expire_order(order, account.db, now, paypal, reconcile=True)
+    _check_and_expire_order(order, account.db, now, paypal, reconcile=True, request=request)
 
     plan = get_plan(order.tier)
     return OrderDetailDto(
@@ -879,7 +881,7 @@ def simulate_subscription_order(
 
     plan = get_plan(order.tier)
 
-    _check_and_expire_order(order, account.db, now, getattr(request.app.state, "paypal", None))
+    _check_and_expire_order(order, account.db, now, getattr(request.app.state, "paypal", None), request=request)
 
     # Idempotent response if order is already resolved
     if order.status == "success":
@@ -903,18 +905,8 @@ def simulate_subscription_order(
         raise AuthError(409, "ORDER_NOT_PAYABLE", "Đơn hàng không ở trạng thái có thể thanh toán.")
 
     if payload.action == "pay_success":
-        # Guard: if order already has an active real PayPal transaction, ensure it was not already captured
-        if order.provider == "paypal_sandbox" and order.provider_txn_id and not order.provider_txn_id.startswith("SIM-") and not order.provider_txn_id.startswith("MOCK-"):
-            paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
-            if paypal and paypal.is_configured():
-                try:
-                    pp_check = paypal.get_order_details(order.provider_txn_id)
-                    if pp_check.get("status") != "VOIDED":
-                        raise AuthError(409, "ORDER_ALREADY_CAPTURED", "Đơn hàng đã được thanh toán trên PayPal.")
-                except PaypalError as exc:
-                    raise AuthError(503, "PAYPAL_UNAVAILABLE", "Chưa thể đối soát đơn PayPal.") from exc
-            else:
-                raise AuthError(503, "PAYPAL_NOT_CONFIGURED", "Chưa thể đối soát đơn PayPal.")
+        if _real_paypal_order(order):
+            raise AuthError(409, "PAYPAL_ORDER_BOUND", "Đơn hàng đang dùng PayPal Sandbox.")
 
         order.status = "success"
         order.completed_at = now
@@ -982,7 +974,7 @@ def capture_subscription_order(
 
     plan = get_plan(order.tier)
 
-    _check_and_expire_order(order, account.db, now, getattr(request.app.state, "paypal", None))
+    _check_and_expire_order(order, account.db, now, getattr(request.app.state, "paypal", None), request=request)
 
     # Idempotent response if order is already resolved
     if order.status == "success":
@@ -997,6 +989,7 @@ def capture_subscription_order(
             currency=order.currency,
             status=order.status,
             provider=order.provider,
+            provider_txn_id=order.provider_txn_id,
             payment_url=order.payment_url,
             created_at=order.created_at,
             completed_at=order.completed_at,
@@ -1011,71 +1004,53 @@ def capture_subscription_order(
     sandbox_enabled = getattr(getattr(request.app.state, "premium", None), "premium_sandbox_enabled", False)
     paypal: PaypalAdapter | None = getattr(request.app.state, "paypal", None)
 
-    if order.provider in ("paypal_sandbox", "unselected"):
+    if payload and payload.intent == "simulate":
+        if auth_env != "development" or not sandbox_enabled:
+            raise AuthError(403, "FORBIDDEN", "Mô phỏng thanh toán bị vô hiệu hóa.")
+        if _real_paypal_order(order) or order.provider not in {"unselected", "paypal_sandbox", "sandbox_simulated"}:
+            raise AuthError(409, "PAYPAL_ORDER_BOUND", "Đơn hàng đang dùng một cổng thanh toán khác.")
+        if payload.paypal_order_id:
+            raise AuthError(400, "INVALID_SIMULATION", "Mô phỏng không nhận mã PayPal.")
+        if payload.mock_fail:
+            raise AuthError(400, "PAYMENT_FAILED", "Mô phỏng thanh toán PayPal thất bại.")
+
         order.provider = "paypal_sandbox"
-        pp_order_id = (payload.paypal_order_id if payload else None) or order.provider_txn_id
+        order.payment_url = None
+        order.provider_txn_id = f"SIM-PP-{uuid4().hex[:12].upper()}"
+        order.provider_payload = {"mock": True, "captured": True}
+        order.provider_response_code = "COMPLETED"
+
+    elif order.provider in {"paypal_sandbox", "unselected"}:
+        pp_order_id = payload.paypal_order_id if payload else None
         if not pp_order_id:
-            raise AuthError(400, "MISSING_PAYPAL_ID", "Thiếu mã định danh giao dịch PayPal (PayPal Order ID).")
+            raise AuthError(400, "MISSING_PAYPAL_ID", "Thiếu mã định danh giao dịch PayPal.")
+        paypal = _require_paypal_sandbox(paypal)
+        if not _real_paypal_order(order) or pp_order_id != order.provider_txn_id:
+            raise AuthError(400, "PAYPAL_ORDER_MISMATCH", "Mã PayPal không khớp đơn hàng Sandbox đã khởi tạo.")
+        try:
+            capture_res = paypal.capture_order(pp_order_id, idempotency_key=order.order_code)
+        except PaypalError as exc:
+            logger.warning("PayPal capture failed: %s", type(exc).__name__)
+            raise AuthError(502, "CAPTURE_FAILED", "Chưa thể xác nhận thanh toán từ PayPal Sandbox.") from exc
 
-        if paypal and paypal.is_configured():
-            if not paypal.merchant_id:
-                raise AuthError(503, "PAYPAL_NOT_CONFIGURED", "Thiếu cấu hình merchant PayPal Sandbox.")
-            if pp_order_id != order.provider_txn_id:
-                raise AuthError(400, "PAYPAL_ORDER_MISMATCH", "Mã PayPal không khớp đơn hàng.")
-            try:
-                capture_res = paypal.capture_order(pp_order_id, idempotency_key=order.order_code)
-            except PaypalError as exc:
-                logger.error("PayPal capture API call failed for order %s: %s", order.order_code, exc)
-                order.status = "failed"
-                order.completed_at = now
-                order.updated_at = now
-                account.db.flush()
-                raise AuthError(400, "CAPTURE_FAILED", f"Lỗi capture từ PayPal: {str(exc)}")
+        if capture_res.get("id") != pp_order_id:
+            raise AuthError(400, "PAYPAL_ORDER_MISMATCH", "Mã phản hồi PayPal không khớp đơn hàng.")
+        is_valid, _ = paypal.verify_capture(
+            capture_res,
+            expected_amount_cents=order.amount_cents,
+            expected_order_code=order.order_code,
+            expected_merchant_id=paypal.merchant_id,
+        )
+        if not is_valid:
+            raise AuthError(400, "CAPTURE_INVALID", "Không thể xác thực giao dịch PayPal Sandbox.")
 
-            if capture_res.get("id") != pp_order_id:
-                raise AuthError(400, "PAYPAL_ORDER_MISMATCH", "Mã phản hồi PayPal không khớp đơn hàng.")
-            is_valid, reason = paypal.verify_capture(
-                capture_res,
-                expected_amount_cents=order.amount_cents,
-                expected_order_code=order.order_code,
-            )
-            if not is_valid:
-                logger.warning("PayPal capture verification failed for %s: %s", order.order_code, reason)
-                order.status = "failed"
-                order.provider_response_code = reason
-                order.provider_payload = capture_res
-                order.completed_at = now
-                order.updated_at = now
-                account.db.flush()
-                raise AuthError(400, "CAPTURE_INVALID", f"Xác thực thanh toán thất bại: {reason}")
-
-            cap_id = pp_order_id
-            try:
-                cap_id = capture_res["purchase_units"][0]["payments"]["captures"][0]["id"]
-            except Exception:
-                pass
-
-            order.provider_txn_id = cap_id
-            order.provider_payload = capture_res
-            order.provider_response_code = "COMPLETED"
-        else:
-            # Production boundary guard: Never allow mock simulation fallback in production environment
-            if auth_env == "production":
-                raise AuthError(503, "PAYPAL_NOT_CONFIGURED", "Cổng thanh toán PayPal chưa được cấu hình cho môi trường production.")
-            if not sandbox_enabled:
-                raise AuthError(403, "FORBIDDEN", "Mô phỏng thanh toán bị vô hiệu hóa.")
-            # Mock sandbox simulation mode
-            if payload and payload.mock_fail:
-                order.status = "failed"
-                order.completed_at = now
-                order.updated_at = now
-                account.db.flush()
-                raise AuthError(400, "PAYMENT_FAILED", "Mô phỏng thanh toán PayPal thất bại.")
-            order.provider_txn_id = f"SIM-PP-{uuid4().hex[:12].upper()}"
-            order.provider_payload = {"mock": True, "captured": True}
-            order.provider_response_code = "COMPLETED"
+        order.provider_txn_id = capture_res["purchase_units"][0]["payments"]["captures"][0]["id"]
+        order.provider_payload = capture_res
+        order.provider_response_code = "COMPLETED"
 
     elif order.provider == "sandbox_simulated":
+        if payload and (payload.paypal_order_id or "intent" in payload.model_fields_set):
+            raise AuthError(400, "INVALID_PROVIDER", "Đơn thẻ không nhận yêu cầu capture PayPal.")
         # Production boundary guard: Never allow simulated capture in production environment
         if auth_env == "production" or not sandbox_enabled:
             raise AuthError(403, "FORBIDDEN", "Phương thức thanh toán mô phỏng bị vô hiệu hóa trên môi trường production.")
@@ -1104,6 +1079,7 @@ def capture_subscription_order(
         currency=order.currency,
         status=order.status,
         provider=order.provider,
+        provider_txn_id=order.provider_txn_id,
         payment_url=order.payment_url,
         created_at=order.created_at,
         completed_at=order.completed_at,

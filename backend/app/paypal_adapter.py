@@ -100,11 +100,9 @@ class PaypalAdapter:
             except Exception:
                 pass
             logger.error(
-                "PayPal API error: %s %s -> HTTP %d: %s",
+                "PayPal API error: %s HTTP %d",
                 method,
-                path,
                 e.code,
-                err_body or e.reason,
             )
             raise PaypalApiError(
                 f"PayPal API returned error {e.code}: {e.reason}",
@@ -112,7 +110,7 @@ class PaypalAdapter:
                 response_body=err_body,
             ) from e
         except urllib.error.URLError as e:
-            logger.error("PayPal connection failed: %s %s: %s", method, path, e.reason)
+            logger.error("PayPal connection failed: %s (%s)", method, type(e.reason).__name__)
             raise PaypalApiError(f"PayPal connection error: {e.reason}", status_code=504) from e
 
     def get_access_token(self, force_refresh: bool = False) -> str:

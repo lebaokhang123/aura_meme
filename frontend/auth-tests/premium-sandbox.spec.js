@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 const pageErrors = new WeakMap();
 test.beforeEach(({ page }) => {
@@ -13,6 +14,22 @@ test.afterEach(({ page }) => {
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const now = '2026-11-14T00:00:00Z';
 
+async function assertReceiptDownload(page, button, orderCode, method, txn = '') {
+  const [download] = await Promise.all([page.waitForEvent('download'), button.click()]);
+  expect(download.suggestedFilename()).toBe('aurameme-receipt-' + orderCode + '.pdf');
+  const pdf = await readFile(await download.path(), 'latin1');
+  expect(pdf.startsWith('%PDF-')).toBe(true);
+  // jsPDF uses uncompressed text streams and embedded Roboto ToUnicode maps.
+  const maps = [...pdf.matchAll(/begincmap([\s\S]*?)endcmap/g)].map(([, cmap]) =>
+    new Map([...cmap.matchAll(/<([\da-f]{4})><([\da-f]{4})>/gi)].map(([, glyph, unicode]) =>
+      [glyph.toLowerCase(), String.fromCharCode(parseInt(unicode, 16))])));
+  const lines = [...pdf.matchAll(/<([\da-f]+)> Tj/gi)].flatMap(([, text]) =>
+    maps.map(map => (text.toLowerCase().match(/.{4}/g) || []).map(glyph => map.get(glyph) || '?').join('')));
+  for (const phrase of [orderCode, method, txn].filter(Boolean)) {
+    expect(lines.some(line => line.includes(phrase)), phrase).toBe(true);
+  }
+}
+
 async function setupMockApi(context, identity = 0, initialSub = null, vnpayApproved = false, orderError = null) {
   const users = ['khang_dev', 'kien_dev', 'giga_user'].map((username, n) => ({
     id: id(n + 1),
@@ -23,6 +40,8 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
   }));
 
   let currentSubscription = initialSub;
+  let checkoutProvider = 'paypal_sandbox';
+  let checkoutTxn = 'SIM-PP-1234';
   const requests = [];
 
   await context.route('**/api/v1/**', async (route) => {
@@ -217,7 +236,9 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
         amount_usd_formatted: currentSubscription?.tier === 'prime' ? '$50' : '$5',
         amount_vnd: currentSubscription?.tier === 'prime' ? 1250000 : 130000,
         status: currentSubscription || code === 'AM-PRIME-1795330988-XNSBYM98' ? 'success' : 'pending',
-        provider: 'paypal_sandbox',
+        provider: checkoutProvider,
+        provider_txn_id: checkoutTxn,
+        owner_username: users[identity]?.username,
       });
     }
 
@@ -277,6 +298,8 @@ async function setupMockApi(context, identity = 0, initialSub = null, vnpayAppro
           order_code: 'AM-SUB-TEST-1234',
         });
       }
+      checkoutProvider = path.endsWith('/capture') ? 'paypal_sandbox' : 'sandbox_simulated';
+      checkoutTxn = path.endsWith('/capture') ? 'SIM-PP-1234' : 'SIM-CARD-1234';
       currentSubscription = {
         tier: 'plus',
         is_active: true,
@@ -436,6 +459,8 @@ test('Logged in user can confirm order in modal, navigate to checkout, enter sim
   await expect(receipt).toContainText('BIÊN NHẬN GIAO DỊCH HỘI VIÊN');
   await expect(receipt).toContainText('ĐÃ KÍCH HOẠT (ACTIVE)');
 
+  await assertReceiptDownload(page, page.locator('.checkout-btn-download-receipt'), 'AM-SUB-TEST-1234', 'Thẻ mô phỏng nội bộ', 'SIM-CARD-1234');
+
   // Verify network requests: NO card/CVV data in capture payload!
   const simReq = s.requests.find((r) => (r.path.endsWith('/simulate') || r.path.endsWith('/capture')) && r.method === 'POST');
   expect(simReq).toBeDefined();
@@ -520,6 +545,51 @@ test('PayPal Sandbox checkout and quick capture flow activate membership success
   const capReq = s.requests.find((r) => r.path.endsWith('/capture') && r.method === 'POST');
   expect(capReq).toBeDefined();
   expect(capReq.csrf).toBe('server-csrf-test-token');
+  expect(capReq.body).toEqual({ intent: 'simulate' });
+
+  await assertReceiptDownload(page, receipt.locator('.checkout-btn-download-receipt'), 'AM-SUB-TEST-1234', 'PayPal Sandbox', 'SIM-PP-1234');
+  await page.reload();
+  await assertReceiptDownload(page, receipt.locator('.checkout-btn-download-receipt'), 'AM-SUB-TEST-1234', 'PayPal Sandbox', 'SIM-PP-1234');
+  expect(s.requests.filter(r => r.path.endsWith('/capture'))).toHaveLength(1);
+});
+
+test('Primary PayPal requires a real Sandbox approval and never auto-captures', async ({ page, context }) => {
+  const { requests } = await setupMockApi(context);
+  const checkout = '/premium/checkout?order=AM-SUB-TEST-1234';
+  await page.goto(checkout);
+  const primary = page.locator('.checkout-btn-paypal');
+  await primary.click(); // Existing mock approval URL must be rejected.
+  await expect(page.getByText('Chưa thể khởi tạo hoặc đối soát PayPal. Vui lòng thử lại.')).toBeVisible();
+  expect(requests.filter(r => r.path.endsWith('/capture'))).toHaveLength(0);
+
+  await context.route('**/api/v1/premium/orders/*/init-paypal', route => route.fulfill({ status: 503, json: { error: { code: 'PAYPAL_NOT_CONFIGURED' } } }));
+  await primary.click();
+  await expect(page.getByText('Chưa thể khởi tạo hoặc đối soát PayPal. Vui lòng thử lại.')).toBeVisible();
+  expect(requests.filter(r => r.path.endsWith('/capture'))).toHaveLength(0);
+
+  const url = 'https://www.sandbox.paypal.com/checkoutnow?token=SANDBOXORDER123';
+  await context.route('**/api/v1/premium/orders/*/init-paypal', route => route.fulfill({ json: {
+    order_code: 'AM-SUB-TEST-1234', status: 'pending', provider: 'paypal_sandbox',
+    provider_txn_id: 'SANDBOXORDER123', payment_url: url,
+  } }));
+  await context.route('https://www.sandbox.paypal.com/checkoutnow?*', route => route.fulfill({ body: 'Sandbox fixture' }));
+  await primary.click();
+  await expect(page).toHaveURL(url);
+  expect(requests.filter(r => r.path.endsWith('/capture'))).toHaveLength(0);
+
+  await context.route('**/api/v1/premium/orders/AM-SUB-TEST-1234', route => route.fulfill({ json: {
+    order_code: 'AM-SUB-TEST-1234', tier: 'plus', status: 'pending', provider: 'paypal_sandbox',
+    provider_txn_id: 'SANDBOXORDER123', amount_vnd: 130000,
+  } }));
+  await page.goto(checkout + '&cancelled=true&token=SANDBOXORDER123');
+  await expect(page.getByText('Bạn đã hủy xác nhận PayPal. Có thể thử lại.')).toBeVisible();
+  await page.goto(checkout + '&token=WRONG');
+  await expect(page.getByText('Mã xác nhận PayPal không khớp đơn hàng.')).toBeVisible();
+  expect(requests.filter(r => r.path.endsWith('/capture'))).toHaveLength(0);
+
+  await page.goto(checkout + '&token=SANDBOXORDER123');
+  await expect.poll(() => requests.filter(r => r.path.endsWith('/capture')).map(r => r.body))
+    .toEqual([{ intent: 'paypal', paypal_order_id: 'SANDBOXORDER123' }]);
 });
 
 test('Guest accessing /premium/checkout directly redirects to /login?next=%2Fpremium%2Fcheckout', async ({ page, context }) => {
@@ -1064,7 +1134,7 @@ test('Part E: Payment History page (/premium/history) displays orders, opens det
   await expect(rows.first().locator('.history-action-btn--download')).toHaveCount(1);
 
   // Click "Tải biên lai" -> triggers download and displays toast
-  await rows.first().locator('.history-action-btn--download').click();
+  await assertReceiptDownload(page, rows.first().locator('.history-action-btn--download'), 'AM-PRIME-1795330988-XNSBYM98', 'PayPal Sandbox');
   await expect(page.locator('.history-toast')).toBeVisible();
   await expect(page.locator('.history-toast')).toContainText('Đã tải biên lai cho đơn hàng AM-PRIME-1795330988-XNSBYM98');
 });

@@ -178,3 +178,9 @@ Các tham số Aura/odds/payment còn mở đã nằm trong `03-database-design.
 - [OWASP — Cheat Sheet Series](https://cheatsheetseries.owasp.org/).
 
 **Bản vẽ và đặc tả là cơ sở triển khai về sau; không thay cho test, cấu hình hạ tầng hay chứng cứ vận hành.**
+
+## Owner Acceptance Hotfix — Cấu hình PayPal Sandbox/SMTP và capture
+
+`PremiumSettings` và `EmailSettings` đọc process env trước `backend/.env`. Launcher demo áp dụng cấu hình DB/auth/media từ allowlist riêng trong `backend/demo.local/.env`. Các khóa PayPal/SMTP được cấu hình riêng ở backend. Frontend và tiến trình mở browser không nhận các biến cấu hình này từ launcher. Tài khoản Buyer/Business tương tác ở Sandbox và nằm ngoài cấu hình ứng dụng.
+
+Thanh toán PayPal Sandbox dùng order ID đầu vào để ràng buộc callback, và lưu capture ID do provider trả về sau khi đối soát. Mô phỏng dùng ý định riêng, không xuất hiện như provider approval và không thể ghi đè order có PayPal ID thật. Trạng thái order thành công độc lập với trạng thái hội viên ACTIVE.
