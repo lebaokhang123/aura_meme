@@ -33,7 +33,7 @@ function CommentRow({comment}) {
   const handleAction=async()=>{
     if(pending.current)return;
     if((confirm==='hide'||confirm==='admin-delete')&&reason.trim().length<5){
-      setError('Vui lòng nhập lý do tối thiểu 5 ký tự.');
+      setError('MODERATION_REASON_REQUIRED');
       return;
     }
     pending.current=true;setBusy(true);setError('');
