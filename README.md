@@ -44,9 +44,23 @@ Dự án được nghiên cứu và phát triển bởi:
 - **Python:** Phiên bản `>= 3.12`.
 - **Cơ sở dữ liệu:** PostgreSQL 15 trở lên.
 
-### Khởi chạy nhanh
+### Hướng dẫn cài đặt & khởi chạy
 
-1. **Cài đặt các gói phụ thuộc:**
+Tùy theo môi trường (máy mới tải mã nguồn về hoặc máy đã cấu hình sẵn), bạn thực hiện theo các bước sau:
+
+#### A. Đối với máy mới (Fresh Clone)
+
+1. **Tải mã nguồn:**
+   ```powershell
+   git clone https://github.com/lebaokhang123/aura_meme.git
+   cd aura_meme
+   ```
+
+2. **Cấu hình môi trường (.env):**
+   - Tạo file `backend/.env` từ file mẫu cấu hình, khai báo chuỗi kết nối PostgreSQL (`DATABASE_URL`) và các khóa bảo mật cần thiết.
+   - *Lưu ý về tài nguyên:* Repository mã nguồn công khai bao gồm toàn bộ mã nguồn, giao diện, cấu trúc cơ sở dữ liệu và các asset giao diện cốt lõi. Các hình ảnh meme demo riêng tư của nhóm thử nghiệm được lưu trữ biệt lập và không cam kết đưa vào kho mã nguồn mở.
+
+3. **Cài đặt các gói phụ thuộc:**
    - **Frontend:**
      ```powershell
      cd frontend
@@ -60,26 +74,30 @@ Dự án được nghiên cứu và phát triển bởi:
      .\.venv\Scripts\Activate.ps1
      pip install -r requirements-ci.txt
      pip install -e . --no-deps
+     # Khởi tạo schema cơ sở dữ liệu:
+     alembic upgrade head
      cd ..
      ```
 
-2. **Chạy ứng dụng:**
-   Dự án đã được tích hợp sẵn tệp lệnh tự động hóa, bạn chỉ cần chạy một trong hai câu lệnh sau tại thư mục gốc:
+#### B. Khởi chạy nhanh (máy đã cấu hình sẵn)
 
-   - **Chế độ Demo:**
-     ```powershell
-     .\run.bat demo
-     ```
-   - **Chế độ Phát triển (Dev):**
-     ```powershell
-     .\run.bat dev
-     ```
+Dự án đã được tích hợp sẵn tệp lệnh tự động hóa, bạn chỉ cần chạy một trong hai câu lệnh sau tại thư mục gốc:
 
-3. **Truy cập ứng dụng:**
-   Sau khi các tiến trình khởi động thành công, mở trình duyệt web và truy cập theo đường dẫn:
-   ```
-   http://localhost:5173
-   ```
+- **Chế độ Demo:**
+  ```powershell
+  .\run.bat demo
+  ```
+- **Chế độ Phát triển (Dev):**
+  ```powershell
+  .\run.bat dev
+  ```
+
+### Truy cập ứng dụng
+
+Sau khi các tiến trình khởi động thành công, mở trình duyệt web và truy cập theo đường dẫn:
+```
+http://localhost:5173
+```
 
 ---
 

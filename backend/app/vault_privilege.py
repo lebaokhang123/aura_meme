@@ -10,6 +10,7 @@ from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.admin_users import KHANG_DEV_ID, KIEN_DEV_ID
+from app.aura_lock import lock_aura_mutation
 from app.catalog_rights import reviewed_source_rights, reviewed_source_rights_sql
 from app.inventory import ready_asset
 from app.inventory_grants import inventory_state
@@ -38,47 +39,59 @@ def assert_khang_dev_target(target_user_id: UUID) -> None:
         )
 
 
-def resolve_reward_policy_id(db: Session, asset_id: UUID | None = None) -> UUID:
-    """Resolve a valid RewardPolicyVersion ID for foreign key constraint satisfaction."""
+def resolve_reward_policy_id(db: Session, asset_id: UUID | None = None, now: datetime | None = None) -> UUID:
+    """Resolve a valid RewardPolicyVersion ID for foreign key constraint satisfaction.
+
+    Strict rules:
+    - Only policies with status='published' and effective_at <= now are eligible.
+    - Draft or future policies are NEVER selected.
+    - If asset_id is provided, prioritize published policy linked to that asset's loot table.
+    - Otherwise, select the latest published policy where effective_at <= now.
+    - If none found, raises ValueError (no fallback to draft/future).
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+
     if asset_id is not None:
         pool_pid = db.scalar(
             select(CaseLootTable.policy_id)
             .join(CasePoolItem, CasePoolItem.loot_table_id == CaseLootTable.id)
+            .join(RewardPolicyVersion, RewardPolicyVersion.id == CaseLootTable.policy_id)
             .where(
                 CasePoolItem.asset_id == asset_id,
                 CaseLootTable.status == "published",
+                RewardPolicyVersion.status == "published",
+                RewardPolicyVersion.effective_at <= now,
             )
+            .order_by(RewardPolicyVersion.version.desc())
         )
         if pool_pid is not None:
             return pool_pid
 
-    # Fallback to latest published reward policy version
+    # Latest published reward policy version effective as of now
     published_pid = db.scalar(
         select(RewardPolicyVersion.id)
-        .where(RewardPolicyVersion.status == "published")
+        .where(
+            RewardPolicyVersion.status == "published",
+            RewardPolicyVersion.effective_at <= now,
+        )
         .order_by(RewardPolicyVersion.version.desc())
     )
     if published_pid is not None:
         return published_pid
 
-    # Fallback to any existing reward policy version
-    any_pid = db.scalar(
-        select(RewardPolicyVersion.id)
-        .order_by(RewardPolicyVersion.created_at.desc())
-    )
-    if any_pid is not None:
-        return any_pid
-
-    raise ValueError("A valid RewardPolicyVersion is required for InventoryGrant foreign key.")
+    raise ValueError("No valid published RewardPolicyVersion with effective_at <= now found.")
 
 
-def is_asset_eligible_for_privilege(asset: AssetItem) -> bool:
+def is_asset_eligible_for_privilege(asset: AssetItem | None) -> bool:
     """Check if an asset is active, approved, and has valid source rights."""
-    if asset is None or not asset.active:
+    if asset is None or not getattr(asset, "active", False):
         return False
-    if asset.kind not in ("avatar", "background"):
+    if getattr(asset, "kind", None) not in ("avatar", "background"):
         return False
-    rights = dict(asset.source_rights or {})
+    if getattr(asset, "rarity", None) not in ("D", "C", "B", "A", "S"):
+        return False
+    rights = dict(getattr(asset, "source_rights", None) or {})
     if rights.get("review_status") != "approved":
         return False
     if rights.get("name_review_status") != "approved":
@@ -95,10 +108,11 @@ def grant_khang_dev_single_asset_if_eligible(
     *,
     actor_id: UUID = KHANG_DEV_ID,
     policy_id: UUID | None = None,
+    source: str = "admin_approval_hook",
 ) -> bool:
     """Grant 1 unit of a single newly eligible asset to Khang Dev if not already owned.
 
-    - Called from admin approval flow or individual publish flow.
+    - Called from admin approval flow, publication flow, or sync tool.
     - Idempotent: does nothing if already owned.
     - Zero EXP, safe locks, audit log recorded.
     - Returns True if granted, False if skipped.
@@ -133,7 +147,7 @@ def grant_khang_dev_single_asset_if_eligible(
         inventory_state(db, KHANG_DEV_ID, asset.id)
         return False
 
-    effective_policy_id = policy_id or resolve_reward_policy_id(db, asset.id)
+    effective_policy_id = policy_id or resolve_reward_policy_id(db, asset.id, now)
 
     # UserInventory must be flushed before InventoryGrant (FK dependency)
     if user_inv is None:
@@ -175,7 +189,7 @@ def grant_khang_dev_single_asset_if_eligible(
             after_json={
                 "granted_assets": [str(asset.id)],
                 "policy_id": str(effective_policy_id),
-                "source": "admin_approval_hook",
+                "source": source,
             },
             created_at=now,
         )
@@ -195,10 +209,12 @@ def auto_grant_khang_dev_published_items(
 ) -> list[UUID]:
     """Automatically grant newly published items to Khang Dev during publication.
 
-    - Strictly idempotent: 1 unit if not owned; preserves existing quantity if already owned.
-    - Uses schema-compatible source_type='admin'.
+    - Reuses grant_khang_dev_single_asset_if_eligible for unified ledger integrity.
+    - Verifies actual AssetItem in database, not relying solely on manifest.
+    - Applies same strict eligibility conditions.
+    - Idempotent: 1 unit if not owned; preserves existing quantity if already owned.
     - +0 EXP, no fake chest openings, no wallet transactions.
-    - Skips cleanly if Khang Dev does not exist in the database (e.g. synthetic publication test).
+    - Skips cleanly if Khang Dev does not exist in the database.
     """
     khang = db.scalar(
         select(User)
@@ -210,89 +226,21 @@ def auto_grant_khang_dev_published_items(
 
     granted: list[UUID] = []
     for item in manifest.items:
-        if item.kind not in ("avatar", "background"):
-            continue
-        if getattr(item, "name_review_status", None) != "approved":
-            continue
-        source_rights = getattr(item, "source_rights", None)
-        if hasattr(source_rights, "review_status") and source_rights.review_status != "approved":
-            continue
-
         item_id = UUID(str(item.id)) if isinstance(item.id, str) else item.id
-
-        # Lock inventory row
-        user_inv = db.scalar(
-            select(UserInventory)
-            .where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == item_id)
-            .with_for_update()
-        )
-        if user_inv is not None and user_inv.quantity > 0:
-            # Already owned: preserve existing quantity without changes
+        asset = db.scalar(select(AssetItem).where(AssetItem.id == item_id))
+        if asset is None or not is_asset_eligible_for_privilege(asset):
             continue
 
-        event_key = f"{PRIVILEGE_KEY_PREFIX}{item_id}"
-        existing_grant = db.scalar(
-            select(InventoryGrant).where(
-                InventoryGrant.user_id == KHANG_DEV_ID,
-                InventoryGrant.event_key == event_key,
-            )
+        was_granted = grant_khang_dev_single_asset_if_eligible(
+            db,
+            asset,
+            now,
+            actor_id=actor_id,
+            policy_id=policy_id,
+            source="publication_hook",
         )
-        if existing_grant is not None:
-            # Grant record already exists, ensure inventory cache matches
-            inventory_state(db, KHANG_DEV_ID, item_id)
-            continue
-
-        effective_policy_id = policy_id or resolve_reward_policy_id(db, item_id)
-
-        # Grant 1 unit: UserInventory must exist and be flushed before InventoryGrant
-        if user_inv is None:
-            user_inv = UserInventory(
-                user_id=KHANG_DEV_ID,
-                asset_id=item_id,
-                quantity=1,
-                acquired_at=now,
-                updated_at=now,
-            )
-            db.add(user_inv)
-        else:
-            user_inv.quantity = 1
-            user_inv.updated_at = now
-        db.flush()
-
-        grant = InventoryGrant(
-            id=uuid4(),
-            user_id=KHANG_DEV_ID,
-            asset_id=item_id,
-            event_key=event_key,
-            quantity=1,
-            source_type=PRIVILEGE_SOURCE_TYPE,
-            case_open_id=None,
-            policy_id=effective_policy_id,
-            granted_at=now,
-        )
-        db.add(grant)
-        db.flush()
-        inventory_state(db, KHANG_DEV_ID, item_id)
-        granted.append(item_id)
-
-    if granted:
-        db.add(
-            AdminAuditLog(
-                id=uuid4(),
-                actor_id=actor_id,
-                action="vault.privilege.auto_grant",
-                target_type="user_inventory",
-                target_id=str(KHANG_DEV_ID),
-                before_json=None,
-                after_json={
-                    "granted_assets": [str(gid) for gid in granted],
-                    "policy_id": str(policy_id),
-                    "source": "publication_hook",
-                },
-                created_at=now,
-            )
-        )
-        db.flush()
+        if was_granted:
+            granted.append(item_id)
 
     return granted
 
@@ -308,6 +256,7 @@ def sync_khang_dev_vault_privilege(
     """Audit or backfill all currently published Vault items for Khang Dev.
 
     - Target is strictly validated to be Khang Dev.
+    - Deduplicates by asset.id: each eligible asset is processed exactly once.
     - Dry-run mode reports differences without mutating database state.
     - Idempotent: missing items receive 1 unit, existing items keep their current quantity.
     """
@@ -332,40 +281,23 @@ def sync_khang_dev_vault_privilege(
             "already_owned": [],
         }
 
-    # Query published assets from published loot tables
-    pool_query = (
-        select(AssetItem, CaseLootTable.policy_id)
-        .join(CasePoolItem, CasePoolItem.asset_id == AssetItem.id)
-        .join(CaseLootTable, CaseLootTable.id == CasePoolItem.loot_table_id)
+    stmt = (
+        select(AssetItem)
         .where(
-            CaseLootTable.status == "published",
             AssetItem.active.is_(True),
-            reviewed_source_rights_sql(AssetItem.source_rights),
             AssetItem.kind.in_(("avatar", "background")),
         )
-        .distinct()
         .order_by(AssetItem.kind, AssetItem.rarity, AssetItem.slug)
     )
-    rows = list(db.execute(pool_query).all())
+    candidates = list(db.scalars(stmt))
 
-    # If no loot tables exist yet, also inspect approved active catalog assets
-    seen_ids = {asset.id for asset, _ in rows}
-    fallback_query = select(AssetItem).where(
-        AssetItem.active.is_(True),
-        reviewed_source_rights_sql(AssetItem.source_rights),
-        AssetItem.kind.in_(("avatar", "background")),
-    ).order_by(AssetItem.kind, AssetItem.rarity, AssetItem.slug)
-    for asset in db.scalars(fallback_query):
-        if asset.id not in seen_ids and ready_asset(asset):
-            if asset.source_rights.get("name_review_status") == "approved":
-                resolved_pid = resolve_reward_policy_id(db, asset.id)
-                rows.append((asset, resolved_pid))
-                seen_ids.add(asset.id)
+    # Filter by unified eligibility check - each asset appears exactly once
+    eligible_assets = [a for a in candidates if is_asset_eligible_for_privilege(a)]
 
     already_owned = []
     missing = []
 
-    for asset, policy_id in rows:
+    for asset in eligible_assets:
         user_inv = db.scalar(
             select(UserInventory)
             .where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == asset.id)
@@ -380,83 +312,52 @@ def sync_khang_dev_vault_privilege(
                 "quantity": user_inv.quantity,
             })
         else:
-            missing.append((asset, policy_id))
+            try:
+                pid = resolve_reward_policy_id(db, asset.id, now)
+                missing.append((asset, pid))
+            except ValueError:
+                # If no valid published policy effective as of now, skip
+                continue
 
     granted = []
     if not dry_run and missing:
         for asset, policy_id in missing:
-            event_key = f"{PRIVILEGE_KEY_PREFIX}{asset.id}"
-            user_inv = db.scalar(
-                select(UserInventory)
-                .where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == asset.id)
-                .with_for_update()
-            )
-            existing_grant = db.scalar(
-                select(InventoryGrant).where(
-                    InventoryGrant.user_id == KHANG_DEV_ID,
-                    InventoryGrant.event_key == event_key,
-                )
-            )
-            if existing_grant is not None:
-                inventory_state(db, KHANG_DEV_ID, asset.id)
-                continue
-
-            effective_policy_id = policy_id or resolve_reward_policy_id(db, asset.id)
-
-            if user_inv is None:
-                user_inv = UserInventory(
-                    user_id=KHANG_DEV_ID,
-                    asset_id=asset.id,
-                    quantity=1,
-                    acquired_at=now,
-                    updated_at=now,
-                )
-                db.add(user_inv)
-            else:
-                user_inv.quantity = 1
-                user_inv.updated_at = now
-            db.flush()
-
-            grant = InventoryGrant(
-                id=uuid4(),
-                user_id=KHANG_DEV_ID,
-                asset_id=asset.id,
-                event_key=event_key,
-                quantity=1,
-                source_type=PRIVILEGE_SOURCE_TYPE,
-                case_open_id=None,
-                policy_id=effective_policy_id,
-                granted_at=now,
-            )
-            db.add(grant)
-            db.flush()
-            inventory_state(db, KHANG_DEV_ID, asset.id)
-            granted.append(str(asset.id))
-
-        db.add(
-            AdminAuditLog(
-                id=uuid4(),
+            was_granted = grant_khang_dev_single_asset_if_eligible(
+                db,
+                asset,
+                now,
                 actor_id=actor_id,
-                action="vault.privilege.sync",
-                target_type="user_inventory",
-                target_id=str(KHANG_DEV_ID),
-                before_json={"missing_count": len(missing)},
-                after_json={
-                    "granted_assets": granted,
-                    "target_username": khang.username,
-                    "source": "sync_tool",
-                },
-                created_at=now,
+                policy_id=policy_id,
+                source="sync_tool",
             )
-        )
-        db.flush()
+            if was_granted:
+                granted.append(str(asset.id))
+
+        if granted:
+            db.add(
+                AdminAuditLog(
+                    id=uuid4(),
+                    actor_id=actor_id,
+                    action="vault.privilege.sync",
+                    target_type="user_inventory",
+                    target_id=str(KHANG_DEV_ID),
+                    before_json={"missing_count": len(missing)},
+                    after_json={
+                        "granted_assets": granted,
+                        "target_username": khang.username,
+                        "source": "sync_tool",
+                    },
+                    created_at=now,
+                )
+            )
+            db.flush()
 
     return {
         "status": "success",
         "dry_run": dry_run,
         "target_user_id": str(KHANG_DEV_ID),
         "target_username": khang.username,
-        "published_count": len(rows),
+        "published_count": len(eligible_assets),
         "already_owned_count": len(already_owned),
         "missing_count": len(missing),
         "granted_count": len(granted),
@@ -473,51 +374,103 @@ def sync_khang_dev_vault_privilege(
     }
 
 
-def main(argv=None):
+def privilege_guard(db: Session, actor_id: UUID) -> None:
+    """Safety guard for Khang Dev privilege operations:
+    - Validates target connection against loopback demo/test/e2e allowlist.
+    - Verifies current database, role, and public schema.
+    - Verifies alembic schema revision 0018.
+    - Verifies actor is active ADMIN and strictly Khang Dev.
+    - Acquires global aura mutation advisory lock.
+    """
+    from app.aura_lock import lock_aura_mutation
+    from app.catalog_activation import validate_target
+    from app.demo import reviewed_demo_schema
+    from app.models import Role, UserRole
+
+    conn = db.connection()
+    db_url = conn.engine.url.render_as_string(hide_password=False)
+    database = validate_target(db_url, allow_demo=True)
+    role = {
+        "aurameme_test": "aurameme_test",
+        "aurameme_e2e": "aurameme_e2e_app",
+        "aurameme_demo": "aurameme_demo",
+    }[database]
+
+    current_id = tuple(db.execute(text("SELECT current_database(), current_user, current_schema()")).one())
+    if current_id != (database, role, "public"):
+        raise ValueError(f"Unsafe database identity: {current_id}")
+
+    reviewed_demo_schema(conn)
+
+    if db.scalar(text("SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls FROM pg_roles WHERE rolname=current_user")):
+        raise ValueError("Privilege operations forbid superuser or privileged application roles.")
+
+    lock_aura_mutation(db)
+
+    assert_khang_dev_target(actor_id)
+    actor = db.scalar(
+        select(User)
+        .join(UserRole, UserRole.user_id == User.id)
+        .join(Role, Role.id == UserRole.role_id)
+        .where(User.id == actor_id, User.status == "active", Role.code == "ADMIN")
+        .with_for_update(of=User, read=True)
+    )
+    if actor is None:
+        raise ValueError("Khang Dev must exist as an active ADMIN user.")
+
+
+def main(argv=None, *, engine=None):
     parser = argparse.ArgumentParser(description="Khang Dev Vault Privilege Tool")
-    parser.add_argument(
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
         "--dry-run",
         action="store_true",
         default=False,
-        help="Simulate without applying changes",
+        help="Simulate without applying changes (default mode)",
     )
-    parser.add_argument(
+    mode_group.add_argument(
         "--execute",
         action="store_true",
         default=False,
-        help="Explicitly execute and commit changes",
+        help="Execute and commit changes (requires --confirm CONFIRM_GRANT_KHANG_DEV)",
     )
     parser.add_argument(
-        "--database-url",
+        "--confirm",
         type=str,
         default=None,
-        help="Database connection URL (must be validated dedicated loopback demo/test)",
+        help="Confirmation phrase required for --execute ('CONFIRM_GRANT_KHANG_DEV')",
     )
     args = parser.parse_args(argv)
 
-    is_dry_run = True
-    if args.execute:
-        is_dry_run = False
-    elif args.dry_run:
-        is_dry_run = True
+    if args.execute and args.confirm != "CONFIRM_GRANT_KHANG_DEV":
+        raise ValueError("--execute requires explicit confirmation: --confirm CONFIRM_GRANT_KHANG_DEV")
 
-    from app.catalog_activation import validate_target
+    is_dry_run = not args.execute
+
     from app.config import load_settings
     from app.db import create_db_engine
 
-    db_url = args.database_url or load_settings().database_url.get_secret_value()
-    target_db = validate_target(db_url, allow_demo=True)
+    created_engine = False
+    if engine is None:
+        settings = load_settings()
+        engine = create_db_engine(settings)
+        created_engine = True
 
-    engine = create_db_engine(db_url)
-    now = datetime.now(timezone.utc)
-    with Session(engine) as db:
-        if not is_dry_run:
-            with db.begin():
-                result = sync_khang_dev_vault_privilege(db, now, dry_run=False)
-        else:
-            result = sync_khang_dev_vault_privilege(db, now, dry_run=True)
+    try:
+        now = datetime.now(timezone.utc)
+        with Session(engine) as db:
+            privilege_guard(db, KHANG_DEV_ID)
+            if not is_dry_run:
+                result = sync_khang_dev_vault_privilege(db, now, dry_run=False, actor_id=KHANG_DEV_ID)
+                db.commit()
+            else:
+                result = sync_khang_dev_vault_privilege(db, now, dry_run=True, actor_id=KHANG_DEV_ID)
 
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return result
+    finally:
+        if created_engine and engine is not None:
+            engine.dispose()
 
 
 if __name__ == "__main__":

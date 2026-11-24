@@ -10,6 +10,7 @@ import {ActivityHeatmap} from './ActivityHeatmap.jsx';
 import {PostCard} from './PostCard.jsx';
 import {TitleBadge} from './RealmBadges.jsx';
 import {icon} from './social-ui.jsx';
+import {computeProfileDecorations} from '../profile-decorations.js';
 function inventoryImage(value){try{const url=new URL(value,location.origin);if(/^\/api\/v1\/catalog\/assets\/[0-9a-f-]{36}$/.test(url.pathname))return url.pathname;}catch{}return '/assets/brand/favicon-64.png';}
 const RARITY_PRIORITY={S:5,A:4,B:3,C:2,D:1};
 function topOwned(items){return [...items].sort((a,b)=>(RARITY_PRIORITY[b.asset.rarity]||0)-(RARITY_PRIORITY[a.asset.rarity]||0)||a.asset.slug.localeCompare(b.asset.slug)).slice(0,9);}
@@ -44,11 +45,7 @@ export function ProfilePage(){
  const isProfilePrime = profileTier === 'prime';
  const isProfilePlus = profileTier === 'plus';
  const hasProfileAura = isProfilePrime || isProfilePlus;
- const KHANG_DEV_ID = 'abcfa9f6-c9d2-4181-9b4b-118a4bb6c647';
- const KIEN_DEV_ID = 'c44f393b-4314-4f83-9b2e-9d1fe73ef64c';
- const isKhangDev = String(p?.id || '').toLowerCase() === KHANG_DEV_ID;
- const isKienDev = String(p?.id || '').toLowerCase() === KIEN_DEV_ID;
- const hasAuraMemeSeal = isKhangDev || isKienDev;
+ const { isKhangDev, isKienDev, hasAuraMemeSeal } = computeProfileDecorations(p);
  React.useEffect(()=>{
   if(!valid||profile.busy||profile.error)return;
   const targetEffect=p?.equipped_background_effect||null;

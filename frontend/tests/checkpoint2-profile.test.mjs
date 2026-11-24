@@ -3,20 +3,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  KHANG_DEV_ID,
+  KIEN_DEV_ID,
+  computeProfileDecorations,
+} from '../src/profile-decorations.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const KHANG_DEV_ID = 'abcfa9f6-c9d2-4181-9b4b-118a4bb6c647';
-const KIEN_DEV_ID = 'c44f393b-4314-4f83-9b2e-9d1fe73ef64c';
-
 test('Checkpoint 2: Profile identity rules and stable account IDs', () => {
-  function computeProfileDecorations(user) {
-    const isKhangDev = String(user?.id || '').toLowerCase() === KHANG_DEV_ID;
-    const isKienDev = String(user?.id || '').toLowerCase() === KIEN_DEV_ID;
-    const hasAuraMemeSeal = isKhangDev || isKienDev;
-    return { isKhangDev, isKienDev, hasAuraMemeSeal };
-  }
 
   // 1. Khang Dev: AuraMeme seal + Celestial Card
   const khang = computeProfileDecorations({
