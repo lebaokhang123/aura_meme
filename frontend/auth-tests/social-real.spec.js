@@ -13,10 +13,18 @@ for(const [name,display,admin] of [['khang_dev','Khang Dev',true],['kien_dev','K
   await login(page,name);await expect(page.locator('.account-avatar')).toHaveAttribute('alt','Ảnh đại diện '+display);
   await page.reload();await expect(page.locator('.account-avatar')).toHaveAttribute('alt','Ảnh đại diện '+display);
   expect((await page.request.get('/api/v1/admin/users')).status()).toBe(admin?200:403);
-  await page.getByRole('button',{name:'Mở menu tài khoản'}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();
+  await logout(page);
   await expect(page.getByRole('button',{name:'Mở menu tài khoản'})).toHaveCount(0);
  });
 }
+async function logout(page){
+ await page.getByRole('button',{name:'Mở menu tài khoản'}).click();
+ await Promise.all([
+  page.waitForEvent('framenavigated',frame=>frame===page.mainFrame()),
+  page.getByRole('button',{name:'Đăng xuất',exact:true}).click()
+ ]);
+}
+
 test('crud text, category/search/Hot, emoji comment, reaction, edit, delete and Guest reload',async({page})=>{
  await login(page);await page.getByLabel('Nội dung bài mới').fill('Social E2E Công nghệ 🔥');
  await page.getByLabel('Danh mục bài mới').selectOption('gaming');await page.getByRole('button',{name:'Đăng bài',exact:true}).click();
@@ -71,7 +79,7 @@ test('admin hides another author post; USER cannot edit or moderate it',async({p
   const {csrf_token}=await (await fetch('/api/v1/auth/csrf')).json();
   return (await fetch('/api/v1/admin/posts/'+id,{method:'PATCH',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf_token},body:JSON.stringify({status:'hidden'})})).status;
  },id);expect(denied).toBe(403);
- await page.getByRole('button',{name:'Mở menu tài khoản'}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();await expect(page.locator('.account-avatar')).toHaveCount(0);await login(page,'khang_dev');
+ await logout(page);await expect(page.locator('.account-avatar')).toHaveCount(0);await login(page,'khang_dev');
  const other=page.locator('[data-post-id="'+id+'"]');await other.getByRole('button',{name:'Tùy chọn bài viết'}).click();await expect(page.getByRole('menuitem',{name:'Sửa bài',exact:true})).toHaveCount(0);
  await page.getByRole('menuitem',{name:'Ẩn bài (Admin)'}).click();
  const confirmation=page.getByRole('alertdialog',{name:'Xác nhận ẩn bài'});await expect(confirmation).toBeVisible();
@@ -99,7 +107,7 @@ test('pagination loads the next server page, resolves direct post links and keep
  await page.goto('/?q=pagination&category=gaming');await expect(page.locator('[data-post-id]')).toHaveCount(20);
  await page.getByRole('button',{name:'Xem thêm bài viết',exact:true}).click();await expect(page.locator('[data-post-id]')).toHaveCount(21);
  await page.goto('/#post-'+ids[0]);await expect(page.locator('[data-post-id="'+ids[0]+'"]')).toBeVisible();
- await page.getByRole('button',{name:'Mở menu tài khoản'}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();
+ await logout(page);
  await expect(page.locator('.account-avatar')).toHaveCount(0);
  const card=page.locator('[data-post-id]').first();await card.getByRole('button',{name:'Thả biểu cảm',exact:true}).click();await page.locator('[data-reaction=fire]').click();
  await expect(page.getByRole('alert')).toContainText('Đăng nhập');
@@ -122,7 +130,7 @@ test('profile-contact real edit, public privacy and private inbox storage',async
  await view.goto('http://localhost:4187/profile/gigachad');await expect(view.getByText('Synthetic Profile Contact E2E bio',{exact:true})).toBeVisible();
  await expect(view.getByRole('button',{name:'Chỉnh sửa hồ sơ',exact:true})).toHaveCount(0);await expect(view.getByText('gigachad@example.com',{exact:true})).toHaveCount(0);
  expect((await view.request.post('http://localhost:4187/api/v1/contact',{data:{name:'Guest',email:'guest@example.com',subject:'No',body:'No'}})).status()).toBe(401);await guest.close();
- await page.getByRole('button',{name:'Mở menu tài khoản'}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();await expect(page.locator('.account-avatar')).toHaveCount(0);
+ await logout(page);await expect(page.locator('.account-avatar')).toHaveCount(0);
  await login(page,'khang_dev');await page.goto('/admin/contacts');const message=page.locator('article').filter({hasText:'Synthetic Profile Contact E2E message'});await expect(message).toHaveCount(1);
  await message.getByLabel('Trạng thái').selectOption('resolved');await expect(message.getByLabel('Trạng thái')).toHaveValue('resolved');
  await page.reload();await expect(page.locator('article').filter({hasText:'Synthetic Profile Contact E2E message'}).getByLabel('Trạng thái')).toHaveValue('resolved');
