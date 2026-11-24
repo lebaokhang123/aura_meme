@@ -282,7 +282,7 @@
 .admin-list-panel .workspace-row-actions .admin-icon-btn.text-error:hover:not(:disabled),
 .admin-icon-btn.text-error:hover:not(:disabled) { border-color:var(--am-error); color:var(--am-error); background:color-mix(in srgb,var(--am-error) 12%,transparent); }
 .admin-list-panel .workspace-row-actions .admin-icon-btn .material-symbols-outlined,
-.admin-icon-btn .material-symbols-outlined { font-size:19px; width:19px; height:19px; display:inline-flex; align-items:center; justify-content:center; }
+.admin-icon-btn .material-symbols-outlined { font-size:19px; width:19px; height:19px; display:inline-flex; align-items:center; justify-content:center; overflow:hidden; pointer-events:none; }
 .admin-content-preview { display:flex; flex-direction:column; gap:16px; padding:4px 0 12px; }
 .admin-content-preview-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:12px; border-bottom:1px solid var(--am-outline-variant); }
 .admin-content-preview-meta { display:flex; flex-direction:column; gap:2px; }
