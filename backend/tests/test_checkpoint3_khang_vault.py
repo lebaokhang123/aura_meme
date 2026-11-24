@@ -1,15 +1,17 @@
 """Targeted unit and PostgreSQL integration tests for Checkpoint 3: Khang Dev exclusive Vault privilege."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import os
+import re
+from secrets import token_urlsafe
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
@@ -18,6 +20,8 @@ from app.admin_workspace import AdminAssetPatch, admin_update_asset
 from app.models import (
     AdminAuditLog,
     AssetItem,
+    AuthSession,
+    Base,
     AuraLedger,
     CaseDefinition,
     CaseLootRarity,
@@ -590,17 +594,26 @@ def test_asset_in_multiple_policies_deduplicated():
 
 
 def resolve_test_db_url() -> str | None:
-    """Resolve TEST_DATABASE_URL from environment or local worktree .env only."""
-    test_url = os.environ.get("TEST_DATABASE_URL")
-    if not test_url:
-        local_env = os.path.join(os.path.dirname(__file__), "..", ".env")
-        if os.path.exists(local_env):
-            with open(local_env, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.startswith("TEST_DATABASE_URL="):
-                        test_url = line.split("=", 1)[1].strip().strip("\"'")
-                        break
-    return test_url
+    return os.environ.get("TEST_DATABASE_URL") or None
+
+
+def disposable_cluster_name() -> str:
+    name = os.environ.get("AURAMEME_DISPOSABLE_TEST_CLUSTER", "")
+    if not re.fullmatch(r"aurameme-fp-[0-9a-f]{32}", name):
+        pytest.fail("Explicit disposable PostgreSQL cluster marker is required.", pytrace=False)
+    return name
+
+
+def test_test_url_does_not_read_dotenv(monkeypatch):
+    monkeypatch.delenv("TEST_DATABASE_URL", raising=False)
+    with patch("builtins.open", side_effect=AssertionError("dotenv fallback")):
+        assert resolve_test_db_url() is None
+
+
+def test_disposable_cluster_marker_is_required(monkeypatch):
+    monkeypatch.delenv("AURAMEME_DISPOSABLE_TEST_CLUSTER", raising=False)
+    with pytest.raises(pytest.fail.Exception, match="cluster marker"):
+        disposable_cluster_name()
 
 
 def validate_test_target(test_url: str):
@@ -627,143 +640,112 @@ def validate_test_target(test_url: str):
 
 
 def verify_test_connection(conn):
-    """Strictly verify connection identity and schema revision before any query or mutation."""
-    current_id = tuple(conn.execute(text("SELECT current_database(), current_user, current_schema()")).one())
-    if current_id != ("aurameme_test", "aurameme_test", "public"):
-        pytest.fail(f"Safety violation: unexpected database identity {current_id}", pytrace=False)
-    rev = conn.scalar(text("SELECT version_num FROM alembic_version"))
-    if rev != "0018_canonical_asset_filenames":
-        pytest.fail(f"Safety violation: unexpected schema revision {rev}", pytrace=False)
+    """Require the dedicated server marker as well as the existing database identity."""
+    identity = tuple(conn.execute(text(
+        "SELECT current_database(), current_user, current_schema(), "
+        "inet_server_port(), current_setting('cluster_name')"
+    )).one())
+    if identity != ("aurameme_test", "aurameme_test", "public", 5432, disposable_cluster_name()):
+        pytest.fail("Safety violation: not the provisioned disposable PostgreSQL instance.", pytrace=False)
+    if conn.scalar(text(
+        "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls "
+        "FROM pg_roles WHERE rolname=current_user"
+    )):
+        pytest.fail("Safety violation: disposable test role is privileged.", pytrace=False)
+    if conn.scalar(text("SELECT version_num FROM alembic_version")) != "0018_canonical_asset_filenames":
+        pytest.fail("Safety violation: unexpected schema revision.", pytrace=False)
+    if set(inspect(conn).get_table_names(schema="public")) != set(Base.metadata.tables) | {"alembic_version"}:
+        pytest.fail("Safety violation: unexpected test schema.", pytrace=False)
 
 
-@pytest.fixture
-def pg_session():
-    """Yield a PostgreSQL session rolled back at end of test to keep aurameme_test clean."""
-    test_url = resolve_test_db_url()
-    if not test_url:
-        pytest.skip("TEST_DATABASE_URL is required for PostgreSQL integration test")
-    validate_test_target(test_url)
-
-    engine = create_engine(test_url)
-    with engine.connect() as check_conn:
-        verify_test_connection(check_conn)
-
-    conn = engine.connect()
-    trans = conn.begin()
-    session = Session(bind=conn)
-    try:
-        now = datetime.now(timezone.utc)
-        # Ensure Khang Dev user and Admin role exist in transaction
-        khang = session.scalar(select(User).where(User.id == KHANG_DEV_ID))
-        if not khang:
-            session.add(
-                User(
-                    id=KHANG_DEV_ID,
-                    username="khang_dev",
-                    email="khang@aurameme.test",
-                    password_hash="test_hash",
-                    status="active",
-                    created_at=now,
-                    updated_at=now,
-                )
-            )
-        role_admin = session.scalar(select(Role).where(Role.code == "ADMIN"))
-        if not role_admin:
-            role_admin = Role(id=uuid4(), code="ADMIN", description="Administrator")
-            session.add(role_admin)
-            session.flush()
-
-        ur = session.scalar(select(UserRole).where(UserRole.user_id == KHANG_DEV_ID, UserRole.role_id == role_admin.id))
-        if not ur:
-            session.add(UserRole(user_id=KHANG_DEV_ID, role_id=role_admin.id, granted_at=now))
-
-        policy = session.scalar(
-            select(RewardPolicyVersion)
-            .where(RewardPolicyVersion.status == "published")
-            .order_by(RewardPolicyVersion.version.desc())
-        )
-        if not policy:
-            session.add(
-                RewardPolicyVersion(
-                    id=uuid4(),
-                    version=1,
-                    config_json={"type": "free-vault-v1"},
-                    status="published",
-                    effective_at=now,
-                    created_by=KHANG_DEV_ID,
-                    created_at=now,
-                )
-            )
-        session.flush()
-        yield session
-    finally:
-        session.close()
-        trans.rollback()
-        conn.close()
-        engine.dispose()
-
-
-@pytest.fixture
-def pg_engine():
-    """Engine fixture for multithreaded concurrency tests connecting to aurameme_test."""
-    test_url = resolve_test_db_url()
-    if not test_url:
-        pytest.skip("TEST_DATABASE_URL is required for PostgreSQL integration test")
-    validate_test_target(test_url)
-
-    engine = create_engine(test_url)
-    with engine.connect() as conn:
+def test_shared_cluster_identity_is_rejected_before_schema_access(monkeypatch):
+    marker = "aurameme-fp-" + "a" * 32
+    monkeypatch.setenv("AURAMEME_DISPOSABLE_TEST_CLUSTER", marker)
+    conn = MagicMock()
+    conn.execute.return_value.one.return_value = ("aurameme_test", "aurameme_test", "public", 5432, "")
+    with pytest.raises(pytest.fail.Exception, match="not the provisioned disposable"):
         verify_test_connection(conn)
+    conn.scalar.assert_not_called()
 
-    # Ensure Khang Dev, ADMIN role, and a default published RewardPolicyVersion exist in committed setup
-    now = datetime.now(timezone.utc)
-    with Session(engine) as setup_db:
-        with setup_db.begin():
-            khang = setup_db.scalar(select(User).where(User.id == KHANG_DEV_ID))
-            if not khang:
-                setup_db.add(
-                    User(
-                        id=KHANG_DEV_ID,
-                        username="khang_dev",
-                        email="khang@aurameme.test",
-                        password_hash="test_hash",
-                        status="active",
-                        created_at=now,
-                        updated_at=now,
-                    )
-                )
-            role_admin = setup_db.scalar(select(Role).where(Role.code == "ADMIN"))
-            if not role_admin:
-                role_admin = Role(id=uuid4(), code="ADMIN", description="Administrator")
-                setup_db.add(role_admin)
-                setup_db.flush()
 
-            ur = setup_db.scalar(select(UserRole).where(UserRole.user_id == KHANG_DEV_ID, UserRole.role_id == role_admin.id))
-            if not ur:
-                setup_db.add(UserRole(user_id=KHANG_DEV_ID, role_id=role_admin.id, granted_at=now))
-
-            policy = setup_db.scalar(
-                select(RewardPolicyVersion)
-                .where(RewardPolicyVersion.status == "published")
-                .order_by(RewardPolicyVersion.version.desc())
-            )
-            if not policy:
-                setup_db.add(
-                    RewardPolicyVersion(
-                        id=uuid4(),
-                        version=1,
-                        config_json={"type": "free-vault-v1"},
-                        status="published",
-                        effective_at=now,
-                        created_by=KHANG_DEV_ID,
-                        created_at=now,
-                    )
-                )
-
+@pytest.fixture
+def disposable_engine():
+    test_url = resolve_test_db_url()
+    if not test_url:
+        pytest.skip("Run with an explicitly provisioned disposable PostgreSQL instance.")
+    disposable_cluster_name()
+    target = validate_test_target(test_url)
+    engine = create_engine(target, connect_args={"connect_timeout": 5})
     try:
+        with engine.connect() as conn:
+            conn.exec_driver_sql("SET TRANSACTION READ ONLY")
+            verify_test_connection(conn)
+            for table in Base.metadata.sorted_tables:
+                if conn.scalar(select(table.c[0]).limit(1)) is not None:
+                    pytest.fail("Disposable test schema must start empty.", pytrace=False)
         yield engine
     finally:
         engine.dispose()
+
+
+def seed_privilege_test(db, *, publish=True):
+    now = datetime.now(timezone.utc)
+    role = Role(id=uuid4(), code="ADMIN", description="Administrator")
+    db.add_all([
+        User(id=KHANG_DEV_ID, username="khang_dev", email="khang@aurameme.test",
+             password_hash="test_hash", status="active", created_at=now, updated_at=now),
+        role,
+    ])
+    db.flush()
+    db.add(UserRole(user_id=KHANG_DEV_ID, role_id=role.id, granted_at=now))
+    if publish:
+        db.add(RewardPolicyVersion(id=uuid4(), version=1, config_json={"type": "free-vault-v1"},
+                                  status="published", effective_at=now, created_by=KHANG_DEV_ID, created_at=now))
+    db.flush()
+
+
+@pytest.fixture
+def pg_session(disposable_engine):
+    with disposable_engine.connect() as conn, conn.begin() as transaction:
+        verify_test_connection(conn)
+        with Session(bind=conn) as db:
+            seed_privilege_test(db)
+            yield db
+        transaction.rollback()
+
+
+@pytest.fixture
+def pg_engine(disposable_engine, request):
+    """Commit in a fresh clone; the runner replaces the disposable database per case."""
+    with Session(disposable_engine) as db, db.begin():
+        verify_test_connection(db.connection())
+        seed_privilege_test(db, publish=getattr(request, "param", True))
+    return disposable_engine
+
+
+@pytest.fixture
+def vault_http(pg_engine, monkeypatch):
+    """Run the real FastAPI app, CSRF, account and transaction dependencies."""
+    from fastapi.testclient import TestClient
+    from app.auth import digest
+    from app.main import app
+
+    monkeypatch.setenv("DATABASE_URL", resolve_test_db_url())
+    monkeypatch.setenv("AUTH_SIGNING_KEY", "test-only-signing-key-with-at-least-32-bytes")
+    monkeypatch.setenv("AUTH_ENVIRONMENT", "production")
+    monkeypatch.setenv("AUTH_ALLOWED_ORIGINS", '["https://testserver"]')
+    monkeypatch.setenv("VAULT_RUNTIME_ENABLED", "true")
+    monkeypatch.setenv("EMAIL_MODE", "disabled")
+    raw = token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    with Session(pg_engine) as db, db.begin():
+        db.add(AuthSession(id=uuid4(), user_id=KHANG_DEV_ID, token_hash=digest(raw),
+                           created_at=now, expires_at=now + timedelta(hours=1)))
+    with TestClient(app, base_url="https://testserver") as client:
+        client.cookies.set("am_session", raw)
+        response = client.get("/api/v1/auth/csrf")
+        assert response.status_code == 200
+        yield client, {"Origin": "https://testserver", "X-CSRF-Token": response.json()["csrf_token"]}
 
 
 @pytest.mark.integration
@@ -1380,7 +1362,7 @@ def test_postgres_khang_dev_publication_real_entrypoint(pg_session):
 
 
 @pytest.mark.integration
-def test_postgres_khang_dev_concurrent_vault_open(pg_engine):
+def test_postgres_khang_dev_concurrent_vault_open(pg_engine, vault_http):
     """Real multithreaded concurrent business flow on PostgreSQL:
     Thread 1: grants vault privilege to Khang Dev for asset 1 via grant_khang_dev_single_asset_if_eligible.
     Thread 2: executes real Vault case opening for Khang Dev via open_runtime.
@@ -1396,7 +1378,8 @@ def test_postgres_khang_dev_concurrent_vault_open(pg_engine):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
     from types import SimpleNamespace
-    from app.vault_runtime import open_runtime
+    from app.aura_runtime import publish_v1
+    from app.vault_open import CaseOpenResult
     from app.inventory_grants import inventory_state
     from app.models import CaseDefinition, CaseLootTable, CaseLootRarity, CasePoolItem
     from app.vault_v1_policy import WEIGHTS
@@ -1411,6 +1394,7 @@ def test_postgres_khang_dev_concurrent_vault_open(pg_engine):
     pool_asset_ids = []
     with Session(engine) as setup_db:
         with setup_db.begin():
+            publish_v1(setup_db, KHANG_DEV_ID, now)
             policy = setup_db.scalar(
                 select(RewardPolicyVersion)
                 .where(
@@ -1520,26 +1504,16 @@ def test_postgres_khang_dev_concurrent_vault_open(pg_engine):
             w_db.commit()
             return res
 
+    client, headers = vault_http
+
     def worker_case_open():
-        with Session(engine) as w_db:
-            barrier.wait(timeout=10)
-            req = SimpleNamespace(
-                app=SimpleNamespace(
-                    state=SimpleNamespace(
-                        vault=SimpleNamespace(vault_runtime_enabled=True),
-                        auth=SimpleNamespace(now=lambda: now),
-                    )
-                ),
-                url_for=lambda name, **kw: f"https://aurameme.test/api/v1/catalog/{kw.get('asset_id')}",
-            )
-            acct = SimpleNamespace(
-                db=w_db,
-                user=SimpleNamespace(id=KHANG_DEV_ID),
-            )
-            key = f"fixture-key-{uuid4().hex}"
-            res = open_runtime(req, acct, case_id, key, randbelow=lambda n: 0)
-            w_db.commit()
-            return res
+        barrier.wait(timeout=10)
+        response = client.post(
+            f"/api/v1/vault/cases/{case_id}/open",
+            headers={**headers, "Idempotency-Key": f"fixture-key-{uuid4().hex}"},
+        )
+        assert response.status_code == 200, response.text
+        return CaseOpenResult.model_validate(response.json())
 
     try:
         with ThreadPoolExecutor(max_workers=2) as executor:
@@ -1550,6 +1524,11 @@ def test_postgres_khang_dev_concurrent_vault_open(pg_engine):
 
         assert r1 is True
         assert r2 is not None
+        checked = client.post("/api/v1/aura/check-in", headers=headers)
+        assert checked.status_code == 200, checked.text
+        assert checked.json()["earned_xp_delta"] == 15
+        repeat = client.post("/api/v1/aura/check-in", headers=headers)
+        assert repeat.status_code == 200 and repeat.json()["earned_xp_delta"] == 0
         open_id = r2.open_id
         reward_asset_id = UUID(str(r2.reward.id))
 
@@ -1559,6 +1538,7 @@ def test_postgres_khang_dev_concurrent_vault_open(pg_engine):
             assert co is not None
             assert co.user_id == KHANG_DEV_ID
             assert co.reward_asset_id == reward_asset_id
+            assert len(list(verify_db.scalars(select(CaseOpen)))) == 1
 
             # 2. Verify vault reward inventory and grant
             inv_vault = verify_db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == reward_asset_id))
@@ -1610,7 +1590,7 @@ def test_postgres_khang_dev_concurrent_vault_open(pg_engine):
 
 
 @pytest.mark.integration
-def test_postgres_khang_dev_concurrent_admin_approval(pg_engine):
+def test_postgres_khang_dev_concurrent_admin_approval(pg_engine, vault_http):
     """Multithreaded concurrent test:
     Thread 1: approves asset via admin flow.
     Thread 2: runs sync_khang_dev_vault_privilege.
@@ -1643,16 +1623,13 @@ def test_postgres_khang_dev_concurrent_admin_approval(pg_engine):
 
     barrier = Barrier(2)
 
+    client, headers = vault_http
+
     def worker_approve():
-        with Session(engine) as w_db:
-            barrier.wait(timeout=10)
-            patch_req = AdminAssetPatch(action="approve")
-            req = MagicMock()
-            req.app.state.auth.now = MagicMock(return_value=now)
-            acc = SimpleNamespace(db=w_db, user=SimpleNamespace(id=KHANG_DEV_ID))
-            with w_db.begin():
-                admin_update_asset(aid, patch_req, req, acc)
-            return True
+        barrier.wait(timeout=10)
+        response = client.patch(f"/api/v1/admin/assets/{aid}", json={"action": "approve"}, headers=headers)
+        assert response.status_code == 200, response.text
+        return True
 
     def worker_sync():
         with Session(engine) as w_db:
@@ -1746,15 +1723,40 @@ def test_postgres_cleanup_preserves_preexisting_inventory(pg_session):
 
 
 @pytest.mark.integration
-def test_postgres_cli_dry_run_and_execute(pg_engine):
+@pytest.mark.parametrize("pg_engine", [True, False], indirect=True, ids=["policy", "no-policy"])
+def test_postgres_cli_dry_run_and_execute(pg_engine, request):
     """Runs CLI main() against PostgreSQL test database in dry-run and execute modes."""
-    # 1. Dry run
-    res_dry = main(["--dry-run"], engine=pg_engine)
-    assert res_dry["status"] == "success"
-    assert res_dry["dry_run"] is True
+    digest = "e" * 64
+    aid = uuid4()
+    now = datetime.now(timezone.utc)
+    with Session(pg_engine) as db, db.begin():
+        db.add(AssetItem(
+            id=aid, slug="synthetic-cli-asset", kind="avatar", collection="admin-upload",
+            rarity="S", media_key=f"catalog/{digest}.png", display_name="Synthetic CLI Asset",
+            source_rights=synthetic_rights(digest, name_review_status="approved", review_status="approved"),
+            active=True, created_at=now, updated_at=now,
+        ))
 
-    # 2. Execute with confirmation
-    res_exec = main(["--execute", "--confirm", "CONFIRM_GRANT_KHANG_DEV"], engine=pg_engine)
-    assert res_exec["status"] == "success"
-    assert res_exec["dry_run"] is False
-
+    dry = main(["--dry-run"], engine=pg_engine)
+    args = ["--execute", "--confirm", "CONFIRM_GRANT_KHANG_DEV"]
+    published = request.node.callspec.params["pg_engine"]
+    assert (dry["eligible_count"], dry["missing_count"], dry["blocked_count"], dry["granted_count"]) == (
+        1, int(published), int(not published), 0,
+    )
+    if not published:
+        with pytest.raises(ValueError, match="Fail-closed"):
+            main(args, engine=pg_engine)
+        with Session(pg_engine) as db:
+            assert not list(db.scalars(select(InventoryGrant)))
+            assert not list(db.scalars(select(UserInventory)))
+            assert not list(db.scalars(select(AuraLedger)))
+            assert not list(db.scalars(select(CaseOpen)))
+        return
+    assert main(args, engine=pg_engine)["granted_count"] == 1
+    assert main(args, engine=pg_engine)["granted_count"] == 0
+    with Session(pg_engine) as db:
+        assert len(list(db.scalars(select(InventoryGrant)))) == 1
+        inv = db.get(UserInventory, (KHANG_DEV_ID, aid))
+        assert inv.quantity == 1
+        assert not list(db.scalars(select(CaseOpen)))
+        assert not list(db.scalars(select(AuraLedger)))
