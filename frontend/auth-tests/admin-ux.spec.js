@@ -183,6 +183,22 @@ test.describe('Task 2 — Admin Workspace UX Refinement', () => {
     await expect(hiddenOpenBtn).toHaveAttribute('title', 'Không thể mở nội dung đã ẩn hoặc đã xóa');
   });
 
+  test('Content preview action keeps its click target when the icon font is unavailable', async ({ page, context }) => {
+    await setupAdminMockApi(context);
+    await page.route('https://fonts.googleapis.com/**', route => route.abort());
+    await page.goto('/admin');
+    await page.locator('.admin-sidebar').getByRole('button', { name: 'Nội dung' }).click();
+    const row = page.locator(`[data-admin-id="${id(10)}"]`);
+    const preview = row.getByRole('button', { name: 'Xem chi tiết bài viết' });
+    await expect(preview).toBeVisible();
+    await preview.scrollIntoViewIfNeeded();
+
+    // Click the visible action using the pointer, even if another glyph overlaps it.
+    const bounds = await preview.boundingBox();
+    await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await expect(page.getByRole('dialog').getByRole('heading', { name: 'Chi tiết bài viết' })).toBeVisible();
+  });
+
   test('Subtask B: Contact management modal presents structured hierarchy', async ({ page, context }) => {
     await setupAdminMockApi(context);
     await page.goto('/admin');

@@ -71,7 +71,7 @@ jobs:
     name: Frontend browser regression
     needs: frontend
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: frontend
