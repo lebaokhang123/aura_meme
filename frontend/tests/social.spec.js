@@ -108,7 +108,7 @@ test('GIF bytes restore after reload, invalid images are rejected and no Aura is
  await composer.getByRole('combobox',{name:'Danh mục bài mới'}).selectOption('Anime');
  await composer.getByRole('button',{name:'Đăng bài',exact:true}).click();
  const post=page.locator('article[data-post-id^="p-"]');await expect(post).toBeVisible();
- await expect(post).toContainText('Lvl 67');await expect(post).toContainText('GIF');
+ await expect(post).toContainText('LVL 67');await expect(post).toContainText('GIF');
  await page.reload();await ready(page);await expect(post.getByAltText('Ảnh bài viết')).toBeVisible();
  expect(await post.getByAltText('Ảnh bài viết').evaluate(img=>img.naturalWidth)).toBe(1);
 });

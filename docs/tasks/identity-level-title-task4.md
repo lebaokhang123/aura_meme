@@ -142,5 +142,34 @@ npx.cmd playwright test --config=../.github/playwright.auth.config.mjs auth-test
   - `task4_contact_mobile_dark.png` (Mobile 375px Dark Mode)
   - `task4_contact_mobile_light.png` (Mobile 375px Light Mode)
 
-
 Hotfix 23/11/2026 tích hợp cùng nền Task 1–5. Chi tiết payment/Admin/PDF và bằng chứng regression được nối trong premium-sandbox-task5.md. Phạm vi hotfix giữ các quyết định UI của task này.
+
+---
+
+## 5. Task 6 — Hệ thống Màu & Hiệu ứng 10 Cảnh Giới + 2 Chức Danh Đặc Biệt (`feat/realm-title-task6`)
+
+- **Base SHA:** `682d247` (`feat/premium-sandbox-task5`)
+- **Worktree:** `D:\Big\du_an_lon\aura_meme_p2_task6`
+
+### 5.1. Vì sao làm & Quyết định Kiến trúc
+- **Single Source of Truth cho 10 cảnh giới:** Chuẩn hóa hàm `realm_for_level(level)`, `admin_cosmetic_title(is_admin)`, `public_title_for_user(level, is_admin)` tại `backend/app/aura_v1.py`, dùng chung cho `UserPublic` (`account_schemas.py`), `AccountPrivate` (`account.py`), `blog.py`, `comments.py`, và `leaderboard` (`aura_reads.py`).
+- **Xác thực danh hiệu Admin theo vai trò DB (Zero N+1):** Bỏ hoàn toàn 2 danh hiệu cũ (`Bá Chủ Thiên Lôi`, `Thiên Tướng Độ Ách`) và thay bằng danh hiệu thống nhất **`Sáng Thế Thần`** cho cả hai Admin (Khang Dev & Kien Dev). Backend xác định quyền thông qua correlated `EXISTS` subquery (`public_is_admin_column()` kiểm tra `UserRole` + `Role.code == "ADMIN"`), tuyệt đối không suy diễn từ username hay dữ liệu client.
+- **Loại bỏ hoàn toàn hardcode username trên Frontend:** Frontend chỉ render dữ liệu `level`, `realm`, `title` do backend xác thực và cấp phát.
+- **Tách bạch Level thật và Chức danh đặc biệt:** `Sáng Thế Thần` là cosmetic title độc lập, không biến thành cảnh giới thứ 11. Huy hiệu `LVL` của Admin vẫn giữ đúng màu/bậc của cảnh giới thật (ví dụ Khang `LVL 79` -> Tier 8 `Đại Thừa`, Kien `LVL 12` -> Tier 2 `Trúc Cơ`) và tự động thăng bậc khi lên Level.
+
+### 5.2. Data Flow & Phân quyền / Bảo mật
+1. **Backend:** `UserProgress.level_cached` (`public_level_column(now)`) + `public_is_admin_column()` -> `UserPublic.public_identity()` suy diễn `(realm, title)`. Trường nội bộ `is_admin_title` được đánh dấu `exclude=True` nên không rò rỉ ra JSON công khai. Nếu `level is None`, cả `realm` và `title` đều bị lược bỏ (`exclude_if=None`), tuyệt đối không bịa chức danh.
+2. **Session `/users/me`:** `AccountPrivate.title` sử dụng `exclude_if=lambda v: v is None`, chỉ trả về `"Sáng Thế Thần"` khi `"ADMIN" in basic.roles`, giữ nguyên contract cho user thường.
+3. **Frontend:** `frontend/src/realm-tier.js` + `frontend/src/components/RealmBadges.jsx` + `frontend/src/realm-badges.css` dùng chung cho Home (`PostCard`, `AuraProgress`), Explore (`PostCard`), Comment (`CommentSection`), Profile (`ProfilePage`, `PostCard`, `AuraProgress`), và `HallIdentity`.
+
+### 5.3. Ngôn ngữ Thiết kế Màu sắc, Hiệu năng & Accessibility
+- **Thang năng lượng 10 cảnh giới thống nhất (giữ nguyên bản Owner đã duyệt):** Slate (`Luyện Khí`) -> Jade (`Trúc Cơ`) -> Emerald (`Kim Đan`) -> Azure (`Nguyên Anh`) -> Indigo (`Hóa Thần`) -> Violet (`Luyện Hư`) -> Amethyst (`Hợp Thể`) -> Crimson (`Đại Thừa`) -> Lightning Ember (`Độ Kiếp`) -> Celestial Prismatic (`Phi Thăng`).
+- **Hiệu ứng Sáng Thế Thần — Vạn Vận Quy Tông:** Bảng màu tím vũ trụ + vàng thần thánh + trắng ngọc + cyan thiên thể (phân biệt rõ với Aura Prime vàng đặc), tích hợp 4 lớp: Sacred Halo (viền đa lớp), Divine Smoke (khói năng lượng mềm bằng CSS radial-gradient), Cosmic Convergence (2 dải ánh sáng cyan/gold hội tụ vào trung tâm), và Divine Emblem (SVG thiên tinh 4 cánh tối giản).
+- **Hiệu năng Feed theo kích thước:** `SM` (Bình luận) chỉ có viền/glow tĩnh; `MD` (Bài đăng/Explore/Rank) chỉ kích hoạt smoke & convergence khi `:hover`/`:focus-visible`; `LG` (Profile/Aura Card) chạy hiệu ứng đầy đủ trên compositor thread (`transform`/`opacity`) và chỉ kích hoạt trong `@media (prefers-reduced-motion: no-preference)`.
+- **Accessibility:** Tương phản văn bản >= 4.5:1 ở cả Dark Mode và Light Mode (`.u219[data-theme="light"]`), có biểu tượng SVG nhận diện riêng (WCAG 1.4.1), và fallback `@media (forced-colors: active)`.
+
+### 5.4. Giới hạn & Gợi ý Giải thích Phỏng vấn
+- **Giới hạn:** Trang `/rank` UI vẫn giữ `MaintenancePage` theo cấu hình hiện tại (API `/api/v1/leaderboard` đã sẵn sàng trả `level`, `realm`, `title`). Không thêm dependency ngoài.
+- **Khi phỏng vấn có thể trình bày:**
+  - *Tại sao không hardcode chức danh admin ở frontend?* Vì phân quyền/nhận diện phải đi từ backend (single source of truth), tránh bị giả mạo hoặc lệch trạng thái khi policy chưa sẵn sàng.
+  - *Tại sao không dùng animation liên tục trên PostCard?* Hàng trăm animation `box-shadow` đồng thời gây repaint nặng; dùng CSS tĩnh trên feed và compositor-only `transform`/`opacity` + `prefers-reduced-motion: no-preference` giúp giữ 60fps và đạt chuẩn accessibility.

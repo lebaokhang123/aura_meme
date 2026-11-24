@@ -34,22 +34,23 @@ test('WebP dimensions are checked before decode and API limits do not weaken moc
  assert.throws(()=>checkImageBytes(bytes,'image/webp',30,true),{message:'FILE_DIMENSIONS'});
 });
 
-test('MVP honorifics use exact identities and level is never inferred from an Admin role',()=>{
- assert.equal(apiAuthor({...author,username:'khang_dev'}).nickname,'Bá Chủ Thiên Lôi');
- assert.equal(apiAuthor({...author,username:'kien_dev'}).nickname,'Thiên Tướng Độ Ách');
+test('MVP honorifics trust backend title only and never fabricate from username or Admin role',()=>{
+ assert.equal(apiAuthor({...author,username:'khang_dev'}).nickname,'');
+ assert.equal(apiAuthor({...author,username:'kien_dev'}).nickname,'');
  assert.equal(apiAuthor({...author,roles:['ADMIN']}).nickname,'');
  assert.equal(apiAuthor({...author,level:11,realm:'Trúc Cơ'}).level,'LVL 11');
  assert.equal(apiAuthor({...author,level:11,realm:'Trúc Cơ'}).realm,'Trúc Cơ');
  assert.equal(apiAuthor({...author,level:11,realm:'Trúc Cơ'}).nickname,'Trúc Cơ');
- assert.equal(apiAuthor({...author,level:11,realm:'Trúc Cơ',title:'Bá Chủ Thiên Lôi',username:'khang_dev'}).nickname,'Bá Chủ Thiên Lôi');
+ assert.equal(apiAuthor({...author,level:11,realm:'Trúc Cơ',title:'Sáng Thế Thần',username:'khang_dev'}).nickname,'Sáng Thế Thần');
  for(const level of [undefined,0,101,1.5,'99']){
-  assert.equal(apiAuthor({...author,level,realm:'Trúc Cơ'}).level,'');
-  assert.equal(apiAuthor({...author,level,realm:'Trúc Cơ'}).realm,'');
+  assert.equal(apiAuthor({...author,level,realm:'Trúc Cơ',title:'Sáng Thế Thần'}).level,'');
+  assert.equal(apiAuthor({...author,level,realm:'Trúc Cơ',title:'Sáng Thế Thần'}).realm,'');
+  assert.equal(apiAuthor({...author,level,realm:'Trúc Cơ',title:'Sáng Thế Thần'}).nickname,'');
  }
- const postWithLevel=apiPost({id,author:{...author,username:'khang_dev',level:12,realm:'Trúc Cơ',title:'Bá Chủ Thiên Lôi'},category:{id,slug:'gaming',name:'Gaming'},title:'Hi',content:'Text',created_at:'2026-11-13T00:00:00Z',media_url:null});
- assert.equal(postWithLevel.level,'LVL 12');assert.equal(postWithLevel.realm,'Trúc Cơ');assert.equal(postWithLevel.nickname,'Bá Chủ Thiên Lôi');
- const commentWithLevel=apiComment({id,post_id:id,author:{...author,username:'kien_dev',level:7,realm:'Luyện Khí',title:'Thiên Tướng Độ Ách'},body:'Hi',created_at:'2026-11-13T00:00:00Z'});
- assert.equal(commentWithLevel.level,'LVL 7');assert.equal(commentWithLevel.realm,'Luyện Khí');assert.equal(commentWithLevel.nickname,'Thiên Tướng Độ Ách');
+ const postWithLevel=apiPost({id,author:{...author,username:'khang_dev',level:12,realm:'Trúc Cơ',title:'Sáng Thế Thần'},category:{id,slug:'gaming',name:'Gaming'},title:'Hi',content:'Text',created_at:'2026-11-13T00:00:00Z',media_url:null});
+ assert.equal(postWithLevel.level,'LVL 12');assert.equal(postWithLevel.realm,'Trúc Cơ');assert.equal(postWithLevel.nickname,'Sáng Thế Thần');
+ const commentWithLevel=apiComment({id,post_id:id,author:{...author,username:'kien_dev',level:7,realm:'Luyện Khí',title:'Sáng Thế Thần'},body:'Hi',created_at:'2026-11-13T00:00:00Z'});
+ assert.equal(commentWithLevel.level,'LVL 7');assert.equal(commentWithLevel.realm,'Luyện Khí');assert.equal(commentWithLevel.nickname,'Sáng Thế Thần');
  const normalUserComment=apiComment({id,post_id:id,author:{...author,username:'alice',level:1,realm:'Luyện Khí',title:'Luyện Khí'},body:'Hi',created_at:'2026-11-13T00:00:00Z'});
  assert.equal(normalUserComment.level,'LVL 1');assert.equal(normalUserComment.realm,'Luyện Khí');assert.equal(normalUserComment.nickname,'Luyện Khí');
 });

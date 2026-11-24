@@ -10,9 +10,10 @@ from test_admin_users_concurrency import admins
 
 
 @pytest.mark.integration
-def test_role_put_replaces_deduplicates_and_audits(admin):
+def test_role_put_replaces_deduplicates_and_audits(admin, monkeypatch):
     client, connection, actor, *_ = admin
     ident = mutation(client, "POST", "/admin/users", PAYLOAD).json()["id"]
+    monkeypatch.setattr("app.admin_users.ALLOWED_ADMIN_IDS", {actor, UUID(ident)})
     response = mutation(client, "PUT", "/admin/users/" + ident + "/roles", {"roles": ["USER", "ADMIN", "ADMIN"]})
     assert response.status_code == 200, response.text
     assert response.json()["roles"] == ["ADMIN", "USER"]
@@ -56,8 +57,9 @@ def test_roles_csrf_and_origin(admin, fault):
 
 
 @pytest.mark.integration
-def test_role_noop_preserves_grant_times_and_sessions(admin):
+def test_role_noop_preserves_grant_times_and_sessions(admin, monkeypatch):
     client, connection, actor, *_ = admin
+    monkeypatch.setattr("app.admin_users.ALLOWED_ADMIN_IDS", {actor})
     before = connection.execute(select(UserRole.__table__).where(UserRole.user_id == actor)).all()
     assert mutation(client, "PUT", f"/admin/users/{actor}/roles", {"roles": ["USER", "ADMIN", "ADMIN"]}).status_code == 200
     assert connection.execute(select(UserRole.__table__).where(UserRole.user_id == actor)).all() == before
@@ -89,13 +91,16 @@ def test_roles_revoke_sessions_and_empty_contract(admin):
 @pytest.mark.integration
 def test_locked_admin_does_not_count_as_surviving_admin(admin):
     client, connection, actor, *_ = admin
-    ident = mutation(client, "POST", "/admin/users", PAYLOAD | {"roles": ["ADMIN"]}).json()["id"]
+    ident = mutation(client, "POST", "/admin/users", PAYLOAD).json()["id"]
+    admin_role = connection.scalar(select(Role.id).where(Role.code == "ADMIN"))
+    connection.execute(UserRole.__table__.insert().values(
+        user_id=UUID(ident), role_id=admin_role, granted_at=client.app.state.auth.now()))
     assert mutation(client, "PATCH", "/admin/users/" + ident, {"status": "locked"}).status_code == 200
     assert mutation(client, "PUT", f"/admin/users/{actor}/roles", {"roles": []}).status_code == 409
 
 
 @pytest.mark.integration
-def test_audit_failure_restores_roles_and_session(admin):
+def test_audit_failure_restores_roles_and_session(admin, monkeypatch):
     from fastapi.testclient import TestClient
     from app.main import app
     client, connection, actor, *_ = admin
@@ -103,6 +108,7 @@ def test_audit_failure_restores_roles_and_session(admin):
     other = TestClient(app, base_url="https://testserver")
     try:
         assert login(other, email=PAYLOAD["email"], password=PAYLOAD["password"]).status_code == 200
+        monkeypatch.setattr("app.admin_users.ALLOWED_ADMIN_IDS", {actor, UUID(ident)})
         connection.exec_driver_sql("CREATE FUNCTION m41b_audit_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic role audit rejection'; END $$")
         connection.exec_driver_sql("CREATE TRIGGER m41b_audit_fail BEFORE INSERT ON admin_audit_logs FOR EACH ROW EXECUTE FUNCTION m41b_audit_fail()")
         assert mutation(client, "PUT", f"/admin/users/{ident}/roles", {"roles": ["ADMIN"]}).status_code == 500

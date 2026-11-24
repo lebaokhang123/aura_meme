@@ -219,7 +219,7 @@ def test_demo_migration_rejects_other_operations(command):
 
 def schema_checks(revision):
     kinds = ('like','laugh','fire') if revision == '0009_vault_open' else ('like','love','laugh','fire','sad','angry')
-    vault = revision in {'0011_vault_v1','0012_aura_v1'}
+    vault = revision in {'0011_vault_v1','0012_aura_v1',demo.DEMO_REVISION}
     if vault:
         kinds += ('meme',)
     expression = "reaction_type = ANY (ARRAY["+', '.join("'"+kind+"'::text" for kind in kinds)+'])'
@@ -231,7 +231,7 @@ def schema_checks(revision):
         if vault:
             checks[table]['ck_'+table+'_meme_reference'] = "(reaction_type = 'meme'::text) = (meme_asset_id IS NOT NULL)"
     checks['daily_checkins'] = {'ck_daily_checkins_effective_day':"effective_day = ((claimed_at AT TIME ZONE 'Asia/Ho_Chi_Minh'::text) - '07:00:00'::interval)::date"}
-    if revision == '0012_aura_v1':
+    if revision in {'0012_aura_v1',demo.DEMO_REVISION}:
         checks['daily_checkins']['ck_daily_checkins_reward_mode'] = "reward_mode = 'legacy'::text AND wallet_transaction_id IS NOT NULL OR reward_mode = 'aura_v1'::text AND wallet_transaction_id IS NULL"
         checks['aura_reward_events'] = {
             'ck_aura_reward_events_kind':"kind = ANY (ARRAY['post'::text, 'reaction'::text, 'comment'::text])",
@@ -262,7 +262,8 @@ def schema_mocks(monkeypatch,revision):
 
 
 @pytest.mark.parametrize('revision,allow_previous,accepted', [
-    ('0012_aura_v1',False,True),
+    (demo.DEMO_REVISION,False,True),
+    ('0012_aura_v1',False,False),
     ('0012_aura_v1',True,True),
     ('0011_vault_v1',False,False),
     ('0011_vault_v1',True,True),
@@ -280,9 +281,9 @@ def test_demo_schema_pins_current_head_and_previous_only_for_upgrade(monkeypatch
         assert len(compared) == 1
         metadata = compared[0]
         assert set(metadata.tables) == set(reviewed_metadata(revision).tables)
-        assert ('reward_mode' in metadata.tables['daily_checkins'].c) == (revision == '0012_aura_v1')
-        assert metadata.tables['daily_checkins'].c.wallet_transaction_id.nullable == (revision == '0012_aura_v1')
-        assert ('runtime_kind' in metadata.tables['case_definitions'].c) == (revision in {'0011_vault_v1','0012_aura_v1'})
+        assert ('reward_mode' in metadata.tables['daily_checkins'].c) == (revision in {'0012_aura_v1',demo.DEMO_REVISION})
+        assert metadata.tables['daily_checkins'].c.wallet_transaction_id.nullable == (revision in {'0012_aura_v1',demo.DEMO_REVISION})
+        assert ('runtime_kind' in metadata.tables['case_definitions'].c) == (revision in {'0011_vault_v1','0012_aura_v1',demo.DEMO_REVISION})
         assert 'aura_reward_events' in Base.metadata.tables
         assert 'reward_mode' in Base.metadata.tables['daily_checkins'].c
     else:
@@ -302,7 +303,7 @@ def test_demo_schema_refuses_drift_even_at_reviewed_revision(monkeypatch,revisio
 @pytest.mark.parametrize('table',['post_reactions','comment_reactions','daily_checkins','aura_reward_events'])
 @pytest.mark.parametrize('tamper',['missing','extra','weakened'])
 def test_demo_schema_refuses_missing_extra_or_weakened_checks(monkeypatch,table,tamper):
-    connection,_,checks,compared = schema_mocks(monkeypatch,'0012_aura_v1')
+    connection,_,checks,compared = schema_mocks(monkeypatch,demo.DEMO_REVISION)
     demo.reviewed_demo_schema(connection)
     first = next(iter(checks[table]))
     if tamper == 'missing':checks[table].pop(first)
@@ -315,7 +316,7 @@ def test_demo_schema_refuses_missing_extra_or_weakened_checks(monkeypatch,table,
 
 
 def test_demo_schema_refuses_unknown_tables_before_comparing(monkeypatch):
-    connection,inspector,_,compared = schema_mocks(monkeypatch,'0012_aura_v1')
+    connection,inspector,_,compared = schema_mocks(monkeypatch,demo.DEMO_REVISION)
     inspector.get_table_names.return_value.add('unreviewed')
     with pytest.raises(ConfigurationError,match='Unexpected demo schema tables'):
         demo.reviewed_demo_schema(connection)

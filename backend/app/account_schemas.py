@@ -17,6 +17,8 @@ class AccountPrivate(UserPrivate):
     cover_media_id: UUID | None = None
     avatar_url: str | None = Field(default=None, json_schema_extra={"format": "uri-reference"})
     cover_url: str | None = Field(default=None, json_schema_extra={"format": "uri-reference"})
+    # Server-authorized special cosmetic title only; omitted for standard accounts.
+    title: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class UserPublic(BaseModel):
@@ -31,27 +33,38 @@ class UserPublic(BaseModel):
     realm: str | None = Field(default=None, exclude_if=lambda value: value is None)
     title: str | None = Field(default=None, exclude_if=lambda value: value is None)
     membership_tier: Literal["free", "plus", "prime"] = "free"
+    # Internal server-verified flag (from DB Role.code == "ADMIN"); never serialized to public JSON.
+    is_admin_title: bool = Field(default=False, exclude=True)
 
     @model_validator(mode="after")
     def public_identity(self):
-        from app.aura_v1 import REALMS
-        if self.level is not None:
-            derived_realm = REALMS[(self.level - 1) // 10]
-            self.realm = derived_realm
-            if self.username == "khang_dev":
-                self.title = "Bá Chủ Thiên Lôi"
-            elif self.username == "kien_dev":
-                self.title = "Thiên Tướng Độ Ách"
-            else:
-                self.title = derived_realm
-        else:
-            self.realm = None
-            self.title = None
+        from app.aura_v1 import public_title_for_user
+        self.realm, self.title = public_title_for_user(self.level, is_admin=bool(self.is_admin_title))
         return self
 
 
 class PublicProfile(UserPublic):
-    pass
+    equipped_background_effect: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    follower_count: int = Field(default=0, ge=0)
+    is_following: bool = False
+
+
+class FollowResult(BaseModel):
+    follower_count: int = Field(ge=0)
+    is_following: bool
+
+
+class SearchPagination(BaseModel):
+    page: int = Field(ge=1)
+    page_size: int = Field(ge=1)
+    total: int = Field(ge=0)
+    total_pages: int = Field(ge=0)
+
+
+class PublicUserSearchPage(BaseModel):
+    items: list[UserPublic]
+    pagination: SearchPagination
+
 
 
 class ProfilePatch(BaseModel):

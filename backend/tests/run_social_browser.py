@@ -1,8 +1,10 @@
 """Social browser on explicitly selected empty test/E2E only; never migrate/reset."""
 from pathlib import Path
 import os,sys,json,secrets,socket,subprocess,tempfile,time,urllib.request,io
+from contextlib import nullcontext
 from contextlib import redirect_stdout
-from uuid import UUID
+from datetime import datetime, timezone
+from uuid import UUID, uuid4
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 from dotenv import dotenv_values
 from sqlalchemy import create_engine,select,text
@@ -10,7 +12,8 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 from run_browser import inventory
-from app.models import Base,User,Role,MediaUpload
+from app.models import Base, User, Profile, Role, UserRole, MediaUpload
+from app.admin_users import KHANG_DEV_ID, KIEN_DEV_ID
 from app.demo import bootstrap_admin
 from app.demo_accounts import ACCOUNTS,CONFIRMATION,account_plan,apply_accounts,api_mutation
 
@@ -21,7 +24,8 @@ def browser_target(config,e2e=False):
     url=dotenv_values(Path(config),interpolate=False).get("E2E_DATABASE_URL" if e2e else "TEST_DATABASE_URL","")
     assert url,"Explicit target URL required; no fallback"
     target=make_url(url)
-    assert (target.database,target.username)==(database,role) and target.host in {"localhost","127.0.0.1"} and target.port in {None,5432} and not target.query
+    ports = {None, 5432, 55434, 55435} if e2e else {None, 5432}
+    assert (target.database,target.username)==(database,role) and target.host in {"localhost","127.0.0.1","::1"} and target.port in ports and not target.query
     return url,database,role
 
 
@@ -49,6 +53,7 @@ def main():
         image.save(fixtures/"fixture.gif",format="GIF",save_all=True,append_images=[Image.new("RGB",(24,24),(220,80,120))],duration=100,loop=0)
         env=os.environ|{"DATABASE_URL":url,"TEST_DATABASE_URL":"" if e2e else url,"E2E_DATABASE_URL":url if e2e else "","AUTH_SIGNING_KEY":secrets.token_hex(32),
           "AUTH_ENVIRONMENT":"development","AUTH_ALLOWED_ORIGINS":json.dumps(["http://localhost:4187"]),
+          "EMAIL_MODE":"disabled","EMAIL_VERIFICATION_REQUIRED":"false",
           "MEDIA_STORAGE_ROOT":str(media),"CATALOG_STORAGE_ROOT":str(Path(private)/"catalog"),
           "AURAMEME_API_TARGET":"http://127.0.0.1:8001","AURA_SOCIAL_E2E":"1","AURA_SOCIAL_FIXTURES":str(fixtures)}
         os.environ.update(env)
@@ -58,13 +63,32 @@ def main():
             def first_admin(ident):
                 with Session(engine) as db,db.begin(),redirect_stdout(io.StringIO()):bootstrap_admin(db,UUID(ident),lambda prompt:CONFIRMATION)
             with TestClient(app,base_url="http://localhost:8001") as client:
-                ids=apply_accounts(client,account_plan([],0),{a["username"]:PASSWORD for a in ACCOUNTS},first_admin,origin="http://localhost:4187")
+                records = [
+                    {**account, "id": ident, "status": "active", "roles": ["USER"]}
+                    for account, ident in zip(ACCOUNTS, (KHANG_DEV_ID, KIEN_DEV_ID))
+                ]
+                now = datetime.now(timezone.utc)
+                with Session(engine) as database_session, database_session.begin():
+                    role = Role(id=uuid4(), code="USER", description="Synthetic Social E2E role")
+                    database_session.add(role)
+                    database_session.flush()
+                    for row in records:
+                        database_session.add(User(
+                            id=row["id"], username=row["username"], email=row["email"], status="active",
+                            password_hash=app.state.auth.hasher.hash(PASSWORD), created_at=now, updated_at=now))
+                        database_session.flush()
+                        database_session.add(Profile(
+                            user_id=row["id"], display_name=row["display_name"], updated_at=now))
+                        database_session.add(UserRole(user_id=row["id"], role_id=role.id, granted_at=now))
+                ids=apply_accounts(client,account_plan(records,0),{a["username"]:PASSWORD for a in ACCOUNTS},first_admin,origin="http://localhost:4187")
                 api_mutation(client,"POST","/auth/login",{"email":ACCOUNTS[0]["email"],"password":PASSWORD},origin="http://localhost:4187")
                 for slug in ("gaming","anime","cong-nghe","truong-hoc","random"):
                     api_mutation(client,"POST","/admin/categories",{"slug":slug,"name":slug},origin="http://localhost:4187")
                 api_mutation(client,"POST","/auth/logout",origin="http://localhost:4187")
             for flow in ("identity","crud","media","admin","pagination","profile-contact"):
-                api=subprocess.Popen([sys.executable,"-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8001"],cwd=ROOT,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                log_dir = os.environ.get("AURAMEME_E2E_API_LOG_DIR")
+                with (Path(log_dir, f"api-{flow}.log").open("wb") if log_dir else nullcontext(subprocess.DEVNULL)) as log:
+                    api=subprocess.Popen([sys.executable,"-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8001"],cwd=ROOT,env=env,stdout=log,stderr=log)
                 for _ in range(100):
                     if api.poll() is not None:raise RuntimeError("Owned API stopped")
                     try:
@@ -84,11 +108,17 @@ def main():
                 assert all(r.username in expected and r.email==expected[r.username] for r in users),"Unknown identity; refuse cleanup"
                 owned=[r.id for r in users]
                 assert all(r.code in {"USER","ADMIN"} for r in c.execute(select(Role.code)))
-                allowed={"users","profiles","roles","user_roles","auth_sessions","categories","posts","comments","post_reactions","comment_reactions","media_uploads","admin_audit_logs","contact_messages"}
+                allowed={"users","profiles","roles","user_roles","auth_sessions","categories","posts","comments","post_reactions","comment_reactions","media_uploads","admin_audit_logs","contact_messages","notifications"}
                 assert not any(count for name,count in counts.items() if name not in allowed),"Unrelated data; refuse cleanup"
                 for name,column in (("contact_messages","user_id"),("posts","author_id"),("comments","author_id"),("post_reactions","user_id"),("comment_reactions","user_id"),("media_uploads","owner_id"),("admin_audit_logs","actor_id"),("profiles","user_id"),("user_roles","user_id"),("auth_sessions","user_id")):
                     table=Base.metadata.tables[name]
                     assert all(v in owned for v in c.scalars(select(table.c[column]))),"Unknown owner; refuse cleanup"
+                notifications = Base.metadata.tables["notifications"]
+                notification_owners = c.execute(select(
+                    notifications.c.recipient_user_id, notifications.c.actor_user_id))
+                assert all(recipient in owned and (actor is None or actor in owned)
+                           for recipient, actor in notification_owners), "Unknown notification identity; refuse cleanup"
+                c.execute(notifications.delete().where(notifications.c.recipient_user_id.in_(owned)))
                 contact=Base.metadata.tables['contact_messages']
                 assert all(row.body=='Synthetic Profile Contact E2E message' for row in c.execute(select(contact))),"Unexpected Contact content; refuse cleanup"
                 uploads=c.execute(select(MediaUpload.object_key)).scalars().all()
@@ -108,7 +138,7 @@ def main():
                 assert not any(inventory(c,database).values())
                 assert c.execute(text("SELECT oid,relname,relfilenode FROM pg_class WHERE relnamespace='public'::regnamespace ORDER BY relname")).all()==before
             engine.dispose()
-            print("Social browser cleanup PASS:"+database+"/public0010,29 empty tables; original schema/object IDs unchanged.")
+            print(f"Social browser cleanup PASS: {database}/public, {len(counts)} empty tables; original schema/object IDs unchanged.")
     return result
 
 if __name__=="__main__":

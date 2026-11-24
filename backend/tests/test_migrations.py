@@ -27,7 +27,8 @@ P0_TABLES = {
 AURA_TABLES = P0_TABLES | {"post_reactions", "post_bookmarks", "reward_policy_versions", "user_progress", "aura_ledger"}
 TABLES = AURA_TABLES | {"aura_reward_events", "comment_reactions", "wallets", "wallet_transactions", "daily_checkins", "asset_items", "user_inventory", "user_equipment", "case_definitions", "case_loot_tables", "case_loot_rarities", "case_pool_items", "case_opens", "inventory_grants"}
 TABLES |= {"notifications", "subscription_orders", "user_subscriptions"}
-REVISION = "0014_premium_sandbox"
+TABLES |= {"user_oauth_identities", "password_reset_tokens", "account_verifications", "user_follows"}
+REVISION = "0018_canonical_asset_filenames"
 
 
 def config():
@@ -148,10 +149,9 @@ def migrated():
                     item.name for item in Base.metadata.tables[name].constraints if isinstance(item, CheckConstraint)
                 }, "Unknown or missing CHECK; refusing downgrade"
         migrate(engine, "upgrade", "head")
-        migrate(engine, "downgrade", "base")
+        migrate(engine, "downgrade", "0017_user_follows")
         with engine.connect() as connection:
-            assert set(inspect(connection).get_table_names()) <= {"alembic_version"}
-            assert connection.execute(text("SELECT count(*) FROM alembic_version")).scalar_one() == 0
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0017_user_follows"
         migrate(engine, "upgrade", "head")
         yield engine
     finally:
@@ -253,7 +253,7 @@ def test_downgrade_refuses_nonempty_tables_without_losing_rows(data):
     connection, _ = data
     cfg = config()
     cfg.attributes["connection"] = connection
-    with pytest.raises(RuntimeError, match="nonempty"):
+    with pytest.raises(RuntimeError, match="nonempty"), connection.begin_nested():
         command.downgrade(cfg, "base")
     assert connection.execute(text("SELECT count(*) FROM users")).scalar_one() == 2
     assert set(inspect(connection).get_table_names()) == TABLES | {"alembic_version"}
@@ -488,3 +488,26 @@ def test_announcement_inbox_isolation_and_lifecycle(data):
         assert get_notifications(1, 1, True, recipient).items == []
         withdraw_admin_announcement(draft.id, request, sender)
         assert get_notifications(1, 1, False, recipient).items[0].payload["status"] == "withdrawn"
+
+
+@pytest.mark.integration
+def test_0018_preserves_catalog_filename_on_upgrade_and_refuses_data_downgrade(migrated):
+    asset = Base.metadata.tables["asset_items"]
+    marker = uuid4()
+    with migrated.connect() as connection, connection.begin() as transaction:
+        cfg = config()
+        cfg.attributes["connection"] = connection
+        command.downgrade(cfg, "0017_user_follows")
+        connection.execute(asset.insert().values(
+            id=marker, kind="avatar", rarity="D", slug="migration-filename",
+            collection="test", media_key="catalog/existing.png", active=False,
+            source_rights={"canonical_filename": "existing.png"},
+            created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc),
+        ))
+        command.upgrade(cfg, "head")
+        read = text("SELECT source_rights FROM asset_items WHERE id=:id")
+        assert connection.scalar(read, {"id": marker}) == {"canonical_filename": "existing.png"}
+        with pytest.raises(RuntimeError, match="verified pre-0018 backup"):
+            command.downgrade(cfg, "0017_user_follows")
+        assert connection.scalar(read, {"id": marker}) == {"canonical_filename": "existing.png"}
+        transaction.rollback()

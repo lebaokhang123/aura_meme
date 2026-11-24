@@ -19,16 +19,21 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         assert schema.status_code == 200
         contract = schema.json()
         assert set(contract["paths"]) == {"/health", "/api/v1/auth/csrf", "/api/v1/auth/register",
-                                          "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/users/me",
-                                          "/api/v1/users/me/password", "/api/v1/users/{username}", "/api/v1/users/{username}/comments", "/api/v1/users/{username}/activity", "/api/v1/categories",
+                                          "/api/v1/auth/login", "/api/v1/auth/logout",
+                                          "/api/v1/auth/verify-email",
+                                          "/api/v1/auth/forgot-password", "/api/v1/auth/reset-password",
+                                          "/api/v1/auth/google/config", "/api/v1/auth/google/login", "/api/v1/auth/google/link",
+                                          "/api/v1/auth/google/onboarding",
+                                          "/api/v1/users/me",
+                                          "/api/v1/users/me/password", "/api/v1/users", "/api/v1/users/search", "/api/v1/users/{username}", "/api/v1/users/{username}/follow", "/api/v1/users/{username}/comments", "/api/v1/users/{username}/activity", "/api/v1/users/{username}/inventory", "/api/v1/categories",
                                           "/api/v1/admin/categories", "/api/v1/admin/categories/{category_id}",
                                           "/api/v1/posts", "/api/v1/posts/{post_id}", "/api/v1/media", "/api/v1/media/{media_id}",
                                           "/api/v1/posts/{post_id}/interactions", "/api/v1/users/me/bookmarks",
                                           "/api/v1/posts/{post_id}/comments", "/api/v1/comments/{comment_id}",
                                           "/api/v1/comments/{comment_id}/reactions", "/api/v1/comments/{comment_id}/interactions", "/api/v1/admin/comments/{comment_id}",
                                           "/api/v1/admin/users", "/api/v1/admin/users/{user_id}",
-                                          "/api/v1/admin/users/{user_id}/roles", "/api/v1/admin/posts",
-                                          "/api/v1/admin/posts/{post_id}", "/api/v1/admin/comments", "/api/v1/admin/assets", "/api/v1/admin/posts/{post_id}/media", "/api/v1/admin/audit-logs", "/api/v1/admin/orders", "/api/v1/admin/announcements", "/api/v1/admin/announcements/{announcement_id}", "/api/v1/admin/announcements/{announcement_id}/publish", "/api/v1/admin/announcements/{announcement_id}/withdraw", "/api/v1/contact",
+                                          "/api/v1/admin/users/{user_id}/roles", "/api/v1/admin/users/{user_id}/restore", "/api/v1/admin/posts",
+                                          "/api/v1/admin/posts/{post_id}", "/api/v1/admin/comments", "/api/v1/admin/assets", "/api/v1/admin/assets/upload", "/api/v1/admin/assets/{asset_id}", "/api/v1/admin/assets/{asset_id}/media", "/api/v1/admin/posts/{post_id}/media", "/api/v1/admin/audit-logs", "/api/v1/admin/orders", "/api/v1/admin/orders/{order_id}/receipt.pdf", "/api/v1/admin/announcements", "/api/v1/admin/announcements/{announcement_id}", "/api/v1/admin/announcements/{announcement_id}/publish", "/api/v1/admin/announcements/{announcement_id}/withdraw", "/api/v1/contact",
                                           "/api/v1/admin/contacts", "/api/v1/admin/contacts/{contact_id}",
                                           "/api/v1/users/me/posts", "/api/v1/users/me/posts/{post_id}",
                                           "/api/v1/posts/{post_id}/reactions", "/api/v1/posts/{post_id}/bookmark", "/api/v1/aura/progress", "/api/v1/leaderboard", "/api/v1/aura/check-in", "/api/v1/inventory/me", "/api/v1/inventory/equipment/{slot_kind}", "/api/v1/catalog/assets/{asset_id}", "/api/v1/vault/cases", "/api/v1/vault/cases/{case_id}", "/api/v1/vault/cases/{case_id}/open", "/api/v1/catalog", "/api/v1/inventory/equipment", "/api/v1/vault/opens/by-request",
@@ -56,7 +61,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
         assert public["properties"]["avatar_url"]["format"] == "uri-reference"
         assert {"type": "string"} in public["properties"]["avatar_url"]["anyOf"]
         profile = contract["components"]["schemas"]["PublicProfile"]
-        assert set(profile["properties"]) == set(public["properties"])
+        assert set(profile["properties"]) == set(public["properties"]) | {"equipped_background_effect", "is_following", "follower_count"}
         assert contract["components"]["schemas"]["PostResponse"]["properties"]["media_url"]["format"] == "uri-reference"
         upload_schema = contract["paths"]["/api/v1/media"]["post"]["responses"]["201"]["content"]["application/json"]["schema"]["$ref"].rsplit("/", 1)[-1]
         assert contract["components"]["schemas"][upload_schema]["properties"]["url"]["format"] == "uri-reference"

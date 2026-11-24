@@ -107,6 +107,17 @@ async function setupAdminMockApi(context) {
 }
 
 test.describe('Task 2 — Admin Workspace UX Refinement', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('aurameme-cookie-consent-v1', JSON.stringify({
+        version: 1,
+        essential: true,
+        optional: false,
+        updatedAt: '2026-11-20T10:00:00Z',
+      }));
+    });
+  });
+
   test('Subtask E: Admin workspace brand displays approved guardian icon', async ({ page, context }) => {
     await setupAdminMockApi(context);
     await page.goto('/admin');

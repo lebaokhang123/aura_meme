@@ -16,12 +16,13 @@ PAYLOAD = dict(username="created_user", email="created-user@example.com", passwo
 @pytest.mark.integration
 def test_admin_create_user_and_redacted_audit(admin):
     client, connection, actor, *_ = admin
-    payload = dict(username="created_admin", email=" Created@EXAMPLE.com ", password="Synthetic long password!", display_name="Private Name", roles=["USER", "ADMIN"])
+    payload = dict(username="created_admin", email=" Created@EXAMPLE.com ", password="Synthetic long password!", display_name="Private Name", roles=["USER"])
+    assert mutation(client, "POST", "/admin/users", payload | {"roles": ["ADMIN"]}).status_code == 403
     response = mutation(client, "POST", "/admin/users", payload)
     assert response.status_code == 201, response.text
     dto = response.json()
     assert set(dto) == {"id", "username", "email", "display_name", "roles", "status"}
-    assert dto["email"] == "created@example.com" and dto["roles"] == ["ADMIN", "USER"]
+    assert dto["email"] == "created@example.com" and dto["roles"] == ["USER"]
     row = connection.execute(select(User.__table__).where(User.id == UUID(dto["id"]))).mappings().one()
     assert client.app.state.auth.hasher.verify(row["password_hash"], payload["password"])
     audit = connection.execute(select(AdminAuditLog.__table__).where(AdminAuditLog.target_type == "user")).mappings().one()

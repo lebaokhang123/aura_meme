@@ -103,7 +103,7 @@ for (const user of users) {
     await page.locator('#identifier').fill(`${user.username}@example.com`);
     await page.locator('#password').fill('demo-password-only');
     await page.locator('#loginForm button[type="submit"]').click();
-    await expect(page).toHaveURL('http://127.0.0.1:4186/');
+    await expect(page).toHaveURL('/');
     expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)), userKey)).toEqual(user);
     expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain('demo-password-only');
     const logout = page.getByRole('button', { name: /đăng xuất/i }).or(page.getByRole('link', { name: /đăng xuất/i })).first();

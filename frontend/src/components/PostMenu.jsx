@@ -27,7 +27,7 @@ export function PostMenu({postId,onEdit}) {
   const toggle=async()=>{
     if(pending.current)return;
     if(isModerating&&reason.trim().length<5){
-      setError('Vui lòng nhập lý do tối thiểu 5 ký tự.');
+      setError('MODERATION_REASON_REQUIRED');
       return;
     }
     pending.current=true;setBusy(true);setError('');

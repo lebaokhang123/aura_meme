@@ -171,3 +171,25 @@ def test_owned_avatar_without_provenance_falls_back_without_erasing_inventory(in
     assert c.scalar(text('SELECT quantity FROM user_inventory WHERE user_id=:owner AND asset_id=:asset'),{'owner':owner,'asset':asset})==quantity
     assert c.scalar(text("SELECT asset_id FROM user_equipment WHERE user_id=:owner AND slot_kind='avatar'"),{'owner':owner})==asset
     assert c.scalar(text('SELECT count(*) FROM inventory_grants'))==grants
+
+@pytest.mark.integration
+def test_public_collection_is_read_only_and_omits_quantity(inventory):
+    client, connection, owner, other, ids, _ = inventory
+    owner_url = '/api/v1/users/alice_auth/inventory'
+    other_url = '/api/v1/users/other_inv/inventory'
+    connection.execute(text("UPDATE user_inventory SET quantity=3 WHERE user_id=:id AND asset_id=:asset"),
+                       {'id': other, 'asset': ids[2]})
+    response = client.get(other_url)
+    assert response.status_code == 200
+    item, = response.json()['items']
+    assert set(item) == {'asset', 'equipped'}
+    assert item['asset']['id'] == str(ids[2])
+    assert 'source_rights' not in item['asset']
+    assert client.get(owner_url).status_code == 200
+    assert client.get('/api/v1/inventory/me').json()['pagination']['total'] == 2
+    client.cookies.clear()
+    assert client.get(other_url).json()['items'] == [item]
+    for status in ('locked', 'deleted'):
+        connection.execute(text("UPDATE users SET status=:status, deleted_at=CASE WHEN :status='deleted' THEN now() END WHERE id=:id"),
+                           {'status': status, 'id': other})
+        assert client.get(other_url).status_code == 404

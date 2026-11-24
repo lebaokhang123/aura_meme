@@ -5,6 +5,6 @@ export default {
   ...base,
   testDir: fileURLToPath(new URL('../frontend/tests', import.meta.url)),
   outputDir: fileURLToPath(new URL('../frontend/test-results', import.meta.url)),
-  use: { ...base.use, channel: 'chromium' },
+  use: { ...base.use, channel: process.env.AURAMEME_TEST_BROWSER_CHANNEL || 'chromium' },
   webServer: { ...base.webServer, cwd: fileURLToPath(new URL('../frontend', import.meta.url)) },
 };

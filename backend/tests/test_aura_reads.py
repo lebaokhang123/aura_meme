@@ -164,7 +164,10 @@ def test_leaderboard_earned_only_stable_global_rank_and_private_whitelist(ready)
         assert dto['pagination']['total'] == 3
         item = dto['items'][0]
         assert item['rank'] == page and item['user']['id'] == str(ident) and item['earned_xp'] == 7
-        assert set(item['user']) == {'id','username','display_name','created_at','bio','avatar_url','membership_tier'}
+        allowed_fields = {'id','username','display_name','created_at','bio','avatar_url','membership_tier'}
+        if ident == owner:
+            allowed_fields |= {'level','realm','title'}
+        assert set(item['user']) == allowed_fields
         assert 'Private address' not in response.text and '@example.com' not in response.text
     assert client.get('/api/v1/leaderboard?page='+str(10**80)).json()['items'] == []
 
@@ -203,8 +206,8 @@ def test_new_read_boundaries_require_https_and_keep_rate_limits(auth,path,expect
     insecure=TestClient(app,base_url='http://testserver')
     try: assert insecure.get(path).status_code == 403
     finally: insecure.close()
-    responses=[client.get(path).status_code for _ in range(61)]
-    assert responses[:60] == [expected]*60 and responses[-1] == 429
+    responses=[client.get(path).status_code for _ in range(301)]
+    assert responses[:300] == [expected]*300 and responses[-1] == 429
 
 
 def test_runtime_contract_only_adds_two_read_endpoints_with_503():
@@ -238,11 +241,13 @@ def test_user_public_level_contract_and_policy_gated_sql():
         assert dumped['realm'] == realm
         assert dumped['title'] == realm
     assert 'realm' not in UserPublic(**base, realm='Phi Thăng').model_dump()
-    assert 'title' not in UserPublic(**base, title='Bá Chủ').model_dump()
-    khang = UserPublic(**{**base, 'username': 'khang_dev'}, level=79).model_dump()
-    assert khang['title'] == 'Bá Chủ Thiên Lôi'
-    kien = UserPublic(**{**base, 'username': 'kien_dev'}, level=9).model_dump()
-    assert kien['title'] == 'Thiên Tướng Độ Ách'
+    assert 'title' not in UserPublic(**base, title='Sáng Thế Thần').model_dump()
+    khang = UserPublic(**{**base, 'username': 'khang_dev'}, level=79, is_admin_title=True).model_dump()
+    assert khang['title'] == 'Sáng Thế Thần' and khang['realm'] == 'Đại Thừa'
+    kien = UserPublic(**{**base, 'username': 'kien_dev'}, level=9, is_admin_title=True).model_dump()
+    assert kien['title'] == 'Sáng Thế Thần' and kien['realm'] == 'Luyện Khí'
+    spoof = UserPublic(**{**base, 'username': 'khang_dev'}, level=79, is_admin_title=False).model_dump()
+    assert spoof['title'] == 'Đại Thừa'
     for invalid in (0, 101, -1, True, '11', 1.5):
         with pytest.raises(ValidationError):
             UserPublic(**base, level=invalid)

@@ -259,8 +259,8 @@ def test_delete_boundary_reuses_https_and_limiter(comments):
         insecure.close()
     client.cookies.clear()
     path = "/api/v1/comments/" + str(uuid4())
-    statuses = [client.delete(path).status_code for _ in range(61)]
-    assert statuses[:60] == [401] * 60 and statuses[-1] == 429
+    statuses = [client.delete(path).status_code for _ in range(301)]
+    assert statuses[:300] == [401] * 300 and statuses[-1] == 429
 
 
 @pytest.mark.integration

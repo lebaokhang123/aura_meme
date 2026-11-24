@@ -165,18 +165,19 @@ def public_posts(now=None):
         MediaUpload.owner_id == Post.author_id, MediaUpload.status == "ready"))
     columns = (Post, User, Profile, Category)
     if now is not None:
-        from app.aura_runtime import public_level_column
-        columns = (*columns, public_level_column(now))
+        from app.aura_runtime import public_is_admin_column, public_level_column
+        columns = (*columns, public_level_column(now), public_is_admin_column())
     return select(*columns).join(User, User.id == Post.author_id).join(
         Profile, Profile.user_id == User.id).join(Category, Category.id == Post.category_id).where(
         Post.status == "published", Post.deleted_at.is_(None), User.status == "active",
         Category.status == "active", or_(Post.media_id.is_(None), ready))
 
 
-def post_dto(post, user, profile, category, level=None, membership_tier="free"):
+def post_dto(post, user, profile, category, level=None, is_admin=False, membership_tier="free"):
     author = UserPublic(id=user.id, username=user.username, display_name=profile.display_name,
         bio=profile.bio, created_at=user.created_at, avatar_url=profile.avatar_url, level=level,
-        membership_tier=membership_tier if membership_tier in {"plus", "prime"} else "free")
+        membership_tier=membership_tier if membership_tier in {"plus", "prime"} else "free",
+        is_admin_title=bool(is_admin))
     # comments_count is optional and omitted until a real aggregate is requested.
     return PostResponse(id=post.id, author=author, category=category_dto(category), title=post.title,
         content=post.content, status=post.status, created_at=post.created_at, updated_at=post.updated_at, media_url=media_url(post.media_id))
@@ -205,7 +206,17 @@ def list_posts(request: Request, page: int = Query(1, ge=1), page_size: int = Qu
         raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
     statement = public_posts(request.app.state.auth.now())
     if search is not None:
-        statement = statement.where(or_(searchable(Post.title).contains(search_text(search), autoescape=True), searchable(Post.content).contains(search_text(search), autoescape=True)))
+        q_norm = search_text(search.lstrip("@#"))
+        statement = statement.where(
+            or_(
+                searchable(Post.title).contains(q_norm, autoescape=True),
+                searchable(Post.content).contains(q_norm, autoescape=True),
+                searchable(User.username).contains(q_norm, autoescape=True),
+                searchable(Profile.display_name).contains(q_norm, autoescape=True),
+                searchable(Category.name).contains(q_norm, autoescape=True),
+                searchable(Category.slug).contains(q_norm, autoescape=True),
+            )
+        )
     if category is not None:
         statement = statement.where(Category.slug == category)
     if author is not None:
@@ -254,11 +265,11 @@ def create_post(payload: PostInput, request: Request, account=Depends(require_ac
             if existing.author_id!=account.user.id or existing.deleted_at is not None or any(getattr(existing,k)!=v for k,v in values.items()):
                 raise AuthError(409,"CONFLICT","Request ID already used.")
             category=validate_post(account.db,account.user.id,existing.category_id,existing.media_id,existing.content)
-            from app.aura_runtime import read_public_level
+            from app.aura_runtime import read_public_is_admin, read_public_level
             from app.membership import read_users_membership_tiers
             now = request.app.state.auth.now()
             tiers = read_users_membership_tiers(account.db, {account.user.id}, now)
-            return post_dto(existing,account.user,account.db.get(Profile,account.user.id),category,read_public_level(account.db,account.user.id,now),membership_tier=tiers.get(account.user.id, "free"))
+            return post_dto(existing,account.user,account.db.get(Profile,account.user.id),category,read_public_level(account.db,account.user.id,now),is_admin=read_public_is_admin(account.db,account.user.id),membership_tier=tiers.get(account.user.id, "free"))
     category = validate_post(account.db, account.user.id, payload.category_id, payload.media_id, payload.content)
     now = request.app.state.auth.now()
     post = Post(id=payload.request_id or uuid4(), author_id=account.user.id, created_at=now, updated_at=now, **values)
@@ -267,12 +278,12 @@ def create_post(payload: PostInput, request: Request, account=Depends(require_ac
     except IntegrityError as error:
         if getattr(error.orig,"sqlstate",None)=="23505":raise AuthError(409,"CONFLICT","Request ID already used.") from None
         raise
-    from app.aura_runtime import award_post, read_public_level
+    from app.aura_runtime import award_post, read_public_is_admin, read_public_level
     if post.status == "published":
         award_post(account.db, post, now)
     from app.membership import read_users_membership_tiers
     tiers = read_users_membership_tiers(account.db, {account.user.id}, now)
-    return post_dto(post, account.user, account.db.get(Profile, account.user.id), category, read_public_level(account.db, account.user.id, now), membership_tier=tiers.get(account.user.id, "free"))
+    return post_dto(post, account.user, account.db.get(Profile, account.user.id), category, read_public_level(account.db, account.user.id, now), is_admin=read_public_is_admin(account.db, account.user.id), membership_tier=tiers.get(account.user.id, "free"))
 
 
 @router.get("/posts/{post_id}", response_model=PostResponse, operation_id="getPost",
@@ -311,12 +322,12 @@ def update_post(post_id: UUID, payload: PostPatch, request: Request, account=Dep
         setattr(post, name, value)
     post.updated_at = request.app.state.auth.now()
     account.db.flush()
-    from app.aura_runtime import award_post, read_public_level, reverse_post
+    from app.aura_runtime import award_post, read_public_is_admin, read_public_level, reverse_post
     if previous_status == "draft" and post.status == "published":
         award_post(account.db, post, post.updated_at)
     elif previous_status == "published" and post.status != "published":
         reverse_post(account.db, post.id, post.updated_at)
-    return post_dto(post, account.user, account.db.get(Profile, account.user.id), category, read_public_level(account.db, account.user.id, post.updated_at))
+    return post_dto(post, account.user, account.db.get(Profile, account.user.id), category, read_public_level(account.db, account.user.id, post.updated_at), is_admin=read_public_is_admin(account.db, account.user.id))
 
 
 @router.delete("/posts/{post_id}", status_code=204, operation_id="deletePost",

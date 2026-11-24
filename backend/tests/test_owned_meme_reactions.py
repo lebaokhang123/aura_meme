@@ -131,7 +131,8 @@ def owned_meme_target(target_comment, monkeypatch):
     import json
     from sqlalchemy import text
     client, connection, owner, comment_id, post_id, _ = target_comment
-    assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '0014_premium_sandbox', 'Review and migrate isolated test DB first.'
+    from test_migrations import REVISION
+    assert connection.scalar(text('SELECT version_num FROM alembic_version')) == REVISION, 'Review and migrate isolated test DB first.'
     monkeypatch.setattr(client.app.state, 'vault', SimpleNamespace(vault_runtime_enabled=True), raising=False)
     asset = uuid4()
     rights = synthetic_rights('a'*64,name_review_status='approved')

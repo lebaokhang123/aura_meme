@@ -32,7 +32,7 @@ def test_counts_and_private_viewer_state_do_not_leak_to_guests(target):
     assert mutation(client, "POST", f"/posts/{post_id}/comments", {"body": "Visible comment"}).status_code == 201
     path = f"/api/v1/posts/{post_id}/interactions"
     expected = {"post_id": str(post_id), "reaction_counts": {"like": 1, "love": 0, "laugh": 0, "fire": 0, "sad": 0, "angry": 0},
-                "comments_count": 1, "viewer_reaction": "like", "bookmarked": True}
+                "comments_count": 1, "viewer_reaction": "like", "bookmarked": True, "meme_reactions": []}
     response = client.get(path)
     assert response.status_code == 200 and response.json() == expected
     assert "am_session=" in response.headers.get("set-cookie", "")

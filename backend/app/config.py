@@ -66,6 +66,31 @@ class PremiumSettings(BaseSettings):
     paypal_cancel_url: str = "http://localhost:5173/premium"
 
 
+class GoogleAuthSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
+    google_client_id: str | None = None
+    google_allowed_issuers: list[str] = ["accounts.google.com", "https://accounts.google.com"]
+
+
+class EmailSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
+    email_mode: Literal["disabled", "sandbox", "smtp"] = "disabled"
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
+    email_from_address: str | None = None
+    email_from_name: str = "AuraMeme"
+    email_domain_verified: bool = False
+    email_reply_to: str | None = None
+    email_admin_inbox: str | None = None
+    app_public_url: str = "http://localhost:5173"
+    email_verification_required: bool = False
+
+
+
 class AuthSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
     auth_signing_key: SecretStr

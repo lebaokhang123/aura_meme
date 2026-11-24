@@ -9,6 +9,7 @@ from uuid import UUID
 from sqlalchemy import or_, select, text
 from sqlalchemy.orm import Session
 
+from app.admin_users import KHANG_DEV_ID, KIEN_DEV_ID
 from app.demo import DEMO_ROOT, activate_demo, bootstrap_admin, demo_connection, demo_environment, validate_demo_url, reviewed_demo_schema
 from app.db import create_db_engine
 from app.models import Profile, Role, User, UserRole
@@ -30,6 +31,9 @@ def account_plan(records,active_admins):
         roles=existing["roles"] if existing else []
         accounts.append({**wanted,"id":str(existing["id"]) if existing else None,"create":existing is None,
                          "grant_admin":"ADMIN" in wanted["roles"] and "ADMIN" not in roles})
+    if any(account["id"] != str(expected_id)
+           for account, expected_id in zip(accounts[:2], (KHANG_DEV_ID, KIEN_DEV_ID))):
+        conflicts.append("Protected administrator identities must already exist with their approved IDs.")
     if accounts[0]["grant_admin"] and active_admins:
         conflicts.append("An administrator already exists; first-admin bootstrap is forbidden.")
     return {"accounts":accounts,"bootstrap":accounts[0]["grant_admin"] and active_admins==0,

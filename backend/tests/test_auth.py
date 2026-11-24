@@ -119,6 +119,8 @@ def auth(migrated, monkeypatch):
     monkeypatch.setenv("AUTH_SIGNING_KEY", "test-only-signing-key-with-at-least-32-bytes")
     monkeypatch.setenv("AUTH_ENVIRONMENT", "production")
     monkeypatch.setenv("AUTH_ALLOWED_ORIGINS", '["https://testserver"]')
+    monkeypatch.setenv("EMAIL_MODE", "disabled")
+    monkeypatch.setenv("EMAIL_VERIFICATION_REQUIRED", "false")
     with migrated.connect() as connection, connection.begin() as transaction:
         with TestClient(app, base_url=ORIGIN) as client:
             client.app.state.auth_session_factory = lambda: Session(bind=connection, join_transaction_mode="create_savepoint")

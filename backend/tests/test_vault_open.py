@@ -102,8 +102,10 @@ def test_insert_failure_rolls_back_debit_receipt_inventory_and_grant(economy,tab
 
 
 @pytest.mark.integration
-def test_runtime_open_checks_auth_csrf_origin_then503_without_writes(economy):
+def test_runtime_open_checks_auth_csrf_origin_then503_without_writes(economy, monkeypatch):
+    from types import SimpleNamespace
     client,db,_,case,policy,_,_=economy;path=f'/api/v1/vault/cases/{case}/open'
+    monkeypatch.setattr(client.app.state, "vault", SimpleNamespace(vault_runtime_enabled=False))
     db.execute(text("UPDATE reward_policy_versions SET status='published' WHERE id=:id"),{'id':policy})
     db.execute(text("UPDATE case_loot_tables SET status='published' WHERE case_id=:id"),{'id':case})
     db.execute(text("UPDATE case_definitions SET status='active' WHERE id=:id"),{'id':case})

@@ -1,0 +1,408 @@
+/* Lucian UX/UI Prompt #409 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#409
+ * Ported for AuraMeme (Task 8 Polish).
+ */
+
+:root {
+  --ux-ease: cubic-bezier(.2, .8, .2, 1);
+  --ux-spring: cubic-bezier(.34, 1.45, .64, 1);
+  --ux-accent: var(--am-secondary, #d0bcff);
+  --ux-accent-soft: rgba(208, 188, 255, 0.15);
+  --ux-surface: var(--am-surface-container, #1e1f27);
+  --ux-surface-2: var(--am-surface-container-low, #1a1b23);
+  --ux-surface-3: var(--am-surface-container-high, #292932);
+  --ux-ink: var(--am-on-surface, #e3e1ed);
+  --ux-ink-2: var(--am-on-surface-variant, #cac4d0);
+  --ux-ink-3: var(--am-outline, #948f9a);
+  --ux-line: rgba(255, 255, 255, 0.08);
+  --ux-line-2: var(--am-outline-variant, #49454f);
+  --ux-shadow: rgba(0, 0, 0, 0.45);
+  --ux-shadow-strong: rgba(0, 0, 0, 0.72);
+}
+
+.u219[data-theme="light"] {
+  --ux-surface: #FFFFFF;
+  --ux-surface-2: var(--am-surface-container, #F5F3EF);
+  --ux-surface-3: var(--am-surface-container-high, #EAE7E1);
+  --ux-ink: var(--am-on-surface, #16151B);
+  --ux-ink-2: var(--am-outline, #57535F);
+  --ux-ink-3: #8E8A97;
+  --ux-line: rgba(22, 21, 27, 0.09);
+  --ux-line-2: rgba(22, 21, 27, 0.17);
+  --ux-accent: var(--am-secondary, #6A57F2);
+  --ux-accent-soft: rgba(106, 87, 242, 0.12);
+  --ux-shadow: rgba(40, 30, 80, 0.14);
+  --ux-shadow-strong: rgba(40, 30, 80, 0.3);
+}
+
+/* Floating wrapper at bottom-right */
+.am-cookie-root {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 95;
+  pointer-events: none;
+}
+
+.u409 {
+  position: relative;
+  width: auto;
+  height: auto;
+  display: block;
+}
+
+.u409-wrap {
+  position: relative;
+  margin-top: 46px;
+  pointer-events: auto;
+  transition: transform .6s var(--ux-ease), opacity .4s;
+}
+
+.u409-wrap.is-in {
+  animation: u409-in .7s var(--ux-spring) both;
+}
+
+@keyframes u409-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(.94);
+  }
+}
+
+.u409-card {
+  --w: 320px;
+  position: relative;
+  width: var(--w);
+  padding: 52px 18px 18px;
+  border-radius: 22px;
+  text-align: center;
+  background: var(--ux-surface);
+  box-shadow: 0 0 0 1px var(--ux-line-2), 0 22px 46px -24px var(--ux-shadow-strong), 0 2px 6px -2px var(--ux-shadow);
+  overflow: hidden;
+  transition: width .6s var(--ux-spring), height .6s var(--ux-spring), padding .5s var(--ux-ease), border-radius .5s;
+}
+
+.u409-main {
+  transition: opacity .18s;
+}
+
+.u409-t {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ux-ink);
+  letter-spacing: -.02em;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.u409-s {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ux-ink-3);
+  white-space: normal;
+}
+
+.u409-link {
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--ux-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 500;
+}
+
+.u409-link:hover {
+  filter: brightness(1.15);
+}
+
+.u409-act {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.u409-act button {
+  height: 38px;
+  border: 0;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform .4s var(--ux-spring), background .2s, opacity .2s;
+}
+
+.u409-act button:hover {
+  transform: translateY(-1px);
+}
+
+.u409-act button:active {
+  transform: scale(.95, .92);
+  transition-duration: .1s;
+}
+
+.u409 .u409-act button:focus-visible,
+.u409-link:focus-visible,
+.am-cookie-reopen:focus-visible {
+  outline: 2px solid var(--ux-accent);
+  outline-offset: 2px;
+}
+
+.u409-ess {
+  background: var(--ux-surface-2);
+  color: var(--ux-ink);
+  box-shadow: inset 0 0 0 1px var(--ux-line-2);
+}
+
+.u409-ess:hover {
+  background: var(--ux-surface-3);
+}
+
+.u409-ok {
+  background: var(--ux-ink);
+  color: var(--ux-surface);
+}
+
+.u409-ok:hover {
+  opacity: .92;
+}
+
+.u409-pill {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 42px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ux-ink);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-6px);
+  pointer-events: none;
+  transition: opacity .25s, transform .5s var(--ux-spring);
+}
+
+.u409.is-pill .u409-main,
+.u409.is-dot .u409-main {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.u409.is-pill .u409-pill {
+  opacity: 1;
+  transform: none;
+  transition-delay: .22s;
+}
+
+.u409-ck {
+  --tx: 0px;
+  --ty: 0px;
+  --sc: 1;
+  --rt: 0deg;
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 0;
+  width: 88px;
+  height: 88px;
+  margin: -44px 0 0 -44px;
+  transform: translate(var(--tx), var(--ty)) scale(var(--sc)) rotate(var(--rt));
+  transition: transform .65s var(--ux-spring);
+}
+
+.u409-ck > svg {
+  position: absolute;
+  inset: 0;
+  width: 88px;
+  height: 88px;
+  overflow: visible;
+  filter: drop-shadow(0 6px 7px rgba(150, 80, 20, .3));
+  transform-origin: 50% 56%;
+  animation: u409-wob 3.6s ease-in-out infinite 1.2s;
+}
+
+@keyframes u409-wob {
+  0%, 62%, 100% { transform: rotate(0); }
+  68% { transform: rotate(-5deg) scale(1.02); }
+  76% { transform: rotate(4deg); }
+  84% { transform: rotate(-2deg); }
+  92% { transform: rotate(1deg); }
+}
+
+.u409-wrap.is-in .u409-ck > svg {
+  animation: u409-pop .65s var(--ux-spring) .12s both;
+}
+
+@keyframes u409-pop {
+  from {
+    transform: scale(.4) rotate(-30deg);
+    opacity: 0;
+  }
+}
+
+.u409 .bt circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0);
+  transition: transform .34s cubic-bezier(.3, 1.6, .5, 1);
+}
+
+.u409 .bt circle:nth-child(2) {
+  transition-delay: .06s;
+}
+
+.u409 .bt circle:nth-child(3) {
+  transition-delay: .11s;
+}
+
+.u409 .ed {
+  opacity: 0;
+  transition: opacity .2s .14s;
+}
+
+.u409.is-bite .bt circle {
+  transform: scale(1);
+}
+
+.u409.is-bite .ed {
+  opacity: 1;
+}
+
+.u409.is-bite .u409-ck > svg {
+  animation: u409-chomp .5s var(--ux-ease);
+}
+
+@keyframes u409-chomp {
+  30% { transform: scale(.9) rotate(-6deg); }
+  65% { transform: scale(1.03) rotate(2deg); }
+}
+
+.u409.is-tiny .u409-ck > svg {
+  animation: none;
+}
+
+.u409-crs {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 0;
+  width: 88px;
+  height: 88px;
+  margin: -44px 0 0 -44px;
+  pointer-events: none;
+}
+
+.u409-cr {
+  position: absolute;
+  width: var(--s);
+  height: var(--s);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.u409-cr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.u409-wrap.is-fly {
+  transform: translateY(-30px) scale(.96);
+  opacity: 0;
+  transition: transform .7s cubic-bezier(.4, 0, .2, 1), opacity .5s .12s;
+}
+
+.u409-wrap.is-tuck {
+  transform: translateY(18px) scale(.75);
+  opacity: 0;
+  transition: transform .55s cubic-bezier(.5, 0, .75, 0), opacity .4s .1s;
+}
+
+.u409-wrap.is-reset,
+.u409-wrap.is-reset * {
+  transition: none !important;
+}
+
+.u409-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Floating mini cookie re-open trigger */
+.am-cookie-reopen {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 85;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  border: 1px solid var(--ux-line-2);
+  background: var(--ux-surface);
+  color: var(--ux-ink);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 150ms ease, border-color 150ms ease;
+  pointer-events: auto;
+}
+
+.am-cookie-reopen:hover {
+  border-color: var(--ux-accent);
+  transform: translateY(-2px);
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .u409-ck > svg {
+    animation: none !important;
+  }
+  .u409-wrap.is-in {
+    animation: none !important;
+  }
+  .u409-wrap.is-in .u409-ck > svg {
+    animation: none !important;
+  }
+  .u409-wrap,
+  .u409-card,
+  .u409-ck,
+  .u409-pill,
+  .u409-main {
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 480px) {
+  .am-cookie-root {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    display: flex;
+    justify-content: center;
+  }
+  .u409-wrap {
+    width: 100%;
+    max-width: 330px;
+    margin: 46px auto 0;
+  }
+  .u409-card {
+    --w: 100%;
+    width: 100%;
+    padding: 50px 14px 14px;
+  }
+  .am-cookie-reopen {
+    right: 14px;
+    bottom: 14px;
+  }
+}

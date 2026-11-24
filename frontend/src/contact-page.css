@@ -11,6 +11,8 @@
 .am-contact-required{color:var(--am-error)}
 .am-contact-input{position:relative;display:flex;align-items:center}
 .am-contact-input>.material-symbols-outlined{position:absolute;left:14px;font-size:20px;color:var(--am-on-surface-variant);pointer-events:none}
+.am-contact-input>.am-contact-lock-icon{left:auto;right:14px;font-size:17px;opacity:.65}
+.am-contact-input--locked input{padding-right:38px;cursor:default;opacity:.88;background:rgb(var(--am-rgb-surface-container) / .7)}
 .am-contact-input input,.am-contact-field textarea{width:100%;min-width:0;border:0;border-radius:8px;background:var(--am-surface-container);color:var(--am-on-surface);font:400 15px/22px Inter,sans-serif;transition:background .15s}
 .am-contact-input input{height:48px;padding:0 16px 0 40px}
 .am-contact-field textarea{height:160px;min-height:160px;padding:16px;resize:none}
@@ -34,9 +36,10 @@
 .am-contact-submit:hover{box-shadow:0 0 28px rgb(var(--am-rgb-tertiary-fixed) / .6);transform:scale(1.01)}
 .am-contact-submit:active{transform:scale(.99)}
 .am-contact-submit:disabled{opacity:.55;cursor:wait;transform:none}
-.am-contact-channels{display:flex;gap:12px;padding:4px;border-radius:12px;background:rgb(var(--am-rgb-surface-container) / .6);border:1px solid var(--am-surface-container-high)}
-.am-contact-channels a{width:44px;height:44px;border:1px solid rgb(var(--am-rgb-outline-variant) / .4);border-radius:8px;background:var(--am-surface-container);color:var(--am-on-surface-variant);display:flex;align-items:center;justify-content:center}
-.am-contact-channels a:hover{background:var(--am-surface-container-high);border-color:var(--am-secondary);color:var(--am-primary)}
+.am-contact-channels{display:flex;gap:12px;padding:4px;border-radius:12px;background:rgb(var(--am-rgb-surface-container) / .6);border:none!important}
+.am-contact-channels a{width:44px;height:44px;border:none!important;outline:none!important;border-radius:8px;background:var(--am-surface-container);color:var(--am-on-surface-variant);display:flex;align-items:center;justify-content:center}
+.am-contact-channels a:hover{background:var(--am-surface-container-high);border:none!important;outline:none!important;color:var(--am-primary)}
+.am-contact-channels a:focus{border:none!important;outline:none!important}
 .am-contact-channels svg{width:20px;height:20px}
 .am-contact-error{color:var(--am-error);margin:0}
 .am-contact-success{padding:16px;border-radius:8px;background:var(--am-surface-container-high);display:flex;align-items:center;gap:12px}

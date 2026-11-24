@@ -108,12 +108,22 @@ test('switching both preferences preserves filters, demo identity and native pos
 test('checked agreement remains visible in light mode and keeps user edits across languages', async ({page}) => {
   await page.goto('/register');
   const terms=page.locator('#terms');
+  await expect(terms).not.toBeChecked();
+  const indicator=page.locator('#terms + i');
+  await terms.focus();
+  await terms.press('Space');
   await expect(terms).toBeChecked();
   await page.locator('.u219-tg').click();
   await expect(page.locator('#root')).toHaveAttribute('data-theme','light');
-  const colors=await terms.evaluate(el=>({background:getComputedStyle(el).backgroundColor,foreground:getComputedStyle(el).color}));
-  expect(colors.background).toBe(colors.foreground);
+  const glyph=await indicator.evaluate(el=>{
+    const style=getComputedStyle(el,'::after');
+    return {color:style.borderRightColor,width:parseFloat(style.borderRightWidth)};
+  });
+  expect(glyph.color).toBe('rgb(255, 255, 255)');
+  expect(glyph.width).toBeGreaterThan(0);
   await expect(page.locator('html')).not.toHaveClass(/u219-reveal/);
-  await terms.uncheck();await choose(page,'en');
+  await terms.press('Space');
+  await expect(terms).not.toBeChecked();
+  await choose(page,'en');
   await expect(terms).not.toBeChecked();
 });

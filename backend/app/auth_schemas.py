@@ -6,6 +6,7 @@ from pydantic import AwareDatetime, BaseModel, EmailStr, Field, SecretStr, field
 
 
 class LoginInput(BaseModel):
+    model_config = {"extra": "forbid"}
     email: EmailStr
     password: SecretStr
 
@@ -39,7 +40,7 @@ class RegisterInput(LoginInput):
     @field_validator("display_name")
     @classmethod
     def nonempty_name(cls, value):
-        if not value.strip():
+        if not value.strip() or "\x00" in value:
             raise ValueError("Display name must not be blank.")
         return value
 
@@ -51,6 +52,23 @@ class UserPrivate(BaseModel):
     display_name: str
     roles: list[Literal["USER", "ADMIN"]]
     status: Literal["active", "locked", "deleted"]
+    deleted_at: AwareDatetime | None = Field(default=None, exclude_if=lambda value: value is None)
+
+
+class RegisterResponse(BaseModel):
+    status: Literal["pending_verification"] = "pending_verification"
+    email: EmailStr
+    message: str
+
+
+class VerifyEmailInput(BaseModel):
+    token: str = Field(min_length=16, max_length=128)
+
+
+class VerifyEmailResponse(BaseModel):
+    status: Literal["verified"] = "verified"
+    message: str
+
 
 
 class CsrfResponse(BaseModel):

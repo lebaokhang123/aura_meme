@@ -133,7 +133,7 @@ def test_public_profile_no_pii(auth, status):
     response = client.get("/api/v1/users/" + ("unknown_user" if status == "missing" else ACCOUNT["username"]))
     assert response.status_code == (200 if status == "active" else 404)
     if status == "active":
-        assert set(response.json()) == PUBLIC and response.json()["avatar_url"] is None
+        assert set(response.json()) == PUBLIC | {"follower_count", "is_following"} and response.json()["avatar_url"] is None
         assert response.json()["bio"] == "Public bio"
     assert not any(secret in response.text for secret in [ACCOUNT["email"], "private-phone", "private-address", "password_hash", "roles", "birth_year"])
 

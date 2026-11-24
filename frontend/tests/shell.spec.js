@@ -49,7 +49,8 @@ for (const width of [375, 768, 1024, 1280, 1920]) {
 test('footer is shared, omitted on Home and opens the privacy policy', async ({ page, context }) => {
   await page.goto('/');
   await expect(page.locator('footer')).toHaveCount(0);
-  await expect(page.getByText('Chính sách bảo mật', { exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-cookie-banner]').getByRole('link', {name:'Chính sách bảo mật'})).toBeVisible();
+  await page.locator('[data-cookie-ess]').click();
   let baseline;
   for (const route of routes.slice(1)) {
     await page.goto(route);
@@ -89,7 +90,7 @@ for (const [username, name, avatar] of [['Khang_dev', 'Khang Dev', 'khang.jpg'],
     await page.locator('#identifier').fill(`${username}@example.com`);
     await page.locator('#password').fill('demo-only');
     await page.locator('#submitBtn').click();
-    await expect(page).toHaveURL('http://127.0.0.1:4186/');
+    await expect(page).toHaveURL('/');
     await expect(page.locator('.site-header .account-avatar')).toHaveAttribute('src', `/assets/demo/${avatar}`);
     await expect(page.locator('.site-header .account-avatar')).toHaveAttribute('alt', `Ảnh đại diện ${name}`);
     await expect(page.locator('[data-current-user-avatar]').first()).toHaveAttribute('src', `/assets/demo/${avatar}`);
@@ -118,11 +119,13 @@ test('Home expands evenly on a wide screen and ends the three-post demo without 
 });
 
 test('Contact, Rank and Vault share the supplied maintenance art and layout', async ({ page }) => {
+  await page.emulateMedia({reducedMotion:'reduce'});
   let baseline;
   for (const route of ['/contact', '/rank', '/vault']) {
     await page.goto(route, { waitUntil: 'networkidle' });
     await expect(page.locator('.maintenance-art')).toHaveAttribute('src', '/assets/brand/baotri.png');
     await expect(page.getByRole('heading', { name: 'Tính năng đang phát triển...' })).toBeVisible();
+    await page.evaluate(async()=>{await document.fonts.ready});
     const box = await page.locator('.maintenance-content').boundingBox();
     if (!baseline) baseline = box;
     expect(box).toEqual(baseline);
@@ -176,6 +179,7 @@ test('header and content reveal together when a page chunk is delayed', async ({
 test('compact navigation remains usable in a short landscape viewport', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 844, height: 320 });
   await page.goto('/', { waitUntil: 'networkidle' });
+  await page.locator('[data-cookie-ess]').click();
   await page.getByRole('button', { name: 'Mở menu điều hướng', exact: true }).click();
   const menu = page.locator('#compact-navigation');
   const box = await menu.boundingBox();

@@ -9,10 +9,13 @@ from sqlalchemy.orm import Session
 from uuid import uuid4
 from pydantic import BaseModel, ValidationError
 
-from app.config import AuthSettings, ConfigurationError, PremiumSettings, VaultSettings, load_settings
+from app.config import AuthSettings, ConfigurationError, EmailSettings, GoogleAuthSettings, PremiumSettings, VaultSettings, load_settings
 from app.db import create_db_engine
 from app.auth_schemas import CooldownDetails
 from app.auth import router
+from app.password_reset import router as password_reset_router
+from app.google_auth import GoogleTokenVerifier, router as google_auth_router
+from app.email_service import EmailService
 from app.account import router as account_router
 from app.profile_activity import router as profile_activity_router
 from app.blog import router as blog_router
@@ -68,6 +71,8 @@ async def lifespan(app: FastAPI):
             return_url=app.state.premium.paypal_return_url,
             cancel_url=app.state.premium.paypal_cancel_url,
         )
+        app.state.google_auth = GoogleTokenVerifier(GoogleAuthSettings())
+        app.state.email_service = EmailService(EmailSettings())
         yield
     finally:
         engine.dispose()
@@ -75,6 +80,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AuraMeme API", version="0.1.0", lifespan=lifespan)
 app.include_router(router)
+app.include_router(password_reset_router)
+app.include_router(google_auth_router)
 app.include_router(account_router)
 app.include_router(profile_activity_router)
 app.include_router(blog_router)
@@ -133,7 +140,10 @@ async def security_headers(request: Request, call_next):
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
-    response.headers["X-Frame-Options"] = "DENY"
+    if request.url.path.endswith("/receipt.pdf"):
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    else:
+        response.headers["X-Frame-Options"] = "DENY"
     if request.url.path.startswith("/api/v1/auth/"):
         response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
     if request.url.scheme == "https" and request.app.state.auth.secure:

@@ -20,7 +20,8 @@ class AuthenticatedAccount:
 
 def authenticated_account(request, response, raw, db):
     runtime = request.app.state.auth
-    record = current_session(db, runtime, raw)
+    lock_user = request.method not in {"GET", "HEAD", "OPTIONS"}
+    record = current_session(db, runtime, raw, lock_user=lock_user)
     lifetime = max(1, int((record.expires_at - runtime.now()).total_seconds()))
     set_cookie(response, runtime, "am_session", raw, lifetime)
     return AuthenticatedAccount(db=db, user=db.get(User, record.user_id), session=record)
