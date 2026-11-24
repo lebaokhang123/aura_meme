@@ -184,3 +184,13 @@ Các tham số Aura/odds/payment còn mở đã nằm trong `03-database-design.
 `PremiumSettings` và `EmailSettings` đọc process env trước `backend/.env`. Launcher demo áp dụng cấu hình DB/auth/media từ allowlist riêng trong `backend/demo.local/.env`. Các khóa PayPal/SMTP được cấu hình riêng ở backend. Frontend và tiến trình mở browser không nhận các biến cấu hình này từ launcher. Tài khoản Buyer/Business tương tác ở Sandbox và nằm ngoài cấu hình ứng dụng.
 
 Thanh toán PayPal Sandbox dùng order ID đầu vào để ràng buộc callback, và lưu capture ID do provider trả về sau khi đối soát. Mô phỏng dùng ý định riêng, không xuất hiện như provider approval và không thể ghi đè order có PayPal ID thật. Trạng thái order thành công độc lập với trạng thái hội viên ACTIVE.
+
+## 25/11/2026 — Founder Collection và kiểm thử PostgreSQL disposable
+
+Founder Collection ràng buộc đúng ID Khang Dev, chỉ xét avatar/background đã duyệt, đang hoạt động và có reward policy hợp lệ. Grant chạy theo khóa idempotency riêng, ghi inventory/InventoryGrant và audit, không sinh CaseOpen hoặc EXP. Daily check-in và mở rương giữ đường ghi EXP độc lập.
+
+Kiểm thử Checkpoint 3 có worker commit thật. Khởi tạo PostgreSQL mới với tên `aurameme_test`, role ứng dụng cùng tên, schema public, cổng PostgreSQL 5432 và revision 0018. Container database không publish cổng và chạy với `--network none`. Tiến trình pytest dùng `--network container:<id>` để gọi 127.0.0.1:5432. Đặt `cluster_name` ở cấu hình server thành `aurameme-fp-<32 hex>`, truyền cùng tên qua `AURAMEME_DISPOSABLE_TEST_CLUSTER` và chỉ truyền DSN qua `TEST_DATABASE_URL`. Dùng phiên bản dependencies trong `requirements-ci.txt`.
+
+Fixture đối chiếu danh tính, marker, revision, role và schema rỗng trước khi ghi. Ca mở rương và duyệt Admin đi qua HTTP, CSRF, session và transaction dependency thật. Dữ liệu rollback dùng một transaction, runner thay thế DB fixture của từng ca commit bằng bản clone của template sạch, giữ trigger append-only. Lệnh từ backend: python tests/run_final_polish_disposable.py --image <image-đã-cài-requirements-ci> --repeat 2 --regressions. Runner chỉ dừng container định danh do nó tạo.
+
+CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute dừng trước mutation nếu bất kỳ mục eligible nào bị chặn do thiếu policy. Execute trên demo là gate riêng của Owner.
