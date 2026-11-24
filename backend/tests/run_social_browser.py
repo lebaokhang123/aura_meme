@@ -108,11 +108,17 @@ def main():
                 assert all(r.username in expected and r.email==expected[r.username] for r in users),"Unknown identity; refuse cleanup"
                 owned=[r.id for r in users]
                 assert all(r.code in {"USER","ADMIN"} for r in c.execute(select(Role.code)))
-                allowed={"users","profiles","roles","user_roles","auth_sessions","categories","posts","comments","post_reactions","comment_reactions","media_uploads","admin_audit_logs","contact_messages"}
+                allowed={"users","profiles","roles","user_roles","auth_sessions","categories","posts","comments","post_reactions","comment_reactions","media_uploads","admin_audit_logs","contact_messages","notifications"}
                 assert not any(count for name,count in counts.items() if name not in allowed),"Unrelated data; refuse cleanup"
                 for name,column in (("contact_messages","user_id"),("posts","author_id"),("comments","author_id"),("post_reactions","user_id"),("comment_reactions","user_id"),("media_uploads","owner_id"),("admin_audit_logs","actor_id"),("profiles","user_id"),("user_roles","user_id"),("auth_sessions","user_id")):
                     table=Base.metadata.tables[name]
                     assert all(v in owned for v in c.scalars(select(table.c[column]))),"Unknown owner; refuse cleanup"
+                notifications = Base.metadata.tables["notifications"]
+                notification_owners = c.execute(select(
+                    notifications.c.recipient_user_id, notifications.c.actor_user_id))
+                assert all(recipient in owned and (actor is None or actor in owned)
+                           for recipient, actor in notification_owners), "Unknown notification identity; refuse cleanup"
+                c.execute(notifications.delete().where(notifications.c.recipient_user_id.in_(owned)))
                 contact=Base.metadata.tables['contact_messages']
                 assert all(row.body=='Synthetic Profile Contact E2E message' for row in c.execute(select(contact))),"Unexpected Contact content; refuse cleanup"
                 uploads=c.execute(select(MediaUpload.object_key)).scalars().all()
@@ -132,7 +138,7 @@ def main():
                 assert not any(inventory(c,database).values())
                 assert c.execute(text("SELECT oid,relname,relfilenode FROM pg_class WHERE relnamespace='public'::regnamespace ORDER BY relname")).all()==before
             engine.dispose()
-            print("Social browser cleanup PASS:"+database+"/public0010,29 empty tables; original schema/object IDs unchanged.")
+            print(f"Social browser cleanup PASS: {database}/public, {len(counts)} empty tables; original schema/object IDs unchanged.")
     return result
 
 if __name__=="__main__":
