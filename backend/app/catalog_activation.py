@@ -184,6 +184,8 @@ def publish_cases(db, manifest, manifest_digest, approved_digest, policy_owner, 
         case=db.scalar(select(CaseDefinition).where(CaseDefinition.id==case_id).options(undefer(CaseDefinition.runtime_kind)))
         load_runtime_pool(db,case,now)
     audit_catalog(db,policy_owner,'vault.cases.publish',manifest_digest,now,{'case_ids':{kind:str(identity) for kind,identity in results.items()}})
+    from app.vault_privilege import auto_grant_khang_dev_published_items
+    auto_grant_khang_dev_published_items(db, manifest, policy_id, now, actor_id=policy_owner)
     return results
 
 
