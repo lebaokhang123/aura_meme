@@ -19,11 +19,13 @@ from app.models import (
     CaseLootTable,
     CasePoolItem,
     InventoryGrant,
+    RewardPolicyVersion,
     User,
     UserInventory,
 )
 
-PRIVILEGE_SOURCE_TYPE = "privilege"
+# Schema constraint: ck_inventory_grants_source_type -> source_type IN ('case_open','weekly_streak','level','admin')
+PRIVILEGE_SOURCE_TYPE = "admin"
 PRIVILEGE_KEY_PREFIX = "privilege:khang_dev:"
 
 
@@ -34,6 +36,153 @@ def assert_khang_dev_target(target_user_id: UUID) -> None:
             f"Vault privilege is strictly exclusive to Khang Dev ({KHANG_DEV_ID}); "
             f"forbidden for user {target_user_id}."
         )
+
+
+def resolve_reward_policy_id(db: Session, asset_id: UUID | None = None) -> UUID:
+    """Resolve a valid RewardPolicyVersion ID for foreign key constraint satisfaction."""
+    if asset_id is not None:
+        pool_pid = db.scalar(
+            select(CaseLootTable.policy_id)
+            .join(CasePoolItem, CasePoolItem.loot_table_id == CaseLootTable.id)
+            .where(
+                CasePoolItem.asset_id == asset_id,
+                CaseLootTable.status == "published",
+            )
+        )
+        if pool_pid is not None:
+            return pool_pid
+
+    # Fallback to latest published reward policy version
+    published_pid = db.scalar(
+        select(RewardPolicyVersion.id)
+        .where(RewardPolicyVersion.status == "published")
+        .order_by(RewardPolicyVersion.version.desc())
+    )
+    if published_pid is not None:
+        return published_pid
+
+    # Fallback to any existing reward policy version
+    any_pid = db.scalar(
+        select(RewardPolicyVersion.id)
+        .order_by(RewardPolicyVersion.created_at.desc())
+    )
+    if any_pid is not None:
+        return any_pid
+
+    raise ValueError("A valid RewardPolicyVersion is required for InventoryGrant foreign key.")
+
+
+def is_asset_eligible_for_privilege(asset: AssetItem) -> bool:
+    """Check if an asset is active, approved, and has valid source rights."""
+    if asset is None or not asset.active:
+        return False
+    if asset.kind not in ("avatar", "background"):
+        return False
+    rights = dict(asset.source_rights or {})
+    if rights.get("review_status") != "approved":
+        return False
+    if rights.get("name_review_status") != "approved":
+        return False
+    if not reviewed_source_rights(rights):
+        return False
+    return True
+
+
+def grant_khang_dev_single_asset_if_eligible(
+    db: Session,
+    asset: AssetItem,
+    now: datetime,
+    *,
+    actor_id: UUID = KHANG_DEV_ID,
+    policy_id: UUID | None = None,
+) -> bool:
+    """Grant 1 unit of a single newly eligible asset to Khang Dev if not already owned.
+
+    - Called from admin approval flow or individual publish flow.
+    - Idempotent: does nothing if already owned.
+    - Zero EXP, safe locks, audit log recorded.
+    - Returns True if granted, False if skipped.
+    """
+    if not is_asset_eligible_for_privilege(asset):
+        return False
+
+    khang = db.scalar(
+        select(User)
+        .where(User.id == KHANG_DEV_ID, User.status == "active")
+        .with_for_update()
+    )
+    if khang is None:
+        return False
+
+    user_inv = db.scalar(
+        select(UserInventory)
+        .where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == asset.id)
+        .with_for_update()
+    )
+    if user_inv is not None and user_inv.quantity > 0:
+        return False
+
+    event_key = f"{PRIVILEGE_KEY_PREFIX}{asset.id}"
+    existing_grant = db.scalar(
+        select(InventoryGrant).where(
+            InventoryGrant.user_id == KHANG_DEV_ID,
+            InventoryGrant.event_key == event_key,
+        )
+    )
+    if existing_grant is not None:
+        inventory_state(db, KHANG_DEV_ID, asset.id)
+        return False
+
+    effective_policy_id = policy_id or resolve_reward_policy_id(db, asset.id)
+
+    # UserInventory must be flushed before InventoryGrant (FK dependency)
+    if user_inv is None:
+        user_inv = UserInventory(
+            user_id=KHANG_DEV_ID,
+            asset_id=asset.id,
+            quantity=1,
+            acquired_at=now,
+            updated_at=now,
+        )
+        db.add(user_inv)
+    else:
+        user_inv.quantity = 1
+        user_inv.updated_at = now
+    db.flush()
+
+    grant = InventoryGrant(
+        id=uuid4(),
+        user_id=KHANG_DEV_ID,
+        asset_id=asset.id,
+        event_key=event_key,
+        quantity=1,
+        source_type=PRIVILEGE_SOURCE_TYPE,
+        case_open_id=None,
+        policy_id=effective_policy_id,
+        granted_at=now,
+    )
+    db.add(grant)
+    db.flush()
+
+    db.add(
+        AdminAuditLog(
+            id=uuid4(),
+            actor_id=actor_id,
+            action="vault.privilege.auto_grant",
+            target_type="user_inventory",
+            target_id=str(KHANG_DEV_ID),
+            before_json=None,
+            after_json={
+                "granted_assets": [str(asset.id)],
+                "policy_id": str(effective_policy_id),
+                "source": "admin_approval_hook",
+            },
+            created_at=now,
+        )
+    )
+    db.flush()
+    inventory_state(db, KHANG_DEV_ID, asset.id)
+    return True
 
 
 def auto_grant_khang_dev_published_items(
@@ -47,6 +196,7 @@ def auto_grant_khang_dev_published_items(
     """Automatically grant newly published items to Khang Dev during publication.
 
     - Strictly idempotent: 1 unit if not owned; preserves existing quantity if already owned.
+    - Uses schema-compatible source_type='admin'.
     - +0 EXP, no fake chest openings, no wallet transactions.
     - Skips cleanly if Khang Dev does not exist in the database (e.g. synthetic publication test).
     """
@@ -92,7 +242,9 @@ def auto_grant_khang_dev_published_items(
             inventory_state(db, KHANG_DEV_ID, item_id)
             continue
 
-        # Grant 1 unit
+        effective_policy_id = policy_id or resolve_reward_policy_id(db, item_id)
+
+        # Grant 1 unit: UserInventory must exist and be flushed before InventoryGrant
         if user_inv is None:
             user_inv = UserInventory(
                 user_id=KHANG_DEV_ID,
@@ -115,11 +267,12 @@ def auto_grant_khang_dev_published_items(
             quantity=1,
             source_type=PRIVILEGE_SOURCE_TYPE,
             case_open_id=None,
-            policy_id=policy_id,
+            policy_id=effective_policy_id,
             granted_at=now,
         )
         db.add(grant)
         db.flush()
+        inventory_state(db, KHANG_DEV_ID, item_id)
         granted.append(item_id)
 
     if granted:
@@ -205,7 +358,8 @@ def sync_khang_dev_vault_privilege(
     for asset in db.scalars(fallback_query):
         if asset.id not in seen_ids and ready_asset(asset):
             if asset.source_rights.get("name_review_status") == "approved":
-                rows.append((asset, None))
+                resolved_pid = resolve_reward_policy_id(db, asset.id)
+                rows.append((asset, resolved_pid))
                 seen_ids.add(asset.id)
 
     already_owned = []
@@ -247,6 +401,8 @@ def sync_khang_dev_vault_privilege(
                 inventory_state(db, KHANG_DEV_ID, asset.id)
                 continue
 
+            effective_policy_id = policy_id or resolve_reward_policy_id(db, asset.id)
+
             if user_inv is None:
                 user_inv = UserInventory(
                     user_id=KHANG_DEV_ID,
@@ -269,11 +425,12 @@ def sync_khang_dev_vault_privilege(
                 quantity=1,
                 source_type=PRIVILEGE_SOURCE_TYPE,
                 case_open_id=None,
-                policy_id=policy_id,
+                policy_id=effective_policy_id,
                 granted_at=now,
             )
             db.add(grant)
             db.flush()
+            inventory_state(db, KHANG_DEV_ID, asset.id)
             granted.append(str(asset.id))
 
         db.add(
@@ -348,7 +505,7 @@ def main(argv=None):
     from app.config import load_settings
     from app.db import create_db_engine
 
-    db_url = args.database_url or load_settings().database_url
+    db_url = args.database_url or load_settings().database_url.get_secret_value()
     target_db = validate_target(db_url, allow_demo=True)
 
     engine = create_db_engine(db_url)

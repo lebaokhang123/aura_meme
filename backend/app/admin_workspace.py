@@ -658,6 +658,8 @@ def admin_update_asset(
         asset.source_rights = rights
         asset.active = True
         audit_action = 'asset.approve'
+        from app.vault_privilege import grant_khang_dev_single_asset_if_eligible
+        grant_khang_dev_single_asset_if_eligible(db, asset, now, actor_id=account.user.id)
     elif action == 'reject':
         if asset.kind == 'background':
             raise AuthError(409, 'CONFLICT', 'Không thể từ chối hoặc xóa Background gốc của hệ thống.')

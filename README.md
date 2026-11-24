@@ -12,12 +12,12 @@
 
 ## 1. Giới thiệu dự án
 
-**AuraMeme** là đồ án tốt nghiệp của nhóm sinh viên, được xây dựng với mục tiêu mang đến một không gian mạng xã hội trực tuyến lành mạnh, sáng tạo và thú vị dành cho cộng đồng yêu thích meme và văn hóa số.
+**AuraMeme** là nền tảng mạng xã hội đa phương tiện kết hợp cơ chế trò chơi hóa (gamification), được xây dựng với mục tiêu mang đến một không gian trực tuyến lành mạnh, sáng tạo và văn minh dành cho cộng đồng yêu thích meme và văn hóa số.
 
-Dự án tích hợp các tính năng tương tác mạng xã hội hiện đại kết hợp với cơ chế trò chơi hóa (gamification) độc đáo:
+Dự án cung cấp trải nghiệm tương tác phong phú, gắn kết cộng đồng thông qua các tính năng cốt lõi:
 
 - **Chia sẻ & Tương tác Meme:** Đăng tải hình ảnh meme chất lượng cao, bài viết blog, thảo luận, bình luận và thả các biểu cảm cảm xúc phong phú.
-- **Cơ chế Aura & EXP:** Người dùng tích lũy điểm Bá Khí (Aura) và EXP thông qua các hoạt động tích cực như điểm danh hàng ngày, tương tác cộng đồng và đóng góp nội dung.
+- **Cơ chế Aura & EXP:** Người dùng tích lũy điểm Bá Khí (Aura) và EXP thông qua các hoạt động tích cực như điểm danh hàng ngày, tương tác cộng đồng và đóng góp nội dung giá trị.
 - **Hệ thống Cảnh giới & Cấp độ (Level):** Hệ thống 10 Cảnh giới với 100 cấp độ (Level) mang đậm dấu ấn huyền huyễn/tu tiên, đem lại trải nghiệm thăng tiến hào hứng cho người dùng.
 - **Bảng xếp hạng (Rank):** Vinh danh những thành viên có cống hiến nổi bật và tích lũy Aura cao nhất trong cộng đồng.
 - **Bảo Khố (Vault):** Tính năng vòng quay may mắn cho phép người dùng mở các rương quà để sưu tầm những avatar meme độc đáo và hình nền thẻ cá nhân lung linh thuộc các phẩm cấp từ D đến S.
@@ -26,7 +26,7 @@ Dự án tích hợp các tính năng tương tác mạng xã hội hiện đạ
 
 ## 2. Thành viên thực hiện
 
-Dự án được nghiên cứu và phát triển bởi các thành viên:
+Dự án được nghiên cứu và phát triển bởi:
 
 - **Lê Bảo Khang** — Trưởng nhóm / Phát triển hệ thống
 - **Phan Trung Kiên** — Thành viên / Phát triển hệ thống
@@ -85,4 +85,4 @@ Dự án được nghiên cứu và phát triển bởi các thành viên:
 
 ## 4. Lời cảm ơn
 
-Chúng tôi xin gửi lời cảm ơn chân thành đến Quý Thầy Cô giảng viên hướng dẫn đã tận tình chỉ dẫn và đóng góp những ý kiến quý báu trong suốt quá trình hoàn thiện đồ án. Đồng thời, nhóm cũng gửi lời cảm ơn đến gia đình, bạn bè và toàn thể cộng đồng đã luôn đồng hành, thử nghiệm và ủng hộ dự án AuraMeme.
+Chúng tôi xin gửi lời cảm ơn chân thành đến Quý Thầy Cô và các cố vấn kỹ thuật đã tận tình hướng dẫn, đóng góp những ý kiến quý báu trong suốt quá trình hoàn thiện dự án. Đồng thời, nhóm cũng gửi lời cảm ơn đến gia đình, bạn bè và toàn thể cộng đồng đã luôn đồng hành, thử nghiệm và ủng hộ AuraMeme.
