@@ -69,6 +69,9 @@ export function ProfilePage(){
     <span className="am-sparkle am-sparkle-3" />
     <span className="am-sparkle am-sparkle-4" />
     <span className="am-sparkle am-sparkle-5" />
+    <span className="am-sparkle am-sparkle-6" />
+    <span className="am-sparkle am-sparkle-7" />
+    <span className="am-sparkle am-sparkle-8" />
    </div>
   </div>
  )}
