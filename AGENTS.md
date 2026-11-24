@@ -1,18 +1,17 @@
 # AGENTS.md — AuraMeme Autonomous Engineering Guide (Clean MVP Baseline)
 
-This document defines core operational rules, safety boundaries, and workflow instructions for autonomous coding agents (Google Antigravity and OpenAI Codex) collaborating on the **AuraMeme** codebase under the `feat/mvp-notifications` branch.
+This document defines core operational rules, safety boundaries, and workflow instructions for autonomous coding agents (Google Antigravity and OpenAI Codex) collaborating on the **AuraMeme** codebase on the product branches.
 
 ---
 
 ## 1. Worktree & Branch Rules
 
-- **Active Workspace Directory:** `D:\Big\du_an_lon\aura_meme_p2_clean` ONLY.
-- **Active Branch:** `feat/mvp-notifications`.
-- **Baseline Commit:** `eacfa7d` (Verified public MVP baseline on `origin/dev`).
+- **Product branches:** `main` is the default branch. Start task branches from `dev` and integrate through pull requests.
+- **Owner acceptance workspace:** `D:\Big\du_an_lon\aura_meme` tracks `origin/dev`. Use an approved worktree for task changes and advance the acceptance checkout with Owner authorization.
+- **Accepted product baseline:** `79f95ee`.
 - **Protected Trees (NEVER touch or modify):**
   - `D:\Big\du_an_lon\aura_meme` (Main workspace / Personal uncommitted edits).
-  - `D:\Big\du_an_lon\aura_meme_mvp` (Private P1 Demo / secrets).
-  - `D:\Big\du_an_lon\aura_meme_p2` (Preserved Antigravity P2 workspace — do not reset or clean).
+  - `D:\Big\du_an_lon\aura_meme_assets` (Private assets and media).
 - **Git Policy:**
   - Never push directly to `dev` or `main`.
   - Never force push (`--force`), rebase, or squash approved commit history.
@@ -73,13 +72,13 @@ Set-Item -Path Env:DATABASE_URL -Value "postgresql+psycopg://test:not-a-real-sec
 ## 5. Codex Handoff Checklist
 
 When completing tasks and preparing handoff for OpenAI Codex:
-1. Document baseline commit (`eacfa7d`), new branch (`feat/mvp-notifications`), and individual task commits.
+1. Document the task baseline, branch, commits, and verification evidence.
 2. Verify zero secrets, zero N+1 queries, zero cross-user notification leaks, and zero regression of MVP UI.
 3. List test results and any parts marked `INTEGRATION UNVERIFIED` or pending Owner decision.
 
 ---
 
-## 6. Engineering Handoff: feat/mvp-notifications
+## 6. Historical Engineering Handoff: feat/mvp-notifications
 
 - **Baseline Commit:** `eacfa7d` ("Hợp nhất bản vá MVP và thưởng Exp từ Bảo Khố" on `origin/dev`).
 - **Target Branch:** `feat/mvp-notifications`.
