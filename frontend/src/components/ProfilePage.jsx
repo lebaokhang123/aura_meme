@@ -44,6 +44,11 @@ export function ProfilePage(){
  const isProfilePrime = profileTier === 'prime';
  const isProfilePlus = profileTier === 'plus';
  const hasProfileAura = isProfilePrime || isProfilePlus;
+ const KHANG_DEV_ID = 'abcfa9f6-c9d2-4181-9b4b-118a4bb6c647';
+ const KIEN_DEV_ID = 'c44f393b-4314-4f83-9b2e-9d1fe73ef64c';
+ const isKhangDev = String(p?.id || '').toLowerCase() === KHANG_DEV_ID;
+ const isKienDev = String(p?.id || '').toLowerCase() === KIEN_DEV_ID;
+ const hasAuraMemeSeal = isKhangDev || isKienDev;
  React.useEffect(()=>{
   if(!valid||profile.busy||profile.error)return;
   const targetEffect=p?.equipped_background_effect||null;
@@ -54,8 +59,21 @@ export function ProfilePage(){
  },[valid,profile.busy,profile.error,p?.equipped_background_effect,username]);
  return <main className="am-profile"><div className="am-profile-layout">{!valid?<p role="alert">{t('Không tìm thấy hồ sơ.','Profile not found.')}</p>:<LoadState state={profile}>{p&&<>
  <aside className="profile-rail am-profile-rail">
- <section className="am-profile-identity"><div className={`am-profile-avatar ${hasProfileAura ? (isProfilePrime ? 'has-aura-prime' : 'has-aura-plus') : ''}`}><div className="am-profile-avatar-glow"/><div className="am-profile-avatar-frame"><img className={`${isProfilePrime ? 'aura-avatar--prime' : isProfilePlus ? 'aura-avatar--plus' : ''}`} src={apiMedia(p.avatar_url)||'/assets/identity/default-avatar.svg'} alt={t('Ảnh đại diện ','Avatar of ')+p.display_name} width="112" height="112"/></div>{hasProfileAura && <span className={`aura-member-badge ${isProfilePrime ? 'aura-member-badge--prime' : 'aura-member-badge--plus'} w-6 h-6 bottom-[6px] right-[6px]`} title={isProfilePrime ? t('Hội viên Aura Prime', 'Aura Prime Member') : t('Hội viên Aura Plus', 'Aura Plus Member')}><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg></span>}</div>
- <div className="am-profile-name"><h1 translate="no">{p.display_name}</h1><p translate="no">@{p.username}</p>{p.level&&p.title&&<div className="mt-1.5 flex justify-center"><TitleBadge level={p.level} realm={p.realm} title={p.title} size="lg"/></div>}{hasProfileAura && <div className="mt-2 flex justify-center"><div className={`profile-premium-badge profile-premium-badge--${profileTier}`} title={isProfilePrime ? t('Hội viên Aura Prime', 'Aura Prime Member') : t('Hội viên Aura Plus', 'Aura Plus Member')}><span className="material-symbols-outlined profile-premium-badge-icon" aria-hidden="true">{isProfilePrime ? 'diamond' : 'workspace_premium'}</span><span className="profile-premium-badge-text">{isProfilePrime ? 'Aura Prime' : 'Aura Plus'}</span></div></div>}</div>
+ <section className={`am-profile-identity ${isKhangDev ? 'am-profile-identity--celestial' : ''}`}>
+ {isKhangDev && (
+  <div className="am-celestial-canvas" aria-hidden="true">
+   <div className="am-celestial-smoke" />
+   <div className="am-celestial-sparkles">
+    <span className="am-sparkle am-sparkle-1" />
+    <span className="am-sparkle am-sparkle-2" />
+    <span className="am-sparkle am-sparkle-3" />
+    <span className="am-sparkle am-sparkle-4" />
+    <span className="am-sparkle am-sparkle-5" />
+   </div>
+  </div>
+ )}
+ <div className={`am-profile-avatar ${hasProfileAura ? (isProfilePrime ? 'has-aura-prime' : 'has-aura-plus') : ''}`}><div className="am-profile-avatar-glow"/><div className="am-profile-avatar-frame"><img className={`${isProfilePrime ? 'aura-avatar--prime' : isProfilePlus ? 'aura-avatar--plus' : ''}`} src={apiMedia(p.avatar_url)||'/assets/identity/default-avatar.svg'} alt={t('Ảnh đại diện ','Avatar of ')+p.display_name} width="112" height="112"/></div>{hasProfileAura && <span className={`aura-member-badge ${isProfilePrime ? 'aura-member-badge--prime' : 'aura-member-badge--plus'} w-6 h-6 bottom-[6px] right-[6px]`} title={isProfilePrime ? t('Hội viên Aura Prime', 'Aura Prime Member') : t('Hội viên Aura Plus', 'Aura Plus Member')}><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg></span>}</div>
+ <div className="am-profile-name"><h1 translate="no"><span>{p.display_name}</span>{hasAuraMemeSeal && <img src="/assets/brand/favicon-64.png" alt="" width="18" height="18" className="am-profile-aurameme-seal" title={t('Dấu ấn AuraMeme', 'AuraMeme Seal')} aria-label={t('Dấu ấn AuraMeme', 'AuraMeme Seal')} />}</h1><p translate="no">@{p.username}</p>{p.level&&p.title&&<div className="mt-1.5 flex justify-center"><TitleBadge level={p.level} realm={p.realm} title={p.title} size="lg"/></div>}{hasProfileAura && <div className="mt-2 flex justify-center"><div className={`profile-premium-badge profile-premium-badge--${profileTier}`} title={isProfilePrime ? t('Hội viên Aura Prime', 'Aura Prime Member') : t('Hội viên Aura Plus', 'Aura Plus Member')}><span className="material-symbols-outlined profile-premium-badge-icon" aria-hidden="true">{isProfilePrime ? 'diamond' : 'workspace_premium'}</span><span className="profile-premium-badge-text">{isProfilePrime ? 'Aura Prime' : 'Aura Plus'}</span></div></div>}</div>
  {mine&&(editing?<EditProfile profile={p} onSaved={values=>{profile.update({...p,...values});closeEdit();loadFeed().catch(()=>{})}} onCancel={closeEdit}/>:<button ref={editButton} className="am-profile-edit" onClick={()=>setEditing(true)}>{icon('edit',16)}{t('Chỉnh sửa hồ sơ','Edit profile')}</button>)}
  <p className="am-profile-bio" translate="no">{p.bio||t('Chưa có tiểu sử.','No bio yet.')}</p>
  <dl className="am-profile-stats"><div><dd>{pagination?.total??'—'}</dd><dt>{t('Bài viết','Posts')}</dt></div><div><dd>{comments.data?.pagination.total??'—'}</dd><dt>{t('Bình luận','Comments')}</dt></div><div><dd data-testid="profile-follower-count">{Number.isSafeInteger(p.follower_count)&&p.follower_count>=0?p.follower_count:0}</dd><dt>{t('Người theo dõi','Followers')}</dt></div></dl>

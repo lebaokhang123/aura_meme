@@ -79,3 +79,102 @@
 .am-follow-btn:disabled{opacity:0.6;cursor:not-allowed}
 .am-follow-btn .am-follow-icon{font-size:18px}
 
+/* Checkpoint 2: Celestial Profile Polish & AuraMeme Identity */
+.am-profile-identity{position:relative}
+.am-profile-name h1{display:inline-flex;align-items:center;justify-content:center;gap:6px;max-width:100%}
+.am-profile-aurameme-seal{display:inline-block;width:18px;height:18px;flex-shrink:0;vertical-align:middle;border-radius:4px}
+
+.am-profile-identity--celestial{
+  position:relative;
+  border:1px solid rgba(168,85,247,0.35);
+  box-shadow:0 10px 25px -3px rgba(0,0,0,0.25),0 0 20px rgba(168,85,247,0.15);
+}
+
+.am-profile-identity--celestial > *:not(.am-celestial-canvas){
+  position:relative;
+  z-index:1;
+}
+
+.am-celestial-canvas{
+  position:absolute;
+  inset:0;
+  border-radius:12px;
+  overflow:hidden;
+  pointer-events:none;
+  z-index:0;
+}
+
+.am-celestial-smoke{
+  position:absolute;
+  inset:-20px;
+  background:
+    radial-gradient(ellipse 65% 50% at 20% 25%,rgba(168,85,247,0.18) 0%,transparent 70%),
+    radial-gradient(ellipse 55% 45% at 80% 35%,rgba(34,211,238,0.15) 0%,transparent 65%),
+    radial-gradient(ellipse 60% 50% at 40% 75%,rgba(59,130,246,0.14) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 40% at 75% 80%,rgba(244,114,182,0.12) 0%,transparent 65%);
+  filter:blur(18px);
+  animation:amCelestialSmokeDrift 16s ease-in-out infinite alternate;
+  will-change:transform,opacity;
+}
+
+@keyframes amCelestialSmokeDrift{
+  0%{transform:translate(0,0) scale(1);opacity:0.85}
+  50%{transform:translate(8px,-10px) scale(1.04);opacity:1}
+  100%{transform:translate(-10px,8px) scale(0.98);opacity:0.9}
+}
+
+.am-celestial-sparkles{
+  position:absolute;
+  inset:0;
+}
+
+.am-sparkle{
+  position:absolute;
+  width:9px;
+  height:9px;
+  background:radial-gradient(circle,#ffffff 15%,rgba(192,132,252,0.9) 60%,transparent 100%);
+  clip-path:polygon(50% 0%,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0% 50%,38% 38%);
+  opacity:0;
+  animation:amCelestialSparklePulse 5s ease-in-out infinite;
+  will-change:opacity,transform;
+}
+
+.am-sparkle-1{top:16%;left:14%;animation-delay:0s}
+.am-sparkle-2{top:34%;right:12%;animation-delay:1.8s}
+.am-sparkle-3{top:62%;left:12%;animation-delay:3.4s}
+.am-sparkle-4{top:80%;right:16%;animation-delay:2.5s}
+.am-sparkle-5{top:48%;right:10%;animation-delay:4.2s}
+
+@keyframes amCelestialSparklePulse{
+  0%,100%{opacity:0;transform:scale(0.5)}
+  50%{opacity:0.85;transform:scale(1.15);filter:drop-shadow(0 0 3px rgba(192,132,252,0.8))}
+}
+
+.u219[data-theme="light"] .am-profile-identity--celestial{
+  border-color:rgba(168,85,247,0.25);
+  box-shadow:0 10px 15px -3px rgba(0,0,0,0.08),0 0 16px rgba(168,85,247,0.1);
+}
+
+.u219[data-theme="light"] .am-celestial-smoke{
+  background:
+    radial-gradient(ellipse 65% 50% at 20% 25%,rgba(168,85,247,0.12) 0%,transparent 70%),
+    radial-gradient(ellipse 55% 45% at 80% 35%,rgba(34,211,238,0.1) 0%,transparent 65%),
+    radial-gradient(ellipse 60% 50% at 40% 75%,rgba(59,130,246,0.09) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 40% at 75% 80%,rgba(244,114,182,0.08) 0%,transparent 65%);
+  filter:blur(16px);
+}
+
+.u219[data-theme="light"] .am-sparkle{
+  background:radial-gradient(circle,#7e22ce 15%,rgba(147,51,234,0.8) 60%,transparent 100%);
+}
+
+@media(prefers-reduced-motion:reduce){
+  .am-celestial-smoke,
+  .am-sparkle{
+    animation:none!important;
+    opacity:0.3!important;
+    transform:none!important;
+  }
+}
+
+
