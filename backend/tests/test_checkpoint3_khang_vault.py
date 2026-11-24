@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import create_engine, select, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from app.admin_users import KHANG_DEV_ID, KIEN_DEV_ID
@@ -17,7 +18,11 @@ from app.admin_workspace import AdminAssetPatch, admin_update_asset
 from app.models import (
     AdminAuditLog,
     AssetItem,
+    AuraLedger,
+    CaseDefinition,
+    CaseLootRarity,
     CaseLootTable,
+    CaseOpen,
     CasePoolItem,
     InventoryGrant,
     RewardPolicyVersion,
@@ -153,6 +158,8 @@ def test_auto_grant_grants_new_published_items_to_khang_dev():
             return None
         if "from inventory_grants" in query_str:
             return None
+        if "from reward_policy_versions" in query_str:
+            return MagicMock(spec=RewardPolicyVersion, id=policy_id, status="published", effective_at=now)
         return None
 
     db.scalar.side_effect = mock_scalar
@@ -308,16 +315,143 @@ def test_sync_khang_dev_vault_privilege_dry_run():
 
     assert report["status"] == "success"
     assert report["dry_run"] is True
+    assert report["eligible_count"] == 2
     assert report["published_count"] == 2
     assert report["already_owned_count"] == 1
     assert report["missing_count"] == 1
+    assert report["blocked_count"] == 0
     assert report["granted_count"] == 0
+    assert report["eligible_count"] == report["already_owned_count"] + report["missing_count"] + report["blocked_count"]
     assert len(report["missing_assets"]) == 1
     assert report["missing_assets"][0]["id"] == str(asset_missing.id)
 
     # Zero writes in dry run
     db.add.assert_not_called()
     db.flush.assert_not_called()
+
+
+def test_sync_khang_dev_vault_privilege_dry_run_reports_blocked_assets():
+    """Dry-run explicitly reports blocked_count and blocked_assets when policy cannot be resolved.
+    Total formula: eligible_count = already_owned_count + missing_count + blocked_count.
+    """
+    db = MagicMock()
+    khang_user = MagicMock(spec=User)
+    khang_user.id = KHANG_DEV_ID
+    khang_user.username = "khang_dev"
+    khang_user.status = "active"
+
+    asset_owned = make_mock_asset(kind="avatar", rarity="C")
+    asset_grantable = make_mock_asset(kind="background", rarity="S")
+    asset_blocked = make_mock_asset(kind="avatar", rarity="A")
+
+    mock_policy_id = uuid4()
+    db.scalars.return_value = [asset_owned, asset_grantable, asset_blocked]
+
+    inv_owned = MagicMock(spec=UserInventory)
+    inv_owned.quantity = 2
+
+    inv_call = 0
+
+    def mock_scalar(query, *args, **kwargs):
+        nonlocal inv_call
+        q = str(query).lower()
+        if "from users" in q:
+            return khang_user
+        if "from user_inventory" in q:
+            inv_call += 1
+            if inv_call == 1:
+                return inv_owned
+            return None
+        if "from reward_policy_versions" in q:
+            # Second check has policy, third check has no policy
+            if inv_call == 2:
+                return mock_policy_id
+            return None
+        return None
+
+    db.scalar.side_effect = mock_scalar
+
+    now = datetime.now(timezone.utc)
+    report = sync_khang_dev_vault_privilege(db, now, dry_run=True)
+
+    assert report["status"] == "success"
+    assert report["dry_run"] is True
+    assert report["eligible_count"] == 3
+    assert report["already_owned_count"] == 1
+    assert report["missing_count"] == 1
+    assert report["blocked_count"] == 1
+    assert report["eligible_count"] == report["already_owned_count"] + report["missing_count"] + report["blocked_count"]
+    assert len(report["blocked_assets"]) == 1
+    assert report["blocked_assets"][0]["id"] == str(asset_blocked.id)
+    assert report["blocked_assets"][0]["reason"] == "missing_policy"
+    db.add.assert_not_called()
+    db.flush.assert_not_called()
+
+
+def test_sync_khang_dev_vault_privilege_execute_fails_closed_when_blocked_assets():
+    """In execute mode, if any eligible asset is blocked from being granted, fail-closed without mutation."""
+    db = MagicMock()
+    khang_user = MagicMock(spec=User)
+    khang_user.id = KHANG_DEV_ID
+    khang_user.username = "khang_dev"
+    khang_user.status = "active"
+
+    asset_blocked = make_mock_asset(kind="avatar", rarity="S")
+    db.scalars.return_value = [asset_blocked]
+
+    def mock_scalar(query, *args, **kwargs):
+        q = str(query).lower()
+        if "from users" in q:
+            return khang_user
+        if "from user_inventory" in q:
+            return None
+        if "from reward_policy_versions" in q:
+            return None  # No published policy
+        return None
+
+    db.scalar.side_effect = mock_scalar
+
+    now = datetime.now(timezone.utc)
+    with pytest.raises(ValueError, match="Fail-closed.*blocked"):
+        sync_khang_dev_vault_privilege(db, now, dry_run=False)
+
+    db.add.assert_not_called()
+    db.flush.assert_not_called()
+
+
+def test_grant_single_asset_validates_supplied_policy_id():
+    """Supplied policy_id must be published and effective as of now."""
+    db = MagicMock()
+    khang_user = MagicMock(spec=User)
+    khang_user.id = KHANG_DEV_ID
+    khang_user.status = "active"
+
+    asset = make_mock_asset(kind="avatar", rarity="S")
+    invalid_policy_id = uuid4()
+
+    def mock_scalar(query, *args, **kwargs):
+        q = str(query).lower()
+        if "from users" in q:
+            return khang_user
+        if "from user_inventory" in q:
+            return None
+        if "from inventory_grants" in q:
+            return None
+        if "from reward_policy_versions" in q:
+            return None  # Policy is not published or not effective
+        return None
+
+    db.scalar.side_effect = mock_scalar
+
+    now = datetime.now(timezone.utc)
+    with pytest.raises(ValueError, match="not a published RewardPolicyVersion effective"):
+        grant_khang_dev_single_asset_if_eligible(
+            db,
+            asset,
+            now,
+            actor_id=KHANG_DEV_ID,
+            policy_id=invalid_policy_id,
+        )
 
 
 def test_sync_khang_dev_vault_privilege_execute_mode():
@@ -469,23 +603,56 @@ def resolve_test_db_url() -> str | None:
     return test_url
 
 
+def validate_test_target(test_url: str):
+    """Safety guard: verify exact loopback test role and database without substring matches."""
+    try:
+        target = make_url(test_url)
+        safe = (
+            target.drivername == "postgresql+psycopg"
+            and target.host == "127.0.0.1"
+            and (target.port or 5432) == 5432
+            and target.database == "aurameme_test"
+            and target.username == "aurameme_test"
+            and bool(target.password)
+            and not target.query
+        )
+    except Exception:
+        safe = False
+    if not safe:
+        pytest.fail(
+            "Safety violation: integration tests require exact isolated test database: postgresql+psycopg://aurameme_test:***@127.0.0.1:5432/aurameme_test",
+            pytrace=False,
+        )
+    return target
+
+
+def verify_test_connection(conn):
+    """Strictly verify connection identity and schema revision before any query or mutation."""
+    current_id = tuple(conn.execute(text("SELECT current_database(), current_user, current_schema()")).one())
+    if current_id != ("aurameme_test", "aurameme_test", "public"):
+        pytest.fail(f"Safety violation: unexpected database identity {current_id}", pytrace=False)
+    rev = conn.scalar(text("SELECT version_num FROM alembic_version"))
+    if rev != "0018_canonical_asset_filenames":
+        pytest.fail(f"Safety violation: unexpected schema revision {rev}", pytrace=False)
+
+
 @pytest.fixture
 def pg_session():
     """Yield a PostgreSQL session rolled back at end of test to keep aurameme_test clean."""
     test_url = resolve_test_db_url()
     if not test_url:
         pytest.skip("TEST_DATABASE_URL is required for PostgreSQL integration test")
-    assert "127.0.0.1" in test_url or "localhost" in test_url, "Safety violation: non-local test database"
+    validate_test_target(test_url)
 
     engine = create_engine(test_url)
     with engine.connect() as check_conn:
-        cur_db = check_conn.scalar(text("SELECT current_database()"))
-        assert cur_db == "aurameme_test", f"Safety violation: forbidden database {cur_db}"
+        verify_test_connection(check_conn)
 
     conn = engine.connect()
     trans = conn.begin()
     session = Session(bind=conn)
     try:
+        now = datetime.now(timezone.utc)
         # Ensure Khang Dev user and Admin role exist in transaction
         khang = session.scalar(select(User).where(User.id == KHANG_DEV_ID))
         if not khang:
@@ -496,8 +663,8 @@ def pg_session():
                     email="khang@aurameme.test",
                     password_hash="test_hash",
                     status="active",
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
+                    created_at=now,
+                    updated_at=now,
                 )
             )
         role_admin = session.scalar(select(Role).where(Role.code == "ADMIN"))
@@ -508,13 +675,32 @@ def pg_session():
 
         ur = session.scalar(select(UserRole).where(UserRole.user_id == KHANG_DEV_ID, UserRole.role_id == role_admin.id))
         if not ur:
-            session.add(UserRole(user_id=KHANG_DEV_ID, role_id=role_admin.id, granted_at=datetime.now(timezone.utc)))
+            session.add(UserRole(user_id=KHANG_DEV_ID, role_id=role_admin.id, granted_at=now))
+
+        policy = session.scalar(
+            select(RewardPolicyVersion)
+            .where(RewardPolicyVersion.status == "published")
+            .order_by(RewardPolicyVersion.version.desc())
+        )
+        if not policy:
+            session.add(
+                RewardPolicyVersion(
+                    id=uuid4(),
+                    version=1,
+                    config_json={"type": "free-vault-v1"},
+                    status="published",
+                    effective_at=now,
+                    created_by=KHANG_DEV_ID,
+                    created_at=now,
+                )
+            )
         session.flush()
         yield session
     finally:
         session.close()
         trans.rollback()
         conn.close()
+        engine.dispose()
 
 
 @pytest.fixture
@@ -523,14 +709,14 @@ def pg_engine():
     test_url = resolve_test_db_url()
     if not test_url:
         pytest.skip("TEST_DATABASE_URL is required for PostgreSQL integration test")
-    assert "127.0.0.1" in test_url or "localhost" in test_url, "Safety violation: non-local test database"
+    validate_test_target(test_url)
 
     engine = create_engine(test_url)
     with engine.connect() as conn:
-        cur_db = conn.scalar(text("SELECT current_database()"))
-        assert cur_db == "aurameme_test", f"Safety violation: forbidden database {cur_db}"
+        verify_test_connection(conn)
 
-    # Ensure Khang Dev and ADMIN role exist in committed setup
+    # Ensure Khang Dev, ADMIN role, and a default published RewardPolicyVersion exist in committed setup
+    now = datetime.now(timezone.utc)
     with Session(engine) as setup_db:
         with setup_db.begin():
             khang = setup_db.scalar(select(User).where(User.id == KHANG_DEV_ID))
@@ -542,8 +728,8 @@ def pg_engine():
                         email="khang@aurameme.test",
                         password_hash="test_hash",
                         status="active",
-                        created_at=datetime.now(timezone.utc),
-                        updated_at=datetime.now(timezone.utc),
+                        created_at=now,
+                        updated_at=now,
                     )
                 )
             role_admin = setup_db.scalar(select(Role).where(Role.code == "ADMIN"))
@@ -554,8 +740,30 @@ def pg_engine():
 
             ur = setup_db.scalar(select(UserRole).where(UserRole.user_id == KHANG_DEV_ID, UserRole.role_id == role_admin.id))
             if not ur:
-                setup_db.add(UserRole(user_id=KHANG_DEV_ID, role_id=role_admin.id, granted_at=datetime.now(timezone.utc)))
-    return engine
+                setup_db.add(UserRole(user_id=KHANG_DEV_ID, role_id=role_admin.id, granted_at=now))
+
+            policy = setup_db.scalar(
+                select(RewardPolicyVersion)
+                .where(RewardPolicyVersion.status == "published")
+                .order_by(RewardPolicyVersion.version.desc())
+            )
+            if not policy:
+                setup_db.add(
+                    RewardPolicyVersion(
+                        id=uuid4(),
+                        version=1,
+                        config_json={"type": "free-vault-v1"},
+                        status="published",
+                        effective_at=now,
+                        created_by=KHANG_DEV_ID,
+                        created_at=now,
+                    )
+                )
+
+    try:
+        yield engine
+    finally:
+        engine.dispose()
 
 
 @pytest.mark.integration
@@ -716,30 +924,37 @@ def test_postgres_khang_dev_concurrent_grant(pg_engine):
             worker_db.commit()
             results.append(res)
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        f1 = executor.submit(worker)
-        f2 = executor.submit(worker)
-        f1.result(timeout=15)
-        f2.result(timeout=15)
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            f1 = executor.submit(worker)
+            f2 = executor.submit(worker)
+            f1.result(timeout=15)
+            f2.result(timeout=15)
 
-    # One worker should return True (granted), the other False (idempotent skip)
-    assert results.count(True) == 1
-    assert results.count(False) == 1
+        # One worker should return True (granted), the other False (idempotent skip)
+        assert results.count(True) == 1
+        assert results.count(False) == 1
 
-    with Session(engine) as verify_db:
-        inv = verify_db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == asset_id))
-        assert inv is not None
-        assert inv.quantity == 1
+        with Session(engine) as verify_db:
+            inv = verify_db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == asset_id))
+            assert inv is not None
+            assert inv.quantity == 1
 
-        grants = list(verify_db.scalars(select(InventoryGrant).where(InventoryGrant.user_id == KHANG_DEV_ID, InventoryGrant.asset_id == asset_id)))
-        assert len(grants) == 1
-        assert grants[0].quantity == 1
-        assert grants[0].source_type == "admin"
-        assert grants[0].event_key == f"{PRIVILEGE_KEY_PREFIX}{asset_id}"
+            grants = list(verify_db.scalars(select(InventoryGrant).where(InventoryGrant.user_id == KHANG_DEV_ID, InventoryGrant.asset_id == asset_id)))
+            assert len(grants) == 1
+            assert grants[0].quantity == 1
+            assert grants[0].source_type == "admin"
+            assert grants[0].event_key == f"{PRIVILEGE_KEY_PREFIX}{asset_id}"
 
-        from app.inventory_grants import inventory_state
-        checked_inv = inventory_state(verify_db, KHANG_DEV_ID, asset_id)
-        assert checked_inv.quantity == 1
+            from app.inventory_grants import inventory_state
+            checked_inv = inventory_state(verify_db, KHANG_DEV_ID, asset_id)
+            assert checked_inv.quantity == 1
+    finally:
+        with Session(engine) as cleanup_db:
+            with cleanup_db.begin():
+                a = cleanup_db.scalar(select(AssetItem).where(AssetItem.id == asset_id))
+                if a:
+                    a.active = False
 
 
 @pytest.mark.integration
@@ -815,21 +1030,29 @@ def test_postgres_khang_dev_concurrent_publication(pg_engine):
             worker_db.commit()
             return res
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        f1 = executor.submit(pub_worker, manifest1)
-        f2 = executor.submit(pub_worker, manifest2)
-        res1 = f1.result(timeout=15)
-        res2 = f2.result(timeout=15)
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            f1 = executor.submit(pub_worker, manifest1)
+            f2 = executor.submit(pub_worker, manifest2)
+            res1 = f1.result(timeout=15)
+            res2 = f2.result(timeout=15)
 
-    assert len(res1) == 1
-    assert len(res2) == 1
+        assert len(res1) == 1
+        assert len(res2) == 1
 
-    with Session(engine) as verify_db:
-        for aid in (asset_id_1, asset_id_2):
-            inv = verify_db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == aid))
-            assert inv is not None and inv.quantity == 1
-            from app.inventory_grants import inventory_state
-            assert inventory_state(verify_db, KHANG_DEV_ID, aid).quantity == 1
+        with Session(engine) as verify_db:
+            for aid in (asset_id_1, asset_id_2):
+                inv = verify_db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == aid))
+                assert inv is not None and inv.quantity == 1
+                from app.inventory_grants import inventory_state
+                assert inventory_state(verify_db, KHANG_DEV_ID, aid).quantity == 1
+    finally:
+        with Session(engine) as cleanup_db:
+            with cleanup_db.begin():
+                for aid in (asset_id_1, asset_id_2):
+                    a = cleanup_db.scalar(select(AssetItem).where(AssetItem.id == aid))
+                    if a:
+                        a.active = False
 
 
 @pytest.mark.integration
@@ -1041,143 +1264,258 @@ def test_postgres_khang_dev_admin_approval_real(pg_session):
 @pytest.mark.integration
 def test_postgres_khang_dev_publication_real_entrypoint(pg_session):
     """Real publication hook on PostgreSQL:
-    Verifies auto_grant_khang_dev_published_items verifies real DB asset and grants eligible items.
+    Calls publish_cases from app.catalog_activation with an approved 5-rarity avatar catalog.
+    Verifies publish_cases publishes the case and automatically triggers auto_grant_khang_dev_published_items.
+    Verifies Khang Dev receives 1 unit of each newly published eligible item with source_type='admin',
+    +0 EXP, and inventory_state holds.
     """
+    from app.catalog_activation import publish_cases
+    from app.inventory_grants import inventory_state
+    from hashlib import sha256
+    import json
+
     db = pg_session
     now = datetime.now(timezone.utc)
 
-    policy = db.scalar(
-        select(RewardPolicyVersion)
-        .where(RewardPolicyVersion.status == "published")
-        .order_by(RewardPolicyVersion.version.desc())
-    )
-    if not policy:
-        policy = RewardPolicyVersion(
-            id=uuid4(),
-            version=9996,
-            config_json={"type": "test_pub_policy"},
-            status="published",
-            effective_at=now,
-            created_by=KHANG_DEV_ID,
-            created_at=now,
+    # Construct 5 avatar items for rarities 'D', 'C', 'B', 'A', 'S'
+    raw_items_dict = []
+    asset_ids = []
+
+    for rarity in "DCBAS":
+        aid = uuid4()
+        asset_ids.append(aid)
+        digest = sha256(f"test-pub-{aid.hex}".encode()).hexdigest()
+        rights = synthetic_rights(digest, name_review_status="approved", review_status="approved")
+        raw_items_dict.append({
+            "id": str(aid),
+            "slug": f"fixture-pub-{aid.hex[:8]}",
+            "kind": "avatar",
+            "collection": "test-pub-collection",
+            "rarity": rarity,
+            "media_key": f"catalog/{digest}.png",
+            "file": f"{aid.hex}.png",
+            "sha256": digest,
+            "mime": "image/png",
+            "name_vi": f"Test Avatar {rarity}",
+            "name_review_status": "approved",
+            "effect_key": None,
+            "source_rights": rights,
+        })
+
+    manifest_json_bytes = json.dumps({"version": 1, "items": raw_items_dict}, sort_keys=True).encode("utf-8")
+    manifest_digest = sha256(manifest_json_bytes).hexdigest()
+
+    # Create real AssetItem records in database with matching manifest_sha256
+    for item in raw_items_dict:
+        aid = UUID(item["id"])
+        full_rights = dict(item["source_rights"])
+        full_rights["manifest_sha256"] = manifest_digest
+        full_rights["name_review_status"] = "approved"
+        full_rights["review_status"] = "approved"
+        db.add(
+            AssetItem(
+                id=aid,
+                slug=item["slug"],
+                kind=item["kind"],
+                collection=item["collection"],
+                rarity=item["rarity"],
+                media_key=item["media_key"],
+                display_name=item["name_vi"],
+                effect_key=None,
+                source_rights=full_rights,
+                active=True,
+                created_at=now,
+                updated_at=now,
+            )
         )
-        db.add(policy)
-        db.flush()
-
-    aid_valid = uuid4()
-    aid_inactive = uuid4()
-    digest_v = "1" * 64
-    digest_i = "2" * 64
-
-    asset_valid = AssetItem(
-        id=aid_valid,
-        slug=f"asset-pub-v-{aid_valid.hex[:6]}",
-        kind="avatar",
-        collection="admin-upload",
-        rarity="S",
-        media_key=f"catalog/{digest_v}.png",
-        display_name="Meme Pub Valid",
-        source_rights=synthetic_rights(digest_v, name_review_status="approved", review_status="approved"),
-        active=True,
-        created_at=now,
-        updated_at=now,
-    )
-    asset_inactive = AssetItem(
-        id=aid_inactive,
-        slug=f"asset-pub-i-{aid_inactive.hex[:6]}",
-        kind="background",
-        collection="admin-upload",
-        rarity="A",
-        media_key=f"catalog/{digest_i}.png",
-        display_name="Meme Pub Inactive",
-        source_rights=synthetic_rights(digest_i, name_review_status="approved", review_status="approved"),
-        active=False,  # Inactive in DB
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(asset_valid)
-    db.add(asset_inactive)
     db.flush()
 
-    class PubItem:
-        def __init__(self, aid, kind, rarity):
-            self.id = aid
-            self.kind = kind
-            self.rarity = rarity
-            self.name_review_status = "approved"
-            self.source_rights = SimpleNamespace(review_status="approved")
+    class ManifestItemWrapper:
+        def __init__(self, data):
+            self.id = UUID(data["id"])
+            self.slug = data["slug"]
+            self.kind = data["kind"]
+            self.collection = data["collection"]
+            self.rarity = data["rarity"]
+            self.sha256 = data["sha256"]
+            self.mime = data["mime"]
+            self.name_vi = data["name_vi"]
+            self.name_review_status = data["name_review_status"]
+            self.effect_key = data["effect_key"]
+            self.source_rights = SimpleNamespace(
+                review_status="approved",
+                model_dump=lambda s=data["source_rights"]: dict(s),
+            )
 
-    manifest = MockManifest([
-        PubItem(aid_valid, "avatar", "S"),
-        PubItem(aid_inactive, "background", "A"),
-    ])
+    class MockCatalogManifest:
+        def __init__(self, items):
+            self.version = 1
+            self.items = items
 
-    granted_ids = auto_grant_khang_dev_published_items(db, manifest, policy.id, now)
-    assert granted_ids == [aid_valid]
+    manifest = MockCatalogManifest([ManifestItemWrapper(d) for d in raw_items_dict])
 
-    inv_v = db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == aid_valid))
-    assert inv_v is not None and inv_v.quantity == 1
+    # Call the real publication entry point
+    results = publish_cases(db, manifest, manifest_digest, manifest_digest, KHANG_DEV_ID, now)
+    assert "avatar" in results
 
-    inv_i = db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == aid_inactive))
-    assert inv_i is None
+    # Verify that Khang Dev received all 5 newly published items
+    for aid in asset_ids:
+        inv = db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == aid))
+        assert inv is not None
+        assert inv.quantity == 1
+
+        grant = db.scalar(select(InventoryGrant).where(InventoryGrant.user_id == KHANG_DEV_ID, InventoryGrant.asset_id == aid))
+        assert grant is not None
+        assert grant.source_type == "admin"
+        assert grant.event_key == f"{PRIVILEGE_KEY_PREFIX}{aid}"
+
+        assert inventory_state(db, KHANG_DEV_ID, aid).quantity == 1
+
+    # Verify audit log was recorded for both publication and privilege grant
+    audit_pub = db.scalar(select(AdminAuditLog).where(AdminAuditLog.action == "vault.cases.publish", AdminAuditLog.target_id == manifest_digest))
+    assert audit_pub is not None
+
+    audit_grants = list(db.scalars(select(AdminAuditLog).where(AdminAuditLog.action == "vault.privilege.auto_grant", AdminAuditLog.target_id == str(KHANG_DEV_ID))))
+    assert len(audit_grants) >= 5
 
 
 @pytest.mark.integration
 def test_postgres_khang_dev_concurrent_vault_open(pg_engine):
-    """Multithreaded concurrent test:
-    Thread 1: grants vault privilege to Khang Dev for asset1.
-    Thread 2: simulates case opening / inventory update for Khang Dev on asset2.
-    Verifies deadlock-free lock ordering (lock_aura_mutation -> User -> UserInventory).
+    """Real multithreaded concurrent business flow on PostgreSQL:
+    Thread 1: grants vault privilege to Khang Dev for asset 1 via grant_khang_dev_single_asset_if_eligible.
+    Thread 2: executes real Vault case opening for Khang Dev via open_runtime.
+
+    Verifies:
+    - Deadlock-free execution under concurrent load.
+    - UserInventory quantity strictly equals sum(InventoryGrant.quantity) for both items.
+    - Real CaseOpen row is inserted with matching loot_table and reward_asset.
+    - Case open awards standard +2 EXP into AuraLedger (source_type='case_open').
+    - Privilege grant awards exactly +0 EXP (no AuraLedger entry for privilege grant).
+    - Invariant ledger holds across both concurrent operations.
     """
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
+    from types import SimpleNamespace
+    from app.vault_runtime import open_runtime
+    from app.inventory_grants import inventory_state
+    from app.models import CaseDefinition, CaseLootTable, CaseLootRarity, CasePoolItem
+    from app.vault_v1_policy import WEIGHTS
 
     engine = pg_engine
     now = datetime.now(timezone.utc)
-    aid_1 = uuid4()
-    aid_2 = uuid4()
-    digest1 = "7" * 64
-    digest2 = "8" * 64
+    aid_privilege = uuid4()
+    case_id = uuid4()
+    pool_id = uuid4()
+    digest_p = "7" * 64
 
+    pool_asset_ids = []
     with Session(engine) as setup_db:
         with setup_db.begin():
-            policy = setup_db.scalar(select(RewardPolicyVersion).where(RewardPolicyVersion.status == "published").order_by(RewardPolicyVersion.version.desc()))
+            policy = setup_db.scalar(
+                select(RewardPolicyVersion)
+                .where(
+                    RewardPolicyVersion.status == "published",
+                    RewardPolicyVersion.config_json["type"].astext == "free-vault-v1",
+                )
+                .order_by(RewardPolicyVersion.version.desc())
+            )
+            if not policy:
+                from sqlalchemy import func
+                ver = setup_db.scalar(select(func.coalesce(func.max(RewardPolicyVersion.version), 0))) + 1
+                policy = RewardPolicyVersion(
+                    id=uuid4(),
+                    version=ver,
+                    config_json={"type": "free-vault-v1"},
+                    status="published",
+                    effective_at=now,
+                    created_by=KHANG_DEV_ID,
+                    created_at=now,
+                )
+                setup_db.add(policy)
+                setup_db.flush()
             effective_pid = policy.id
-            a1 = AssetItem(
-                id=aid_1,
-                slug=f"meme-con-v1-{aid_1.hex[:6]}",
+
+            # Privilege candidate asset
+            a_priv = AssetItem(
+                id=aid_privilege,
+                slug=f"meme-con-priv-{aid_privilege.hex[:6]}",
                 kind="avatar",
                 collection="admin-upload",
                 rarity="S",
-                media_key=f"catalog/{digest1}.png",
-                display_name="Meme Concur 1",
-                source_rights=synthetic_rights(digest1, name_review_status="approved", review_status="approved"),
+                media_key=f"catalog/{digest_p}.png",
+                display_name="Meme Concur Privilege",
+                source_rights=synthetic_rights(digest_p, name_review_status="approved", review_status="approved"),
                 active=True,
                 created_at=now,
                 updated_at=now,
             )
-            a2 = AssetItem(
-                id=aid_2,
-                slug=f"meme-con-v2-{aid_2.hex[:6]}",
-                kind="background",
-                collection="admin-upload",
-                rarity="A",
-                media_key=f"catalog/{digest2}.png",
-                display_name="Meme Concur 2",
-                source_rights=synthetic_rights(digest2, name_review_status="approved", review_status="approved"),
-                active=True,
+            setup_db.add(a_priv)
+            setup_db.flush()
+
+            # Set up real runtime case definition and draft loot table
+            case_def = CaseDefinition(
+                id=case_id,
+                slug=f"free-case-{case_id.hex[:6]}",
+                label="Free Test Case",
+                cost_khi_van=0,
+                status="active",
+                runtime_kind="avatar",
                 created_at=now,
                 updated_at=now,
             )
-            setup_db.add(a1)
-            setup_db.add(a2)
+            setup_db.add(case_def)
+            setup_db.flush()
+
+            loot_tbl = CaseLootTable(
+                id=pool_id,
+                case_id=case_id,
+                odds_version=1,
+                band_no=1,
+                min_earned_xp=0,
+                max_earned_xp=None,
+                policy_id=effective_pid,
+                status="draft",
+                active_from=now,
+                created_at=now,
+            )
+            setup_db.add(loot_tbl)
+            setup_db.flush()
+
+            for rarity, weight in zip("DCBAS", WEIGHTS):
+                setup_db.add(CaseLootRarity(loot_table_id=pool_id, rarity=rarity, weight_bps=weight))
+
+            # 5 approved items for each rarity so load_runtime_pool succeeds
+            for rarity in "DCBAS":
+                aid = uuid4()
+                pool_asset_ids.append(aid)
+                digest = sha256(f"test-con-vault-{aid.hex}".encode()).hexdigest()
+                setup_db.add(
+                    AssetItem(
+                        id=aid,
+                        slug=f"meme-con-v-{rarity.lower()}-{aid.hex[:6]}",
+                        kind="avatar",
+                        collection="admin-upload",
+                        rarity=rarity,
+                        media_key=f"catalog/{digest}.png",
+                        display_name=f"Meme Concur {rarity}",
+                        source_rights=synthetic_rights(digest, name_review_status="approved", review_status="approved"),
+                        active=True,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                )
+                setup_db.add(CasePoolItem(loot_table_id=pool_id, asset_id=aid, rarity=rarity, item_weight=1))
+            setup_db.flush()
+
+            loot_tbl.status = "published"
+            setup_db.flush()
 
     barrier = Barrier(2)
 
     def worker_privilege():
         with Session(engine) as w_db:
             barrier.wait(timeout=10)
-            a = w_db.scalar(select(AssetItem).where(AssetItem.id == aid_1))
+            a = w_db.scalar(select(AssetItem).where(AssetItem.id == aid_privilege))
             res = grant_khang_dev_single_asset_if_eligible(w_db, a, now, actor_id=KHANG_DEV_ID, policy_id=effective_pid)
             w_db.commit()
             return res
@@ -1185,33 +1523,90 @@ def test_postgres_khang_dev_concurrent_vault_open(pg_engine):
     def worker_case_open():
         with Session(engine) as w_db:
             barrier.wait(timeout=10)
-            from app.aura_lock import lock_aura_mutation
-            with w_db.begin():
-                lock_aura_mutation(w_db)
-                u = w_db.scalar(select(User).where(User.id == KHANG_DEV_ID).with_for_update())
-                inv = w_db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == aid_2).with_for_update())
-                if inv is None:
-                    inv = UserInventory(user_id=KHANG_DEV_ID, asset_id=aid_2, quantity=1, acquired_at=now, updated_at=now)
-                    w_db.add(inv)
-                else:
-                    inv.quantity += 1
-                    inv.updated_at = now
-            return True
+            req = SimpleNamespace(
+                app=SimpleNamespace(
+                    state=SimpleNamespace(
+                        vault=SimpleNamespace(vault_runtime_enabled=True),
+                        auth=SimpleNamespace(now=lambda: now),
+                    )
+                ),
+                url_for=lambda name, **kw: f"https://aurameme.test/api/v1/catalog/{kw.get('asset_id')}",
+            )
+            acct = SimpleNamespace(
+                db=w_db,
+                user=SimpleNamespace(id=KHANG_DEV_ID),
+            )
+            key = f"fixture-key-{uuid4().hex}"
+            res = open_runtime(req, acct, case_id, key, randbelow=lambda n: 0)
+            w_db.commit()
+            return res
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        f1 = executor.submit(worker_privilege)
-        f2 = executor.submit(worker_case_open)
-        r1 = f1.result(timeout=15)
-        r2 = f2.result(timeout=15)
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            f1 = executor.submit(worker_privilege)
+            f2 = executor.submit(worker_case_open)
+            r1 = f1.result(timeout=15)
+            r2 = f2.result(timeout=15)
 
-    assert r1 is True
-    assert r2 is True
+        assert r1 is True
+        assert r2 is not None
+        open_id = r2.open_id
+        reward_asset_id = UUID(str(r2.reward.id))
 
-    with Session(engine) as verify_db:
-        inv1 = verify_db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == aid_1))
-        inv2 = verify_db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == aid_2))
-        assert inv1 is not None and inv1.quantity == 1
-        assert inv2 is not None and inv2.quantity == 1
+        with Session(engine) as verify_db:
+            # 1. Verify CaseOpen record
+            co = verify_db.scalar(select(CaseOpen).where(CaseOpen.id == open_id))
+            assert co is not None
+            assert co.user_id == KHANG_DEV_ID
+            assert co.reward_asset_id == reward_asset_id
+
+            # 2. Verify vault reward inventory and grant
+            inv_vault = verify_db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == reward_asset_id))
+            assert inv_vault is not None and inv_vault.quantity >= 1
+            grant_vault = verify_db.scalar(select(InventoryGrant).where(InventoryGrant.case_open_id == open_id))
+            assert grant_vault is not None
+            assert grant_vault.source_type == "case_open"
+            assert grant_vault.user_id == KHANG_DEV_ID
+            assert grant_vault.asset_id == reward_asset_id
+            assert inventory_state(verify_db, KHANG_DEV_ID, reward_asset_id).quantity == inv_vault.quantity
+
+            # 3. Verify privilege grant inventory and grant
+            inv_priv = verify_db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == aid_privilege))
+            assert inv_priv is not None and inv_priv.quantity == 1
+            grant_priv = verify_db.scalar(select(InventoryGrant).where(InventoryGrant.user_id == KHANG_DEV_ID, InventoryGrant.asset_id == aid_privilege))
+            assert grant_priv is not None
+            assert grant_priv.source_type == "admin"
+            assert grant_priv.event_key == f"{PRIVILEGE_KEY_PREFIX}{aid_privilege}"
+            assert inventory_state(verify_db, KHANG_DEV_ID, aid_privilege).quantity == 1
+
+            # 4. Verify EXP: Case open awards +2 EXP; Privilege grant awards +0 EXP
+            from app.vault_exp_award import VAULT_KEY_PREFIX as VAULT_EXP_KEY_PREFIX
+            vault_exp = verify_db.scalar(
+                select(AuraLedger).where(
+                    AuraLedger.user_id == KHANG_DEV_ID,
+                    AuraLedger.event_key == f"{VAULT_EXP_KEY_PREFIX}{open_id}",
+                )
+            )
+            assert vault_exp is not None
+            assert vault_exp.base_xp == 2
+
+            priv_exp = verify_db.scalar(
+                select(AuraLedger).where(
+                    AuraLedger.user_id == KHANG_DEV_ID,
+                    AuraLedger.event_key == f"{PRIVILEGE_KEY_PREFIX}{aid_privilege}",
+                )
+            )
+            assert priv_exp is None
+    finally:
+        with Session(engine) as cleanup_db:
+            with cleanup_db.begin():
+                for aid in [aid_privilege] + pool_asset_ids:
+                    a = cleanup_db.scalar(select(AssetItem).where(AssetItem.id == aid))
+                    if a:
+                        a.active = False
+                cd = cleanup_db.scalar(select(CaseDefinition).where(CaseDefinition.id == case_id))
+                if cd:
+                    cd.runtime_kind = None
 
 
 @pytest.mark.integration
@@ -1266,18 +1661,25 @@ def test_postgres_khang_dev_concurrent_admin_approval(pg_engine):
                 res = sync_khang_dev_vault_privilege(w_db, now, dry_run=False, actor_id=KHANG_DEV_ID)
             return res
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        f1 = executor.submit(worker_approve)
-        f2 = executor.submit(worker_sync)
-        r1 = f1.result(timeout=15)
-        r2 = f2.result(timeout=15)
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            f1 = executor.submit(worker_approve)
+            f2 = executor.submit(worker_sync)
+            r1 = f1.result(timeout=15)
+            r2 = f2.result(timeout=15)
 
-    assert r1 is True
-    assert r2["status"] == "success"
+        assert r1 is True
+        assert r2["status"] == "success"
 
-    with Session(engine) as verify_db:
-        inv = verify_db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == aid))
-        assert inv is not None and inv.quantity == 1
+        with Session(engine) as verify_db:
+            inv = verify_db.scalar(select(UserInventory).where(UserInventory.user_id == KHANG_DEV_ID, UserInventory.asset_id == aid))
+            assert inv is not None and inv.quantity == 1
+    finally:
+        with Session(engine) as cleanup_db:
+            with cleanup_db.begin():
+                a = cleanup_db.scalar(select(AssetItem).where(AssetItem.id == aid))
+                if a:
+                    a.active = False
 
 
 @pytest.mark.integration

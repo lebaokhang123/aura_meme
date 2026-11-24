@@ -115,6 +115,7 @@ def grant_khang_dev_single_asset_if_eligible(
     - Called from admin approval flow, publication flow, or sync tool.
     - Idempotent: does nothing if already owned.
     - Zero EXP, safe locks, audit log recorded.
+    - Validates that supplied or resolved policy_id is published and effective.
     - Returns True if granted, False if skipped.
     """
     if not is_asset_eligible_for_privilege(asset):
@@ -147,7 +148,19 @@ def grant_khang_dev_single_asset_if_eligible(
         inventory_state(db, KHANG_DEV_ID, asset.id)
         return False
 
-    effective_policy_id = policy_id or resolve_reward_policy_id(db, asset.id, now)
+    if policy_id is not None:
+        pol = db.scalar(
+            select(RewardPolicyVersion).where(
+                RewardPolicyVersion.id == policy_id,
+                RewardPolicyVersion.status == "published",
+                RewardPolicyVersion.effective_at <= now,
+            )
+        )
+        if pol is None:
+            raise ValueError(f"Supplied policy_id {policy_id} is not a published RewardPolicyVersion effective as of {now.isoformat()}")
+        effective_policy_id = policy_id
+    else:
+        effective_policy_id = resolve_reward_policy_id(db, asset.id, now)
 
     # UserInventory must be flushed before InventoryGrant (FK dependency)
     if user_inv is None:
@@ -273,10 +286,13 @@ def sync_khang_dev_vault_privilege(
             "target_user_id": str(KHANG_DEV_ID),
             "dry_run": dry_run,
             "message": "Khang Dev account not found or not active in this database.",
+            "eligible_count": 0,
             "published_count": 0,
             "already_owned_count": 0,
             "missing_count": 0,
+            "blocked_count": 0,
             "granted_count": 0,
+            "blocked_assets": [],
             "missing_assets": [],
             "already_owned": [],
         }
@@ -296,6 +312,7 @@ def sync_khang_dev_vault_privilege(
 
     already_owned = []
     missing = []
+    blocked_assets = []
 
     for asset in eligible_assets:
         user_inv = db.scalar(
@@ -316,8 +333,20 @@ def sync_khang_dev_vault_privilege(
                 pid = resolve_reward_policy_id(db, asset.id, now)
                 missing.append((asset, pid))
             except ValueError:
-                # If no valid published policy effective as of now, skip
-                continue
+                blocked_assets.append({
+                    "id": str(asset.id),
+                    "slug": asset.slug,
+                    "kind": asset.kind,
+                    "rarity": asset.rarity,
+                    "reason": "missing_policy",
+                })
+
+    # Fail-closed in execute mode: refuse partial mutation if any eligible assets are blocked
+    if not dry_run and blocked_assets:
+        raise ValueError(
+            f"Fail-closed: {len(blocked_assets)} eligible asset(s) blocked due to missing published policy. "
+            f"Aborting privilege execution without mutation."
+        )
 
     granted = []
     if not dry_run and missing:
@@ -357,10 +386,13 @@ def sync_khang_dev_vault_privilege(
         "dry_run": dry_run,
         "target_user_id": str(KHANG_DEV_ID),
         "target_username": khang.username,
+        "eligible_count": len(eligible_assets),
         "published_count": len(eligible_assets),
         "already_owned_count": len(already_owned),
         "missing_count": len(missing),
+        "blocked_count": len(blocked_assets),
         "granted_count": len(granted),
+        "blocked_assets": blocked_assets,
         "missing_assets": [
             {
                 "id": str(a.id),
