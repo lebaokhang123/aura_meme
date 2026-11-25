@@ -232,6 +232,10 @@ async function submitApiForm(form){
    try{
     const regRes = await auth.register({email,password,username:cleanTag,display_name:displayName});
     if(regRes?.status==='pending_verification'){
+     try {
+      sessionStorage.setItem('aurameme_last_registered_email', email);
+      sessionStorage.setItem('aurameme_verify_cooldown_' + email.toLowerCase(), (Date.now() + 30000).toString());
+     } catch {}
      location.assign('/login?pending_verification='+encodeURIComponent(email));
      return;
     }

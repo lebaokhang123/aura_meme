@@ -74,6 +74,7 @@ export function createAuthClient({fetch=globalThis.fetch,notify=()=>{}}={}){
     async googleLogin(id_token,nonce,username){const res=await mutation('google/login',{id_token,...(nonce?{nonce}:{}),...(username?{username}:{})});if(res?.status==='needs_onboarding')return res;if(!await refresh())throw new AuthError(401,'SESSION_EXPIRED');notify();return res;},
     async googleOnboarding(onboarding_token,username){const res=await mutation('google/onboarding',{onboarding_token,username});if(!await refresh())throw new AuthError(401,'SESSION_EXPIRED');notify();return res;},
     async verifyEmail(token){return mutation('verify-email',{token});},
+    async resendVerification(email){return mutation('resend-verification',{email});},
   };
 }
 export function authMessage(error,language='vi'){
