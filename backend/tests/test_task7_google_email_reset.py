@@ -369,3 +369,36 @@ def test_smtp_starttls_receipt_and_transactional_templates(monkeypatch):
     text = "".join(page.extract_text() for page in PdfReader(BytesIO(attachment.get_payload(decode=True))).pages)
     for expected in ("AM-PLUS-SMTPFIX", "SIM-PP-TEST123", "PayPal Sandbox"):
         assert expected in text
+
+
+def test_receipt_email_formats_timestamp_in_asia_ho_chi_minh():
+    from app.email_service import format_receipt_timestamp
+
+    # 1. UTC ISO conversion to Asia/Ho_Chi_Minh (+7 hours)
+    formatted = format_receipt_timestamp("2026-11-24T16:00:17+00:00")
+    assert formatted == "23:00:17 - 24/11/2026"
+
+    # 2. 'Z' suffix handled
+    formatted_z = format_receipt_timestamp("2026-11-24T16:00:17Z")
+    assert formatted_z == "23:00:17 - 24/11/2026"
+
+    # 3. Invalid or empty string fallbacks safely
+    assert format_receipt_timestamp("") == ""
+    assert format_receipt_timestamp("not-a-timestamp") == "not-a-timestamp"
+
+    # 4. Email template renders formatted timestamp in both plain text and HTML
+    svc = EmailService(EmailSettings(email_mode="sandbox", email_from_address="test@example.com"))
+    res = svc.send_premium_receipt_email(
+        to_email="buyer@example.com",
+        display_name="Cultivator",
+        order_code="AM-RECEIPT-VN-TIME",
+        tier="plus",
+        amount_vnd_formatted="130.000 VNĐ",
+        amount_usd_formatted="$5.00",
+        provider="paypal_sandbox",
+        completed_at_iso="2026-11-24T16:00:17+00:00",
+    )
+    assert res.status == "sandbox_captured"
+    mail = svc.sandbox_outbox[-1]
+    assert "Thời gian: 23:00:17 - 24/11/2026" in mail["text"]
+    assert "23:00:17 - 24/11/2026" in mail["html"]

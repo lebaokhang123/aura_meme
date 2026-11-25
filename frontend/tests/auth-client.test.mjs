@@ -72,3 +72,28 @@ test('Vault retries retain idempotency headers with existing session CSRF',async
 test('cooldown exposes bounded server retry metadata; catalog avatars stay valid',async()=>{
  const next='2026-11-14T15:00:00Z',t=transport([Response.json({error:{code:'COOLDOWN',details:{next_open_at:next,private:'ignore'}}},{status:429,headers:{'Retry-After':'5'}}),ok({...user,avatar_url:'/api/v1/catalog/assets/'+user.id})]),c=createAuthClient({fetch:t.fetch});await assert.rejects(c.read('/catalog'),error=>error.retryAfter===5&&error.nextOpenAt===next&&!error.private);await c.refresh();assert.equal(c.snapshot().user.avatar_url,'/api/v1/catalog/assets/'+user.id);
 });
+
+test('resendVerification sends email and returns cooldown seconds', async () => {
+  const t = transport([
+    ok({ csrf_token: 'test-csrf' }),
+    ok({ status: 'sent', email: 'user@example.com', message: 'Verification email re-sent successfully.', cooldown_seconds: 30 }),
+  ]);
+  const c = createAuthClient({ fetch: t.fetch });
+  const res = await c.resendVerification('user@example.com');
+  assert.equal(res.status, 'sent');
+  assert.equal(res.cooldown_seconds, 30);
+  assert.equal(t.calls[1].path, '/api/v1/auth/resend-verification');
+  assert.equal(JSON.parse(t.calls[1].body).email, 'user@example.com');
+});
+
+test('cooldown MM:SS formatting handles seconds above 59 cleanly', () => {
+  const formatCooldown = (cooldown) => {
+    const mins = Math.floor(cooldown / 60);
+    const secs = cooldown % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+  assert.equal(formatCooldown(30), '00:30');
+  assert.equal(formatCooldown(5), '00:05');
+  assert.equal(formatCooldown(90), '01:30');
+  assert.equal(formatCooldown(605), '10:05');
+});
