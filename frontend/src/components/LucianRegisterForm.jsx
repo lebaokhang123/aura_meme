@@ -195,6 +195,11 @@ export default function LucianRegisterForm() {
       });
       setIsDone(true);
       if (regRes?.status === 'pending_verification') {
+        try {
+          sessionStorage.setItem('aurameme_last_registered_email', cleanEmail);
+          const target = Date.now() + 30000;
+          sessionStorage.setItem('aurameme_verify_cooldown_' + cleanEmail.toLowerCase(), target.toString());
+        } catch {}
         location.assign('/login?pending_verification=' + encodeURIComponent(cleanEmail));
       } else {
         location.assign('/login?registered=1');

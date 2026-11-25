@@ -41,7 +41,7 @@ export default function LucianLoginForm() {
     if (!trimmedId) {
       setErrorField('identifier');
       triggerShake('identifier');
-      setErrorMsg(t('Vui lòng nhập email hoặc tên đăng nhập.', 'Please enter your email or username.'));
+      setErrorMsg(t('Vui lòng nhập email.', 'Please enter your email.'));
       identifierRef.current?.focus();
       return;
     }
@@ -127,7 +127,7 @@ export default function LucianLoginForm() {
             onBlur={() => setFocusedField(null)}
             disabled={isBusy || isOk}
           />
-          <label htmlFor="identifier">{t('Email hoặc tên đăng nhập', 'Email or username')}</label>
+          <label htmlFor="identifier">{t('Email', 'Email')}</label>
         </div>
 
         {/* Password field */}

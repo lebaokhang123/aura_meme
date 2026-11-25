@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from email.message import EmailMessage
 from email.utils import formataddr
 from functools import lru_cache
@@ -24,6 +25,7 @@ import smtplib
 import ssl
 import threading
 from typing import Any, Literal
+from zoneinfo import ZoneInfo
 
 from app.config import EmailSettings
 from app.receipt_pdf import generate_receipt_pdf_bytes, resolve_payment_method_label
@@ -75,6 +77,21 @@ def format_email_subject(title: str) -> str:
     if not cleaned:
         cleaned = "Thông báo hệ thống"
     return f"{SUBJECT_PREFIX}{cleaned}"
+
+
+def format_receipt_timestamp(iso_str: str) -> str:
+    """Format ISO timestamp string into 'HH:MM:SS - DD/MM/YYYY' in Asia/Ho_Chi_Minh timezone."""
+    if not iso_str:
+        return ""
+    try:
+        cleaned = str(iso_str).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(cleaned)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        vn_dt = dt.astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
+        return vn_dt.strftime("%H:%M:%S - %d/%m/%Y")
+    except Exception:
+        return str(iso_str)
 
 
 def render_email_preview_html(html_body: str) -> str:
@@ -532,6 +549,8 @@ class EmailService:
                 )
             )
 
+        formatted_completed_at = format_receipt_timestamp(completed_at_iso) or completed_at_iso
+
         text_body = (
             f"Xin chào {display_name},\n\n"
             f"Giao dịch nâng cấp gói hội viên của bạn đã hoàn tất:\n"
@@ -539,7 +558,7 @@ class EmailService:
             f"- Gói hội viên: {tier_label}\n"
             f"- Số tiền: {amount_vnd_formatted} ({amount_usd_formatted})\n"
             f"- Phương thức: {provider_label}\n"
-            f"- Thời gian: {completed_at_iso}\n\n"
+            f"- Thời gian: {formatted_completed_at}\n\n"
             f"Biên lai PDF đã được đính kèm trực tiếp trong email này (AuraMeme-Receipt-{order_code}.pdf).\n"
             f"Xem lại lịch sử giao dịch và tải biên lai PDF tại: {history_url}\n\n"
             f"Lưu ý: {simulation_note}Đây là giao dịch thử nghiệm/mô phỏng trong môi trường Sandbox giáo dục, không có giá trị xác nhận thanh toán thực tế.\n"
@@ -552,7 +571,7 @@ class EmailService:
             <tr><td style="color:#948f9a;">Gói hội viên</td><td align="right" style="font-weight:700;">{escape(tier_label)}</td></tr>
             <tr><td style="color:#948f9a;">Số tiền</td><td align="right" style="font-weight:700;">{escape(amount_vnd_formatted)} ({escape(amount_usd_formatted)})</td></tr>
             <tr><td style="color:#948f9a;">Phương thức</td><td align="right">{escape(provider_label)}</td></tr>
-            <tr><td style="color:#948f9a;">Thời gian xác nhận</td><td align="right">{escape(completed_at_iso)}</td></tr>
+            <tr><td style="color:#948f9a;">Thời gian xác nhận</td><td align="right">{escape(formatted_completed_at)}</td></tr>
           </table>
           <p style="margin:0 0 18px;padding:10px 14px;border-radius:8px;background-color:#15161f;border:1px solid #292932;font-size:12px;color:#948f9a;line-height:1.5;">
             Lưu ý: {simulation_note}Đây là biên nhận giao dịch <strong>thử nghiệm/mô phỏng</strong> trong môi trường Sandbox giáo dục, <strong>không có giá trị xác nhận thanh toán thực tế</strong>.

@@ -59,6 +59,19 @@ class RegisterResponse(BaseModel):
     status: Literal["pending_verification"] = "pending_verification"
     email: EmailStr
     message: str
+    cooldown_seconds: int = 30
+
+
+class ResendVerificationInput(BaseModel):
+    model_config = {"extra": "forbid"}
+    email: EmailStr
+
+
+class ResendVerificationResponse(BaseModel):
+    status: Literal["sent"] = "sent"
+    email: EmailStr
+    message: str
+    cooldown_seconds: int = 30
 
 
 class VerifyEmailInput(BaseModel):

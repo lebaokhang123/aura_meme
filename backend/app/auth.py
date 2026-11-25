@@ -1,5 +1,5 @@
 """P0 authentication: one PostgreSQL transaction per operation, no schema changes."""
-from datetime import timedelta
+from datetime import datetime, timedelta
 import secrets
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -16,6 +16,8 @@ from app.auth_schemas import (
     LoginInput,
     RegisterInput,
     RegisterResponse,
+    ResendVerificationInput,
+    ResendVerificationResponse,
     UserPrivate,
     VerifyEmailInput,
     VerifyEmailResponse,
@@ -120,6 +122,67 @@ def get_csrf(request: Request, response: Response):
     return CsrfResponse(csrf_token=runtime.csrf("pre:" + digest(pre)))
 
 
+def _is_verification_required(email_service) -> bool:
+    if email_service is not None:
+        return bool(getattr(email_service.settings, "email_verification_required", False))
+    from app.config import EmailSettings
+    return bool(EmailSettings().email_verification_required)
+
+
+def _require_available_email_service(email_service) -> None:
+    if email_service is None or getattr(email_service.settings, "email_mode", "disabled") not in ("smtp", "sandbox"):
+        raise AuthError(
+            503,
+            "EMAIL_SERVICE_UNAVAILABLE",
+            "Dịch vụ email xác minh hiện không khả dụng. Vui lòng thử lại sau.",
+        )
+
+
+def _enforce_verification_rate_limits(runtime, request: Request, email: str) -> None:
+    client_ip = request.client.host if request.client else "unknown"
+    runtime.limiter.check(f"verification_email:ip:{client_ip}", 10, 600)
+    runtime.limiter.check("verification_email:account:" + digest(email), 5, 600)
+
+
+def _enforce_verification_cooldown(verif: AccountVerification, now: datetime) -> None:
+    cooldown_target = verif.created_at + timedelta(seconds=30)
+    if now < cooldown_target:
+        remaining = max(1, int((cooldown_target - now).total_seconds()))
+        raise AuthError(
+            429,
+            "RATE_LIMITED",
+            f"Vui lòng đợi {remaining} giây trước khi gửi lại email xác minh.",
+            retry_after=remaining,
+            details={"next_open_at": cooldown_target.isoformat()},
+        )
+
+
+def _deliver_verification_email(
+    email_service,
+    *,
+    to_email: str,
+    display_name: str,
+    raw_token: str,
+    token_hash: str,
+) -> None:
+    from urllib.parse import urlencode
+    base = email_service.settings.app_public_url.rstrip("/")
+    verify_url = f"{base}/verify-email?{urlencode({'token': raw_token})}"
+    email_res = email_service.send_account_verification_email(
+        to_email=to_email,
+        display_name=display_name,
+        verify_url=verify_url,
+        expires_hours=24,
+        dedupe_key=f"verify:{token_hash}",
+    )
+    if email_res is None or email_res.status not in ("sent", "sandbox_captured"):
+        raise AuthError(
+            503,
+            "EMAIL_DELIVERY_FAILED",
+            "Không thể gửi email xác minh lúc này. Vui lòng thử lại sau.",
+        )
+
+
 @router.post("/register", response_model=UserPrivate | RegisterResponse, status_code=201, operation_id="register",
              responses={status: ERRORS[status] for status in (403, 409, 422, 429, 500)},
              openapi_extra=CSRF_HEADER)
@@ -129,13 +192,11 @@ def register(payload: RegisterInput, request: Request, pre=Depends(guest_guard))
     now, user_id = runtime.now(), uuid4()
 
     email_service = getattr(request.app.state, "email_service", None)
-    verification_required = bool(
-        email_service
-        and getattr(email_service.settings, "email_verification_required", False)
-        and email_service.settings.email_mode in ("smtp", "sandbox")
-    )
+    verification_required = _is_verification_required(email_service)
 
     if verification_required:
+        _require_available_email_service(email_service)
+        _enforce_verification_rate_limits(runtime, request, str(payload.email))
         raw_token = secrets.token_urlsafe(32)
         token_hash = digest(raw_token)
         with request.app.state.auth_session_factory() as db, db.begin():
@@ -158,6 +219,7 @@ def register(payload: RegisterInput, request: Request, pre=Depends(guest_guard))
                 select(AccountVerification).where(AccountVerification.email == str(payload.email)).with_for_update()
             )
             if existing_verif is not None:
+                _enforce_verification_cooldown(existing_verif, now)
                 existing_verif.username = payload.username
                 existing_verif.display_name = payload.display_name
                 existing_verif.password_hash = encoded
@@ -180,20 +242,18 @@ def register(payload: RegisterInput, request: Request, pre=Depends(guest_guard))
                     )
                 )
 
-        from urllib.parse import urlencode
-        base = email_service.settings.app_public_url.rstrip("/")
-        verify_url = f"{base}/verify-email?{urlencode({'token': raw_token})}"
-        email_service.send_account_verification_email(
+        _deliver_verification_email(
+            email_service,
             to_email=str(payload.email),
             display_name=payload.display_name,
-            verify_url=verify_url,
-            expires_hours=24,
-            dedupe_key=f"verify:{token_hash}",
+            raw_token=raw_token,
+            token_hash=token_hash,
         )
         return RegisterResponse(
             status="pending_verification",
             email=str(payload.email),
             message="Email xác minh đã được gửi. Vui lòng kiểm tra hộp thư để kích hoạt tài khoản.",
+            cooldown_seconds=30,
         )
 
     try:
@@ -226,6 +286,67 @@ def register(payload: RegisterInput, request: Request, pre=Depends(guest_guard))
         if getattr(error.orig, "sqlstate", None) == "23505":
             raise AuthError(409, "CONFLICT", "Username or email already registered.") from None
         raise
+
+
+@router.post("/resend-verification", response_model=ResendVerificationResponse, operation_id="resendVerification",
+             responses={status: ERRORS[status] for status in (400, 403, 409, 422, 429, 500)},
+             openapi_extra=CSRF_HEADER)
+def resend_verification(payload: ResendVerificationInput, request: Request, pre=Depends(guest_guard)):
+    runtime = request.app.state.auth
+    email_service = getattr(request.app.state, "email_service", None)
+    _require_available_email_service(email_service)
+    _enforce_verification_rate_limits(runtime, request, str(payload.email))
+
+    now = runtime.now()
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = digest(raw_token)
+
+    with request.app.state.auth_session_factory() as db, db.begin():
+        if db.scalar(select(User.id).where(User.email == str(payload.email))) is not None:
+            raise AuthError(409, "ALREADY_REGISTERED", "Tài khoản đã được kích hoạt trước đó. Vui lòng đăng nhập.")
+
+        verif = db.scalar(
+            select(AccountVerification)
+            .where(AccountVerification.email == str(payload.email), AccountVerification.verified_at.is_(None))
+            .with_for_update()
+        )
+        if verif is None:
+            raise AuthError(404, "NOT_FOUND", "Không tìm thấy yêu cầu xác minh cho email này. Vui lòng đăng ký tài khoản.")
+
+        _enforce_verification_cooldown(verif, now)
+
+        if verif.expires_at <= now:
+            if db.scalar(select(User.id).where(User.username == verif.username)) is not None:
+                raise AuthError(409, "USERNAME_EXISTS", "Tag đã được sử dụng, vui lòng đăng ký lại với tag khác.")
+            pending_tag = db.scalar(
+                select(AccountVerification.id).where(
+                    AccountVerification.username == verif.username,
+                    AccountVerification.email != str(payload.email),
+                    AccountVerification.verified_at.is_(None),
+                    AccountVerification.expires_at > now,
+                )
+            )
+            if pending_tag is not None:
+                raise AuthError(409, "USERNAME_EXISTS", "Tag đã được sử dụng, vui lòng đăng ký lại với tag khác.")
+
+        verif.token_hash = token_hash
+        verif.created_at = now
+        verif.expires_at = now + timedelta(hours=24)
+        display_name = verif.display_name
+
+    _deliver_verification_email(
+        email_service,
+        to_email=str(payload.email),
+        display_name=display_name,
+        raw_token=raw_token,
+        token_hash=token_hash,
+    )
+    return ResendVerificationResponse(
+        status="sent",
+        email=str(payload.email),
+        message="Email xác minh đã được gửi lại.",
+        cooldown_seconds=30,
+    )
 
 
 @router.post("/verify-email", response_model=VerifyEmailResponse, operation_id="verifyEmail",

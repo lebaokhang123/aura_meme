@@ -34,6 +34,7 @@ import PaymentHistoryPage from './components/PaymentHistoryPage.jsx';
 import ForgotPasswordPage from './components/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './components/ResetPasswordPage.jsx';
 import VerifyEmailPage from './components/VerifyEmailPage.jsx';
+import PendingVerificationScreen from './components/PendingVerificationScreen.jsx';
 
 const pages=import.meta.glob('./generated/*.js');
 const cssFiles=import.meta.glob('./generated/*.css',{query:'?raw',import:'default'});
@@ -81,7 +82,11 @@ function App() {
     document.body.className=page.bodyClass;
     document.body.dataset.screen=page.key;
     const style=document.createElement('style');style.id='stitch-active-styles';
-    const custom={'/admin':AdminPage,'/premium':PremiumPage,'/premium/checkout':PremiumCheckoutPage,'/premium/history':PaymentHistoryPage,'/forgot-password':ForgotPasswordPage,'/reset-password':ResetPasswordPage,'/verify-email':VerifyEmailPage}[page.path]||(!MOCK_AUTH&&((page.path.startsWith('/profile')||page.path.startsWith('/u/'))?ProfilePage:page.path==='/contact'?ContactPage:page.path==='/vault'?VaultPage:page.path==='/admin/contacts'?ContactInbox:null));
+    const isPending = (page.path === '/login' || page.path === '/register' || page.path === '/verify-email') &&
+      new URLSearchParams(location.search).has('pending_verification');
+    const custom = isPending
+      ? PendingVerificationScreen
+      : {'/admin':AdminPage,'/premium':PremiumPage,'/premium/checkout':PremiumCheckoutPage,'/premium/history':PaymentHistoryPage,'/forgot-password':ForgotPasswordPage,'/reset-password':ResetPasswordPage,'/verify-email':VerifyEmailPage}[page.path]||(!MOCK_AUTH&&((page.path.startsWith('/profile')||page.path.startsWith('/u/'))?ProfilePage:page.path==='/contact'?ContactPage:page.path==='/vault'?VaultPage:page.path==='/admin/contacts'?ContactInbox:null));
 
     const maintenance=page.path==='/rank'||MOCK_AUTH&&['/contact','/vault'].includes(page.path);
     const pageLoader=custom?Promise.resolve(custom):maintenance ? Promise.resolve(MaintenancePage) : pages[`./generated/${page.key}.js`]().then(mod=>mod.default);
@@ -96,7 +101,7 @@ function App() {
   useEffect(() => {
     if(!screen)return;
     applyDemoIdentity();
-    if(['/admin','/premium','/premium/checkout','/premium/history','/forgot-password','/reset-password','/verify-email'].includes(page.path)||!MOCK_AUTH&&!['/','/explore','/about','/login','/register','/rank'].includes(page.path))return;
+    if(['/admin','/premium','/premium/checkout','/premium/history','/forgot-password','/reset-password','/verify-email'].includes(page.path)||screen===PendingVerificationScreen||!MOCK_AUTH&&!['/','/explore','/about','/login','/register','/rank'].includes(page.path))return;
 
     let stopped=false;let cleanup=()=>{};
     const loader=effectsFiles[`./generated/${page.key}.effects.json`]; if(loader&&!['/','/explore'].includes(page.path))loader().then(mod=>{
@@ -106,15 +111,12 @@ function App() {
   },[page.key,screen]);
   useEffect(()=>attachNavigation(),[]);
   useEffect(()=>{
-    if(!MOCK_AUTH&&screen&&page.path==='/login'){
+    if(!MOCK_AUTH&&screen&&page.path==='/login'&&screen!==PendingVerificationScreen){
       const params=new URLSearchParams(location.search);
       if(params.has('registered')){
         showDemoMessage(language==='en'?'Account created. Please sign in.':'Đăng ký thành công. Vui lòng đăng nhập.');
       }else if(params.has('verified')){
         showDemoMessage(language==='en'?'Account activated successfully! Please sign in.':'Kích hoạt tài khoản thành công! Vui lòng đăng nhập.');
-      }else if(params.has('pending_verification')){
-        const em=params.get('pending_verification');
-        showDemoMessage(language==='en'?`Verification email sent to ${em}. Please check your inbox.`:`Email xác minh đã được gửi đến ${em}. Vui lòng kiểm tra hộp thư để kích hoạt tài khoản.`);
       }
     }
   },[screen]);
@@ -126,7 +128,7 @@ function App() {
   if(!MOCK_AUTH&&protectedPage&&authState.status!=='authenticated')return null;
   // Reveal the header and page together after the lazy content and CSS are ready.
   if(!screen&&!failed)return null;
-  return render(<><EquippedBackground/><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : [AdminPage,PremiumPage,PremiumCheckoutPage,PaymentHistoryPage,ForgotPasswordPage,ResetPasswordPage,ProfilePage,ContactPage,VaultPage,ContactInbox].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}<CookieConsent /></>);
+  return render(<><EquippedBackground/><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : [AdminPage,PremiumPage,PremiumCheckoutPage,PaymentHistoryPage,ForgotPasswordPage,ResetPasswordPage,ProfilePage,ContactPage,VaultPage,ContactInbox,PendingVerificationScreen].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}<CookieConsent /></>);
 }
 
 import {PremiumProvider} from './PremiumContext.jsx';

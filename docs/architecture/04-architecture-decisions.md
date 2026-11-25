@@ -157,8 +157,8 @@ Các tham số Aura/odds/payment còn mở đã nằm trong `03-database-design.
 - **Chống giả mạo sender:** Chặn `no-reply@aurameme.com` khi `EMAIL_DOMAIN_VERIFIED=false` (`EMAIL_DOMAIN_UNVERIFIED`). Hỗ trợ 3 chế độ: `disabled`, `sandbox` (in-memory test capture), và `smtp` (TLS/SSL, tối đa 2 lần thử, không log secret).
 
 ### 9.4. Hướng dẫn Owner cấu hình Credentials (khi bật Live)
-1. **Google Cloud Console:** Tạo OAuth 2.0 Web Client ID, thêm Authorized JavaScript origins (`http://localhost:5173`, domain production), gán `GOOGLE_CLIENT_ID` vào `backend/.env`.
-2. **SMTP / Email Provider:** Cấu hình `EMAIL_MODE=smtp`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM_ADDRESS`, `EMAIL_ADMIN_INBOX`, và chỉ bật `EMAIL_DOMAIN_VERIFIED=true` sau khi xác minh SPF/DKIM cho `aurameme.com`.
+1. **Google Cloud Console:** Tạo OAuth 2.0 Web Client ID (loại Web application), cấu hình Authorized JavaScript origins (`http://localhost:5173`, `http://127.0.0.1:5173` và domain production), Authorized redirect URIs để trống đối với GIS JavaScript callback hiện hành. Không yêu cầu Client Secret. Gán `GOOGLE_CLIENT_ID` vào `backend/.env`. Endpoint Tokeninfo phục vụ local/demo; đánh giá nâng cấp sang xác minh ID Token bằng thư viện chính thức (`google-auth`) hoặc JWKS signature là gate bảo mật riêng trước production.
+2. **SMTP / Email Provider:** Cấu hình `EMAIL_MODE=smtp`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM_ADDRESS`, `EMAIL_ADMIN_INBOX`, và chỉ bật `EMAIL_DOMAIN_VERIFIED=true` sau khi xác minh SPF/DKIM cho `aurameme.com`. Timestamp trong email biên nhận Premium hiển thị định dạng `HH:MM:SS - DD/MM/YYYY` theo múi giờ `Asia/Ho_Chi_Minh`, giữ nguyên dữ liệu thời gian gốc trong database.
 
 ## 10. Task 8 — Public Profile, Follower Count & Cookie Consent (`feat/public-profile-cookie-task8`)
 

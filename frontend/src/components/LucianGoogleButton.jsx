@@ -3,6 +3,7 @@
  * Ported for AuraMeme — Google Sign-In Button & Onboarding Modal.
  */
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { auth } from '../auth.js';
 import { authMessage } from '../auth-client.js';
 import { usePreferences } from '../PreferencesContext.jsx';
@@ -174,7 +175,10 @@ export default function LucianGoogleButton({ disabled = false }) {
   }
 
   async function handleOnboardingSubmit(ev) {
-    ev.preventDefault();
+    if (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
     if (!onboarding || onboardingBusy) return;
     const cleanTag = chosenTag.trim().toLowerCase().replace(/^@/, '');
     if (!cleanTag || !/^[a-z0-9_]{3,32}$/.test(cleanTag)) {
@@ -193,7 +197,7 @@ export default function LucianGoogleButton({ disabled = false }) {
       setOnboarding(null);
       finishSuccessAndRedirect();
     } catch (err) {
-      setTagError(authMessage(err, language));
+      setTagError(err?.serverMessage || authMessage(err, language));
     } finally {
       setOnboardingBusy(false);
     }
@@ -241,7 +245,7 @@ export default function LucianGoogleButton({ disabled = false }) {
         </p>
       </div>
 
-      {onboarding && (
+      {onboarding && typeof document !== 'undefined' && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -294,7 +298,7 @@ export default function LucianGoogleButton({ disabled = false }) {
               </p>
             </div>
 
-            <form onSubmit={handleOnboardingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <form onSubmit={handleOnboardingSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label
                   htmlFor="onboarding-tag"
@@ -355,7 +359,10 @@ export default function LucianGoogleButton({ disabled = false }) {
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                 <button
                   type="button"
-                  onClick={() => setOnboarding(null)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOnboarding(null);
+                  }}
                   style={{
                     flex: 1,
                     height: 42,
@@ -392,7 +399,8 @@ export default function LucianGoogleButton({ disabled = false }) {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
