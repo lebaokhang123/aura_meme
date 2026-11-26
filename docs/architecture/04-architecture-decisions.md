@@ -194,3 +194,15 @@ Kiểm thử Checkpoint 3 có worker commit thật. Khởi tạo PostgreSQL mớ
 Fixture đối chiếu danh tính, marker, revision, role và schema rỗng trước khi ghi. Ca mở rương và duyệt Admin đi qua HTTP, CSRF, session và transaction dependency thật. Dữ liệu rollback dùng một transaction, runner thay thế DB fixture của từng ca commit bằng bản clone của template sạch, giữ trigger append-only. Lệnh từ backend: python tests/run_final_polish_disposable.py --image <image-đã-cài-requirements-ci> --repeat 2 --regressions. Runner chỉ dừng container định danh do nó tạo.
 
 CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute dừng trước mutation nếu bất kỳ mục eligible nào bị chặn do thiếu policy. Execute trên demo là gate riêng của Owner.
+
+
+## Hardening H02 — Authentication & Security Stabilization (27/11/2026)
+
+- **Nhánh & Baseline:** `fix/h02-auth-security` từ `origin/dev@98ddc31` (bảo toàn `test/system-simulation@ee1fd45` cho H01).
+- **Sửa lỗi đồng bộ Authentication đa tab:**
+  - Nguyên nhân: `frontend/src/auth.js` reload tab khi `BroadcastChannel('aurameme-auth')` thông báo thay đổi, nhưng `frontend/src/main.jsx` chỉ redirect `protectedPage` khi thành `guest`, thiếu redirect cho `/login` và `/register` khi `authState.status === 'authenticated'`.
+  - Thay đổi tối thiểu: thêm [auth-routing.js](../../frontend/src/auth-routing.js) (`resolveAuthRedirect`, `isProtectedPath`) sử dụng `safeReturnUrl`, lắng nghe `pageshow` (`ev.persisted`) trong [auth.js](../../frontend/src/auth.js) cho back/forward cache, và áp dụng redirect + render guard trong [main.jsx](../../frontend/src/main.jsx) khi `authState.status === 'authenticated'` trên `/login` hoặc `/register` (giữ nguyên `/verify-email`, `/reset-password`, `/forgot-password`).
+  - Bảo mật: không truyền token/cookie qua `BroadcastChannel`, không tin `localStorage`, giữ server `/api/v1/users/me` và `guest_guard` là nguồn xác thực duy nhất.
+- **Hiệu chỉnh benchmark H04 (ghi nhận từ audit `perf_baseline.py` H01):**
+  - H01 `perf_baseline.py` dùng chung `httpx.AsyncClient` không tách session/cookie theo từng virtual user, chưa có think time giữa các request trong `run_stage`, thời lượng mỗi mức tải ngắn (4s), chưa đo riêng authenticated write workload. Sẽ hiệu chỉnh các tham số này trong H04 (không tối ưu sản phẩm ở H02).
+- **Learning Check:** `PENDING OWNER`.
