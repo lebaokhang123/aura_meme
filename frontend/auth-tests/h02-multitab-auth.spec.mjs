@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { chromium } = require('C:/Users/sammy/aurameme-h01-sim/frontend/node_modules/playwright');
+const { chromium } = require('playwright');
 
 const BASE_URL = 'http://localhost:5173';
 
