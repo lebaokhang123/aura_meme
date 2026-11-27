@@ -35,6 +35,7 @@ from app.vault import router as vault_router
 from app.vault_open import router as vault_open_router
 from app.vault_runtime import router as vault_runtime_router
 from app.notifications import router as notifications_router
+from app.presence import PresenceStore, router as presence_router
 from app.premium import router as premium_router
 from app.vnpay_adapter import VnpayAdapter
 from app.paypal_adapter import PaypalAdapter
@@ -73,6 +74,7 @@ async def lifespan(app: FastAPI):
         )
         app.state.google_auth = GoogleTokenVerifier(GoogleAuthSettings())
         app.state.email_service = EmailService(EmailSettings())
+        app.state.presence = PresenceStore()
         yield
     finally:
         engine.dispose()
@@ -101,6 +103,7 @@ app.include_router(vault_router)
 app.include_router(vault_open_router)
 app.include_router(vault_runtime_router)
 app.include_router(notifications_router)
+app.include_router(presence_router)
 app.include_router(premium_router)
 app.add_middleware(AuthBoundaryMiddleware)
 

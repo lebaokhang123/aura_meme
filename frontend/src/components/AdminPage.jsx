@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {auth,MOCK_AUTH} from '../auth.js';
 import {authMessage} from '../auth-client.js';
 import {usePreferences} from '../PreferencesContext.jsx';
-import {adminPage,canAdmin} from '../admin-api.js';
+import {adminPage,adminPresence,canAdmin} from '../admin-api.js';
 import {mountBackground} from '../background-effects.js';
 import ErrorPage from './ErrorPage.jsx';
 import '../workspace.css';
@@ -21,10 +21,10 @@ function BackgroundPreviewStage({effectKey,t}){
  );
 }
 
-const sections=[['users','Người dùng','Users',['users']],['content','Nội dung','Content',['posts','comments','categories']],['contacts','Liên hệ','Contacts',['contacts']],['moderation','Kiểm duyệt','Moderation',['audit-logs','assets','orders']],['notifications','Thông báo','Notifications',['announcements']]];
-const labels={users:['Người dùng','Users'],posts:['Bài viết','Posts'],comments:['Bình luận','Comments'],categories:['Danh mục','Categories'],contacts:['Hộp thư liên hệ','Contact inbox'],'audit-logs':['Nhật ký quản trị','Admin activity'],assets:['Trạng thái vật phẩm','Asset status'],orders:['Giao dịch','Transactions'],announcements:['Thông báo hệ thống','System announcements']};
-const sectionIcons={users:'group',content:'article',contacts:'inbox',moderation:'shield',notifications:'campaign'};
-const resourceNotes={users:['Quản lý trạng thái và quyền truy cập của thành viên.','Manage member status and access.'],posts:['Xem nội dung và kiểm soát những bài xuất hiện trong cộng đồng.','Review posts and control their visibility in the community.'],comments:['Xem và xử lý bình luận, kể cả nội dung đã ẩn.','Review comments, including hidden content.'],categories:['Sắp xếp nội dung bằng các danh mục dùng chung.','Organize community content with shared categories.'],contacts:['Đọc và phân loại tin nhắn gửi đến AuraMeme.','Read and triage messages sent to AuraMeme.'],'audit-logs':['Ghi lại các thay đổi do quản trị viên thực hiện: ai đã làm gì và khi nào.','Log of administrative actions: who did what and when.'],assets:['Kiểm tra trạng thái hoạt động, tải lên Meme mới và duyệt danh mục vật phẩm.','Inspect catalog availability, upload new Memes, and review pending assets.'],orders:['Xem danh sách và lịch sử các giao dịch thanh toán gói hội viên.','View member subscription orders and payment history.'],announcements:['Soạn thảo, quản lý và phát thông báo tới các thành viên.','Draft, manage, and broadcast announcements to community members.']};
+const sections=[['overview','Tổng quan','Overview',['overview']],['users','Người dùng','Users',['users']],['content','Nội dung','Content',['posts','comments','categories']],['contacts','Liên hệ','Contacts',['contacts']],['moderation','Kiểm duyệt','Moderation',['audit-logs','assets','orders']],['notifications','Thông báo','Notifications',['announcements']]];
+const labels={overview:['Tổng quan trực tuyến','Live Overview'],users:['Người dùng','Users'],posts:['Bài viết','Posts'],comments:['Bình luận','Comments'],categories:['Danh mục','Categories'],contacts:['Hộp thư liên hệ','Contact inbox'],'audit-logs':['Nhật ký quản trị','Admin activity'],assets:['Trạng thái vật phẩm','Asset status'],orders:['Giao dịch','Transactions'],announcements:['Thông báo hệ thống','System announcements']};
+const sectionIcons={overview:'monitoring',users:'group',content:'article',contacts:'inbox',moderation:'shield',notifications:'campaign'};
+const resourceNotes={overview:['Theo dõi số thành viên và khách đang hoạt động trong cửa sổ 90 giây gần nhất (tự động làm mới mỗi 15 giây).','Monitor active members and guests within the last 90-second window (auto-refreshes every 15 seconds).'],users:['Quản lý trạng thái và quyền truy cập của thành viên.','Manage member status and access.'],posts:['Xem nội dung và kiểm soát những bài xuất hiện trong cộng đồng.','Review posts and control their visibility in the community.'],comments:['Xem và xử lý bình luận, kể cả nội dung đã ẩn.','Review comments, including hidden content.'],categories:['Sắp xếp nội dung bằng các danh mục dùng chung.','Organize community content with shared categories.'],contacts:['Đọc và phân loại tin nhắn gửi đến AuraMeme.','Read and triage messages sent to AuraMeme.'],'audit-logs':['Ghi lại các thay đổi do quản trị viên thực hiện: ai đã làm gì và khi nào.','Log of administrative actions: who did what and when.'],assets:['Kiểm tra trạng thái hoạt động, tải lên Meme mới và duyệt danh mục vật phẩm.','Inspect catalog availability, upload new Memes, and review pending assets.'],orders:['Xem danh sách và lịch sử các giao dịch thanh toán gói hội viên.','View member subscription orders and payment history.'],announcements:['Soạn thảo, quản lý và phát thông báo tới các thành viên.','Draft, manage, and broadcast announcements to community members.']};
 const Icon=({name,...props})=><span className="material-symbols-outlined" aria-hidden="true" {...props}>{name}</span>;
 const states={users:['active','locked','deleted'],posts:['draft','published','hidden','deleted'],comments:['visible','hidden','deleted'],categories:['active','hidden'],contacts:['new','in_review','resolved'],assets:['pending','approved','rejected','unknown'],orders:['pending','success','failed','cancelled','expired'],announcements:['draft','published','withdrawn']};
 const auditActionLabels={
@@ -74,19 +74,51 @@ export default function AdminPage(){
  const title=resource=>t(...labels[resource]),status=value=>resource==='orders'&&value==='pending'?t('Chờ thanh toán','Pending'):statusLabels[value]?t(...statusLabels[value]):value,formatAuditAction=a=>auditActionLabels[a]?t(...auditActionLabels[a]):a,formatAuditTarget=trg=>auditTargetLabels[trg]?t(...auditTargetLabels[trg]):trg,formatKind=k=>kindLabels[k]?t(...kindLabels[k]):k;
  const allowed=!MOCK_AUTH&&session.status==='authenticated'&&canAdmin(session.user),owner=allowed?session.user.id:null;
  const [resource,setResource]=useState('users'),[query,setQuery]=useState(''),[search,setSearch]=useState(''),[filter,setFilter]=useState(''),[role,setRole]=useState(''),[assetKind,setAssetKind]=useState(''),[assetRarity,setAssetRarity]=useState(''),[page,setPage]=useState(1),[revision,setRevision]=useState(0);
- const [result,setData]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[denied,setDenied]=useState(false),[edit,setEdit]=useState(null),[busy,setBusy]=useState(false),[holdingPreview,setHoldingPreview]=useState(false),[copiedId,setCopiedId]=useState(null),[previewTab,setPreviewTab]=useState('avatar');
- const dialog=useRef(null),inflight=useRef(false),currentOwner=useRef(owner);currentOwner.current=owner;
+ const [result,setData]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[denied,setDenied]=useState(false),[edit,setEdit]=useState(null),[busy,setBusy]=useState(false),[holdingPreview,setHoldingPreview]=useState(false),[copiedId,setCopiedId]=useState(null),[previewTab,setPreviewTab]=useState('avatar'),[presence,setPresence]=useState(null),[presenceStale,setPresenceStale]=useState(false),[presenceCooldownUntil,setPresenceCooldownUntil]=useState(0);
+ const dialog=useRef(null),inflight=useRef(false),currentOwner=useRef(owner),presenceRef=useRef(null);currentOwner.current=owner;presenceRef.current=presence;
  // Never render a previous resource or account while the next read is pending.
  const data=result?.resource===resource&&result.owner===owner?result:null;
+ const overviewData=presence?.owner===owner?presence:null;
  const section=sections.find(row=>row[3].includes(resource));
  const explain=e=>(e.code==='RESTORE_WINDOW_EXPIRED'?t('Đã quá thời hạn 30 ngày khôi phục tài khoản.','The 30-day account restoration window has expired.'):e.status===409&&resource==='users'?t('Thay đổi bị từ chối. Phải giữ ít nhất một Admin đang hoạt động.','Change refused. At least one active Admin must remain.'):e.status===409&&resource==='assets'&&e.code!=='DUPLICATE_IMAGE_HASH'?t('Không thể xóa hoặc sửa vật phẩm hệ thống gốc được bảo vệ.','Protected original system assets cannot be modified or deleted.'):e.serverMessage||authMessage(e,language));
- useEffect(()=>{setDenied(false);setData(null);setEdit(null);setHoldingPreview(false);setError('');setSuccess('');},[owner]);
+ useEffect(()=>{setDenied(false);setData(null);setPresence(null);setPresenceStale(false);setPresenceCooldownUntil(0);setEdit(null);setHoldingPreview(false);setError('');setSuccess('');},[owner]);
  useEffect(()=>{
-  setData(null);setError('');if(!allowed)return;let active=true;setLoading(true);
+  setData(null);setError('');if(!allowed||denied)return;
+  if(resource==='overview'){
+   let active=true,timerId=null,inFlight=false;const requestOwner=owner;
+   const fetchPresence=async(isManual=false)=>{
+    if(!active||inFlight)return;
+    if(!isManual&&typeof document!=='undefined'&&document.visibilityState==='hidden')return;
+    if(!isManual&&Date.now()<presenceCooldownUntil)return;
+    inFlight=true;
+    if(!presenceRef.current||presenceRef.current.owner!==owner)setLoading(true);
+    try{
+     const raw=await auth.read('/admin/presence');
+     const parsed=adminPresence(raw);
+     if(active&&currentOwner.current===requestOwner){setPresence({...parsed,owner,fetchedAt:Date.now()});setPresenceStale(false);setError('');}
+    }catch(e){
+     if(!active||currentOwner.current!==requestOwner)return;
+     if(e.status===403){setPresence(null);setDenied(true);auth.refresh().catch(()=>{});return;}
+     if(e.status===401){setPresence(null);auth.refresh().catch(()=>{});return;}
+     if(e.status===429){const sec=Number.isFinite(e.retryAfter)&&e.retryAfter>0?e.retryAfter:60;setPresenceCooldownUntil(Date.now()+sec*1000);}
+     if(presenceRef.current&&presenceRef.current.owner===owner){setPresenceStale(true);}
+     setError(explain(e));
+    }finally{inFlight=false;if(active)setLoading(false);}
+   };
+   const startPoll=()=>{if(timerId===null&&active)timerId=setInterval(()=>fetchPresence(false),15000);};
+   const stopPoll=()=>{if(timerId!==null){clearInterval(timerId);timerId=null;}};
+   const onVis=()=>{if(!active)return;if(document.visibilityState==='visible'){fetchPresence(false);startPoll();}else{stopPoll();}};
+   fetchPresence(true);
+   if(typeof document==='undefined'||document.visibilityState!=='hidden')startPoll();
+   const staleCheck=setInterval(()=>{if(active&&presenceRef.current?.owner===owner&&Date.now()-presenceRef.current.fetchedAt>45000)setPresenceStale(true);},15000);
+   if(typeof document!=='undefined')document.addEventListener('visibilitychange',onVis);
+   return()=>{active=false;stopPoll();clearInterval(staleCheck);if(typeof document!=='undefined')document.removeEventListener('visibilitychange',onVis);};
+  }
+  let active=true;setLoading(true);
   const params=new URLSearchParams({page:String(page),page_size:'10'});if(search)params.set('search',search);if(filter)params.set(resource==='assets'?'review_status':'status',filter);if(resource==='users'&&role)params.set('role',role);if(resource==='assets'&&assetKind)params.set('kind',assetKind);if(resource==='assets'&&assetRarity)params.set('rarity',assetRarity);
   auth.read('/admin/'+resource+'?'+params).then(value=>adminPage(value,resource)).then(value=>{if(active){if(value.items.length===0&&page>1&&value.pagination.total>0){setPage(p=>Math.max(1,p-1));return;}setData({...value,resource,owner});}}).catch(e=>{if(active){setError(explain(e));if(e.status===403){setDenied(true);auth.refresh().catch(()=>{})}if(e.status===401)auth.refresh().catch(()=>{});}}).finally(()=>{if(active)setLoading(false)});
   return()=>{active=false};
- },[allowed,owner,resource,search,filter,role,assetKind,assetRarity,page,revision]);
+ },[allowed,denied,owner,resource,search,filter,role,assetKind,assetRarity,page,revision]);
  useEffect(()=>{if(edit&&!dialog.current?.open)dialog.current.showModal();else if(!edit){dialog.current?.close();setHoldingPreview(false);}},[edit]);
  function choose(value){setResource(value);setPage(1);setQuery('');setSearch('');setFilter('');setRole('');setAssetKind('');setAssetRarity('');setError('');setSuccess('');}
  function confirm(row,body,label,path='/admin/'+resource+'/'+row.id,method='PATCH'){setError('');setEdit({type:'confirm',row,body,label,path,method})}
@@ -149,6 +181,39 @@ export default function AdminPage(){
   <header className="admin-heading"><div><p className="admin-breadcrumb">Workspace <Icon name="chevron_right"/>{t(section[1],section[2])}</p><h1>{t('Không gian quản trị','Admin Workspace')}</h1></div></header>
   {section[3].length>1&&<nav className="workspace-subtabs" aria-label={t('Chức năng quản trị','Admin tools')}>{section[3].map(value=><button type="button" key={value} aria-pressed={resource===value} onClick={()=>choose(value)}>{title(value)}</button>)}</nav>}
   <section className="workspace-panel admin-list-panel" aria-labelledby="admin-list-title" data-resource={resource}><div className="workspace-panel-heading"><div><div className="admin-list-title"><h2 id="admin-list-title">{title(resource)}</h2>{data&&<span className="admin-count" aria-label={t('Tổng số mục','Total records')}>{data.pagination.total}</span>}</div><p className="admin-list-note">{t(...resourceNotes[resource])}</p></div><div className="admin-toolbar-actions"><button type="button" className="admin-refresh" disabled={loading||busy} aria-label={t('Tải lại danh sách','Refresh list')} onClick={()=>setRevision(n=>n+1)}><Icon name="refresh"/></button>{resource==='assets'&&assetKind!=='background'&&<button type="button" className="admin-icon-btn workspace-primary admin-add-asset-btn" disabled={loading||busy} aria-label={t('Thêm vật phẩm','Add asset')} title={t('Thêm vật phẩm','Add asset')} onClick={()=>{setError('');setEdit({type:'asset-upload',file:null})}}><Icon name="add"/></button>}{resource==='announcements'&&<button type="button" className="workspace-primary admin-broadcast-btn" disabled={loading||busy} onClick={()=>{setError('');setEdit({type:'announcement',row:null,title:'',body:'',mode:'compose'})}}><Icon name="campaign"/>{t('Phát thông báo','Broadcast')}</button>}{resource==='categories'&&<button type="button" className="workspace-primary admin-icon-btn admin-add-asset-btn" aria-label={t('Thêm danh mục','Add category')} title={t('Thêm danh mục','Add category')} onClick={()=>{setError('');setEdit({type:'category',row:null,name:'',slug:''})}}><Icon name="add"/></button>}</div></div>
+   {resource==='overview'?(
+    <>
+     {error&&!edit&&<div className="workspace-error" role="alert">{error}<button type="button" onClick={()=>setRevision(n=>n+1)}>{t('Thử lại','Retry')}</button></div>}
+     {presenceStale&&overviewData&&<p className="admin-presence-stale" role="status">{t('Dữ liệu có thể đã cũ hơn 45 giây. Đang chờ lần làm mới tiếp theo.','Data may be stale (>45s). Waiting for next refresh.')}</p>}
+     {loading&&!overviewData?(
+      <div className="admin-loading" role="status" aria-busy="true"><span className="workspace-sr">{t('Đang tải…','Loading…')}</span>{[0,1,2].map(n=><div className="admin-skeleton-row" key={n} aria-hidden="true"><span/><div><i/><i/></div><b/></div>)}</div>
+     ):overviewData?(
+      <div className="admin-presence-wrap" aria-live="polite">
+       <div className="admin-presence-grid">
+        <article className="admin-presence-card is-total">
+         <span className="admin-presence-label"><Icon name="groups"/>{t('Tổng số đang hoạt động','Total active')}</span>
+         <strong className="admin-presence-value" data-testid="presence-total">{overviewData.active_total}</strong>
+        </article>
+        <article className="admin-presence-card">
+         <span className="admin-presence-label"><Icon name="verified_user"/>{t('Thành viên đang hoạt động','Active members')}</span>
+         <strong className="admin-presence-value" data-testid="presence-users">{overviewData.active_users}</strong>
+        </article>
+        <article className="admin-presence-card">
+         <span className="admin-presence-label"><Icon name="person_outline"/>{t('Khách đang hoạt động','Active guests')}</span>
+         <strong className="admin-presence-value" data-testid="presence-guests">{overviewData.active_guests}</strong>
+        </article>
+       </div>
+       {overviewData.active_total===0&&<div className="admin-empty admin-presence-empty"><Icon name="hourglass_empty"/><h3>{t('Chưa ghi nhận phiên hoạt động trong cửa sổ hiện tại.','No active sessions recorded in the current window.')}</h3></div>}
+       <p className="workspace-meta admin-presence-meta">
+        <span>{t(`Cửa sổ đo ${overviewData.window_seconds} giây gần nhất`,`Last ${overviewData.window_seconds}-second window`)}</span>
+        <span>·</span>
+        <span>{t('Cập nhật cuối: ','Last updated: ')}<time dateTime={overviewData.generated_at}>{stamp(overviewData.generated_at)}</time></span>
+       </p>
+      </div>
+     ):!error&&<div className="admin-empty"><Icon name="monitoring"/><h3>{t('Chưa có dữ liệu trực tuyến.','No presence data yet.')}</h3></div>}
+    </>
+   ):(
+   <>
    <form className="workspace-filters" role="search" aria-label={t('Tìm trong khu quản trị','Search Admin Workspace')} onSubmit={e=>{e.preventDefault();setSearch(query.trim());setPage(1)}}><div className="admin-search-field"><label htmlFor="admin-search-input">{t('Tìm kiếm','Search')}</label><div className="admin-search-input-wrap"><input id="admin-search-input" type="search" maxLength={100} value={query} onChange={e=>setQuery(e.target.value)} /><button type="submit" className="admin-search-button" aria-label={t('Tìm kiếm','Search')} title={t('Tìm kiếm','Search')}><Icon name="search"/></button></div></div>{states[resource]&&<label>{t('Trạng thái','Status')}<select value={filter} onChange={e=>{setFilter(e.target.value);setPage(1)}}><option value="">{t('Tất cả','All')}</option>{states[resource].map(v=><option key={v} value={v}>{status(v)}</option>)}</select></label>}{resource==='assets'&&<><label>{t('Loại','Kind')}<select value={assetKind} onChange={e=>{setAssetKind(e.target.value);setPage(1)}}><option value="">{t('Tất cả','All')}</option><option value="avatar">{t('Meme Avatar','Meme Avatar')}</option><option value="background">{t('Background','Background')}</option></select></label><label>{t('Hạng','Rank')}<select value={assetRarity} onChange={e=>{setAssetRarity(e.target.value);setPage(1)}}><option value="">{t('Tất cả','All')}</option>{['D','C','B','A','S'].map(r=><option key={r} value={r}>{t(`Hạng ${r}`,`Rank ${r}`)}</option>)}</select></label></>}{resource==='users'&&<label>{t('Vai trò','Role')}<select value={role} onChange={e=>{setRole(e.target.value);setPage(1)}}><option value="">{t('Tất cả','All')}</option><option>USER</option><option>ADMIN</option></select></label>}</form>
    {error&&!edit&&<div className="workspace-error" role="alert">{error}<button type="button" onClick={()=>setRevision(n=>n+1)}>{t('Thử lại','Retry')}</button></div>}{success&&<p role="status" className="workspace-success">{success}</p>}
    <div className="admin-column-head" aria-hidden="true"><span>{resource==='users'?t('Thành viên / Vai trò','Member / Role'):title(resource)}</span><span>{resource==='audit-logs'?t('Thời gian','Time'):t('Trạng thái','Status')}</span><span>{resource==='audit-logs'?'':t('Thao tác','Actions')}</span></div>
@@ -271,6 +336,7 @@ export default function AdminPage(){
     </div>}
    </div></article>)}</div>}
    {data&&<nav className="workspace-pagination" aria-label={t('Phân trang quản trị','Admin pagination')}><button type="button" disabled={loading||page<=1} onClick={()=>setPage(n=>n-1)}>{t('Trước','Previous')}</button><span>{(()=>{const fromIndex=data.pagination.total===0?0:(page-1)*data.pagination.page_size+1;const toIndex=Math.min(page*data.pagination.page_size,data.pagination.total);return t(`Tổng cộng: ${data.pagination.total} mục · Đang hiển thị ${fromIndex}–${toIndex} · Trang ${page}/${Math.max(1,data.pagination.total_pages)}`,`Total: ${data.pagination.total} records · Showing ${fromIndex}–${toIndex} · Page ${page}/${Math.max(1,data.pagination.total_pages)}`);})()}</span><button type="button" disabled={loading||page>=data.pagination.total_pages} onClick={()=>setPage(n=>n+1)}>{t('Sau','Next')}</button></nav>}
+   </>)}
   </section>
   </div>
   <dialog ref={dialog} className={`workspace-dialog ${edit?.type==='receipt-preview'?'admin-receipt-dialog':''}`} aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='receipt-preview'?t('Biên lai thu tiền điện tử','Electronic payment receipt'):edit.type==='announcement-preview'?t('Chi tiết thông báo hệ thống','Announcement details'):edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='asset-preview'?t('Chi tiết & Xem trước vật phẩm','Asset details & preview'):edit.type==='asset-edit'?t('Chỉnh sửa vật phẩm','Edit asset'):edit.type==='asset-upload'?t('Thêm Meme vào Bảo Khố','Add Meme to Vault'):edit.type==='announcement'?t('Soạn thông báo hệ thống','Compose system announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Chi tiết & Xử lý liên hệ','Contact details & processing'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>

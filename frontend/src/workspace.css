@@ -940,3 +940,63 @@
 
 
 
+
+
+/* H05 Admin Presence Overview */
+.admin-presence-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.admin-presence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.admin-presence-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--am-outline-variant);
+  background: var(--am-surface-container-low);
+}
+.admin-presence-card.is-total {
+  border-color: var(--am-primary);
+}
+.admin-presence-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--am-on-surface-variant);
+}
+.admin-presence-value {
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 800;
+  color: var(--am-on-surface);
+  font-variant-numeric: tabular-nums;
+}
+.admin-presence-stale {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--am-on-surface);
+  font-size: 13px;
+}
+.admin-presence-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .admin-presence-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -4,6 +4,16 @@ const text=(v,max=20000)=>typeof v==='string'&&v.length<=max&&!v.includes('\0')?
 const one=(v,choices)=>choices.includes(v)?v:bad();
 const date=v=>typeof v==='string'&&Number.isFinite(Date.parse(v))?v:bad();
 export const canAdmin=user=>Array.isArray(user?.roles)&&user.roles.includes('ADMIN');
+const count=v=>Number.isSafeInteger(v)&&v>=0?v:bad();
+export function adminPresence(value){
+ if(!value||typeof value!=='object')bad();
+ const active_total=count(value.active_total);
+ const active_users=count(value.active_users);
+ const active_guests=count(value.active_guests);
+ const window_seconds=Number.isSafeInteger(value.window_seconds)&&value.window_seconds>=1?value.window_seconds:bad();
+ if(active_total!==active_users+active_guests)bad();
+ return {active_total,active_users,active_guests,window_seconds,generated_at:date(value.generated_at)};
+}
 export function adminPage(value,resource){
  const page=apiPage(value);
  const items=page.items.map(row=>{

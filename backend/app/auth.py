@@ -444,4 +444,8 @@ def logout(request: Request, response: Response, raw=Depends(session_cookie)):
         origin_guard(request)
         runtime.verify_csrf(request.headers.get("x-csrf-token"), "session:" + str(record.id))
         record.revoked_at = runtime.now()
+        session_id = str(record.id)
+    presence = getattr(request.app.state, "presence", None)
+    if presence is not None:
+        presence.remove_session(session_id)
     delete_cookie(response, runtime, "am_session")
