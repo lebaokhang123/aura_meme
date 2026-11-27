@@ -4,6 +4,7 @@ import {authMessage} from '../auth-client.js';
 import {usePreferences} from '../PreferencesContext.jsx';
 import {adminPage,canAdmin} from '../admin-api.js';
 import {mountBackground} from '../background-effects.js';
+import ErrorPage from './ErrorPage.jsx';
 import '../workspace.css';
 
 function BackgroundPreviewStage({effectKey,t}){
@@ -137,7 +138,7 @@ export default function AdminPage(){
  const copyTargetId=id=>{if(navigator?.clipboard?.writeText){navigator.clipboard.writeText(id).then(()=>{setCopiedId(id);setTimeout(()=>setCopiedId(null),2000)}).catch(()=>{})}};
  const stamp=value=>new Date(value).toLocaleString(language==='en'?'en-GB':'vi-VN');
  const restoreDaysLeft=row=>{if(row?.status!=='deleted')return null;if(!row.deleted_at)return 30;const elapsed=(Date.now()-Date.parse(row.deleted_at))/86400000;return Math.max(0,Math.ceil(30-elapsed));};
- if(!allowed||denied)return <main className="workspace-page"><div className="workspace-content"><section className="workspace-panel" role="alert"><h1>{t('Không có quyền truy cập','Access denied')}</h1><p>{t('Trang này chỉ dành cho Admin do máy chủ xác minh.','This workspace requires an Admin role verified by the server.')}</p><a href="/">{t('Quay lại Trang chủ','Back to Home')}</a></section></div></main>;
+ if(!allowed||denied)return <ErrorPage status={404} />;
  return <main className="workspace-page admin-page"><div className="workspace-content admin-layout">
   <aside className="admin-sidebar">
    <div className="admin-workspace-brand"><span className="admin-brand-mark"><img src="/assets/brand/04_admin_guardian-circle-48.png" alt="AuraMeme Guardian" width="40" height="40" className="admin-brand-logo-img"/></span><div><strong>AuraMeme</strong><span>Workspace</span></div></div>
@@ -152,7 +153,7 @@ export default function AdminPage(){
    {error&&!edit&&<div className="workspace-error" role="alert">{error}<button type="button" onClick={()=>setRevision(n=>n+1)}>{t('Thử lại','Retry')}</button></div>}{success&&<p role="status" className="workspace-success">{success}</p>}
    <div className="admin-column-head" aria-hidden="true"><span>{resource==='users'?t('Thành viên / Vai trò','Member / Role'):title(resource)}</span><span>{resource==='audit-logs'?t('Thời gian','Time'):t('Trạng thái','Status')}</span><span>{resource==='audit-logs'?'':t('Thao tác','Actions')}</span></div>
    {loading?<div className="admin-loading" role="status" aria-busy="true"><span className="workspace-sr">{t('Đang tải…','Loading…')}</span>{[0,1,2].map(n=><div className="admin-skeleton-row" key={n} aria-hidden="true"><span/><div><i/><i/></div><b/></div>)}</div>:data&&!data.items.length?<div className="admin-empty"><Icon name="search_off"/><h3>{t('Không có dữ liệu phù hợp.','No matching records.')}</h3><p>{t('Thử thay đổi từ khóa hoặc bỏ bộ lọc.','Try a different search or clear the filters.')}</p>{(search||filter||role||assetKind||assetRarity)&&<button type="button" onClick={()=>choose(resource)}>{t('Xóa bộ lọc','Clear filters')}</button>}</div>:<div className="workspace-rows" key={resource}>{data?.items.map(row=><article className="workspace-row" key={row.id} data-admin-id={row.id}><div className="workspace-row-main">
-    {resource==='users'&&<div className="admin-identity"><span className="admin-initial" aria-hidden="true">{row.display_name.trim().slice(0,1).toUpperCase()||'@'}</span><div><h3 translate="no">{row.display_name}</h3><p translate="no">@{row.username}</p><p className="admin-role-list">{row.roles.length?row.roles.map(value=><span key={value} data-role={value}>{value}</span>):t('Chưa có vai trò','No role')}</p></div></div>}
+    {resource==='users'&&<div className="admin-identity"><span className="admin-initial" aria-hidden="true">{row.display_name.trim().slice(0,1).toUpperCase()||'@'}</span><div><h3 translate="no">{row.display_name}</h3><p translate="no">@{row.username}</p>{row.email&&<p className="admin-user-email" translate="no">{row.email}</p>}<p className="admin-role-list">{row.roles.length?row.roles.map(value=><span key={value} data-role={value}>{value}</span>):t('Chưa có vai trò','No role')}</p></div></div>}
     {(resource==='posts'||resource==='comments')&&<><h3>{resource==='posts'?row.title:'@'+row.author.username}</h3><p className="workspace-meta">@{row.author.username} · {stamp(row.created_at)}</p><p className="admin-content-snippet" translate="no">{(row.content??row.body)?.length>120?((row.content??row.body).slice(0,120)+'…'):(row.content??row.body)}</p></>}
     {resource==='categories'&&<><h3>{row.name}</h3><p className="workspace-meta">{row.slug}</p></>}
     {resource==='contacts'&&<><h3>{row.subject}</h3><p>{row.name}</p><p className="workspace-meta">{stamp(row.created_at)}</p></>}
