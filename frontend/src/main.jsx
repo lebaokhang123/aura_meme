@@ -6,6 +6,7 @@ import {createRoot} from 'react-dom/client';
 import { resolveScreen, initLegacyEffects, attachNavigation, prepareAuthForm, showDemoMessage } from './runtime.js';
 import {AuthBoundary} from './AuthBoundary.jsx';
 import {auth,MOCK_AUTH} from './auth.js';
+import {startPresenceHeartbeat} from './presence.js';
 import {authMessage} from './auth-client.js';
 import {ProfilePage,ContactPage,ContactInbox} from './components/AccountPages.jsx';
 import './account-pages.css';
@@ -113,6 +114,7 @@ function App() {
     return()=>{stopped=true;cleanup()};
   },[page.key,screen]);
   useEffect(()=>attachNavigation(),[]);
+  useEffect(()=>{if(!MOCK_AUTH)return startPresenceHeartbeat();},[]);
   useEffect(()=>{
     if(!MOCK_AUTH&&screen&&page.path==='/login'&&screen!==PendingVerificationScreen){
       const params=new URLSearchParams(location.search);

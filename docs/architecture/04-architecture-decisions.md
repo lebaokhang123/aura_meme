@@ -239,3 +239,20 @@ CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute 
   - **Pham vi benchmark:** Cac so lieu latency/RPS BEFORE/AFTER hien co duoc do truoc khi bo sung visibility guard cuoi; khong tuyen bo final candidate da duoc benchmark day du lai.
   - **Gioi han he thong:** HTTP 429 tu rate limiter tren loopback IP o 10-25 VUs va `feed_search` (~1.5s-1.9s) van la gioi han can theo doi.
   - **Test Harness Safety Gate:** Dung chung `scripts/h04/safety_guard.py` (fail-closed kiem tra container `aurameme-h01-sim-pg`, port mapping `127.0.0.1:55450`, DB `aurameme_test`, revision `0018_canonical_asset_filenames`, synthetic fixture marker, SMTP sandbox, va owned uvicorn subprocess tren cong rieng `18080`).
+
+
+## ADR-H05: Admin Presence Monitoring (`feat/h05-admin-presence`)
+
+- **Trang thai:** Da chap thuan & Trien khai tren nhanh `feat/h05-admin-presence`.
+- **Van de:** Admin can theo doi so luong thanh vien va khach dang hoat dong gan thoi gian thuc ma khong tao database migration, khong ghi tung heartbeat vao PostgreSQL, khong dung WebSocket/SSE/Redis, va khong lam lo du lieu dinh danh ca nhan.
+- **Quyet dinh:**
+  1. **Single-process In-Memory Store (`PresenceStore` trong `backend/app/presence.py`):** Dung `OrderedDict` ket hop `threading.Lock`, `ttl_seconds=90`, va `max_entries=16384` cho moi loai (`_user_sessions`, `_guest_tokens`). Lazy prune cac ban ghi het han truoc khi ghi/doc va O(1) eviction khi day bo nho.
+  2. **Identity & Privacy:**
+     - Authenticated user: Xac thuc qua `am_session` cookie (read-only `SELECT` 1 truy van, khong `FOR UPDATE`, khong ghi DB); luu `(session_id) -> (user_id, expiry)` de nhieu tab/nhieu thiet bi cua cung 1 user chi dem **1** `distinct user_id`, va logout 1 thiet bi chi xoa `session_id` do.
+     - Guest: Cap random token 32-byte vao cookie `am_guest` (`HttpOnly`, `SameSite=Lax`), chi luu `sha256` digest; khong dung IP hay browser fingerprint. Khi guest dang nhap, tu dong xoa `guest_digest` khoi `_guest_tokens` de tranh dem trung.
+  3. **API & Frontend:**
+     - `POST /api/v1/presence/heartbeat`: Origin guard + rate limit (12/60s per identity + `AuthBoundaryMiddleware`), `0 SQL` cho Guest, `1 read-only SELECT` cho Auth.
+     - `GET /api/v1/admin/presence`: Guard `require_role("ADMIN")`, `Cache-Control: no-store`, chi tra tong hop (`active_total`, `active_users`, `active_guests`, `window_seconds`, `generated_at`).
+     - Frontend `startPresenceHeartbeat` (30s interval, tam dung khi `hidden`, ton trong HTTP 429 `Retry-After`) va Admin Overview tab (polling 15s khi co quyen & dang xem).
+  4. **Gioi han:** Chi chinh xac trong pham vi single-process (`workers=1`); neu scale multi-worker trong tuong lai, huong nang cap la Redis TTL (`SET EX` / `ZSET`).
+  5. **Learning Check:** `PENDING OWNER`.

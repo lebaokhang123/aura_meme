@@ -4157,9 +4157,66 @@ paths:
         },
         "x-phase": "P0"
       }
+    },
+    "/api/v1/presence/heartbeat": {
+      "post": {
+        "tags": ["Presence"],
+        "summary": "Ghi nhận heartbeat hiện diện (Guest hoặc Authenticated)",
+        "operationId": "presenceHeartbeat",
+        "responses": {
+          "200": {
+            "description": "Đã ghi nhận heartbeat",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HeartbeatAck" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/api/v1/admin/presence": {
+      "get": {
+        "tags": ["Presence"],
+        "summary": "Thống kê tổng hợp số lượng người dùng/khách trực tuyến (Admin)",
+        "operationId": "getAdminPresence",
+        "security": [{ "sessionCookie": [] }],
+        "responses": {
+          "200": {
+            "description": "Số liệu hiện diện tổng hợp",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PresenceSummary" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
     }
 components:
   schemas:
+    HeartbeatAck:
+      type: object
+      required: [status, interval_seconds, window_seconds]
+      properties:
+        status: { type: string, enum: [ok] }
+        interval_seconds: { type: integer, minimum: 1 }
+        window_seconds: { type: integer, minimum: 1 }
+    PresenceSummary:
+      type: object
+      required: [active_total, active_users, active_guests, window_seconds, generated_at]
+      properties:
+        active_total: { type: integer, minimum: 0 }
+        active_users: { type: integer, minimum: 0 }
+        active_guests: { type: integer, minimum: 0 }
+        window_seconds: { type: integer, minimum: 1 }
+        generated_at: { type: string, format: date-time }
     AnnouncementPage:
       properties:
         items:
