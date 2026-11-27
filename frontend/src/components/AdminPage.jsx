@@ -54,7 +54,8 @@ const auditActionLabels={
   'asset.update':['Cập nhật thông tin vật phẩm','Updated asset metadata'],
   'asset.approve':['Duyệt vật phẩm vào Bảo Khố','Approved asset into Vault'],
   'asset.reject':['Từ chối vật phẩm','Rejected asset'],
-  'asset.archive':['Lưu trữ / Ngừng lưu hành vật phẩm','Archived / deactivated asset'],
+  'asset.archive':['Ngừng lưu hành vật phẩm','Archived / deactivated asset'],
+  'asset.restore':['Khôi phục vật phẩm vào lưu hành','Restored asset to active catalog'],
   'asset.delete':['Xóa vật phẩm chờ duyệt','Removed pending asset']
 };
 const auditTargetLabels={
@@ -80,7 +81,7 @@ export default function AdminPage(){
  const data=result?.resource===resource&&result.owner===owner?result:null;
  const overviewData=presence?.owner===owner?presence:null;
  const section=sections.find(row=>row[3].includes(resource));
- const explain=e=>(e.code==='RESTORE_WINDOW_EXPIRED'?t('Đã quá thời hạn 30 ngày khôi phục tài khoản.','The 30-day account restoration window has expired.'):e.status===409&&resource==='users'?t('Thay đổi bị từ chối. Phải giữ ít nhất một Admin đang hoạt động.','Change refused. At least one active Admin must remain.'):e.status===409&&resource==='assets'&&e.code!=='DUPLICATE_IMAGE_HASH'?t('Không thể xóa hoặc sửa vật phẩm hệ thống gốc được bảo vệ.','Protected original system assets cannot be modified or deleted.'):e.serverMessage||authMessage(e,language));
+ const explain=e=>(e.code==='RESTORE_WINDOW_EXPIRED'?t('Đã quá thời hạn 30 ngày khôi phục tài khoản.','The 30-day account restoration window has expired.'):e.status===409&&resource==='users'?t('Thay đổi bị từ chối. Phải giữ ít nhất một Admin đang hoạt động.','Change refused. At least one active Admin must remain.'):e.serverMessage||(e.status===409&&resource==='assets'&&e.code!=='DUPLICATE_IMAGE_HASH'?t('Không thể xóa hoặc sửa vật phẩm hệ thống gốc được bảo vệ.','Protected original system assets cannot be modified or deleted.'):authMessage(e,language)));
  useEffect(()=>{setDenied(false);setData(null);setPresence(null);setPresenceStale(false);setPresenceCooldownUntil(0);setEdit(null);setHoldingPreview(false);setError('');setSuccess('');},[owner]);
  useEffect(()=>{
   setData(null);setError('');if(!allowed||denied)return;
@@ -280,7 +281,7 @@ export default function AdminPage(){
     {resource==='audit-logs'&&<time className="workspace-meta" dateTime={row.created_at}>{stamp(row.created_at)}</time>}
     {resource==='orders'&&<span className="workspace-badge" data-status={row.status} style={{fontWeight:600}}>{status(row.status)}</span>}
     {resource==='assets'&&row.review_status&&<span className="workspace-badge" data-status={row.review_status}>{status(row.review_status)}</span>}
-    {row.status&&resource!=='orders'&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='users'&&row.status==='deleted'&&(()=>{const days=restoreDaysLeft(row);return <span className="workspace-meta" style={{marginTop:4}}>{days>0?t(`Còn ${days} ngày khôi phục`,`${days} days left to restore`):t('Hết hạn khôi phục','Restore expired')}</span>;})()}{resource==='assets'&&<span className="workspace-badge" data-status={row.active?'active':'hidden'}>{row.active?t('Đang bật','Active'):t('Đang tắt','Inactive')}</span>}
+    {row.status&&resource!=='orders'&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='users'&&row.status==='deleted'&&(()=>{const days=restoreDaysLeft(row);return <span className="workspace-meta" style={{marginTop:4}}>{days>0?t(`Còn ${days} ngày khôi phục`,`${days} days left to restore`):t('Hết hạn khôi phục','Restore expired')}</span>;})()}{resource==='assets'&&<span className="workspace-badge" data-status={row.active?'active':'hidden'}>{row.active?t('Đang bật','Active'):(row.review_status==='approved'?t('Ngừng lưu hành','Archived'):t('Đang tắt','Inactive'))}</span>}{resource==='assets'&&row.system_protected&&<span className="workspace-badge" data-status="active">{t('Hệ thống gốc','Protected')}</span>}
     </div><div className="workspace-row-actions">{resource==='users'&&<div className="admin-action-icons">{(row.username==='khang_dev'||row.id==='abcfa9f6-c9d2-4181-9b4b-118a4bb6c647')?(
       null
     ):row.status!=='deleted'?(
@@ -300,8 +301,16 @@ export default function AdminPage(){
     </div>}
     {resource==='assets'&&<div className="admin-action-icons">
       <button type="button" className="admin-icon-btn" disabled={busy} aria-label={t('Xem vật phẩm','View asset')} title={t('Xem vật phẩm','View asset')} onClick={()=>{setError('');setPreviewTab('avatar');setEdit({type:'asset-preview',row})}}><Icon name="visibility"/></button>
-      <button type="button" className="admin-icon-btn" disabled={busy||row.kind==='background'} aria-label={t('Sửa vật phẩm','Edit asset')} title={row.kind==='background'?t('Background hệ thống không thể chỉnh sửa','System backgrounds cannot be edited'):t('Sửa tên hiển thị & hạng','Edit display name & rank')} onClick={()=>{setError('');setEdit({type:'asset-edit',row,display_name:row.display_name||row.slug,rarity:row.rarity})}}><Icon name="edit"/></button>
-      <button type="button" className="admin-icon-btn text-error" disabled={busy||row.kind==='background'} aria-label={t('Xóa vật phẩm','Delete asset')} title={row.kind==='background'?t('5 Background gốc được bảo vệ','5 original Backgrounds are protected'):t('Xóa / Ngừng lưu hành vật phẩm','Delete / archive asset')} onClick={()=>confirm(row,{action:row.review_status==='pending'?'reject':'archive'},row.review_status==='pending'?t('Từ chối và loại bỏ vật phẩm chờ duyệt này?','Reject and remove this pending asset?'):t('Ngừng lưu hành vật phẩm này? Các tài khoản từng sở hữu hoặc lịch sử mở rương vẫn được bảo toàn an toàn.','Deactivate this asset? Existing inventory and chest open history will remain intact.'),'/admin/assets/'+row.id,'PATCH')}><Icon name="delete"/></button>
+      <button type="button" className="admin-icon-btn" disabled={busy||row.system_protected} aria-label={t('Sửa vật phẩm','Edit asset')} title={row.system_protected?t('75 vật phẩm gốc của hệ thống được bảo vệ','75 original system assets are protected'):t('Sửa tên hiển thị & hạng','Edit display name & rank')} onClick={()=>{setError('');setEdit({type:'asset-edit',row,display_name:row.display_name||row.slug,rarity:row.rarity})}}><Icon name="edit"/></button>
+      {row.system_protected?(
+        <button type="button" className="admin-icon-btn is-disabled" disabled aria-label={t('Vật phẩm hệ thống được bảo vệ','Protected system asset')} title={t('75 vật phẩm gốc của hệ thống được bảo vệ','75 original system assets are protected')}><Icon name="shield"/></button>
+      ):row.review_status==='pending'?(
+        <button type="button" className="admin-icon-btn text-error" disabled={busy} aria-label={t('Từ chối vật phẩm','Reject asset')} title={t('Từ chối vật phẩm chờ duyệt','Reject pending asset')} onClick={()=>confirm(row,{action:'reject'},t('Từ chối vật phẩm chờ duyệt này?','Reject this pending asset?'),'/admin/assets/'+row.id,'PATCH')}><Icon name="block"/></button>
+      ):row.active?(
+        <button type="button" className="admin-icon-btn text-error" disabled={busy} aria-label={t('Ngừng lưu hành vật phẩm','Archive asset')} title={t('Ngừng lưu hành vật phẩm','Archive / deactivate asset')} onClick={()=>confirm(row,{action:'archive'},t('Ngừng lưu hành vật phẩm này? Vật phẩm sẽ tự tháo khỏi hồ sơ đang trang bị nhưng vẫn giữ nguyên lịch sử sở hữu và mở rương.','Archive this asset? It will be unequipped from profiles while preserving inventory and chest history.'),'/admin/assets/'+row.id,'PATCH')}><Icon name="unpublished"/></button>
+      ):(
+        <button type="button" className="admin-icon-btn" disabled={busy} aria-label={t('Khôi phục vật phẩm','Restore asset')} title={t('Khôi phục vật phẩm vào lưu hành','Restore asset to active catalog')} onClick={()=>confirm(row,{action:'approve'},t('Khôi phục vật phẩm này trở lại lưu hành? Không tạo phần thưởng trùng lặp.','Restore this asset to active catalog? No duplicate grants will be created.'),'/admin/assets/'+row.id,'PATCH')}><Icon name="restore_from_trash"/></button>
+      )}
     </div>}
     {(resource==='posts'||resource==='comments')&&<div className="admin-action-icons">
       <button type="button" className="admin-icon-btn" disabled={busy} aria-label={resource==='posts'?t('Xem chi tiết bài viết','View post details'):t('Xem chi tiết bình luận','View comment details')} title={resource==='posts'?t('Xem chi tiết bài viết','View post details'):t('Xem chi tiết bình luận','View comment details')} onClick={()=>{setError('');setEdit({type:'content-preview',row,targetResource:resource})}}><Icon name="visibility"/></button>
