@@ -72,7 +72,7 @@ test('other profile has no owner controls or private inventory reads; Admin Inbo
  await expect(page.getByRole('link',{name:'Hộp thư quản trị',exact:true})).toHaveCount(0);
  expect(s.requests.some(r=>r.p==='/inventory/me')).toBe(false);
  s.user={...owner,roles:['USER','ADMIN']};await page.goto('/profile');await page.goto('/admin/contacts');await expect(page.getByRole('heading',{name:'Hộp thư quản trị',exact:true})).toBeVisible();
- s.user={...owner};await page.reload();await expect(page.getByRole('heading',{name:'Không có quyền truy cập'})).toBeVisible();
+ s.user={...owner};await page.reload();await expect(page.getByRole('heading',{name:'Trang không tồn tại'})).toBeVisible();
 });
 test('owner edits name/bio with CSRF; owned inventory avatar uses existing equip contract',async({page,context})=>{
  const s=await api(context);await page.goto('/profile');await page.getByRole('button',{name:'Chỉnh sửa hồ sơ',exact:true}).click();
