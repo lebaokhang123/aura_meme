@@ -154,8 +154,8 @@ test('a failed page chunk keeps the header and offers a reload instead of a blan
   await page.route(/\/assets\/guest-about-[^/]+\.js$/, route => route.abort());
   await page.goto('/about');
   await expect(page.locator('.site-header')).toBeVisible();
-  await expect(page.getByRole('alert')).toContainText('Không tải được trang.');
-  await expect(page.getByRole('button', { name: 'Tải lại', exact: true })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('503');
+  await expect(page.getByRole('button', { name: 'Thử lại', exact: true })).toBeVisible();
 });
 
 test('header and content reveal together when a page chunk is delayed', async ({ page }) => {

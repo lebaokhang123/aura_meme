@@ -8,7 +8,7 @@ export function adminPage(value,resource){
  const page=apiPage(value);
  const items=page.items.map(row=>{
   const id=apiId(row?.id);
-  if(resource==='users'){if(!Array.isArray(row.roles)||row.roles.some(r=>!['ADMIN','USER'].includes(r)))bad();return {id,username:text(row.username,32),display_name:text(row.display_name,80),status:one(row.status,['active','locked','deleted']),roles:[...row.roles],...(row.deleted_at?{deleted_at:date(row.deleted_at)}:{})};}
+  if(resource==='users'){if(!Array.isArray(row.roles)||row.roles.some(r=>!['ADMIN','USER'].includes(r)))bad();return {id,username:text(row.username,32),...(typeof row.email==='string'&&row.email.trim()?{email:text(row.email.trim(),254)}:{}),display_name:text(row.display_name,80),status:one(row.status,['active','locked','deleted']),roles:[...row.roles],...(row.deleted_at?{deleted_at:date(row.deleted_at)}:{})};}
   if(resource==='categories')return {id,name:text(row.name,80),slug:text(row.slug,80),status:one(row.status,['active','hidden'])};
   if(resource==='posts'||resource==='comments'){
    const author={username:text(row.author?.username,32),display_name:text(row.author?.display_name,80)};

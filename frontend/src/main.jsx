@@ -35,6 +35,9 @@ import ForgotPasswordPage from './components/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './components/ResetPasswordPage.jsx';
 import VerifyEmailPage from './components/VerifyEmailPage.jsx';
 import PendingVerificationScreen from './components/PendingVerificationScreen.jsx';
+import ErrorPage from './components/ErrorPage.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
+import { canAdmin } from './admin-api.js';
 
 const pages=import.meta.glob('./generated/*.js');
 const cssFiles=import.meta.glob('./generated/*.css',{query:'?raw',import:'default'});
@@ -127,11 +130,13 @@ function App() {
   const authRedirect=resolveAuthRedirect({path:page.path,search:location.search,status:authState.status,mockAuth:MOCK_AUTH});
   useEffect(()=>{if(authRedirect)location.replace(authRedirect);},[authRedirect]);
   if(!MOCK_AUTH&&((protectedPage&&authState.status!=='authenticated')||authRedirect))return null;
+  const adminUnauthorized=!MOCK_AUTH&&['/admin','/admin/contacts'].includes(page.path)&&authState.status==='authenticated'&&!canAdmin(authState.user);
   // Reveal the header and page together after the lazy content and CSS are ready.
-  if(!screen&&!failed)return null;
-  return render(<><EquippedBackground/><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : [AdminPage,PremiumPage,PremiumCheckoutPage,PaymentHistoryPage,ForgotPasswordPage,ResetPasswordPage,ProfilePage,ContactPage,VaultPage,ContactInbox,PendingVerificationScreen].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}<CookieConsent /></>);
+  if(!screen&&!failed&&!page.notFound&&!adminUnauthorized)return null;
+  const content=failed?<ErrorPage status={503} onRetry={()=>location.reload()}/>:(page.notFound||adminUnauthorized)?<ErrorPage status={404}/>:screen===MaintenancePage?<MaintenancePage />:[AdminPage,PremiumPage,PremiumCheckoutPage,PaymentHistoryPage,ForgotPasswordPage,ResetPasswordPage,ProfilePage,ContactPage,VaultPage,ContactInbox,PendingVerificationScreen].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />;
+  return render(<><EquippedBackground/><SiteHeader />{content}{page.path==='/'&&!page.notFound ? null : <SiteFooter />}<CookieConsent /></>);
 }
 
 import {PremiumProvider} from './PremiumContext.jsx';
 applyPreferences(readPreferences());
-createRoot(document.getElementById('root')).render(<PreferencesProvider><AuthBoundary><SocialProvider><FeedProvider><PremiumProvider><App /></PremiumProvider></FeedProvider></SocialProvider></AuthBoundary></PreferencesProvider>);
+createRoot(document.getElementById('root')).render(<PreferencesProvider><ErrorBoundary><AuthBoundary><SocialProvider><FeedProvider><PremiumProvider><App /></PremiumProvider></FeedProvider></SocialProvider></AuthBoundary></ErrorBoundary></PreferencesProvider>);

@@ -206,3 +206,20 @@ CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute 
 - **Hiệu chỉnh benchmark H04 (ghi nhận từ audit `perf_baseline.py` H01):**
   - H01 `perf_baseline.py` dùng chung `httpx.AsyncClient` không tách session/cookie theo từng virtual user, chưa có think time giữa các request trong `run_stage`, thời lượng mỗi mức tải ngắn (4s), chưa đo riêng authenticated write workload. Sẽ hiệu chỉnh các tham số này trong H04 (không tối ưu sản phẩm ở H02).
 - **Learning Check:** `PENDING OWNER`.
+
+
+## Hardening H03 — Product Reliability & Error Handling (27/11/2026)
+
+- **Nhánh & Baseline:** `fix/h03-product-reliability` từ `origin/dev@b20122c` (sau PR #46 H02 và CI `45914443441` PASS 3/3).
+- **H03.1 — Admin Users Email:**
+  - `frontend/src/admin-api.js`: giữ trường `email` cho `resource === 'users'` (giới hạn 254 ký tự), giữ nguyên việc loại bỏ `password_hash` và `email` trên `contacts`.
+  - `frontend/src/components/AdminPage.jsx` & `frontend/src/workspace.css`: hiển thị `.admin-user-email` dưới `@username` và trên `.admin-role-list`, hỗ trợ ngắt dòng an toàn (`overflow-wrap: anywhere`) trên mobile và Dark/Light mode. Public profile/feed/search không thay đổi và không lộ email.
+- **H03.2 — Email MIME Inline Logo:**
+  - `backend/app/email_service.py`: loại bỏ `filename="aurameme-logo.png"` khỏi `html_part.add_related(..., disposition="inline")` và bổ sung `X-Attachment-Id: aurameme-logo` để tránh client Gmail nhận diện inline logo thành chip attachment. Giữ `cid:aurameme-logo` khớp `<aurameme-logo>` (tương thích toàn bộ test hiện hành) và bảo toàn PDF attachment trong Premium receipt.
+  - Gmail visual acceptance trên inbox thật vẫn ở trạng thái `PENDING OWNER`.
+- **H03.3 — Error Pages, Strict Routing & Error Boundary:**
+  - Thêm `frontend/src/components/ErrorPage.jsx` (403, 404, 500, 503; cyber-clean gradient tím/cyan; VI/EN; Dark/Light; `prefers-reduced-motion`; không lộ stack trace/DSN/token) và `frontend/src/components/ErrorBoundary.jsx`.
+  - `frontend/src/runtime.js`: thay `PAGE[path] || 'home'` bằng `isKnownRoute(path)` (kiểm kê rõ static routes + `PROFILE_ROUTE`), route không hợp lệ trả `notFound: true` và render `ErrorPage` 404.
+  - `frontend/src/main.jsx` & `frontend/src/components/AdminPage.jsx`: USER đã đăng nhập truy cập `/admin` hoặc `/admin/contacts` nhận `ErrorPage` 404 chung (không lộ chi tiết khu quản trị), trong khi backend API vẫn giữ nguyên `403 FORBIDDEN`. Guest vẫn được redirect `/login?next=...` theo H02.
+  - Lưu ý kiến trúc: `ErrorPage` là client-side UI trong SPA; HTTP status thực tế từ static hosting vẫn do Nginx/reverse proxy quyết định (không thay đổi hạ tầng trong H03).
+- **Learning Check:** `PENDING OWNER`.
