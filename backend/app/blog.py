@@ -237,19 +237,18 @@ def list_posts(request: Request, page: int = Query(1, ge=1), page_size: int = Qu
     user_ids = {row[1].id for row in rows}
     from app.membership import read_users_membership_tiers
     tiers = read_users_membership_tiers(db, user_ids, request.app.state.auth.now())
-    meme_states={}
+    interaction_states={}
     if include_interactions:
+        from app.interactions import read_post_states
         from app.meme_reactions import meme_reaction_states
-        meme_states=meme_reaction_states(db,PostReaction,[row[0].id for row in rows],viewer_id,request)
+        post_ids=[row[0].id for row in rows]
+        meme_states=meme_reaction_states(db,PostReaction,post_ids,viewer_id,request)
+        interaction_states=read_post_states(post_ids,db,viewer_id,request,meme_states=meme_states)
     items=[]
     for row in rows:
         dto=post_dto(*row, membership_tier=tiers.get(row[1].id, "free"))
         if include_interactions:
-            from app.interactions import read_post_state
-            try:dto.interactions=read_post_state(dto.id,db,viewer_id,request,meme_states.get(dto.id,{}))
-            except AuthError as error:
-                if error.status==404:continue
-                raise
+            dto.interactions=interaction_states.get(dto.id)
         items.append(dto)
     return PostPage(items=items,pagination=pagination)
 

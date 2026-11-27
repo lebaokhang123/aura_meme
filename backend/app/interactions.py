@@ -68,6 +68,69 @@ def read_post_state(post_id, db, viewer_id, request, meme_state=None):
                             comments_count=row[7], viewer_reaction=row[8], bookmarked=row[9], **meme)
 
 
+def read_post_states(post_ids: list[UUID], db, viewer_id, request, meme_states=None) -> dict[UUID, PostInteractions]:
+    """Batch-load PostInteractions for a page of posts in O(1) SQL queries."""
+    unique_ids = list(dict.fromkeys(post_ids))
+    if not unique_ids:
+        return {}
+    reaction_rows = db.execute(
+        select(PostReaction.post_id, PostReaction.reaction_type, func.count())
+        .join(User, User.id == PostReaction.user_id)
+        .where(
+            PostReaction.post_id.in_(unique_ids),
+            PostReaction.reaction_type.in_(REACTION_TYPES),
+            User.status == "active",
+        )
+        .group_by(PostReaction.post_id, PostReaction.reaction_type)
+    ).all()
+    comment_rows = db.execute(
+        select(Comment.post_id, func.count())
+        .join(User, User.id == Comment.author_id)
+        .join(Profile, Profile.user_id == User.id)
+        .where(
+            Comment.post_id.in_(unique_ids),
+            Comment.status == "visible",
+            Comment.deleted_at.is_(None),
+            User.status == "active",
+        )
+        .group_by(Comment.post_id)
+    ).all()
+    if viewer_id is not None:
+        viewer_reactions = dict(
+            db.execute(
+                select(PostReaction.post_id, PostReaction.reaction_type)
+                .where(PostReaction.post_id.in_(unique_ids), PostReaction.user_id == viewer_id)
+            ).all()
+        )
+        bookmarked_ids = set(
+            db.scalars(
+                select(PostBookmark.post_id)
+                .where(PostBookmark.post_id.in_(unique_ids), PostBookmark.user_id == viewer_id)
+            ).all()
+        )
+    else:
+        viewer_reactions = {}
+        bookmarked_ids = set()
+    if meme_states is None:
+        from app.meme_reactions import meme_reaction_states
+        meme_states = meme_reaction_states(db, PostReaction, unique_ids, viewer_id, request)
+    counts_by_post = {pid: {kind: 0 for kind in REACTION_TYPES} for pid in unique_ids}
+    for pid, kind, count in reaction_rows:
+        counts_by_post[pid][kind] = int(count)
+    comments_by_post = {pid: int(count) for pid, count in comment_rows}
+    return {
+        pid: PostInteractions(
+            post_id=pid,
+            reaction_counts=ReactionCounts(**counts_by_post[pid]),
+            comments_count=comments_by_post.get(pid, 0),
+            viewer_reaction=viewer_reactions.get(pid),
+            bookmarked=pid in bookmarked_ids,
+            **meme_states.get(pid, {}),
+        )
+        for pid in unique_ids
+    }
+
+
 @router.get("/users/me/bookmarks", response_model=PostPage, operation_id="listSavedPosts", responses=ERRORS)
 def list_saved_posts(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                      search: str | None = Query(None, max_length=100), category: str | None = None,
