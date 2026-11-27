@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from python_multipart import MultipartParser
 from python_multipart.exceptions import MultipartParseError
 from python_multipart.multipart import parse_options_header
-from sqlalchemy import case, delete, func, or_, select, text
+from sqlalchemy import case, delete, event, func, or_, select, text
 from sqlalchemy.orm import undefer
 from starlette.requests import ClientDisconnect
 
@@ -963,7 +963,7 @@ def admin_permanent_delete_asset(
     asset.updated_at = now
     db.flush()
 
-    media_removed = False
+    media_cleanup_scheduled = False
     if asset.collection == 'admin-upload':
         m = re.fullmatch(r'catalog/([a-f0-9]{64})\.(png|jpg|webp)', asset.media_key or '')
         if m:
@@ -976,12 +976,17 @@ def admin_permanent_delete_asset(
             )
             if other_refs == 0:
                 candidate_path = CatalogSettings().catalog_storage_root / f'{m[1]}.{m[2]}'
-                try:
-                    if candidate_path.is_file():
-                        candidate_path.unlink()
-                        media_removed = True
-                except OSError:
-                    media_removed = False
+                if candidate_path.is_file():
+                    media_cleanup_scheduled = True
+
+                    def _unlink_after_commit(_session, target=candidate_path):
+                        try:
+                            if target.is_file():
+                                target.unlink()
+                        except OSError:
+                            pass
+
+                    event.listen(db, 'after_commit', _unlink_after_commit, once=True)
 
     db.add(
         AdminAuditLog(
@@ -995,7 +1000,7 @@ def admin_permanent_delete_asset(
                 'active': False,
                 'deleted_at': now.isoformat(),
                 'deleted_by': str(account.user.id),
-                'media_file_removed': media_removed,
+                'media_file_removed': media_cleanup_scheduled,
             },
             created_at=now,
         )
@@ -1004,7 +1009,7 @@ def admin_permanent_delete_asset(
     return AdminAssetPermanentDeleteResponse(
         id=asset.id,
         deleted_at=now,
-        media_file_removed=media_removed,
+        media_file_removed=media_cleanup_scheduled,
         pool_warnings=list(dict.fromkeys(pool_warnings)),
     )
 

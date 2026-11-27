@@ -1,7 +1,7 @@
 """H04 Calibrated Performance Benchmark & Diagnostics Harness.
 
 Measures:
-1. DB Identity Guard (aurameme_test @ 127.0.0.1:55450, alembic 0018_canonical_asset_filenames)
+1. DB Identity Guard (aurameme_test @ 127.0.0.1:55450, alembic 0019_asset_lifecycle_tombstone)
 2. Single-request SQL query counts across page_size 10/20/50/100 + hot/search/direct/comments
 3. EXPLAIN (ANALYZE, BUFFERS) for core feed/search/direct/comment queries
 4. Calibrated concurrent load ramp (1 -> 5 -> 10 -> 25 -> 50 -> 100 VUs) with:

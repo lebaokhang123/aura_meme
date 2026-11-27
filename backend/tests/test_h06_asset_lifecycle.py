@@ -467,3 +467,143 @@ def test_h06_empty_rarity_bucket_allowed_with_warning_and_case_unavailable(monke
         with app.state.auth_session_factory() as db:
             with pytest.raises(ValueError, match="Each V1 rarity needs approved items"):
                 load_runtime_pool(db, db.get(CaseDefinition, case_id), app.state.auth.now())
+
+
+def test_h06_media_cleanup_rollback_and_shared_ref_safety(monkeypatch):
+    _ensure_test_db()
+    monkeypatch.setenv("AURAMEME_OWNER_MEME_DEMO", "1")
+    from types import SimpleNamespace
+    from starlette.requests import Request
+    from app.admin_workspace import AdminAssetPermanentDeleteInput, admin_permanent_delete_asset
+    from app.config import CatalogSettings
+    from app.main import app
+    from app.models import AssetItem, User
+
+    with TestClient(app, base_url="http://127.0.0.1:8000", headers=ORIGIN) as client:
+        _login(client, ADMIN_EMAIL, ADMIN_PASSWORD)
+        aid = _upload_and_approve(client, "D_281126_93.png", "H06 Media Safety")
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        assert client.patch(f"/api/v1/admin/assets/{aid}", json={"action": "archive"}, headers={"X-CSRF-Token": csrf}).status_code == 200
+
+        with app.state.auth_session_factory() as db:
+            asset = db.get(AssetItem, aid)
+            mkey = asset.media_key
+            sha = asset.source_rights["sha256"]
+            file_path = CatalogSettings().catalog_storage_root / f"{sha}.{mkey.split('.')[-1]}"
+            assert file_path.is_file()
+
+        # 1. Rollback case: call permanent delete inside a rolled-back transaction -> file MUST NOT be deleted!
+        db = app.state.auth_session_factory()
+        try:
+            db.begin()
+            khang = db.scalar(select(User).where(User.email == ADMIN_EMAIL))
+            fake_req = Request({"type": "http", "app": app, "headers": []})
+            resp = admin_permanent_delete_asset(
+                aid, AdminAssetPermanentDeleteInput(confirm_text="XÓA VĨNH VIỄN"),
+                fake_req, SimpleNamespace(db=db, user=khang),
+            )
+            assert resp.media_file_removed is True
+            db.rollback()
+        finally:
+            db.close()
+        assert file_path.is_file()
+
+        # 2. Shared-reference case: if another non-deleted AssetItem shares media_key -> file MUST NOT be deleted!
+        with app.state.auth_session_factory() as db, db.begin():
+            now = app.state.auth.now()
+            twin = AssetItem(
+                id=uuid4(), slug=f"h06-twin-{uuid4().hex[:6]}", kind="avatar", collection="admin-upload",
+                rarity="D", media_key=mkey, display_name="H06 Twin", effect_key=None,
+                source_rights={"review_status": "pending", "sha256": sha},
+                active=False, created_at=now, updated_at=now,
+            )
+            db.add(twin)
+            twin_id = twin.id
+
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        del_shared = client.request(
+            "DELETE", f"/api/v1/admin/assets/{aid}",
+            json={"confirm_text": "XÓA VĨNH VIỄN"}, headers={"X-CSRF-Token": csrf},
+        )
+        assert del_shared.status_code == 200
+        assert del_shared.json()["media_file_removed"] is False
+        assert file_path.is_file()
+
+        # Clean up twin so subsequent runs stay clean
+        with app.state.auth_session_factory() as db, db.begin():
+            t = db.get(AssetItem, twin_id)
+            t.deleted_at = app.state.auth.now()
+
+
+def test_h06_concurrent_vault_open_and_admin_mutation(monkeypatch):
+    _ensure_test_db()
+    monkeypatch.setenv("AURAMEME_OWNER_MEME_DEMO", "1")
+    from concurrent.futures import ThreadPoolExecutor
+    from app.main import app
+    from app.models import AssetItem, CaseDefinition, CaseLootRarity, CaseLootTable, CasePoolItem, RewardPolicyVersion
+    from app.vault import RARITIES
+    from app.vault_v1_policy import WEIGHTS
+
+    with TestClient(app, base_url="http://127.0.0.1:8000", headers=ORIGIN) as client:
+        _login(client, ADMIN_EMAIL, ADMIN_PASSWORD)
+        target_id = _upload_and_approve(client, "C_281126_94.png", "H06 Concurrent C")
+        backup_by_rarity = {
+            rar: _upload_and_approve(client, f"{rar}_281126_{idx + 50}.png", f"H06 Conc Backup {rar}")
+            for idx, rar in enumerate(RARITIES)
+        }
+        with app.state.auth_session_factory() as db, db.begin():
+            now = app.state.auth.now()
+            for b_id in list(backup_by_rarity.values()) + [target_id]:
+                b_asset = db.get(AssetItem, b_id)
+                sha = (b_asset.source_rights or {}).get("sha256") or ("c" * 64)
+                b_asset.source_rights = {
+                    "review_status": "approved", "name_review_status": "approved",
+                    "source": "aurameme://original/h06-conc", "author": "AuraMeme H06 Test",
+                    "license": "LicenseRef-AuraMeme-Original", "attribution": "AuraMeme H06 Test",
+                    "sha256": sha,
+                    "proof": {
+                        "basis": "original", "source": "aurameme://original/h06-conc",
+                        "license_id": "LicenseRef-AuraMeme-Original", "license_url": "aurameme://original/license",
+                        "artifact_sha256": sha, "evidence_sha256": sha, "copyright_notice": "AuraMeme H06 Test",
+                    },
+                }
+            pol = db.scalar(
+                select(RewardPolicyVersion).where(
+                    RewardPolicyVersion.status == "published",
+                    RewardPolicyVersion.config_json.op("->>")("type") == "free-vault-v1",
+                ).limit(1)
+            )
+            case = db.scalar(select(CaseDefinition).where(CaseDefinition.runtime_kind == "avatar"))
+            max_ver = db.scalar(select(func.max(CaseLootTable.odds_version)).where(CaseLootTable.case_id == case.id)) or 0
+            lt = CaseLootTable(
+                id=uuid4(), case_id=case.id, policy_id=pol.id, odds_version=max_ver + 1,
+                band_no=1, min_earned_xp=0, max_earned_xp=None, status="draft", active_from=now, created_at=now,
+            )
+            db.add(lt)
+            db.flush()
+            for rar, w in zip(RARITIES, WEIGHTS):
+                db.add(CaseLootRarity(loot_table_id=lt.id, rarity=rar, weight_bps=w))
+                db.add(CasePoolItem(loot_table_id=lt.id, asset_id=backup_by_rarity[rar], rarity=rar, item_weight=1))
+            db.add(CasePoolItem(loot_table_id=lt.id, asset_id=target_id, rarity="C", item_weight=1))
+            db.flush()
+            lt.status = "published"
+            db.flush()
+            case_id = str(case.id)
+
+        def do_admin_archive():
+            with TestClient(app, base_url="http://127.0.0.1:8000", headers=ORIGIN) as c1:
+                csrf1 = _login(c1, ADMIN_EMAIL, ADMIN_PASSWORD)
+                return c1.patch(f"/api/v1/admin/assets/{target_id}", json={"action": "archive"}, headers={"X-CSRF-Token": csrf1}).status_code
+
+        def do_user_vault_open():
+            with TestClient(app, base_url="http://127.0.0.1:8000", headers=ORIGIN) as c2:
+                csrf2 = _login(c2, USER_1_EMAIL, "H01SimUser!2026")
+                r = c2.post(f"/api/v1/vault/cases/{case_id}/open", headers={"X-CSRF-Token": csrf2, "Idempotency-Key": f"h06-conc-{uuid4().hex[:12]}"})
+                return r.status_code
+
+        with ThreadPoolExecutor(max_workers=2) as pool_exec:
+            f1 = pool_exec.submit(do_admin_archive)
+            f2 = pool_exec.submit(do_user_vault_open)
+            s1, s2 = f1.result(), f2.result()
+        assert s1 == 200
+        assert s2 in (200, 429, 503)
