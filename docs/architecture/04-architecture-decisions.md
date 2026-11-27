@@ -223,3 +223,19 @@ CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute 
   - `frontend/src/main.jsx` & `frontend/src/components/AdminPage.jsx`: USER đã đăng nhập truy cập `/admin` hoặc `/admin/contacts` nhận `ErrorPage` 404 chung (không lộ chi tiết khu quản trị), trong khi backend API vẫn giữ nguyên `403 FORBIDDEN`. Guest vẫn được redirect `/login?next=...` theo H02.
   - Lưu ý kiến trúc: `ErrorPage` là client-side UI trong SPA; HTTP status thực tế từ static hosting vẫn do Nginx/reverse proxy quyết định (không thay đổi hạ tầng trong H03).
 - **Learning Check:** `PENDING OWNER`.
+
+
+## ADR-H04: Batch Query Cho Feed Interactions (`read_post_states`) & Danh Gia Index/Search
+
+- **Trang thai:** Da chap thuan & Trien khai tren nhanh `perf/h04-feed-optimization`.
+- **Van de:** `GET /api/v1/posts?include_interactions=true` goi `read_post_state` theo vong lap tung bai viet (`N+1` queries: 27 SQL o `page_size=20`, 107 SQL o `page_size=100` cho Guest; 32 -> 112 SQL cho Auth), lam p50/p95 tang manh va kich hoat safe-stop o 25 VUs (`p95 = 6709.51 ms`).
+- **Quyet dinh:**
+  1. Them `read_post_states(post_ids, db, viewer_id, request, meme_states=None)` trong `backend/app/interactions.py`, dung `WHERE post_id IN (...)` + `GROUP BY` de gom reaction counts, comment counts, viewer reaction, va viewer bookmarks thanh hang so `O(1)` truy van (9 SQL cho Guest, 16 SQL cho Auth bat ke `page_size` 10/20/50/100), bo qua 2 truy van viewer khi `viewer_id is None`.
+  2. Giu nguyen `read_post_state` cho endpoint don le `/api/v1/posts/{id}/interactions` va xac minh 100% parity qua PostgreSQL integration test (`backend/tests/test_h04_batch_interactions.py`).
+  3. **Danh gia Search & Index:** Khong them migration/index moi o H04 vi: (a) `searchable(col)` dung `translate(translate(lower(...)))` + `ILIKE '%...%'` nen B-tree index thong thuong khong co tac dung; (b) giu nguyen Offset Pagination contract va tim kiem tieng Viet substring hien hanh; (c) giu nguyen `SELECT ... FOR UPDATE` tren `auth_sessions` de bao toan an toan xac thuc & single-flight session.
+  4. **Learning Check:** `PENDING OWNER`.
+- **H04 Final Query Count & Benchmark Caveats (Safety Gate):**
+  - **Final SQL query count:** `Guest 10`, `Auth 17`, on dinh theo `page_size` `10/20/50/100` (bao gom `public_posts` visibility guard trong `read_post_states`).
+  - **Pham vi benchmark:** Cac so lieu latency/RPS BEFORE/AFTER hien co duoc do truoc khi bo sung visibility guard cuoi; khong tuyen bo final candidate da duoc benchmark day du lai.
+  - **Gioi han he thong:** HTTP 429 tu rate limiter tren loopback IP o 10-25 VUs va `feed_search` (~1.5s-1.9s) van la gioi han can theo doi.
+  - **Test Harness Safety Gate:** Dung chung `scripts/h04/safety_guard.py` (fail-closed kiem tra container `aurameme-h01-sim-pg`, port mapping `127.0.0.1:55450`, DB `aurameme_test`, revision `0018_canonical_asset_filenames`, synthetic fixture marker, SMTP sandbox, va owned uvicorn subprocess tren cong rieng `18080`).
