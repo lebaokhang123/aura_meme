@@ -753,7 +753,7 @@ def _version_published_pool(
                 warnings.append(warn)
         return warnings
 
-    # mode == 'include' (on restore): return asset to active runtime case pool if previously in a pool
+    # mode == 'include' (on approve/restore): add or return asset to active runtime case pool
     if asset.kind not in ('avatar', 'background'):
         return warnings
     prior_case_ids = list(
@@ -764,9 +764,19 @@ def _version_published_pool(
             .distinct()
         )
     )
-    if not prior_case_ids:
+    active_runtime_case_ids = list(
+        db.scalars(
+            select(CaseDefinition.id).where(
+                CaseDefinition.runtime_kind == asset.kind,
+                CaseDefinition.status == 'active',
+                CaseDefinition.cost_khi_van == 0,
+            )
+        )
+    )
+    target_case_ids = list(dict.fromkeys([*prior_case_ids, *active_runtime_case_ids]))
+    if not target_case_ids:
         return warnings
-    for cid in prior_case_ids:
+    for cid in target_case_ids:
         latest_pub = db.scalar(
             select(CaseLootTable)
             .where(
@@ -886,6 +896,7 @@ def admin_update_asset(
         asset.active = False
         audit_action = 'asset.archive'
 
+    asset.source_rights = dict(asset.source_rights or {}) | {'admin_managed': True}
     asset.updated_at = now
     db.flush()
 
@@ -960,6 +971,7 @@ def admin_permanent_delete_asset(
     asset.active = False
     asset.deleted_at = now
     asset.deleted_by = account.user.id
+    asset.source_rights = dict(asset.source_rights or {}) | {'admin_managed': True}
     asset.updated_at = now
     db.flush()
 

@@ -607,3 +607,88 @@ def test_h06_concurrent_vault_open_and_admin_mutation(monkeypatch):
             s1, s2 = f1.result(), f2.result()
         assert s1 == 200
         assert s2 in (200, 429, 503)
+
+
+def test_h06_upload_approve_auto_pool_and_vault_open_recovery(monkeypatch):
+    """Real flow: manifest policy -> archive sole C (503) -> upload & approve new C meme -> auto pool -> Vault open (200)."""
+    _ensure_test_db()
+    monkeypatch.setenv("AURAMEME_OWNER_MEME_DEMO", "1")
+    monkeypatch.setattr("app.catalog_rights._owner_private_demo_enabled", lambda: True)
+    from app.main import app
+    from app.models import AssetItem, CaseDefinition, CaseLootRarity, CaseLootTable, CasePoolItem, RewardPolicyVersion, User
+    from app.vault import RARITIES
+    from app.vault_runtime import load_runtime_pool
+    from app.vault_v1_policy import WEIGHTS
+
+    manifest_sha = "d" * 64
+    with TestClient(app, base_url="http://127.0.0.1:8000", headers=ORIGIN) as client:
+        _login(client, ADMIN_EMAIL, ADMIN_PASSWORD)
+        # Seed initial manifest-backed pool where C has 1 item
+        initial_by_rarity = {
+            rar: _upload_and_approve(client, f"{rar}_281126_{idx + 60}.png", f"H06 Manifest {rar}")
+            for idx, rar in enumerate(RARITIES)
+        }
+        with app.state.auth_session_factory() as db, db.begin():
+            now = app.state.auth.now()
+            khang = db.scalar(select(User).where(User.email == ADMIN_EMAIL))
+            for b_id in initial_by_rarity.values():
+                b_asset = db.get(AssetItem, b_id)
+                b_asset.collection = "vault-v1-test"
+                b_asset.source_rights = {**dict(b_asset.source_rights or {}), "manifest_sha256": manifest_sha}
+
+            pol = RewardPolicyVersion(
+                id=uuid4(), version=int(db.scalar(select(func.coalesce(func.max(RewardPolicyVersion.version), 0))) + 1),
+                config_json={"type": "free-vault-v1", "catalog_manifest_sha256": manifest_sha},
+                status="published", effective_at=now, created_by=khang.id, created_at=now,
+            )
+            db.add(pol)
+            db.flush()
+            case = db.scalar(select(CaseDefinition).where(CaseDefinition.runtime_kind == "avatar"))
+            max_ver = db.scalar(select(func.max(CaseLootTable.odds_version)).where(CaseLootTable.case_id == case.id)) or 0
+            lt = CaseLootTable(
+                id=uuid4(), case_id=case.id, policy_id=pol.id, odds_version=max_ver + 1,
+                band_no=1, min_earned_xp=0, max_earned_xp=None, status="draft", active_from=now, created_at=now,
+            )
+            db.add(lt)
+            db.flush()
+            for rar, w in zip(RARITIES, WEIGHTS):
+                db.add(CaseLootRarity(loot_table_id=lt.id, rarity=rar, weight_bps=w))
+                db.add(CasePoolItem(loot_table_id=lt.id, asset_id=initial_by_rarity[rar], rarity=rar, item_weight=1))
+            db.flush()
+            lt.status = "published"
+            db.flush()
+            case_id = str(case.id)
+
+        # 1. Archive sole C item -> case temporarily unavailable (503)
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        ar = client.patch(f"/api/v1/admin/assets/{initial_by_rarity['C']}", json={"action": "archive"}, headers={"X-CSRF-Token": csrf})
+        assert ar.status_code == 200 and len(ar.json().get("pool_warnings", [])) >= 1
+
+        # 2. Upload & approve a brand-new admin-upload C meme (NO manual CasePoolItem insert!)
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        up = client.post(
+            "/api/v1/admin/assets/upload",
+            files={"file": ("C_281126_99.png", _make_png_bytes(), "image/png")},
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert up.status_code == 201, up.text
+        new_c_id = up.json()["items"][0]["id"]
+
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        assert client.patch(f"/api/v1/admin/assets/{new_c_id}", json={"display_name": "H06 Fresh Pool C"}, headers={"X-CSRF-Token": csrf}).status_code == 200
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        ap = client.patch(f"/api/v1/admin/assets/{new_c_id}", json={"action": "approve"}, headers={"X-CSRF-Token": csrf})
+        assert ap.status_code == 200, ap.text
+
+        # 3. Verify new meme is automatically in latest published pool and load_runtime_pool succeeds!
+        with app.state.auth_session_factory() as db:
+            pool = load_runtime_pool(db, db.get(CaseDefinition, case_id), app.state.auth.now())
+            assert any(str(item_id) == new_c_id for item_id, _ in pool.buckets[1])
+
+        # 4. Real Vault open recovers and returns 200 OK (or 429 if user_1 is in cooldown from earlier test, so use user_2!)
+        csrf_u2 = _login(client, USER_2_EMAIL, "H01SimUser!2026")
+        open_res = client.post(
+            f"/api/v1/vault/cases/{case_id}/open",
+            headers={"X-CSRF-Token": csrf_u2, "Idempotency-Key": f"h06-rec-{uuid4().hex[:12]}"},
+        )
+        assert open_res.status_code == 200, open_res.text

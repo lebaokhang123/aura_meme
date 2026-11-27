@@ -93,9 +93,13 @@ def load_runtime_pool(db, case, now):
         CasePoolItem.loot_table_id == table.id).options(undefer(AssetItem.display_name), undefer(AssetItem.effect_key))
         .order_by(CasePoolItem.asset_id).with_for_update(read=True).execution_options(populate_existing=True))
     for item, asset in rows:
-        if (not ready_runtime_asset(asset, case.runtime_kind) or asset.rarity != item.rarity or item.item_weight != 1
-                or (config.catalog_manifest_sha256 is not None
-                    and asset.source_rights.get('manifest_sha256') != config.catalog_manifest_sha256)):
+        is_admin_upload = asset.collection == 'admin-upload' and bool((asset.source_rights or {}).get('uploaded_by'))
+        manifest_ok = (
+            config.catalog_manifest_sha256 is None
+            or is_admin_upload
+            or asset.source_rights.get('manifest_sha256') == config.catalog_manifest_sha256
+        )
+        if not ready_runtime_asset(asset, case.runtime_kind) or asset.rarity != item.rarity or item.item_weight != 1 or not manifest_ok:
             raise ValueError('V1 pool contains an unapproved, mixed-kind or nonuniform item.')
         buckets[item.rarity].append((asset.id, 1))
     if any(not bucket for bucket in buckets.values()):
