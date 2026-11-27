@@ -73,11 +73,19 @@ def read_post_states(post_ids: list[UUID], db, viewer_id, request, meme_states=N
     unique_ids = list(dict.fromkeys(post_ids))
     if not unique_ids:
         return {}
+    now = request.app.state.auth.now() if request is not None else None
+    visible_ids = list(
+        db.scalars(
+            public_posts(now).with_only_columns(Post.id).where(Post.id.in_(unique_ids))
+        ).all()
+    )
+    if not visible_ids:
+        return {}
     reaction_rows = db.execute(
         select(PostReaction.post_id, PostReaction.reaction_type, func.count())
         .join(User, User.id == PostReaction.user_id)
         .where(
-            PostReaction.post_id.in_(unique_ids),
+            PostReaction.post_id.in_(visible_ids),
             PostReaction.reaction_type.in_(REACTION_TYPES),
             User.status == "active",
         )
@@ -88,7 +96,7 @@ def read_post_states(post_ids: list[UUID], db, viewer_id, request, meme_states=N
         .join(User, User.id == Comment.author_id)
         .join(Profile, Profile.user_id == User.id)
         .where(
-            Comment.post_id.in_(unique_ids),
+            Comment.post_id.in_(visible_ids),
             Comment.status == "visible",
             Comment.deleted_at.is_(None),
             User.status == "active",
@@ -99,13 +107,13 @@ def read_post_states(post_ids: list[UUID], db, viewer_id, request, meme_states=N
         viewer_reactions = dict(
             db.execute(
                 select(PostReaction.post_id, PostReaction.reaction_type)
-                .where(PostReaction.post_id.in_(unique_ids), PostReaction.user_id == viewer_id)
+                .where(PostReaction.post_id.in_(visible_ids), PostReaction.user_id == viewer_id)
             ).all()
         )
         bookmarked_ids = set(
             db.scalars(
                 select(PostBookmark.post_id)
-                .where(PostBookmark.post_id.in_(unique_ids), PostBookmark.user_id == viewer_id)
+                .where(PostBookmark.post_id.in_(visible_ids), PostBookmark.user_id == viewer_id)
             ).all()
         )
     else:
@@ -113,8 +121,8 @@ def read_post_states(post_ids: list[UUID], db, viewer_id, request, meme_states=N
         bookmarked_ids = set()
     if meme_states is None:
         from app.meme_reactions import meme_reaction_states
-        meme_states = meme_reaction_states(db, PostReaction, unique_ids, viewer_id, request)
-    counts_by_post = {pid: {kind: 0 for kind in REACTION_TYPES} for pid in unique_ids}
+        meme_states = meme_reaction_states(db, PostReaction, visible_ids, viewer_id, request)
+    counts_by_post = {pid: {kind: 0 for kind in REACTION_TYPES} for pid in visible_ids}
     for pid, kind, count in reaction_rows:
         counts_by_post[pid][kind] = int(count)
     comments_by_post = {pid: int(count) for pid, count in comment_rows}
@@ -127,7 +135,7 @@ def read_post_states(post_ids: list[UUID], db, viewer_id, request, meme_states=N
             bookmarked=pid in bookmarked_ids,
             **meme_states.get(pid, {}),
         )
-        for pid in unique_ids
+        for pid in visible_ids
     }
 
 

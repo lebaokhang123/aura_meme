@@ -248,7 +248,9 @@ def list_posts(request: Request, page: int = Query(1, ge=1), page_size: int = Qu
     for row in rows:
         dto=post_dto(*row, membership_tier=tiers.get(row[1].id, "free"))
         if include_interactions:
-            dto.interactions=interaction_states.get(dto.id)
+            if dto.id not in interaction_states:
+                continue
+            dto.interactions=interaction_states[dto.id]
         items.append(dto)
     return PostPage(items=items,pagination=pagination)
 
