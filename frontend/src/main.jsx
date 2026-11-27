@@ -10,7 +10,7 @@ import {authMessage} from './auth-client.js';
 import {ProfilePage,ContactPage,ContactInbox} from './components/AccountPages.jsx';
 import './account-pages.css';
 import './profile-page.css';
-import {loginUrl} from './return-url.js';
+import { isProtectedPath, resolveAuthRedirect } from './auth-routing.js';
 import {usePreferences} from './PreferencesContext.jsx';
 import { applyDemoIdentity } from './demo.js';
 import { SiteHeader, SiteFooter, MaintenancePage } from './components/SiteShell.jsx';
@@ -123,9 +123,10 @@ function App() {
 
   useEffect(()=>{if(screen)prepareAuthForm();},[screen,language]);
   useEffect(()=>{if(!MOCK_AUTH&&authState.error)showDemoMessage(authMessage(authState.error,language));},[authState.error]);
-  const protectedPage=['/admin','/contact','/vault','/admin/contacts','/profile','/premium','/premium/checkout','/premium/history'].includes(page.path);
-  useEffect(()=>{if(!MOCK_AUTH&&protectedPage&&authState.status==='guest')location.replace(loginUrl());},[protectedPage,authState.status]);
-  if(!MOCK_AUTH&&protectedPage&&authState.status!=='authenticated')return null;
+  const protectedPage=isProtectedPath(page.path);
+  const authRedirect=resolveAuthRedirect({path:page.path,search:location.search,status:authState.status,mockAuth:MOCK_AUTH});
+  useEffect(()=>{if(authRedirect)location.replace(authRedirect);},[authRedirect]);
+  if(!MOCK_AUTH&&((protectedPage&&authState.status!=='authenticated')||authRedirect))return null;
   // Reveal the header and page together after the lazy content and CSS are ready.
   if(!screen&&!failed)return null;
   return render(<><EquippedBackground/><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : [AdminPage,PremiumPage,PremiumCheckoutPage,PaymentHistoryPage,ForgotPasswordPage,ResetPasswordPage,ProfilePage,ContactPage,VaultPage,ContactInbox,PendingVerificationScreen].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}<CookieConsent /></>);

@@ -14,8 +14,9 @@ export function startAuth(){
     }catch{}finally{pending=false;}
   };
   const resumed=()=>{if(document.visibilityState==='visible')check();};
+  const onPageShow=ev=>{if(ev.persisted)check();};
   auth.refresh().catch(()=>{});
   if(typeof BroadcastChannel!=='undefined'){channel=new BroadcastChannel('aurameme-auth');channel.onmessage=check;}
-  window.addEventListener('focus',resumed);document.addEventListener('visibilitychange',resumed);
-  return()=>{stopped=true;channel?.close();channel=null;window.removeEventListener('focus',resumed);document.removeEventListener('visibilitychange',resumed);};
+  window.addEventListener('focus',resumed);document.addEventListener('visibilitychange',resumed);window.addEventListener('pageshow',onPageShow);
+  return()=>{stopped=true;channel?.close();channel=null;window.removeEventListener('focus',resumed);document.removeEventListener('visibilitychange',resumed);window.removeEventListener('pageshow',onPageShow);};
 }
