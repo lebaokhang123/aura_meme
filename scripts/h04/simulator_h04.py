@@ -21,25 +21,22 @@ import uuid
 import httpx
 from sqlalchemy import create_engine, text
 
+from safety_guard import (
+    DEFAULT_HARNESS_PORT,
+    load_env_file,
+    owned_uvicorn_server,
+    verify_isolated_postgres,
+    verify_runtime_env,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT / "backend"
 ENV_FILE = BACKEND_DIR / ".env.h01"
 MANIFEST_FILE = BACKEND_DIR / "h01.local" / "seed_manifest.json"
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = f"http://127.0.0.1:{DEFAULT_HARNESS_PORT}"
 ORIGIN_HEADERS = {"Origin": "http://127.0.0.1:5173"}
 USER_PASSWORD = "H01SimUser!2026"
 ADMIN_PASSWORD = "H01SimAdmin!2026"
-
-
-def load_env_file(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        values[k.strip()] = v.strip().strip('"').strip("'")
-    return values
 
 
 def login_client(email: str, password: str) -> tuple[httpx.Client, str]:
@@ -79,29 +76,14 @@ def run_data_integrity_checks(db_url: str) -> dict:
 
 def main():
     env_vals = load_env_file(ENV_FILE)
+    verify_runtime_env(env_vals)
     db_url = env_vals["DATABASE_URL"]
+    db_identity = verify_isolated_postgres(db_url, MANIFEST_FILE)
     manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
 
-    proc_env = os.environ.copy()
-    proc_env.update(env_vals)
-    proc = subprocess.Popen(
-        [str(BACKEND_DIR / ".venv" / "Scripts" / "python.exe"), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000", "--workers", "1", "--log-level", "warning"],
-        cwd=str(BACKEND_DIR),
-        env=proc_env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
     results: dict[str, dict] = {}
-    try:
+    with owned_uvicorn_server(BACKEND_DIR, env_vals, port=DEFAULT_HARNESS_PORT):
         with httpx.Client(timeout=15.0, headers=ORIGIN_HEADERS) as guest:
-            for _ in range(30):
-                try:
-                    if guest.get(f"{BASE_URL}/health").status_code == 200:
-                        break
-                except Exception:
-                    pass
-                time.sleep(0.3)
-
             # 1. Guest flow
             r_feed = guest.get(f"{BASE_URL}/api/v1/posts?page=1&page_size=20&include_interactions=true")
             r_hot = guest.get(f"{BASE_URL}/api/v1/posts?sort=reaction_desc&page=1&page_size=20&include_interactions=true")
@@ -204,16 +186,10 @@ def main():
         finally:
             admin.close()
 
-    finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-
     integrity = run_data_integrity_checks(db_url)
     report = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "db_identity": db_identity,
         "flows": results,
         "data_integrity": integrity,
     }

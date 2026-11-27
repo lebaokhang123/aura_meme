@@ -1,9 +1,8 @@
 """H04 integration tests: verify batch read_post_states parity with single-post read_post_state and O(1) SQL count."""
 from contextlib import contextmanager
-from datetime import datetime, timezone
 import os
 from pathlib import Path
-from urllib.parse import urlparse
+import sys
 from uuid import uuid4
 
 import pytest
@@ -11,29 +10,32 @@ from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts" / "h04"))
+from safety_guard import load_env_file, verify_isolated_postgres, verify_runtime_env  # noqa: E402
+
 pytestmark = pytest.mark.integration
 
 ORIGIN_HEADERS = {"Origin": "http://127.0.0.1:5173"}
 USER_1_EMAIL = "sim_user_001@example.com"
 USER_2_EMAIL = "sim_user_002@example.com"
 USER_PASSWORD = "H01SimUser!2026"
+MANIFEST_PATH = ROOT / "backend" / "h01.local" / "seed_manifest.json"
+ENV_PATH = ROOT / "backend" / ".env.h01"
 
 
 def _ensure_test_db_env():
+    if ENV_PATH.exists():
+        env_vals = load_env_file(ENV_PATH)
+        for k, v in env_vals.items():
+            os.environ.setdefault(k, v)
+    else:
+        env_vals = dict(os.environ)
     db_url = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
     if not db_url:
-        env_path = Path(__file__).resolve().parents[1] / ".env.h01"
-        if env_path.exists():
-            for raw in env_path.read_text(encoding="utf-8").splitlines():
-                if "=" in raw and not raw.strip().startswith("#"):
-                    k, v = raw.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-            db_url = os.environ.get("DATABASE_URL")
-    if not db_url:
         pytest.skip("TEST_DATABASE_URL / DATABASE_URL not configured for integration test.")
-    parsed = urlparse(db_url)
-    if parsed.path.lstrip("/") != "aurameme_test":
-        pytest.skip(f"Refusing to run against non-test database: {parsed.path}")
+    verify_runtime_env({**env_vals, "DATABASE_URL": db_url})
+    verify_isolated_postgres(db_url, MANIFEST_PATH)
     os.environ["DATABASE_URL"] = db_url
 
 
@@ -211,11 +213,22 @@ def test_read_post_states_edge_cases_visibility_locked_comments_and_meme():
                     PostReaction(post_id=post_b.id, user_id=locked_u.id, reaction_type="fire", created_at=now, updated_at=now),
                     PostReaction(post_id=post_b.id, user_id=deleted_u.id, reaction_type="sad", created_at=now, updated_at=now),
                 ])
+                meme_owner_id, meme_asset_id = None, None
                 if owned_inv is not None and owned_inv[0] not in (active_u1.id, locked_u.id, deleted_u.id):
-                    db.add(PostReaction(
-                        post_id=post_b.id, user_id=owned_inv[0], reaction_type="meme",
-                        meme_asset_id=owned_inv[1], created_at=now, updated_at=now,
-                    ))
+                    meme_owner_id, meme_asset_id = owned_inv[0], owned_inv[1]
+                else:
+                    # Grant an existing active approved avatar in rolled-back transaction so meme reaction is always tested
+                    existing_avatar = db.scalar(
+                        select(AssetItem).where(AssetItem.active.is_(True), AssetItem.kind == "avatar").limit(1)
+                    )
+                    assert existing_avatar is not None, "Expected at least one active avatar AssetItem in aurameme_test"
+                    db.add(UserInventory(user_id=active_u2.id, asset_id=existing_avatar.id, quantity=1, acquired_at=now, updated_at=now))
+                    db.flush()
+                    meme_owner_id, meme_asset_id = active_u2.id, existing_avatar.id
+                db.add(PostReaction(
+                    post_id=post_b.id, user_id=meme_owner_id, reaction_type="meme",
+                    meme_asset_id=meme_asset_id, created_at=now, updated_at=now,
+                ))
                 # Bookmark for Viewer 1 only
                 db.add(PostBookmark(post_id=post_b.id, user_id=active_u1.id, created_at=now))
 

@@ -234,3 +234,8 @@ CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute 
   2. Giu nguyen `read_post_state` cho endpoint don le `/api/v1/posts/{id}/interactions` va xac minh 100% parity qua PostgreSQL integration test (`backend/tests/test_h04_batch_interactions.py`).
   3. **Danh gia Search & Index:** Khong them migration/index moi o H04 vi: (a) `searchable(col)` dung `translate(translate(lower(...)))` + `ILIKE '%...%'` nen B-tree index thong thuong khong co tac dung; (b) giu nguyen Offset Pagination contract va tim kiem tieng Viet substring hien hanh; (c) giu nguyen `SELECT ... FOR UPDATE` tren `auth_sessions` de bao toan an toan xac thuc & single-flight session.
   4. **Learning Check:** `PENDING OWNER`.
+- **H04 Final Query Count & Benchmark Caveats (Safety Gate):**
+  - **Final SQL query count:** `Guest 10`, `Auth 17`, on dinh theo `page_size` `10/20/50/100` (bao gom `public_posts` visibility guard trong `read_post_states`).
+  - **Pham vi benchmark:** Cac so lieu latency/RPS BEFORE/AFTER hien co duoc do truoc khi bo sung visibility guard cuoi; khong tuyen bo final candidate da duoc benchmark day du lai.
+  - **Gioi han he thong:** HTTP 429 tu rate limiter tren loopback IP o 10-25 VUs va `feed_search` (~1.5s-1.9s) van la gioi han can theo doi.
+  - **Test Harness Safety Gate:** Dung chung `scripts/h04/safety_guard.py` (fail-closed kiem tra container `aurameme-h01-sim-pg`, port mapping `127.0.0.1:55450`, DB `aurameme_test`, revision `0018_canonical_asset_filenames`, synthetic fixture marker, SMTP sandbox, va owned uvicorn subprocess tren cong rieng `18080`).

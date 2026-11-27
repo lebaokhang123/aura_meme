@@ -34,52 +34,20 @@ import psutil
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
 
+from safety_guard import (
+    DEFAULT_HARNESS_PORT,
+    load_env_file,
+    owned_uvicorn_server,
+    verify_isolated_postgres,
+    verify_runtime_env,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT / "backend"
 ENV_FILE = BACKEND_DIR / ".env.h01"
 MANIFEST_FILE = BACKEND_DIR / "h01.local" / "seed_manifest.json"
-EXPECTED_REVISION = "0018_canonical_asset_filenames"
-EXPECTED_DB = "aurameme_test"
-EXPECTED_HOST = "127.0.0.1"
-EXPECTED_PORT = 55450
 USER_PASSWORD = "H01SimUser!2026"
-BASE_URL = "http://127.0.0.1:8000"
-
-
-def load_env_file(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        values[k.strip()] = v.strip().strip('"').strip("'")
-    return values
-
-
-def verify_db_identity(database_url: str) -> dict:
-    parsed = urlparse(database_url)
-    db_name = parsed.path.lstrip("/")
-    host = parsed.hostname
-    port = parsed.port
-    if db_name != EXPECTED_DB or host != EXPECTED_HOST or port != EXPECTED_PORT:
-        raise RuntimeError(
-            f"DB Identity Guard failed: got {host}:{port}/{db_name}, "
-            f"expected {EXPECTED_HOST}:{EXPECTED_PORT}/{EXPECTED_DB}"
-        )
-    engine = create_engine(database_url, pool_pre_ping=True)
-    with engine.connect() as conn:
-        row = conn.execute(
-            text("SELECT current_database(), (SELECT version_num FROM alembic_version LIMIT 1)")
-        ).one()
-        actual_db, revision = row[0], row[1]
-        if actual_db != EXPECTED_DB or revision != EXPECTED_REVISION:
-            raise RuntimeError(
-                f"DB Identity Guard failed: db={actual_db}, revision={revision}, "
-                f"expected {EXPECTED_DB} @ {EXPECTED_REVISION}"
-            )
-    engine.dispose()
-    return {"database": actual_db, "host": host, "port": port, "alembic_revision": revision}
+BASE_URL = f"http://127.0.0.1:{DEFAULT_HARNESS_PORT}"
 
 
 def percentile(values: list[float], pct: float) -> float:
@@ -442,8 +410,9 @@ def collect_resource_snapshot(server_pid: int | None) -> dict:
 
 async def main_async(args):
     env_vals = load_env_file(ENV_FILE)
+    verify_runtime_env(env_vals)
     db_url = env_vals["DATABASE_URL"]
-    db_identity = verify_db_identity(db_url)
+    db_identity = verify_isolated_postgres(db_url, MANIFEST_FILE)
     manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
 
     print("[1/5] Measuring SQL counts (in-process TestClient)...")
@@ -452,31 +421,9 @@ async def main_async(args):
     print("[2/5] Running EXPLAIN (ANALYZE, BUFFERS)...")
     explain_plans = run_explain_analyze(db_url, manifest)
 
-    print("[3/5] Starting uvicorn server on 127.0.0.1:8000 (workers=1)...")
-    proc_env = os.environ.copy()
-    proc_env.update(env_vals)
-    proc = subprocess.Popen(
-        [str(BACKEND_DIR / ".venv" / "Scripts" / "python.exe"), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000", "--workers", "1", "--log-level", "warning"],
-        cwd=str(BACKEND_DIR),
-        env=proc_env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    try:
-        # Wait for health
+    print(f"[3/5] Starting owned uvicorn server on 127.0.0.1:{DEFAULT_HARNESS_PORT} (workers=1)...")
+    with owned_uvicorn_server(BACKEND_DIR, env_vals, port=DEFAULT_HARNESS_PORT) as (proc, _):
         async with httpx.AsyncClient(timeout=5.0) as hc:
-            for _ in range(30):
-                try:
-                    r = await hc.get(f"{BASE_URL}/health")
-                    if r.status_code == 200:
-                        break
-                except Exception:
-                    pass
-                await asyncio.sleep(0.3)
-            else:
-                raise RuntimeError("Uvicorn server did not become healthy in time.")
-
-            # Grab 50 post IDs for realistic direct/write sampling
             posts_r = await hc.get(f"{BASE_URL}/api/v1/posts?page=1&page_size=50")
             post_ids = [item["id"] for item in posts_r.json()["items"]]
 
@@ -496,12 +443,6 @@ async def main_async(args):
                 stop_reason = f"Safe stop triggered at {vus} VUs (error_rate={stage['error_rate_pct']}%, p95={stage['p95_ms']}ms)"
                 print(f"  !! {stop_reason}")
                 break
-    finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
 
     report = {
         "phase": args.phase,
