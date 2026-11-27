@@ -1,4 +1,4 @@
-"""H06 PostgreSQL integration tests for Asset Lifecycle, Vault Pool Versioning, and System Asset Protection."""
+"""H06 PostgreSQL integration tests for Final Asset Lifecycle, Rarity Versioning, Empty Buckets & Founder Authority."""
 from io import BytesIO
 import os
 from pathlib import Path
@@ -49,10 +49,11 @@ def _make_png_bytes() -> bytes:
     return buf.getvalue()
 
 
-def _login_admin(client: TestClient) -> str:
+def _login(client: TestClient, email: str, password: str) -> str:
+    client.cookies.clear()
     pre = client.get("/api/v1/auth/csrf").json()["csrf_token"]
-    r = client.post("/api/v1/auth/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}, headers={"X-CSRF-Token": pre})
-    assert r.status_code == 200
+    r = client.post("/api/v1/auth/login", json={"email": email, "password": password}, headers={"X-CSRF-Token": pre})
+    assert r.status_code == 200, r.text
     return client.get("/api/v1/auth/csrf").json()["csrf_token"]
 
 
@@ -82,67 +83,63 @@ def _upload_and_approve(client: TestClient, filename: str, display_name: str) ->
     return aid
 
 
-def test_h06_asset_lifecycle_archive_restore_vault_and_protection(monkeypatch):
+def test_h06_final_asset_lifecycle_rarity_archive_restore_and_founder_delete(monkeypatch):
     _ensure_test_db()
     monkeypatch.setenv("AURAMEME_OWNER_MEME_DEMO", "1")
     from starlette.requests import Request
-    from app.catalog_rights import reviewed_source_rights_sql
     from app.main import app
     from app.meme_reactions import meme_reaction_states
     from app.models import (
-        AssetItem, AuraLedger, CaseDefinition, CaseLootRarity, CaseLootTable, CaseOpen,
-        CasePoolItem, Category, InventoryGrant, Post, PostReaction,
-        RewardPolicyVersion, User, UserEquipment, UserInventory,
+        AdminAuditLog, AssetItem, AuraLedger, CaseDefinition, CaseLootRarity,
+        CaseLootTable, CaseOpen, CasePoolItem, Category, InventoryGrant,
+        Post, PostReaction, Profile, RewardPolicyVersion, Role, User, UserEquipment,
+        UserInventory, UserRole,
     )
     from app.vault import RARITIES
-    from app.vault_runtime import load_runtime_pool
-    from app.vault_v1_policy import WEIGHTS
+    from app.vault_privilege import sync_khang_dev_vault_privilege
+    from app.vault_runtime import load_runtime_pool, receipt_reward
+    from app.vault_v1_policy import EFFECT_KEYS, WEIGHTS
 
     with TestClient(app, base_url="http://127.0.0.1:8000", headers=ORIGIN) as client:
-        csrf = _login_admin(client)
-        # 1. Upload & approve a fresh admin-upload meme (unique color so no hash collision)
-        png = _make_png_bytes()
+        _login(client, ADMIN_EMAIL, ADMIN_PASSWORD)
+
+        # 1. Upload & edit rarity while pending
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
         up = client.post(
             "/api/v1/admin/assets/upload",
-            files={"file": ("D_281126_91.png", png, "image/png")},
+            files={"file": ("D_281126_91.png", _make_png_bytes(), "image/png")},
             headers={"X-CSRF-Token": csrf},
         )
         assert up.status_code == 201, up.text
         asset_id = up.json()["items"][0]["id"]
-        assert up.json()["items"][0]["review_status"] == "pending"
-        assert up.json()["items"][0]["system_protected"] is False
 
-        # Edit name & rarity while pending and unowned -> succeeds
         csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
         ed = client.patch(
             f"/api/v1/admin/assets/{asset_id}",
-            json={"display_name": "H06 Lifecycle Meme", "rarity": "C"},
+            json={"display_name": "H06 Final Meme", "rarity": "C"},
             headers={"X-CSRF-Token": csrf},
         )
         assert ed.status_code == 200
-        assert ed.json()["display_name"] == "H06 Lifecycle Meme"
         assert ed.json()["rarity"] == "C"
 
-        # Approve -> active=True, review_status='approved'
         csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
         ap = client.patch(
             f"/api/v1/admin/assets/{asset_id}",
             json={"action": "approve"},
             headers={"X-CSRF-Token": csrf},
         )
-        assert ap.status_code == 200
-        assert ap.json()["active"] is True
-        assert ap.json()["review_status"] == "approved"
+        assert ap.status_code == 200 and ap.json()["active"] is True
 
-        # 2. Seed multi-user ownership, equipment, post reaction, and a Vault CaseOpen in DB
+        # Seed backup items per rarity with valid original proof
         now = app.state.auth.now()
         backup_by_rarity = {
-            rar: _upload_and_approve(client, f"{rar}_281126_{idx + 10}.png", f"H06 Backup {rar}")
+            rar: _upload_and_approve(client, f"{rar}_281126_{idx + 30}.png", f"H06 Final Backup {rar}")
             for idx, rar in enumerate(RARITIES)
         }
 
+        secondary_admin_email = f"h06_admin_{uuid4().hex[:6]}@example.com"
         with app.state.auth_session_factory() as db, db.begin():
-            for b_id in backup_by_rarity.values():
+            for b_id in list(backup_by_rarity.values()) + [asset_id]:
                 b_asset = db.get(AssetItem, b_id)
                 sha = (b_asset.source_rights or {}).get("sha256") or ("a" * 64)
                 b_asset.source_rights = {
@@ -163,9 +160,22 @@ def test_h06_asset_lifecycle_archive_restore_vault_and_protection(monkeypatch):
                         "copyright_notice": "AuraMeme H06 Test",
                     },
                 }
+
+            # Create a secondary non-Founder ADMIN for RBAC tests
+            admin_role = db.scalar(select(Role).where(Role.code == "ADMIN"))
+            admin_pw_hash = db.scalar(select(User.password_hash).where(User.email == ADMIN_EMAIL))
+            sec_admin = User(
+                id=uuid4(), username=f"h06admin_{uuid4().hex[:6]}", email=secondary_admin_email,
+                password_hash=admin_pw_hash,
+                status="active", created_at=now, updated_at=now,
+            )
+            db.add(sec_admin)
+            db.flush()
+            db.add(Profile(user_id=sec_admin.id, display_name="Secondary Admin", bio="", updated_at=now))
+            db.add(UserRole(user_id=sec_admin.id, role_id=admin_role.id, granted_at=now))
+
             u1 = db.scalar(select(User).where(User.email == USER_1_EMAIL))
             u2 = db.scalar(select(User).where(User.email == USER_2_EMAIL))
-            khang = db.scalar(select(User).where(User.email == ADMIN_EMAIL))
             pol = db.scalar(
                 select(RewardPolicyVersion).where(
                     RewardPolicyVersion.status == "published",
@@ -173,9 +183,8 @@ def test_h06_asset_lifecycle_archive_restore_vault_and_protection(monkeypatch):
                 ).limit(1)
             )
             cat = db.scalar(select(Category).limit(1))
-            assert u1 and u2 and khang and pol and cat
+            assert u1 and u2 and pol and cat
 
-            # Grant to u1 and u2, equip on u1 and u2
             for u in (u1, u2):
                 if db.scalar(select(UserInventory).where(UserInventory.user_id == u.id, UserInventory.asset_id == asset_id)) is None:
                     db.add(UserInventory(user_id=u.id, asset_id=asset_id, quantity=1, acquired_at=now, updated_at=now))
@@ -184,13 +193,11 @@ def test_h06_asset_lifecycle_archive_restore_vault_and_protection(monkeypatch):
             for u in (u1, u2):
                 db.add(UserEquipment(user_id=u.id, slot_kind="avatar", asset_id=asset_id, equipped_at=now))
 
-            # Post reaction using this meme
-            p = Post(id=uuid4(), author_id=u1.id, category_id=cat.id, title="H06 Reaction Post", content="h06", status="published", created_at=now, updated_at=now)
+            p = Post(id=uuid4(), author_id=u1.id, category_id=cat.id, title="H06 Final Reaction Post", content="h06", status="published", created_at=now, updated_at=now)
             db.add(p)
             db.flush()
             db.add(PostReaction(post_id=p.id, user_id=u1.id, reaction_type="meme", meme_asset_id=asset_id, created_at=now, updated_at=now))
 
-            # Reuse or create an active CaseDefinition (uq_case_definitions_runtime_kind allows one per runtime_kind)
             case = db.scalar(select(CaseDefinition).where(CaseDefinition.runtime_kind == "avatar"))
             if case is None:
                 case = CaseDefinition(id=uuid4(), slug=f"h06-case-{uuid4().hex[:6]}", label="H06 Case", cost_khi_van=0, status="active", runtime_kind="avatar", created_at=now, updated_at=now)
@@ -208,7 +215,6 @@ def test_h06_asset_lifecycle_archive_restore_vault_and_protection(monkeypatch):
             lt.status = "published"
             db.flush()
 
-            # Record a real CaseOpen referencing (lt.id, asset_id)
             earned = db.scalar(
                 select(func.coalesce(func.sum(AuraLedger.base_xp), 0)).where(
                     AuraLedger.user_id == u1.id, AuraLedger.occurred_at <= now
@@ -217,6 +223,7 @@ def test_h06_asset_lifecycle_archive_restore_vault_and_protection(monkeypatch):
             co = CaseOpen(
                 id=uuid4(), user_id=u1.id, request_key=f"h06-open-{uuid4().hex}",
                 case_id=case.id, loot_table_id=lt.id, reward_asset_id=asset_id,
+                reward_rarity="C",
                 earned_xp_at_open=int(earned or 0), cost_khi_van=0, wallet_transaction_id=None,
                 is_daily_free=False, effective_day=now.date(),
                 decision_trace={"runtime": "free-vault-v1"}, created_at=now,
@@ -226,119 +233,201 @@ def test_h06_asset_lifecycle_archive_restore_vault_and_protection(monkeypatch):
             lt_id = lt.id
             case_id = case.id
             post_id = p.id
-            khang_id = khang.id
+            open_id = co.id
 
-        # Rarity change after owned & in published pool -> 409 RARITY_IMMUTABLE (never 500)
+        # 2. Change rarity from C -> B even when owned, equipped, and in published Vault pool + CaseOpen!
         csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
         rc = client.patch(
             f"/api/v1/admin/assets/{asset_id}",
-            json={"rarity": "B"},
+            json={"display_name": "H06 Renamed B", "rarity": "B"},
             headers={"X-CSRF-Token": csrf},
         )
-        assert rc.status_code == 409
-        assert rc.json()["error"]["code"] == "RARITY_IMMUTABLE"
+        assert rc.status_code == 200, rc.text
+        assert rc.json()["rarity"] == "B"
+        assert rc.json()["display_name"] == "H06 Renamed B"
 
-        # 3. Archive the used meme -> MUST SUCCEED (200), auto-unequip, version loot table, keep history!
+        with app.state.auth_session_factory() as db:
+            # Historical CaseOpen receipt STILL preserves reward_rarity='C' while asset is now 'B'
+            opening = db.get(CaseOpen, open_id)
+            fake_req = Request({"type": "http", "app": app, "headers": []})
+            rew = receipt_reward(db, opening, fake_req)
+            assert rew.rarity == "C"
+            # New published pool has asset_id in B bucket, old lt retired with C untouched
+            old_lt = db.get(CaseLootTable, lt_id)
+            assert old_lt.status == "retired"
+            new_lt = db.scalar(select(CaseLootTable).where(CaseLootTable.case_id == case_id, CaseLootTable.odds_version == max_ver + 2))
+            assert new_lt is not None and new_lt.status == "published"
+            moved_pool_item = db.scalar(select(CasePoolItem).where(CasePoolItem.loot_table_id == new_lt.id, CasePoolItem.asset_id == asset_id))
+            assert moved_pool_item.rarity == "B"
+
+        # 3. Original asset (e.g. non-admin-upload meme or background) can also be renamed, rarity-changed, archived & restored!
+        with app.state.auth_session_factory() as db:
+            orig_bg = db.scalar(select(AssetItem).where(AssetItem.kind == "background", AssetItem.deleted_at.is_(None)).limit(1))
+            assert orig_bg is not None
+            orig_bg_id = str(orig_bg.id)
+            orig_bg_rar = orig_bg.rarity
+            orig_bg_eff = orig_bg.effect_key
+        new_bg_rar = "A" if orig_bg_rar != "A" else "B"
         csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        bg_edit = client.patch(
+            f"/api/v1/admin/assets/{orig_bg_id}",
+            json={"display_name": "H06 Renamed BG", "rarity": new_bg_rar},
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert bg_edit.status_code == 200, bg_edit.text
+        assert bg_edit.json()["rarity"] == new_bg_rar
+        assert bg_edit.json()["effect_key"] == EFFECT_KEYS[RARITIES.index(new_bg_rar)]
+        # Restore original rarity/effect_key of bg so shared test fixture stays clean
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        bg_restore_rar = client.patch(
+            f"/api/v1/admin/assets/{orig_bg_id}",
+            json={"rarity": orig_bg_rar},
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert bg_restore_rar.status_code == 200
+        assert bg_restore_rar.json()["effect_key"] == orig_bg_eff
+
+        # 4. Founder CANNOT permanently delete an Active asset -> 409 ASSET_NOT_ARCHIVED
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        del_active = client.request(
+            "DELETE",
+            f"/api/v1/admin/assets/{asset_id}",
+            json={"confirm_text": "XÓA VĨNH VIỄN"},
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert del_active.status_code == 409
+        assert del_active.json()["error"]["code"] == "ASSET_NOT_ARCHIVED"
+
+        # 5. Secondary non-Founder ADMIN archives & restores, but CANNOT permanent delete (403)
+        csrf = _login(client, secondary_admin_email, ADMIN_PASSWORD)
         ar = client.patch(
             f"/api/v1/admin/assets/{asset_id}",
             json={"action": "archive"},
             headers={"X-CSRF-Token": csrf},
         )
-        assert ar.status_code == 200, ar.text
-        assert ar.json()["active"] is False
-        assert ar.json()["review_status"] == "approved"
+        assert ar.status_code == 200
+        assert ar.json()["active"] is False and ar.json()["review_status"] == "approved"
 
+        # Verify auto-unequip, inventory preserved, meme reaction hidden
         with app.state.auth_session_factory() as db:
-            # Equipment removed
-            eq_cnt = db.scalar(select(func.count()).select_from(UserEquipment).where(UserEquipment.asset_id == asset_id))
-            assert eq_cnt == 0
-            # Multi-user inventory preserved
-            inv_cnt = db.scalar(select(func.count()).select_from(UserInventory).where(UserInventory.asset_id == asset_id, UserInventory.quantity == 1))
-            assert inv_cnt >= 2
-            # Old loot table retired, new version 2 published without archived asset
-            old_lt = db.get(CaseLootTable, lt_id)
-            assert old_lt.status == "retired"
-            new_lt = db.scalar(select(CaseLootTable).where(CaseLootTable.case_id == case_id, CaseLootTable.odds_version == max_ver + 2))
-            assert new_lt is not None and new_lt.status == "published"
-            # Vault pool still loads cleanly with original D/C/B/A/S weights!
-            pool = load_runtime_pool(db, db.get(CaseDefinition, case_id), app.state.auth.now())
-            assert pool.id == new_lt.id and pool.version == max_ver + 2
-            # Meme reaction on post is excluded while inactive
+            assert db.scalar(select(func.count()).select_from(UserEquipment).where(UserEquipment.asset_id == asset_id)) == 0
+            assert db.scalar(select(func.count()).select_from(UserInventory).where(UserInventory.asset_id == asset_id, UserInventory.quantity == 1)) >= 2
             fake_req = Request({"type": "http", "app": app, "headers": []})
-            mr = meme_reaction_states(db, PostReaction, [post_id], None, fake_req)
-            assert mr[post_id]["meme_reactions"] == []
+            assert meme_reaction_states(db, PostReaction, [post_id], None, fake_req)[post_id]["meme_reactions"] == []
 
-        # 4. Restore archived meme -> active=True, no duplicate InventoryGrant for khang_dev!
+        # Secondary ADMIN calling permanent delete -> 403 FORBIDDEN!
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        sec_del = client.request(
+            "DELETE",
+            f"/api/v1/admin/assets/{asset_id}",
+            json={"confirm_text": "XÓA VĨNH VIỄN"},
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert sec_del.status_code == 403
+
+        # Secondary ADMIN restores -> active=True, returned to Vault pool, no auto-re-equip
         csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
         rs = client.patch(
             f"/api/v1/admin/assets/{asset_id}",
             json={"action": "approve"},
             headers={"X-CSRF-Token": csrf},
         )
-        assert rs.status_code == 200
-        assert rs.json()["active"] is True
+        assert rs.status_code == 200 and rs.json()["active"] is True
         with app.state.auth_session_factory() as db:
-            grant_cnt = db.scalar(
-                select(func.count()).select_from(InventoryGrant).where(
-                    InventoryGrant.user_id == khang_id, InventoryGrant.asset_id == asset_id
-                )
-            )
-            assert grant_cnt <= 1
+            assert db.scalar(select(func.count()).select_from(UserEquipment).where(UserEquipment.asset_id == asset_id)) == 0
+            pool = load_runtime_pool(db, db.get(CaseDefinition, case_id), app.state.auth.now())
+            # B bucket (index 2) contains restored asset_id
+            assert any(item_id == asset_id or str(item_id) == asset_id for item_id, _ in pool.buckets[2])
 
-        # 5. System original assets (70 memes + 5 backgrounds) remain protected on backend
+        # 6. Founder archives -> invalid confirm phrase rejected (422) -> valid permanent delete succeeds (200)
+        csrf = _login(client, ADMIN_EMAIL, ADMIN_PASSWORD)
+        assert client.patch(f"/api/v1/admin/assets/{asset_id}", json={"action": "archive"}, headers={"X-CSRF-Token": csrf}).status_code == 200
+
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        bad_del = client.request(
+            "DELETE",
+            f"/api/v1/admin/assets/{asset_id}",
+            json={"confirm_text": "DELETE"},
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert bad_del.status_code == 422
+
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        perm_del = client.request(
+            "DELETE",
+            f"/api/v1/admin/assets/{asset_id}",
+            json={"confirm_text": "XÓA VĨNH VIỄN"},
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert perm_del.status_code == 200, perm_del.text
+
+        # Excluded from Admin list, cannot be patched/restored, CaseOpen preserved, reconciliation skips tombstone
+        listed = client.get("/api/v1/admin/assets?page=1&page_size=100&search=H06+Renamed+B")
+        assert listed.status_code == 200
+        assert all(it["id"] != asset_id for it in listed.json()["items"])
+
+        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
+        assert client.patch(f"/api/v1/admin/assets/{asset_id}", json={"action": "approve"}, headers={"X-CSRF-Token": csrf}).status_code == 404
+
         with app.state.auth_session_factory() as db:
-            orig_meme = db.scalar(select(AssetItem).where(AssetItem.collection != "admin-upload", AssetItem.kind == "avatar").limit(1))
-            orig_bg = db.scalar(select(AssetItem).where(AssetItem.kind == "background").limit(1))
-            assert orig_meme and orig_bg
-        for sys_id in (orig_meme.id, orig_bg.id):
-            csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
-            prot = client.patch(
-                f"/api/v1/admin/assets/{sys_id}",
-                json={"action": "archive"},
-                headers={"X-CSRF-Token": csrf},
-            )
-            assert prot.status_code == 409
-            assert prot.json()["error"]["code"] == "SYSTEM_ASSET_PROTECTED"
+            tomb = db.get(AssetItem, asset_id)
+            assert tomb.deleted_at is not None and tomb.active is False
+            assert db.get(CaseOpen, open_id) is not None
+            audit_del = db.scalar(select(AdminAuditLog).where(AdminAuditLog.action == "asset.permanent_delete", AdminAuditLog.target_id == asset_id))
+            assert audit_del is not None
+            dry = sync_khang_dev_vault_privilege(db, app.state.auth.now(), dry_run=True)
+            assert all(m["id"] != asset_id for m in dry.get("missing_assets", []))
+
+        # 7. USER role receives 403 on admin asset mutation
+        csrf = _login(client, USER_1_EMAIL, "H01SimUser!2026")
+        assert client.patch(f"/api/v1/admin/assets/{orig_bg_id}", json={"display_name": "Hack"}, headers={"X-CSRF-Token": csrf}).status_code == 403
 
 
-def test_h06_empty_rarity_bucket_rollback(monkeypatch):
+def test_h06_empty_rarity_bucket_allowed_with_warning_and_case_unavailable(monkeypatch):
     _ensure_test_db()
     monkeypatch.setenv("AURAMEME_OWNER_MEME_DEMO", "1")
-    from app.catalog_rights import reviewed_source_rights_sql
     from app.main import app
     from app.models import (
         AssetItem, CaseDefinition, CaseLootRarity, CaseLootTable,
         CasePoolItem, RewardPolicyVersion,
     )
     from app.vault import RARITIES
+    from app.vault_runtime import load_runtime_pool
     from app.vault_v1_policy import WEIGHTS
 
     with TestClient(app, base_url="http://127.0.0.1:8000", headers=ORIGIN) as client:
-        csrf = _login_admin(client)
-        up = client.post(
-            "/api/v1/admin/assets/upload",
-            files={"file": ("C_281126_92.png", _make_png_bytes(), "image/png")},
-            headers={"X-CSRF-Token": csrf},
-        )
-        assert up.status_code == 201, up.text
-        asset_id = up.json()["items"][0]["id"]
-        csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
-        ap = client.patch(
-            f"/api/v1/admin/assets/{asset_id}",
-            json={"action": "approve"},
-            headers={"X-CSRF-Token": csrf},
-        )
-        assert ap.status_code == 200, ap.text
-
+        _login(client, ADMIN_EMAIL, ADMIN_PASSWORD)
+        asset_id = _upload_and_approve(client, "C_281126_92.png", "H06 Sole C")
         backup_by_rarity = {
-            rar: _upload_and_approve(client, f"{rar}_281126_{idx + 20}.png", f"H06 Empty Backup {rar}")
+            rar: _upload_and_approve(client, f"{rar}_281126_{idx + 40}.png", f"H06 Empty Backup {rar}")
             for idx, rar in enumerate(RARITIES)
             if rar != "C"
         }
 
         with app.state.auth_session_factory() as db, db.begin():
             now = app.state.auth.now()
+            for b_id in list(backup_by_rarity.values()) + [asset_id]:
+                b_asset = db.get(AssetItem, b_id)
+                sha = (b_asset.source_rights or {}).get("sha256") or ("b" * 64)
+                b_asset.source_rights = {
+                    "review_status": "approved",
+                    "name_review_status": "approved",
+                    "source": "aurameme://original/h06-empty",
+                    "author": "AuraMeme H06 Test",
+                    "license": "LicenseRef-AuraMeme-Original",
+                    "attribution": "AuraMeme H06 Test",
+                    "sha256": sha,
+                    "proof": {
+                        "basis": "original",
+                        "source": "aurameme://original/h06-empty",
+                        "license_id": "LicenseRef-AuraMeme-Original",
+                        "license_url": "aurameme://original/license",
+                        "artifact_sha256": sha,
+                        "evidence_sha256": sha,
+                        "copyright_notice": "AuraMeme H06 Test",
+                    },
+                }
+
             pol = db.scalar(
                 select(RewardPolicyVersion).where(
                     RewardPolicyVersion.status == "published",
@@ -346,13 +435,6 @@ def test_h06_empty_rarity_bucket_rollback(monkeypatch):
                 ).limit(1)
             )
             case = db.scalar(select(CaseDefinition).where(CaseDefinition.runtime_kind == "avatar"))
-            if case is None:
-                case = CaseDefinition(
-                    id=uuid4(), slug=f"h06-empty-{uuid4().hex[:6]}", label="H06 Empty Bucket Case",
-                    cost_khi_van=0, status="active", runtime_kind="avatar", created_at=now, updated_at=now,
-                )
-                db.add(case)
-                db.flush()
             max_ver = db.scalar(select(func.max(CaseLootTable.odds_version)).where(CaseLootTable.case_id == case.id)) or 0
             lt = CaseLootTable(
                 id=uuid4(), case_id=case.id, policy_id=pol.id, odds_version=max_ver + 1,
@@ -363,27 +445,25 @@ def test_h06_empty_rarity_bucket_rollback(monkeypatch):
             db.flush()
             for rar, w in zip(RARITIES, WEIGHTS):
                 db.add(CaseLootRarity(loot_table_id=lt.id, rarity=rar, weight_bps=w))
-                if rar == "C":
-                    db.add(CasePoolItem(loot_table_id=lt.id, asset_id=asset_id, rarity="C", item_weight=1))
-                else:
-                    db.add(CasePoolItem(loot_table_id=lt.id, asset_id=backup_by_rarity[rar], rarity=rar, item_weight=1))
+                cid = asset_id if rar == "C" else backup_by_rarity[rar]
+                db.add(CasePoolItem(loot_table_id=lt.id, asset_id=cid, rarity=rar, item_weight=1))
             db.flush()
             lt.status = "published"
             db.flush()
-            lt_id = lt.id
+            case_id = case.id
 
-        # Archiving the sole item in bucket C must fail 409 EMPTY_RARITY_BUCKET and roll back cleanly
+        # Archiving the sole C item MUST SUCCEED (200) and emit a clear pool_warning!
         csrf = client.get("/api/v1/auth/csrf").json()["csrf_token"]
         ar = client.patch(
             f"/api/v1/admin/assets/{asset_id}",
             json={"action": "archive"},
             headers={"X-CSRF-Token": csrf},
         )
-        assert ar.status_code == 409, ar.text
-        assert ar.json()["error"]["code"] == "EMPTY_RARITY_BUCKET"
+        assert ar.status_code == 200, ar.text
+        assert ar.json()["active"] is False
+        assert len(ar.json().get("pool_warnings", [])) >= 1
 
+        # Affected case is temporarily unavailable until replenished (ValueError -> 503 NOT_READY)
         with app.state.auth_session_factory() as db:
-            lt_after = db.get(CaseLootTable, lt_id)
-            assert lt_after.status == "published"
-            asset_after = db.get(AssetItem, asset_id)
-            assert asset_after.active is True
+            with pytest.raises(ValueError, match="Each V1 rarity needs approved items"):
+                load_runtime_pool(db, db.get(CaseDefinition, case_id), app.state.auth.now())

@@ -262,17 +262,16 @@ CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute 
   - **Bounded capacity:** `max_entries = 16384` gioi han bo nho tren RAM, khong dong nghia ho tro `16.384 concurrent users` (nhieu session/thiet bi cua cung user hoac guest churn co the chiem nhieu entry).
 
 
-## ADR-H06: Asset Lifecycle, Soft Delete, Referential Integrity & Vault Pool Versioning (`fix/h06-asset-lifecycle`)
+## ADR-H06: Final Asset Lifecycle, Rarity Versioning, Tombstone & Founder Authority (`fix/h06-asset-lifecycle`)
 
-- **Trang thai:** Da chap thuan & Trien khai tren nhanh `fix/h06-asset-lifecycle`.
-- **Van de (Owner Acceptance Bug Report):** Meme `admin-upload` dang duoc su dung (da trang bi, co trong kho, co reaction hoac nam trong `case_pool_items` da phat hanh) khi bam Archive/Xoa that bai voi loi chung `"Database operation failed"`. Ngoai ra giao dien Admin chua phan biet ro `Pending`, `Approved + Active`, `Archived (Approved + Inactive)` va `Rejected`, con dung tu "Xoa", va gom moi loi HTTP 409 thanh mot thong bao chung.
-- **Root Cause (da tai hien tren PostgreSQL `aurameme_test`):**
-  1. `admin_workspace.py` goi `delete(CasePoolItem)` tren bang rương da phat hanh -> PostgreSQL trigger `case_pool_items_guard` (`aurameme_odds_guard()`) chan voi `CheckViolation: Published odds children are immutable` va `CaseOpen` co FK `ON DELETE RESTRICT` (`fk_case_opens_pool_reward`) toi `case_pool_items`.
-  2. `asset_items_guard` (`aurameme_equipment_guard()`) chan `CheckViolation: Unequip before deactivating asset` neu `active=False` flush truoc khi xoa `UserEquipment`, va chan `Referenced catalog kind and rarity are immutable` neu doi `rarity` sau khi co nguoi so huu.
-  3. `admin_workspace.py` gan `review_status='rejected'` khi `archive`, lam mat phan biet giua `Archived` va `Rejected`.
+- **Trang thai:** Da chap thuan & Trien khai tren nhanh `fix/h06-asset-lifecycle` (thay the quy tac bao ve co dinh 75 vat pham goc va `RARITY_IMMUTABLE` truoc do).
+- **Van de:** Admin can quan ly toan dien ca vat pham goc lan vat pham tai len (doi ten, doi hang D/C/B/A/S, ngung luu hanh, khoi phuc) ngay ca khi da so huu/trang bi/mo ruong, va rieng Founder Khang Dev co quyen xoa vinh vien vat pham da luu tru, nhung van bao toan toan ven tham chieu (`fk_case_opens_pool_reward`, `aurameme_odds_guard`, `aurameme_equipment_guard`) va lich su mo ruong.
 - **Quyet dinh:**
-  1. **Soft-delete / Archive lifecycle khong doi schema DB:** Giu nguyen `AssetItem.id`, `UserInventory`, `InventoryGrant`, `CaseOpen`, lich su Vault/EXP/Audit va file media vat ly. Khi `archive`, auto-unequip `UserEquipment` va `flush()` truoc khi dat `asset.active = False`, dong thoi giu `review_status = 'approved'`.
-  2. **Vault Pool Versioning (`_retire_and_republish_pool_without_asset`):** Khong xoa `CasePoolItem` khoi `CaseLootTable` da `published`. Thay vao do kiem tra bucket rarity con it nhat 1 vat pham hoat dong co proof hop le (neu rong -> `409 EMPTY_RARITY_BUCKET` va rollback sach), tao phien ban `CaseLootTable` moi (`odds_version + 1`) khong chua vat pham bi archive voi nguyen trong so D/C/B/A/S, chuyen bang cu sang `retired` va publish bang moi.
-  3. **Bao ve 75 vat pham goc & bat bien rarity:** Chan `409 SYSTEM_ASSET_PROTECTED` cho toan bo 70 meme goc va 5 background goc; chan `409 RARITY_IMMUTABLE` khi vat pham da co nguoi so huu/mo ruong/phat hanh.
-  4. **Restore & Admin UI:** Ho tro khoi phuc (`action='approve'`) vat pham da archive ma khong tao trung `InventoryGrant`; cap nhat `AdminPage.jsx` & `admin-api.js` voi nhan `Ngung luu hanh`, `Khoi phuc`, badge `He thong goc`, va hien thi dung `error.message` tu backend cho tung ma loi 409.
+  1. **Migration `0019_asset_lifecycle_tombstone`:**
+     - Them tombstone `asset_items.deleted_at` / `deleted_by` (`FK users.id ON DELETE RESTRICT`, `CHECK (deleted_at IS NULL OR NOT active)`).
+     - Them `case_opens.reward_rarity` (luu snapshot hang tai thoi diem mo ruong) va thay `fk_case_pool_items_asset_rarity` bang `fk_case_pool_items_asset_id` (`asset_id -> asset_items.id ON DELETE RESTRICT`) de cac bang `case_pool_items` da `retired` giu nguyen hang lich su khi `asset_items.rarity` thay doi.
+     - Cap nhat `aurameme_equipment_guard()`: cho phep doi `rarity` khi da co trong `user_inventory` (van khoa doi `kind`), va chan deactivate/tombstone neu `user_equipment` van dang tro toi.
+  2. **RBAC & Founder Authority:** Moi `ADMIN` duoc doi ten, doi hang, duyet/tu choi, ngung luu hanh (`archive`), khoi phuc (`approve`). Rieng `DELETE /api/v1/admin/assets/{id}` chi cho phep `KHANG_DEV_ID` (`403 FORBIDDEN` cho Admin khac), chi ap dung khi dang `Archived` (`409 ASSET_NOT_ARCHIVED`), va bat buoc nhap xac nhan `XÓA VĨNH VIỄN`.
+  3. **Vault Pool Versioning & Empty Bucket Policy:** Moi thay doi (`archive`, `reject`, `permanent_delete`, `rarity` change, `restore`) tao `CaseLootTable` phien ban moi (`odds_version + 1`), giu nguyen trong so D/C/B/A/S (`6890, 2000, 1000, 100, 10`). Neu mot bucket bi rong, thao tac quan ly van thanh cong kem `pool_warnings` cho Admin va ruong bi anh huong tam ngung mo (`503 NOT_READY`) cho den khi duoc bo sung.
+  4. **Tombstone Isolation:** Toan bo truy van runtime (`inventory`, `vault/catalog`, `equipment`, `meme_reactions`, `vault_privilege` Founder reconciliation, `admin/assets`) loc `deleted_at IS NULL`, bao toan `CaseOpen`, `InventoryGrant`, EXP, wallet va `AdminAuditLog`.
   5. **Learning Check:** `PENDING OWNER`.
