@@ -27,7 +27,7 @@ const ERROR_COPY = {
     icon: 'cloud_off',
     viTitle: 'Dịch vụ tạm thời không khả dụng',
     enTitle: 'Service temporarily unavailable',
-    viDesc: 'Không thể kết nối tới máy chủ lúc này. Vui lòng thử lại sau.',
+    viDesc: 'Không kết nối được máy chủ lúc này. Vui lòng thử lại sau.',
     enDesc: 'Unable to reach the server right now. Please try again shortly.',
   },
 };
