@@ -18,6 +18,7 @@ def valid_meme_reaction(model):
         .join(AssetItem, AssetItem.id == UserInventory.asset_id)
         .where(UserInventory.user_id == model.user_id, UserInventory.asset_id == model.meme_asset_id,
                UserInventory.quantity > 0, AssetItem.kind == 'avatar', AssetItem.active.is_(True),
+               AssetItem.deleted_at.is_(None),
                reviewed_source_rights_sql(AssetItem.source_rights))).correlate(model))
 
 
@@ -63,6 +64,7 @@ def meme_reaction_states(db, model, target_ids, viewer_id, request):
                                   UserInventory.asset_id == model.meme_asset_id))
         .where(target.in_(target_ids), model.reaction_type == 'meme', User.status == 'active',
                UserInventory.quantity > 0, AssetItem.kind == 'avatar', AssetItem.active.is_(True),
+               AssetItem.deleted_at.is_(None),
                reviewed_source_rights_sql(AssetItem.source_rights))
         .group_by(target, AssetItem.id).order_by(target, AssetItem.id)
         .options(undefer(AssetItem.display_name), undefer(AssetItem.effect_key)))

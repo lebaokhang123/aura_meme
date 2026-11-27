@@ -40,7 +40,7 @@ def schema_ready(db):
     return list(db.scalars(text('SELECT version_num FROM alembic_version'))) in (
         ['0012_aura_v1'], ['0013_notifications'], ['0014_premium_sandbox'],
         ['0015_google_auth_and_password_reset'], ['0016_account_email_verifications'],
-        ['0017_user_follows'], ['0018_canonical_asset_filenames'])
+        ['0017_user_follows'], ['0018_canonical_asset_filenames'], ['0019_asset_lifecycle_tombstone'])
 
 
 def require_schema(db):
@@ -93,9 +93,13 @@ def load_runtime_pool(db, case, now):
         CasePoolItem.loot_table_id == table.id).options(undefer(AssetItem.display_name), undefer(AssetItem.effect_key))
         .order_by(CasePoolItem.asset_id).with_for_update(read=True).execution_options(populate_existing=True))
     for item, asset in rows:
-        if (not ready_runtime_asset(asset, case.runtime_kind) or asset.rarity != item.rarity or item.item_weight != 1
-                or (config.catalog_manifest_sha256 is not None
-                    and asset.source_rights.get('manifest_sha256') != config.catalog_manifest_sha256)):
+        is_admin_upload = asset.collection == 'admin-upload' and bool((asset.source_rights or {}).get('uploaded_by'))
+        manifest_ok = (
+            config.catalog_manifest_sha256 is None
+            or is_admin_upload
+            or asset.source_rights.get('manifest_sha256') == config.catalog_manifest_sha256
+        )
+        if not ready_runtime_asset(asset, case.runtime_kind) or asset.rarity != item.rarity or item.item_weight != 1 or not manifest_ok:
             raise ValueError('V1 pool contains an unapproved, mixed-kind or nonuniform item.')
         buckets[item.rarity].append((asset.id, 1))
     if any(not bucket for bucket in buckets.values()):
@@ -115,9 +119,19 @@ def receipt_reward(db, opening, request):
         undefer(AssetItem.display_name), undefer(AssetItem.effect_key)))
     if asset is None:
         raise AuthError(503, 'NOT_READY', 'Stored reward reference is unavailable.')
+    historical_rarity = getattr(opening, 'reward_rarity', None)
+    if not historical_rarity:
+        historical_rarity = db.scalar(
+            select(CasePoolItem.rarity).where(
+                CasePoolItem.loot_table_id == opening.loot_table_id,
+                CasePoolItem.asset_id == opening.reward_asset_id,
+            )
+        ) or asset.rarity
     if ready_asset(asset):
-        return asset_dto(asset, request, metadata=True)
-    return Asset(id=asset.id, slug=asset.slug, kind=asset.kind, rarity=asset.rarity,
+        dto = asset_dto(asset, request, metadata=True)
+        return dto.model_copy(update={'rarity': historical_rarity})
+    from app.asset_schemas import Asset
+    return Asset(id=asset.id, slug=asset.slug, kind=asset.kind, rarity=historical_rarity,
                  display_name=asset.display_name or asset.slug, effect_key=None, media_url=None, available=False)
 
 
@@ -173,11 +187,15 @@ def open_runtime(request, account, case_id, key, *, randbelow=secrets.randbelow)
     except ValueError:
         raise AuthError(503, 'NOT_READY', 'This case needs a complete approved catalog and policy.') from None
     asset_id, trace = draw(pool, randbelow=randbelow)
+    reward_rarity = next(
+        (rar for rar, bucket in zip(RARITIES, pool.buckets) if any(item_id == asset_id for item_id, _ in bucket)),
+        None,
+    )
     # Read-only compatibility snapshot for 0009's trigger; XP never selects odds or changes here.
     earned = db.scalar(select(func.coalesce(func.sum(AuraLedger.base_xp), 0)).where(
         AuraLedger.user_id == owner, AuraLedger.occurred_at <= now))
     opening = CaseOpen(id=uuid4(), user_id=owner, request_key=key, case_id=case.id, loot_table_id=pool.id,
-        reward_asset_id=asset_id, earned_xp_at_open=earned, cost_khi_van=0, wallet_transaction_id=None,
+        reward_asset_id=asset_id, reward_rarity=reward_rarity, earned_xp_at_open=earned, cost_khi_van=0, wallet_transaction_id=None,
         is_daily_free=False, effective_day=effective_day(now), decision_trace=trace | {'runtime': 'free-vault-v1'}, created_at=now)
     db.add(opening)
     db.flush()
@@ -211,7 +229,7 @@ def catalog(request: Request, kind: Literal['avatar', 'background'] | None = Non
         raise AuthError(422, "VALIDATION_ERROR", "Invalid catalog search.")
     query = select(AssetItem, UserInventory.asset_id).outerjoin(UserInventory, and_(
         UserInventory.asset_id == AssetItem.id, UserInventory.user_id == account.user.id,
-        UserInventory.quantity > 0)).where(AssetItem.active.is_(True),
+        UserInventory.quantity > 0)).where(AssetItem.active.is_(True), AssetItem.deleted_at.is_(None),
         reviewed_source_rights_sql(AssetItem.source_rights), AssetItem.kind.in_(('avatar','background')))
     if kind:
         query = query.where(AssetItem.kind == kind)
@@ -240,6 +258,7 @@ def equipment(request: Request, account=Depends(require_authenticated_user, scop
     require_enabled(request, account.db)
     rows = account.db.execute(select(UserEquipment, AssetItem).join(AssetItem, AssetItem.id == UserEquipment.asset_id)
         .where(UserEquipment.user_id == account.user.id, AssetItem.active.is_(True),
+               AssetItem.deleted_at.is_(None),
                reviewed_source_rights_sql(AssetItem.source_rights))
         .options(undefer(AssetItem.display_name), undefer(AssetItem.effect_key)).order_by(UserEquipment.slot_kind))
     return EquipmentPage(items=[EquippedItem(slot_kind=slot.slot_kind, asset=asset_dto(asset, request, metadata=True))

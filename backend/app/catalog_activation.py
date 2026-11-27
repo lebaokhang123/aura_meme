@@ -93,6 +93,8 @@ def activate_catalog(db, manifest, manifest_digest, approved_digest, now, *, act
         key = 'catalog/'+item.sha256+{'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp'}[item.mime]
         asset = db.scalar(select(AssetItem).where(or_(AssetItem.id == item.id, AssetItem.slug == item.slug))
             .options(undefer(AssetItem.display_name),undefer(AssetItem.effect_key)).with_for_update())
+        if asset is not None and (asset.deleted_at is not None or (asset.source_rights or {}).get('admin_managed') is True):
+            continue
         if asset is not None and ((asset.id,asset.slug,asset.kind,asset.collection,asset.rarity,asset.media_key) !=
                 (item.id,item.slug,item.kind,item.collection,item.rarity,key)):
             raise ValueError('Conflicting identity; never overwrite catalog assets.')

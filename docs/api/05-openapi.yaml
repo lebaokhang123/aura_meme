@@ -4051,6 +4051,39 @@ paths:
               "type": "string",
               "nullable": true
             }
+          },
+          {
+            "name": "rarity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "title": "Rarity",
+              "enum": [
+                "D",
+                "C",
+                "B",
+                "A",
+                "S"
+              ],
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "lifecycle_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "title": "Lifecycle Status",
+              "enum": [
+                "pending",
+                "active",
+                "archived",
+                "rejected"
+              ],
+              "type": "string",
+              "nullable": true
+            }
           }
         ],
         "responses": {
@@ -4081,6 +4114,143 @@ paths:
           }
         },
         "x-phase": "P0"
+      }
+    }
+  /api/v1/admin/assets/{asset_id}:
+    {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Update Asset",
+        "operationId": "adminUpdateAsset",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminAssetPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAsset"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Permanent Delete Asset (Founder Only)",
+        "operationId": "adminPermanentDeleteAsset",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminAssetPermanentDeleteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAssetPermanentDeleteResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
       }
     }
   /api/v1/admin/posts/{post_id}/media:
@@ -6054,6 +6224,83 @@ components:
         ],
         "title": "AdminCommentPage"
       }
+    AdminAssetPatch:
+      {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "nullable": true
+          },
+          "rarity": {
+            "type": "string",
+            "enum": [
+              "D",
+              "C",
+              "B",
+              "A",
+              "S"
+            ],
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "reject",
+              "archive"
+            ],
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "title": "AdminAssetPatch"
+      }
+    AdminAssetPermanentDeleteInput:
+      {
+        "properties": {
+          "confirm_text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "type": "object",
+        "required": [
+          "confirm_text"
+        ],
+        "title": "AdminAssetPermanentDeleteInput"
+      }
+    AdminAssetPermanentDeleteResponse:
+      {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "media_file_removed": {
+            "type": "boolean",
+            "default": false
+          },
+          "pool_warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "deleted_at"
+        ],
+        "title": "AdminAssetPermanentDeleteResponse"
+      }
     AdminAsset:
       {
         "properties": {
@@ -6101,6 +6348,33 @@ components:
               "unknown"
             ],
             "title": "Review Status"
+          },
+          "display_name": {
+            "type": "string",
+            "nullable": true,
+            "title": "Display Name"
+          },
+          "effect_key": {
+            "type": "string",
+            "nullable": true,
+            "title": "Effect Key"
+          },
+          "filename": {
+            "type": "string",
+            "nullable": true,
+            "title": "Filename"
+          },
+          "system_protected": {
+            "type": "boolean",
+            "default": false,
+            "title": "System Protected"
+          },
+          "pool_warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Pool Warnings"
           }
         },
         "type": "object",

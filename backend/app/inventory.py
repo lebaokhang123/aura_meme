@@ -63,8 +63,14 @@ class EquipmentResult(BaseModel):
 
 
 def ready_asset(asset):
+    from datetime import datetime
     from app.catalog_rights import reviewed_source_rights
-    return asset is not None and asset.active and reviewed_source_rights(asset.source_rights)
+    return (
+        asset is not None
+        and asset.active
+        and not isinstance(getattr(asset, 'deleted_at', None), datetime)
+        and reviewed_source_rights(asset.source_rights)
+    )
 
 
 def asset_dto(asset, request, *, metadata=False):
@@ -81,6 +87,7 @@ def inventory(request: Request, page: int = Query(1, ge=1), page_size: int = Que
     query = select(UserInventory, AssetItem, UserEquipment.asset_id).join(AssetItem, AssetItem.id == UserInventory.asset_id).outerjoin(
         UserEquipment, and_(UserEquipment.user_id == UserInventory.user_id, UserEquipment.asset_id == UserInventory.asset_id)).where(
         UserInventory.user_id == account.user.id, UserInventory.quantity > 0, AssetItem.active.is_(True),
+        AssetItem.deleted_at.is_(None),
         reviewed_source_rights_sql(AssetItem.source_rights)).order_by(UserInventory.acquired_at.desc(), AssetItem.id)
     if kind is not None:
         query = query.where(AssetItem.kind == kind)
@@ -112,6 +119,7 @@ def public_user_inventory(request: Request, username: str = Path(min_length=3, m
             UserInventory.user_id == target_user,
             UserInventory.quantity > 0,
             AssetItem.active.is_(True),
+            AssetItem.deleted_at.is_(None),
             reviewed_source_rights_sql(AssetItem.source_rights)
         ).order_by(UserInventory.acquired_at.desc(), AssetItem.id)
         if kind is not None:

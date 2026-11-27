@@ -122,6 +122,8 @@ def import_draft(db, manifest, now):
             key = 'catalog/' + item.sha256 + {'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp'}[item.mime]
             existing = db.scalar(select(AssetItem).where(or_(AssetItem.id == item.id, AssetItem.slug == item.slug)).execution_options(populate_existing=True))
             if existing is not None:
+                if existing.deleted_at is not None or (existing.source_rights or {}).get('admin_managed') is True:
+                    continue
                 saved = {k: v for k, v in existing.source_rights.items() if k not in {'catalog_version', 'manifest_sha256'}}
                 if ((existing.id, existing.slug, existing.kind, existing.collection, existing.rarity, existing.media_key) !=
                     (item.id, item.slug, item.kind, item.collection, item.rarity, key) or saved != rights):

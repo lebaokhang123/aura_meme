@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {auth,MOCK_AUTH} from '../auth.js';
 import {authMessage} from '../auth-client.js';
 import {usePreferences} from '../PreferencesContext.jsx';
-import {adminPage,adminPresence,canAdmin} from '../admin-api.js';
+import {adminPage,adminPresence,canAdmin,isFounderUser} from '../admin-api.js';
 import {mountBackground} from '../background-effects.js';
 import ErrorPage from './ErrorPage.jsx';
 import '../workspace.css';
@@ -26,7 +26,7 @@ const labels={overview:['Tổng quan trực tuyến','Live Overview'],users:['Ng
 const sectionIcons={overview:'monitoring',users:'group',content:'article',contacts:'inbox',moderation:'shield',notifications:'campaign'};
 const resourceNotes={overview:['Theo dõi số thành viên và khách đang hoạt động trong cửa sổ 90 giây gần nhất (tự động làm mới mỗi 15 giây).','Monitor active members and guests within the last 90-second window (auto-refreshes every 15 seconds).'],users:['Quản lý trạng thái và quyền truy cập của thành viên.','Manage member status and access.'],posts:['Xem nội dung và kiểm soát những bài xuất hiện trong cộng đồng.','Review posts and control their visibility in the community.'],comments:['Xem và xử lý bình luận, kể cả nội dung đã ẩn.','Review comments, including hidden content.'],categories:['Sắp xếp nội dung bằng các danh mục dùng chung.','Organize community content with shared categories.'],contacts:['Đọc và phân loại tin nhắn gửi đến AuraMeme.','Read and triage messages sent to AuraMeme.'],'audit-logs':['Ghi lại các thay đổi do quản trị viên thực hiện: ai đã làm gì và khi nào.','Log of administrative actions: who did what and when.'],assets:['Kiểm tra trạng thái hoạt động, tải lên Meme mới và duyệt danh mục vật phẩm.','Inspect catalog availability, upload new Memes, and review pending assets.'],orders:['Xem danh sách và lịch sử các giao dịch thanh toán gói hội viên.','View member subscription orders and payment history.'],announcements:['Soạn thảo, quản lý và phát thông báo tới các thành viên.','Draft, manage, and broadcast announcements to community members.']};
 const Icon=({name,...props})=><span className="material-symbols-outlined" aria-hidden="true" {...props}>{name}</span>;
-const states={users:['active','locked','deleted'],posts:['draft','published','hidden','deleted'],comments:['visible','hidden','deleted'],categories:['active','hidden'],contacts:['new','in_review','resolved'],assets:['pending','approved','rejected','unknown'],orders:['pending','success','failed','cancelled','expired'],announcements:['draft','published','withdrawn']};
+const states={users:['active','locked','deleted'],posts:['draft','published','hidden','deleted'],comments:['visible','hidden','deleted'],categories:['active','hidden'],contacts:['new','in_review','resolved'],assets:['pending','active','archived','rejected'],orders:['pending','success','failed','cancelled','expired'],announcements:['draft','published','withdrawn']};
 const auditActionLabels={
   'contact.update':['Cập nhật trạng thái liên hệ','Updated contact status'],
   'post.update':['Cập nhật bài viết','Updated post'],
@@ -54,7 +54,9 @@ const auditActionLabels={
   'asset.update':['Cập nhật thông tin vật phẩm','Updated asset metadata'],
   'asset.approve':['Duyệt vật phẩm vào Bảo Khố','Approved asset into Vault'],
   'asset.reject':['Từ chối vật phẩm','Rejected asset'],
-  'asset.archive':['Lưu trữ / Ngừng lưu hành vật phẩm','Archived / deactivated asset'],
+  'asset.archive':['Ngừng lưu hành vật phẩm','Archived / deactivated asset'],
+  'asset.restore':['Khôi phục vật phẩm vào lưu hành','Restored asset to active catalog'],
+  'asset.permanent_delete':['Xóa vĩnh viễn vật phẩm (Founder)','Permanently deleted asset (Founder)'],
   'asset.delete':['Xóa vật phẩm chờ duyệt','Removed pending asset']
 };
 const auditTargetLabels={
@@ -66,13 +68,13 @@ const auditTargetLabels={
   category:['Danh mục','Category'],
   asset:['Vật phẩm','Asset']
 };
-const statusLabels={active:['Hoạt động','Active'],locked:['Đã khóa','Locked'],deleted:['Đã xóa','Deleted'],draft:['Bản nháp','Draft'],published:['Công khai','Published'],visible:['Hiển thị','Visible'],hidden:['Đã ẩn','Hidden'],new:['Mới','New'],in_review:['Đang xử lý','In review'],resolved:['Đã xử lý','Resolved'],pending:['Chờ duyệt','Pending'],approved:['Đã duyệt','Approved'],rejected:['Từ chối','Rejected'],unknown:['Chưa rõ','Unknown'],withdrawn:['Đã thu hồi','Withdrawn'],success:['Thành công','Completed'],failed:['Thất bại','Failed'],cancelled:['Đã hủy','Cancelled'],expired:['Hết hạn','Expired']};
+const statusLabels={active:['Hoạt động','Active'],archived:['Ngừng lưu hành','Archived'],locked:['Đã khóa','Locked'],deleted:['Đã xóa','Deleted'],draft:['Bản nháp','Draft'],published:['Công khai','Published'],visible:['Hiển thị','Visible'],hidden:['Đã ẩn','Hidden'],new:['Mới','New'],in_review:['Đang xử lý','In review'],resolved:['Đã xử lý','Resolved'],pending:['Chờ duyệt','Pending'],approved:['Đã duyệt','Approved'],rejected:['Từ chối','Rejected'],unknown:['Chưa rõ','Unknown'],withdrawn:['Đã thu hồi','Withdrawn'],success:['Thành công','Completed'],failed:['Thất bại','Failed'],cancelled:['Đã hủy','Cancelled'],expired:['Hết hạn','Expired']};
 const kindLabels={avatar:['Avatar','Avatar'],background:['Background','Background'],frame:['Khung','Frame'],icon:['Biểu tượng','Icon'],effect:['Hiệu ứng','Effect']};
 
 export default function AdminPage(){
  const session=useSyncExternalStore(auth.subscribe,auth.snapshot),{language}=usePreferences(),t=(vi,en)=>language==='en'?en:vi;
  const title=resource=>t(...labels[resource]),status=value=>resource==='orders'&&value==='pending'?t('Chờ thanh toán','Pending'):statusLabels[value]?t(...statusLabels[value]):value,formatAuditAction=a=>auditActionLabels[a]?t(...auditActionLabels[a]):a,formatAuditTarget=trg=>auditTargetLabels[trg]?t(...auditTargetLabels[trg]):trg,formatKind=k=>kindLabels[k]?t(...kindLabels[k]):k;
- const allowed=!MOCK_AUTH&&session.status==='authenticated'&&canAdmin(session.user),owner=allowed?session.user.id:null;
+ const allowed=!MOCK_AUTH&&session.status==='authenticated'&&canAdmin(session.user),owner=allowed?session.user.id:null,isFounder=isFounderUser(session.user);
  const [resource,setResource]=useState('users'),[query,setQuery]=useState(''),[search,setSearch]=useState(''),[filter,setFilter]=useState(''),[role,setRole]=useState(''),[assetKind,setAssetKind]=useState(''),[assetRarity,setAssetRarity]=useState(''),[page,setPage]=useState(1),[revision,setRevision]=useState(0);
  const [result,setData]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[denied,setDenied]=useState(false),[edit,setEdit]=useState(null),[busy,setBusy]=useState(false),[holdingPreview,setHoldingPreview]=useState(false),[copiedId,setCopiedId]=useState(null),[previewTab,setPreviewTab]=useState('avatar'),[presence,setPresence]=useState(null),[presenceStale,setPresenceStale]=useState(false),[presenceCooldownUntil,setPresenceCooldownUntil]=useState(0);
  const dialog=useRef(null),inflight=useRef(false),currentOwner=useRef(owner),presenceRef=useRef(null);currentOwner.current=owner;presenceRef.current=presence;
@@ -80,7 +82,7 @@ export default function AdminPage(){
  const data=result?.resource===resource&&result.owner===owner?result:null;
  const overviewData=presence?.owner===owner?presence:null;
  const section=sections.find(row=>row[3].includes(resource));
- const explain=e=>(e.code==='RESTORE_WINDOW_EXPIRED'?t('Đã quá thời hạn 30 ngày khôi phục tài khoản.','The 30-day account restoration window has expired.'):e.status===409&&resource==='users'?t('Thay đổi bị từ chối. Phải giữ ít nhất một Admin đang hoạt động.','Change refused. At least one active Admin must remain.'):e.status===409&&resource==='assets'&&e.code!=='DUPLICATE_IMAGE_HASH'?t('Không thể xóa hoặc sửa vật phẩm hệ thống gốc được bảo vệ.','Protected original system assets cannot be modified or deleted.'):e.serverMessage||authMessage(e,language));
+ const explain=e=>(e.code==='RESTORE_WINDOW_EXPIRED'?t('Đã quá thời hạn 30 ngày khôi phục tài khoản.','The 30-day account restoration window has expired.'):e.status===409&&resource==='users'?t('Thay đổi bị từ chối. Phải giữ ít nhất một Admin đang hoạt động.','Change refused. At least one active Admin must remain.'):e.serverMessage||authMessage(e,language));
  useEffect(()=>{setDenied(false);setData(null);setPresence(null);setPresenceStale(false);setPresenceCooldownUntil(0);setEdit(null);setHoldingPreview(false);setError('');setSuccess('');},[owner]);
  useEffect(()=>{
   setData(null);setError('');if(!allowed||denied)return;
@@ -115,7 +117,7 @@ export default function AdminPage(){
    return()=>{active=false;stopPoll();clearInterval(staleCheck);if(typeof document!=='undefined')document.removeEventListener('visibilitychange',onVis);};
   }
   let active=true;setLoading(true);
-  const params=new URLSearchParams({page:String(page),page_size:'10'});if(search)params.set('search',search);if(filter)params.set(resource==='assets'?'review_status':'status',filter);if(resource==='users'&&role)params.set('role',role);if(resource==='assets'&&assetKind)params.set('kind',assetKind);if(resource==='assets'&&assetRarity)params.set('rarity',assetRarity);
+  const params=new URLSearchParams({page:String(page),page_size:'10'});if(search)params.set('search',search);if(filter)params.set(resource==='assets'?'lifecycle_status':'status',filter);if(resource==='users'&&role)params.set('role',role);if(resource==='assets'&&assetKind)params.set('kind',assetKind);if(resource==='assets'&&assetRarity)params.set('rarity',assetRarity);
   auth.read('/admin/'+resource+'?'+params).then(value=>adminPage(value,resource)).then(value=>{if(active){if(value.items.length===0&&page>1&&value.pagination.total>0){setPage(p=>Math.max(1,p-1));return;}setData({...value,resource,owner});}}).catch(e=>{if(active){setError(explain(e));if(e.status===403){setDenied(true);auth.refresh().catch(()=>{})}if(e.status===401)auth.refresh().catch(()=>{});}}).finally(()=>{if(active)setLoading(false)});
   return()=>{active=false};
  },[allowed,denied,owner,resource,search,filter,role,assetKind,assetRarity,page,revision]);
@@ -131,6 +133,14 @@ export default function AdminPage(){
   if(edit.type==='asset-edit'){
     method='PATCH';path='/admin/assets/'+edit.row.id;
     body={display_name:(edit.display_name||'').trim(),rarity:edit.rarity};
+  }
+  if(edit.type==='asset-permanent-delete'){
+    if((edit.confirmText||'').trim()!=='XÓA VĨNH VIỄN'){
+      setError(t('Vui lòng nhập chính xác cụm từ xác nhận: XÓA VĨNH VIỄN.','Please type the exact confirmation phrase: XÓA VĨNH VIỄN.'));
+      inflight.current=false;setBusy(false);return;
+    }
+    method='DELETE';path='/admin/assets/'+edit.row.id;
+    body={confirm_text:(edit.confirmText||'').trim()};
   }
   if(edit.type==='asset-preview'&&edit.pendingAction){
     method='PATCH';path='/admin/assets/'+edit.row.id;
@@ -163,7 +173,7 @@ export default function AdminPage(){
     path='/admin/'+edit.targetResource+'/'+edit.row.id;
     body={status:edit.action,reason:edit.reason.trim()};
   }
-  try{const res=await auth.write(method,path,body);if(currentOwner.current!==requestOwner)return;setEdit(null);if((edit.action==='deleted'||method==='DELETE')&&data?.items?.length===1&&page>1){setPage(p=>Math.max(1,p-1));}setRevision(n=>n+1);setSuccess(edit.type==='asset-upload'?t(`Đã tải lên ${res?.uploaded_count||1} vật phẩm Meme vào hàng chờ duyệt (Pending).`,`Uploaded ${res?.uploaded_count||1} Meme asset(s) to the Pending queue.`):t('Đã lưu thay đổi.','Changes saved.'));if(resource==='users'&&edit.row?.id===requestOwner)await auth.refresh().catch(()=>{});}
+  try{const res=await auth.write(method,path,body);if(currentOwner.current!==requestOwner)return;setEdit(null);if((edit.action==='deleted'||method==='DELETE')&&data?.items?.length===1&&page>1){setPage(p=>Math.max(1,p-1));}setRevision(n=>n+1);const warnText=Array.isArray(res?.pool_warnings)&&res.pool_warnings.length?(' '+res.pool_warnings.join(' ')):'';setSuccess((edit.type==='asset-upload'?t(`Đã tải lên ${res?.uploaded_count||1} vật phẩm Meme vào hàng chờ duyệt (Pending).`,`Uploaded ${res?.uploaded_count||1} Meme asset(s) to the Pending queue.`):edit.type==='asset-permanent-delete'?t('Đã xóa vĩnh viễn vật phẩm khỏi hệ thống.','Asset permanently deleted.'):t('Đã lưu thay đổi.','Changes saved.'))+warnText);if(resource==='users'&&edit.row?.id===requestOwner)await auth.refresh().catch(()=>{});}
   catch(e){if(currentOwner.current===requestOwner){if(edit.type==='asset-preview')edit.pendingAction=null;setError(explain(e));if(e.status===403){setData(null);setDenied(true);setEdit(null);auth.refresh().catch(()=>{})}}}
   finally{inflight.current=false;setBusy(false)}
  }
@@ -280,7 +290,7 @@ export default function AdminPage(){
     {resource==='audit-logs'&&<time className="workspace-meta" dateTime={row.created_at}>{stamp(row.created_at)}</time>}
     {resource==='orders'&&<span className="workspace-badge" data-status={row.status} style={{fontWeight:600}}>{status(row.status)}</span>}
     {resource==='assets'&&row.review_status&&<span className="workspace-badge" data-status={row.review_status}>{status(row.review_status)}</span>}
-    {row.status&&resource!=='orders'&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='users'&&row.status==='deleted'&&(()=>{const days=restoreDaysLeft(row);return <span className="workspace-meta" style={{marginTop:4}}>{days>0?t(`Còn ${days} ngày khôi phục`,`${days} days left to restore`):t('Hết hạn khôi phục','Restore expired')}</span>;})()}{resource==='assets'&&<span className="workspace-badge" data-status={row.active?'active':'hidden'}>{row.active?t('Đang bật','Active'):t('Đang tắt','Inactive')}</span>}
+    {row.status&&resource!=='orders'&&<span className="workspace-badge" data-status={row.status}>{status(row.status)}</span>}{resource==='users'&&row.status==='deleted'&&(()=>{const days=restoreDaysLeft(row);return <span className="workspace-meta" style={{marginTop:4}}>{days>0?t(`Còn ${days} ngày khôi phục`,`${days} days left to restore`):t('Hết hạn khôi phục','Restore expired')}</span>;})()}{resource==='assets'&&<span className="workspace-badge" data-status={row.active?'active':'hidden'}>{row.active?t('Đang hoạt động','Active'):(row.review_status==='approved'?t('Ngừng lưu hành','Archived'):t('Đang tắt','Inactive'))}</span>}
     </div><div className="workspace-row-actions">{resource==='users'&&<div className="admin-action-icons">{(row.username==='khang_dev'||row.id==='abcfa9f6-c9d2-4181-9b4b-118a4bb6c647')?(
       null
     ):row.status!=='deleted'?(
@@ -300,8 +310,19 @@ export default function AdminPage(){
     </div>}
     {resource==='assets'&&<div className="admin-action-icons">
       <button type="button" className="admin-icon-btn" disabled={busy} aria-label={t('Xem vật phẩm','View asset')} title={t('Xem vật phẩm','View asset')} onClick={()=>{setError('');setPreviewTab('avatar');setEdit({type:'asset-preview',row})}}><Icon name="visibility"/></button>
-      <button type="button" className="admin-icon-btn" disabled={busy||row.kind==='background'} aria-label={t('Sửa vật phẩm','Edit asset')} title={row.kind==='background'?t('Background hệ thống không thể chỉnh sửa','System backgrounds cannot be edited'):t('Sửa tên hiển thị & hạng','Edit display name & rank')} onClick={()=>{setError('');setEdit({type:'asset-edit',row,display_name:row.display_name||row.slug,rarity:row.rarity})}}><Icon name="edit"/></button>
-      <button type="button" className="admin-icon-btn text-error" disabled={busy||row.kind==='background'} aria-label={t('Xóa vật phẩm','Delete asset')} title={row.kind==='background'?t('5 Background gốc được bảo vệ','5 original Backgrounds are protected'):t('Xóa / Ngừng lưu hành vật phẩm','Delete / archive asset')} onClick={()=>confirm(row,{action:row.review_status==='pending'?'reject':'archive'},row.review_status==='pending'?t('Từ chối và loại bỏ vật phẩm chờ duyệt này?','Reject and remove this pending asset?'):t('Ngừng lưu hành vật phẩm này? Các tài khoản từng sở hữu hoặc lịch sử mở rương vẫn được bảo toàn an toàn.','Deactivate this asset? Existing inventory and chest open history will remain intact.'),'/admin/assets/'+row.id,'PATCH')}><Icon name="delete"/></button>
+      <button type="button" className="admin-icon-btn" disabled={busy} aria-label={t('Sửa vật phẩm','Edit asset')} title={t('Sửa tên hiển thị & hạng','Edit display name & rank')} onClick={()=>{setError('');setEdit({type:'asset-edit',row,display_name:row.display_name||row.slug,rarity:row.rarity})}}><Icon name="edit"/></button>
+      {row.review_status==='pending'?(
+        <button type="button" className="admin-icon-btn text-error" disabled={busy} aria-label={t('Từ chối vật phẩm','Reject asset')} title={t('Từ chối vật phẩm chờ duyệt','Reject pending asset')} onClick={()=>confirm(row,{action:'reject'},t('Từ chối vật phẩm chờ duyệt này?','Reject this pending asset?'),'/admin/assets/'+row.id,'PATCH')}><Icon name="block"/></button>
+      ):row.active?(
+        <button type="button" className="admin-icon-btn text-error" disabled={busy} aria-label={t('Ngừng lưu hành vật phẩm','Archive asset')} title={t('Ngừng lưu hành vật phẩm','Archive / deactivate asset')} onClick={()=>confirm(row,{action:'archive'},t('Ngừng lưu hành vật phẩm này? Vật phẩm sẽ tự tháo khỏi hồ sơ đang trang bị nhưng vẫn giữ nguyên lịch sử sở hữu và mở rương.','Archive this asset? It will be unequipped from profiles while preserving inventory and chest history.'),'/admin/assets/'+row.id,'PATCH')}><Icon name="unpublished"/></button>
+      ):(
+        <>
+          <button type="button" className="admin-icon-btn" disabled={busy} aria-label={t('Khôi phục vật phẩm','Restore asset')} title={t('Khôi phục vật phẩm vào lưu hành','Restore asset to active catalog')} onClick={()=>confirm(row,{action:'approve'},t('Khôi phục vật phẩm này trở lại lưu hành? Không tạo phần thưởng trùng lặp.','Restore this asset to active catalog? No duplicate grants will be created.'),'/admin/assets/'+row.id,'PATCH')}><Icon name="restore_from_trash"/></button>
+          {isFounder&&row.review_status==='approved'&&(
+            <button type="button" className="admin-icon-btn text-error" disabled={busy} aria-label={t('Xóa vĩnh viễn vật phẩm','Permanently delete asset')} title={t('Xóa vĩnh viễn vật phẩm (chỉ Founder)','Permanently delete asset (Founder only)')} onClick={()=>{setError('');setEdit({type:'asset-permanent-delete',row,confirmText:''})}}><Icon name="delete_forever"/></button>
+          )}
+        </>
+      )}
     </div>}
     {(resource==='posts'||resource==='comments')&&<div className="admin-action-icons">
       <button type="button" className="admin-icon-btn" disabled={busy} aria-label={resource==='posts'?t('Xem chi tiết bài viết','View post details'):t('Xem chi tiết bình luận','View comment details')} title={resource==='posts'?t('Xem chi tiết bài viết','View post details'):t('Xem chi tiết bình luận','View comment details')} onClick={()=>{setError('');setEdit({type:'content-preview',row,targetResource:resource})}}><Icon name="visibility"/></button>
@@ -339,7 +360,7 @@ export default function AdminPage(){
    </>)}
   </section>
   </div>
-  <dialog ref={dialog} className={`workspace-dialog ${edit?.type==='receipt-preview'?'admin-receipt-dialog':''}`} aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='receipt-preview'?t('Biên lai thu tiền điện tử','Electronic payment receipt'):edit.type==='announcement-preview'?t('Chi tiết thông báo hệ thống','Announcement details'):edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='asset-preview'?t('Chi tiết & Xem trước vật phẩm','Asset details & preview'):edit.type==='asset-edit'?t('Chỉnh sửa vật phẩm','Edit asset'):edit.type==='asset-upload'?t('Thêm Meme vào Bảo Khố','Add Meme to Vault'):edit.type==='announcement'?t('Soạn thông báo hệ thống','Compose system announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Chi tiết & Xử lý liên hệ','Contact details & processing'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>
+  <dialog ref={dialog} className={`workspace-dialog ${edit?.type==='receipt-preview'?'admin-receipt-dialog':''}`} aria-labelledby="admin-dialog-title" onCancel={e=>{if(busy)e.preventDefault();else {setEdit(null);setHoldingPreview(false);}}} onClose={()=>{setEdit(null);setHoldingPreview(false);}}>{edit&&<form onSubmit={save}><div className="workspace-panel-heading"><h2 id="admin-dialog-title">{edit.type==='receipt-preview'?t('Biên lai thu tiền điện tử','Electronic payment receipt'):edit.type==='announcement-preview'?t('Chi tiết thông báo hệ thống','Announcement details'):edit.type==='content-preview'?(edit.targetResource==='posts'?t('Chi tiết bài viết','Post details'):t('Chi tiết bình luận','Comment details')):edit.type==='asset-preview'?t('Chi tiết & Xem trước vật phẩm','Asset details & preview'):edit.type==='asset-edit'?t('Chỉnh sửa vật phẩm','Edit asset'):edit.type==='asset-permanent-delete'?t('Xóa vĩnh viễn vật phẩm','Permanently delete asset'):edit.type==='asset-upload'?t('Thêm Meme vào Bảo Khố','Add Meme to Vault'):edit.type==='announcement'?t('Soạn thông báo hệ thống','Compose system announcement'):edit.type==='roles'?t('Sửa vai trò','Edit roles'):edit.type==='category'?t('Danh mục','Category'):edit.type==='contact'?t('Chi tiết & Xử lý liên hệ','Contact details & processing'):edit.label}</h2><button type="button" aria-label={t('Đóng','Close')} disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>×</button></div>
    {edit.type==='asset-preview'&&<div className="admin-asset-preview-modal">
       <div className="admin-content-preview-header">
         <div className="admin-content-preview-meta">
@@ -421,6 +442,14 @@ export default function AdminPage(){
         <select value={edit.rarity} disabled={busy} onChange={e=>setEdit({...edit,rarity:e.target.value})}>
           {['D','C','B','A','S'].map(r=><option key={r} value={r}>{t(`Hạng ${r}`,`Rank ${r}`)}</option>)}
         </select>
+      </label>
+   </div>}
+   {edit.type==='asset-permanent-delete'&&<div className="admin-asset-edit-fields">
+      <p className="admin-confirm-target" translate="no">{edit.row.display_name||edit.row.slug}</p>
+      <p className="workspace-error" role="alert">{t('Cảnh báo: Hành động này KHÔNG THỂ hoàn tác. Vật phẩm sẽ biến mất khỏi kho đồ khả dụng của mọi thành viên, tháo khỏi hồ sơ đang trang bị và không thể khôi phục. Lịch sử mở rương, EXP và nhật ký kiểm duyệt vẫn được bảo toàn.','Warning: This action is IRREVERSIBLE. The asset will disappear from all usable inventories, be unequipped, and cannot be restored. Chest history, EXP, and audit logs remain preserved.')}</p>
+      <label>
+        <span>{t('Nhập chính xác cụm từ xác nhận: XÓA VĨNH VIỄN','Type exact confirmation phrase: XÓA VĨNH VIỄN')}</span>
+        <input value={edit.confirmText||''} maxLength={64} required disabled={busy} placeholder="XÓA VĨNH VIỄN" onChange={e=>setEdit({...edit,confirmText:e.target.value})}/>
       </label>
    </div>}
    {edit.type==='receipt-preview'&&<div className="admin-receipt-preview-modal">
@@ -559,7 +588,7 @@ export default function AdminPage(){
       ):edit.type==='asset-preview'?(
         <>
           <button type="button" disabled={busy} onClick={()=>{setEdit(null);setHoldingPreview(false);}}>{t('Đóng','Close')}</button>
-          {edit.row.kind!=='background'&&edit.row.review_status==='pending'&&(
+          {edit.row.review_status==='pending'&&(
             <>
               <button type="button" className="text-error" disabled={busy} onClick={e=>{edit.pendingAction='reject';save(e);}}>{t('Từ chối','Reject')}</button>
               <button type="button" className="workspace-primary" disabled={busy} onClick={e=>{edit.pendingAction='approve';save(e);}}>{busy?t('Đang duyệt…','Approving…'):t('Duyệt vật phẩm','Approve asset')}</button>
@@ -574,6 +603,8 @@ export default function AdminPage(){
               <button type="button" disabled={busy||!edit.title.trim()||!edit.body.trim()} onClick={e=>{edit.draft=true;save(e);}}>{t('Lưu bản nháp','Save draft')}</button>
               <button type="submit" className="workspace-primary" disabled={busy||!edit.title.trim()||!edit.body.trim()}>{busy?t('Đang phát…','Broadcasting…'):t('Phát thông báo','Broadcast')}</button>
             </>
+          ):edit.type==='asset-permanent-delete'?(
+            <button type="submit" className="workspace-primary text-error" disabled={busy||(edit.confirmText||'').trim()!=='XÓA VĨNH VIỄN'}>{busy?t('Đang xóa…','Deleting…'):t('Xóa vĩnh viễn','Permanently delete')}</button>
           ):(
             <button type="submit" className="workspace-primary" disabled={busy}>{busy?t('Đang lưu…','Saving…'):edit.type==='contact'?t('Lưu trạng thái','Save status'):edit.type==='asset-upload'?t('Tải lên','Upload'):t('Xác nhận','Confirm')}</button>
           )}
