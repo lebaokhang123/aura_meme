@@ -1,6 +1,6 @@
 """Single-process in-memory presence tracking (Heartbeat + TTL) and Admin summary API."""
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from threading import Lock
 import secrets
 import time
@@ -14,7 +14,7 @@ from app.auth import origin_guard, set_cookie
 from app.auth_schemas import ErrorResponse
 from app.models import AuthSession, User
 from app.permissions import require_role
-from app.security import AuthError, TOKEN, digest
+from app.security import ABSOLUTE_SECONDS, AuthError, TOKEN, digest
 
 HEARTBEAT_INTERVAL_SECONDS = 30
 PRESENCE_TTL_SECONDS = 90
@@ -149,7 +149,14 @@ def heartbeat(request: Request, response: Response) -> HeartbeatAck:
         # Read-only lookup: never lock or mutate session/user rows on presence heartbeat.
         with request.app.state.auth_session_factory() as db:
             row = db.execute(
-                select(AuthSession.id, AuthSession.user_id, AuthSession.expires_at, AuthSession.revoked_at, User.status)
+                select(
+                    AuthSession.id,
+                    AuthSession.user_id,
+                    AuthSession.created_at,
+                    AuthSession.expires_at,
+                    AuthSession.revoked_at,
+                    User.status,
+                )
                 .join(User, User.id == AuthSession.user_id)
                 .where(AuthSession.token_hash == token_hash)
             ).one_or_none()
@@ -157,6 +164,8 @@ def heartbeat(request: Request, response: Response) -> HeartbeatAck:
             row is None
             or row.revoked_at is not None
             or row.expires_at <= now_utc
+            or row.created_at > now_utc
+            or row.created_at + timedelta(seconds=ABSOLUTE_SECONDS) <= now_utc
             or row.status != "active"
         ):
             raise AuthError(401, "UNAUTHORIZED", "Invalid or expired session.")
@@ -164,6 +173,8 @@ def heartbeat(request: Request, response: Response) -> HeartbeatAck:
         store.record_user_session(str(row.id), str(row.user_id), guest_digest=guest_hash)
     else:
         if not guest_hash:
+            peer = request.client.host if request.client else "unknown"
+            runtime.limiter.check(f"presence-hb:guest-new:{peer}", 30, 60)
             raw_guest = secrets.token_urlsafe(32)
             guest_hash = digest(raw_guest)
             set_cookie(response, runtime, guest_cookie, raw_guest, 86400 * 7)

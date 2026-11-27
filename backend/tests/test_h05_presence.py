@@ -120,7 +120,7 @@ def test_presence_api_guest_auth_rbac_revoked_and_rate_limit(monkeypatch):
 
     assert TOKEN.fullmatch(raw_user_token)
 
-    state = {"user_status": "active", "revoked": False, "expired": False}
+    state = {"user_status": "active", "revoked": False, "expired": False, "abs_expired": False}
 
     @contextmanager
     def fake_session_factory():
@@ -176,19 +176,29 @@ def test_presence_api_guest_auth_rbac_revoked_and_rate_limit(monkeypatch):
                     if state["revoked"]:
                         res.one_or_none.return_value = SimpleNamespace(
                             id=sess_user_id, user_id=user_id,
+                            created_at=now_utc - timedelta(minutes=1),
                             expires_at=now_utc + timedelta(minutes=10),
                             revoked_at=now_utc, status="active",
                         )
                     elif state["expired"]:
                         res.one_or_none.return_value = SimpleNamespace(
                             id=sess_user_id, user_id=user_id,
+                            created_at=now_utc - timedelta(minutes=1),
                             expires_at=now_utc - timedelta(seconds=5),
+                            revoked_at=None, status="active",
+                        )
+                    elif state["abs_expired"]:
+                        res.one_or_none.return_value = SimpleNamespace(
+                            id=sess_user_id, user_id=user_id,
+                            created_at=now_utc - timedelta(hours=13),
+                            expires_at=now_utc + timedelta(minutes=10),
                             revoked_at=None, status="active",
                         )
                     else:
                         res.one_or_none.return_value = SimpleNamespace(
                             id=sess_admin_id if role_code == "ADMIN" else sess_user_id,
                             user_id=admin_id if role_code == "ADMIN" else user_id,
+                            created_at=now_utc - timedelta(minutes=1),
                             expires_at=now_utc + timedelta(minutes=10),
                             revoked_at=None, status=state["user_status"],
                         )
@@ -249,6 +259,11 @@ def test_presence_api_guest_auth_rbac_revoked_and_rate_limit(monkeypatch):
         state["expired"] = True
         assert client.post("/api/v1/presence/heartbeat").status_code == 401
         state["expired"] = False
+
+        # Absolute-expired session -> 401
+        state["abs_expired"] = True
+        assert client.post("/api/v1/presence/heartbeat").status_code == 401
+        state["abs_expired"] = False
 
         # Locked user -> 401
         state["user_status"] = "locked"

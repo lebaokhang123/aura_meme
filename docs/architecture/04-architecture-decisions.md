@@ -256,3 +256,7 @@ CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute 
      - Frontend `startPresenceHeartbeat` (30s interval, tam dung khi `hidden`, ton trong HTTP 429 `Retry-After`) va Admin Overview tab (polling 15s khi co quyen & dang xem).
   4. **Gioi han:** Chi chinh xac trong pham vi single-process (`workers=1`); neu scale multi-worker trong tuong lai, huong nang cap la Redis TTL (`SET EX` / `ZSET`).
   5. **Learning Check:** `PENDING OWNER`.
+
+- **Bo sung Final Preflight (Eventual Consistency & ORM Lifecycle):**
+  - **Session revocation & eventual consistency:** `heartbeat()` kiem tra day du `revoked_at`, `expires_at` (idle expiry), `created_at + ABSOLUTE_SECONDS` (absolute expiry), va `User.status == "active"`. Khi user `logout()`, `remove_session(session_id)` xoa ngay lap tuc khoi `PresenceStore`; tuy nhien neu session bi revoke tu xa hoac user bi khoa boi Admin, ban ghi presence cu co the ton tai toi da `TTL = 90s` truoc khi tu het han.
+  - **Bounded capacity:** `max_entries = 16384` gioi han bo nho tren RAM, khong dong nghia ho tro `16.384 concurrent users` (nhieu session/thiet bi cua cung user hoac guest churn co the chiem nhieu entry).

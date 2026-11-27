@@ -85,24 +85,25 @@ export default function AdminPage(){
  useEffect(()=>{
   setData(null);setError('');if(!allowed||denied)return;
   if(resource==='overview'){
-   let active=true,timerId=null;
+   let active=true,timerId=null,inFlight=false;const requestOwner=owner;
    const fetchPresence=async(isManual=false)=>{
-    if(!active)return;
+    if(!active||inFlight)return;
     if(!isManual&&typeof document!=='undefined'&&document.visibilityState==='hidden')return;
     if(!isManual&&Date.now()<presenceCooldownUntil)return;
+    inFlight=true;
     if(!presenceRef.current||presenceRef.current.owner!==owner)setLoading(true);
     try{
      const raw=await auth.read('/admin/presence');
      const parsed=adminPresence(raw);
-     if(active){setPresence({...parsed,owner,fetchedAt:Date.now()});setPresenceStale(false);setError('');}
+     if(active&&currentOwner.current===requestOwner){setPresence({...parsed,owner,fetchedAt:Date.now()});setPresenceStale(false);setError('');}
     }catch(e){
-     if(!active)return;
+     if(!active||currentOwner.current!==requestOwner)return;
      if(e.status===403){setPresence(null);setDenied(true);auth.refresh().catch(()=>{});return;}
      if(e.status===401){setPresence(null);auth.refresh().catch(()=>{});return;}
      if(e.status===429){const sec=Number.isFinite(e.retryAfter)&&e.retryAfter>0?e.retryAfter:60;setPresenceCooldownUntil(Date.now()+sec*1000);}
      if(presenceRef.current&&presenceRef.current.owner===owner){setPresenceStale(true);}
      setError(explain(e));
-    }finally{if(active)setLoading(false);}
+    }finally{inFlight=false;if(active)setLoading(false);}
    };
    const startPoll=()=>{if(timerId===null&&active)timerId=setInterval(()=>fetchPresence(false),15000);};
    const stopPoll=()=>{if(timerId!==null){clearInterval(timerId);timerId=null;}};
