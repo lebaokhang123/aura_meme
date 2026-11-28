@@ -2091,6 +2091,20 @@ paths:
           enum: [draft, published, hidden]
       - $ref: '#/components/parameters/PostSearch'
       - $ref: '#/components/parameters/PostCategory'
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Lọc bài viết từ ngày (YYYY-MM-DD, múi giờ Asia/Ho_Chi_Minh).
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Lọc bài viết đến hết ngày (YYYY-MM-DD, múi giờ Asia/Ho_Chi_Minh).
       - $ref: '#/components/parameters/PostSort'
       responses:
         '200':
@@ -2791,6 +2805,20 @@ paths:
       - $ref: '#/components/parameters/PostSearch'
       - $ref: '#/components/parameters/AdminStatus'
       - $ref: '#/components/parameters/PostCategory'
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Lọc bài viết từ ngày (YYYY-MM-DD, múi giờ Asia/Ho_Chi_Minh).
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Lọc bài viết đến hết ngày (YYYY-MM-DD, múi giờ Asia/Ho_Chi_Minh).
       - $ref: '#/components/parameters/PostSort'
       responses:
         '200':
@@ -3378,6 +3406,20 @@ paths:
       - $ref: '#/components/parameters/PageSize'
       - $ref: '#/components/parameters/PostSearch'
       - $ref: '#/components/parameters/PostCategory'
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Lọc bài viết từ ngày (YYYY-MM-DD, múi giờ Asia/Ho_Chi_Minh).
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Lọc bài viết đến hết ngày (YYYY-MM-DD, múi giờ Asia/Ho_Chi_Minh).
       - $ref: '#/components/parameters/PostSort'
       responses:
         '200':

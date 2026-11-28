@@ -18,7 +18,7 @@ EXPECTED_CONTAINER = "aurameme-h01-sim-pg"
 EXPECTED_HOST = "127.0.0.1"
 EXPECTED_PORT = 55450
 EXPECTED_DB = "aurameme_test"
-EXPECTED_REVISION = "0019_asset_lifecycle_tombstone"
+EXPECTED_REVISION = "0020_follow_notifications"
 DEFAULT_HARNESS_PORT = 18080
 
 

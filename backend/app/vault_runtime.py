@@ -40,7 +40,8 @@ def schema_ready(db):
     return list(db.scalars(text('SELECT version_num FROM alembic_version'))) in (
         ['0012_aura_v1'], ['0013_notifications'], ['0014_premium_sandbox'],
         ['0015_google_auth_and_password_reset'], ['0016_account_email_verifications'],
-        ['0017_user_follows'], ['0018_canonical_asset_filenames'], ['0019_asset_lifecycle_tombstone'])
+        ['0017_user_follows'], ['0018_canonical_asset_filenames'], ['0019_asset_lifecycle_tombstone'],
+        ['0020_follow_notifications'])
 
 
 def require_schema(db):

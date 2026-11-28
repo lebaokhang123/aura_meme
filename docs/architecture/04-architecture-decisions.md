@@ -276,3 +276,14 @@ CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute 
   4. **Tombstone Isolation:** Toan bo truy van runtime (`inventory`, `vault/catalog`, `equipment`, `meme_reactions`, `vault_privilege` Founder reconciliation, `admin/assets`) loc `deleted_at IS NULL`, bao toan `CaseOpen`, `InventoryGrant`, EXP, wallet va `AdminAuditLog`.
   5. **Migration & Rollback Safety (`0018 -> 0019`):** Truoc khi nang cap `aurameme_demo` hoac moi truong chinh len `0019_asset_lifecycle_tombstone`, bat buoc `pg_dump -Fc` ban sao luu pre-0019. `downgrade()` cua `0019` duoc thiet ke fail-closed: sau khi da phat sinh du lieu tombstone (`deleted_at IS NOT NULL`) hoac thay doi rarity lich su (`case_pool_items.rarity <> asset_items.rarity`), lenh `alembic downgrade` se bi chan de bao ve du lieu lich su; khi can rollback bat buoc phuc hoi tu ban backup `pg_restore`.
   6. **Learning Check:** `PENDING OWNER`.
+
+
+## ADR-H06-Polish: Notification Localization, Follow Notification & Admin Search/Date Filter (`fix/h06-notification-admin-search`)
+
+- **Trang thai:** Da chap thuan & Trien khai tren nhanh `fix/h06-notification-admin-search`.
+- **Quyet dinh:**
+  1. **Migration `0020_follow_notifications`:** Mo rong check constraint `ck_notifications_notification_type` them `'follow'` va `ck_notifications_notification_target_type` them `'user'`; `downgrade()` chan fail-closed neu da co du lieu `follow`/`user`.
+  2. **Follow Notification (`account.py`):** Khi `follow_user()` tao moi `UserFollow` (`existing is None`, da loai tru self-follow), goi `create_notification` trong cung transaction voi `dedupe_key = f"follow:{follower_id}:{followee_id}"` de chong spam khi unfollow/refollow ma khong anh huong quy tac chong farm `+10 EXP` (`follow-v1:{follower_id}`).
+  3. **Notification UI (`NotificationsDropdown.jsx`):** Dong bo `describeNotification()` giua dropdown va modal; hien thi chinh xac hanh dong kiem duyet (`hidden`/`deleted` x `post`/`comment`), an nut `Xem bài viết` doi voi bai viet da bi an/xoa, bo ma tieng Anh tho `(${reactionType})`, phan biet `reaction` vao bai viet vs binh luan, va bo sung loai `follow` kem nut `Xem trang cá nhân` (`/u/<username>`).
+  4. **Admin Search & Posts Date Range (`blog.py`, `admin_posts.py`, `admin_workspace.py`, `admin_users.py`, `AdminPage.jsx`):** Tai su dung helper `build_search_filter` (khong dau tieng Viet + ho tro `@username`) cho Admin Posts, Comments (join `Post`), Categories va Users. `GET /api/v1/admin/posts` bo sung `date_from`/`date_to` (`YYYY-MM-DD`, kiem tra `date_from <= date_to`) quy doi nua mo `[start, next_day)` theo mui gio `Asia/Ho_Chi_Minh`.
+  5. **Learning Check:** `PENDING OWNER`.
