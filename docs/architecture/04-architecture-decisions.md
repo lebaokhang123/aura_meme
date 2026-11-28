@@ -311,3 +311,17 @@ CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute 
   4. **H07.4 Notifications:** Them reply notification (`type='comment'`, `payload.action='reply'`, khong trung khi reply target dong thoi la chu bai viet) va comment reaction notification (`dedupe_key=comment-reaction:{cid}:{uid}`, khong EXP). Hoan thien badge kiem duyet cu the trong `NotificationsDropdown.jsx`.
   5. **H07.5 Post Detail & Share:** Bo sung route `/posts/{UUID}` (`PostDetailPage.jsx`), endpoint `/locate`, canonical share link `/posts/{UUID}`, van giu ho tro deep link cu `/#post-UUID`.
   6. **Learning Check:** `PENDING OWNER`.
+
+
+## ADR-Release-v1.0.0: MIT License, Release Archive Exclusions & License Scope (`chore/official-release-v1`)
+
+- **Trang thai:** Da chuan bi tren nhanh `chore/official-release-v1` (Feature Freeze MVP v1.0.0).
+- **Quyet dinh:**
+  1. **Giay phep ma nguon mo (`LICENSE`):** Ap dung **MIT License**, `Copyright (c) 2026 Lê Bảo Khang (lebaokhang123)` cho ma nguon AuraMeme.
+  2. **Loai tru khoi Release Archive (`.gitattributes` `export-ignore`):** Khong dua `AGENTS.md`, `run.bat` va `run_qa.bat` vao source release archives (`git archive`), nhung van giu nguyen cac tep nay trong workspace phat trien local.
+  3. **Kiem ke pham vi License & Third-party:**
+     - Frontend/Backend permissive dependencies: React 19 / Vite 7 / jsPDF (MIT), Playwright (Apache-2.0), FastAPI / Pydantic / SQLAlchemy / Alembic (MIT), Uvicorn / httpx / pypdf (BSD-3-Clause), Pillow (MIT-CMU), Roboto TTF nhung (Apache-2.0), Lucian UX/UI Prompt adaptations (MIT, Seokwoooo).
+     - `psycopg` / `psycopg-binary`: `LGPL-3.0-only`.
+     - **Luu y copyleft (`PyMuPDF==2.1`):** `backend/app/receipt_pdf.py` va `backend/app/admin_workspace.py` su dung `pymupdf` (Dual-licensed **AGPL-3.0** hoac Artifex Commercial License). Khi phan phoi hoac van hanh dich vu mang dung PyMuPDF, can tuan thu nghia vu AGPL-3.0 hoac thay the bang thu vien PDF permissive/commercial o pha sau release v1.0.0.
+     - **Media & Demo Assets (`frontend/ASSET_SOURCES.md`):** Giay phep MIT cua ma nguon khong cap quyen thuong hieu hoac ban quyen ben thu ba doi voi logo thanh toan, anh demo (`khang.jpg`, `kien.jpg`, `gigachad.jpg`), hoac tham chieu Stitch. Bo 70 meme + 5 background Vault rieng tu va `backend/demo.local` khong nam trong repository cong khai.
+  4. **Learning Check:** `PENDING OWNER`.

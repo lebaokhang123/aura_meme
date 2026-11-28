@@ -42,3 +42,11 @@ Tài liệu này lưu trữ toàn bộ các ghi chú kỹ thuật nội bộ, ch
 - Frontend build & unit test: Đảm bảo mã nguồn React biên dịch sạch và vượt qua các bài kiểm tra giao diện.
 - Browser regression test: Kiểm thử tự động với Playwright headless Chromium.
 - Nghiêm cấm can thiệp hoặc tự ý chạy migration phá hủy trên cơ sở dữ liệu production/demo.
+
+---
+
+## 5. Chuẩn bị phát hành MVP v1.0.0 (`chore/official-release-v1`)
+
+- Mã nguồn phát hành dưới giấy phép **MIT License** (`Copyright (c) 2026 Lê Bảo Khang (lebaokhang123)`).
+- `.gitattributes` loại trừ `AGENTS.md`, `run.bat` và `run_qa.bat` khỏi Git release archives (`export-ignore`) nhưng vẫn giữ đầy đủ trong workspace phát triển.
+- Lưu ý phạm vi license bên thứ ba: `PyMuPDF==2.1` dùng AGPL-3.0 / Artifex Commercial License; `psycopg`/`psycopg-binary` dùng LGPL-3.0-only; asset/logo minh họa tuân theo phạm vi ghi nhận tại `frontend/ASSET_SOURCES.md` và `frontend/public/third-party-notices.txt`.
