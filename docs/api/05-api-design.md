@@ -277,3 +277,13 @@ Operator `python -m app.catalog_activation` nhận manifest có SHA duyệt chí
 `POST /premium/orders/{order_code}/capture` dùng `intent: "paypal"` cùng `paypal_order_id` từ callback, hoặc `intent: "simulate"` không kèm mã PayPal. Capture mặc định là PayPal. Mô phỏng cần `AUTH_ENVIRONMENT=development` và cờ Sandbox, đồng thời từ chối đơn đang gắn với PayPal thật. Card tiếp tục dùng `/simulate`. Quyền chủ đơn, CSRF, khóa hàng và kiểm merchant, mã đơn, USD, số tiền vẫn áp dụng.
 
 Checkout và History lấy detail cùng lịch sử success của tài khoản trước khi tải PDF. Nhãn hiển thị PayPal hoặc Thẻ. PDF/email dùng PayPal Sandbox hoặc Thẻ mô phỏng nội bộ. Mã giao dịch mô phỏng PayPal giữ tiền tố `SIM-PP-` và ghi chú riêng trong disclaimer.
+
+
+## H07 — Final Social Interaction Polish
+
+- `GET /api/v1/posts/{post_id}/reactions` và `GET /api/v1/comments/{comment_id}/reactions`: Trả danh sách người reaction (pagination, lọc `reaction_type`, `meme_asset_id`), kèm `reaction_counts` và `meme_reactions`. Tuân thủ visibility bài viết, bình luận, tài khoản active và catalog H06 (404 nếu target bị ẩn/xóa; ẩn meme bị archive/tombstone). Không lộ email hay thông tin riêng tư.
+- `GET /api/v1/posts/{post_id}/comments`: Hỗ trợ `sort=created_asc|created_desc|reaction_desc` (sắp xếp tại DB trước pagination) và `include_interactions=true` (batch aggregation O(1) SQL queries, tránh N+1). Trả bình luận gốc kèm `reply_count`.
+- `GET /api/v1/comments/{comment_id}/replies`: Trả danh sách replies phân trang theo thread gốc, hỗ trợ `include_interactions=true`; trả 404 nếu comment gốc bị ẩn/xóa.
+- `GET /api/v1/posts/{post_id}/comments/{comment_id}/locate`: Định vị trực tiếp `root_comment_id` và `is_reply` cho deep link `/posts/{post_id}?comment={comment_id}`.
+- `POST /api/v1/posts/{post_id}/comments`: Hỗ trợ `parent_comment_id` (tự động đưa về thread 1 cấp và lưu `reply_to_comment_id`, `reply_to_user_id`), kiểm tra cùng bài viết (422), kiểm tra idempotency `request_id` (409 nếu lệch parent), tạo notification reply trong cùng transaction (không trùng với notification chủ bài viết).
+- `PUT /api/v1/comments/{comment_id}/reactions`: Bổ sung `reaction` notification cho tác giả comment (dedupe theo `(comment_id, actor_user_id)`, không tự thông báo, không cộng EXP).

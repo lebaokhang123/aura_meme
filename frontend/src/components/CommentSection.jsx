@@ -13,8 +13,9 @@ import {LevelPill,TitleBadge} from './RealmBadges.jsx';
 import {relativeTime} from '../relative-time.js';
 import UserAvatar from './UserAvatar.jsx';
 export {relativeTime};
-function CommentRow({comment}) {
+function CommentRow({comment,isReply=false,onReply,highlighted=false,children}) {
   const render=useLocalized(),{commit}=useSocial(),current=readDemoUser(),{language}=usePreferences();
+  const t=(vi,en)=>language==='en'?en:vi;
   const {subscription}=usePremium?.()||{};
   const isCurrentAuthor=Boolean(current&&(
     (comment.authorId&&comment.authorId===current.id)||
@@ -48,8 +49,8 @@ function CommentRow({comment}) {
       setMenuOpen(false);setConfirm(null);setReason('');
     }catch(e){setError(e.message)}finally{pending.current=false;setBusy(false)}
   };
-  const commentProfileHref=comment.api&&comment.author?'/profile/'+encodeURIComponent(comment.author):null;
-  return render(<div className="flex items-start gap-3 p-2.5 rounded-xl bg-surface-container/40 hover:bg-surface-container/70 transition-colors" data-comment-id={comment.id}>
+  const commentProfileHref=comment.api&&comment.author?'/u/'+encodeURIComponent(comment.author):null;
+  return render(<div id={`comment-${comment.id}`} className={`flex items-start gap-3 p-2.5 rounded-xl transition-colors ${highlighted?'bg-secondary/15 ring-1 ring-secondary/50':'bg-surface-container/40 hover:bg-surface-container/70'}`} data-comment-id={comment.id}>
     {commentProfileHref?<a href={commentProfileHref} aria-label={`Hồ sơ ${author.displayName}`} className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-secondary"><UserAvatar src={author.avatar} alt={author.displayName} tier={effectiveAuthorTier} size="sm"/></a>:<UserAvatar src={author.avatar} alt={author.displayName} tier={effectiveAuthorTier} size="sm"/>}
     <div className="flex-1 flex flex-col gap-1 min-w-0">
       <div className="flex items-start justify-between gap-2">
@@ -95,21 +96,37 @@ function CommentRow({comment}) {
         </div>}
       </div>}</div>}
       </div>
-      <p translate="no" className="font-body-sm text-[13px] text-on-surface leading-snug pt-0.5 social-user-text">{comment.text}</p>
-      <div className="flex items-center gap-2 pt-1 flex-wrap"><ReactionBar target="comment" id={comment.id} compact/></div>
+      <p translate="no" className="font-body-sm text-[13px] text-on-surface leading-snug pt-0.5 social-user-text">
+        {isReply&&comment.replyToUser&&<span className="text-secondary font-semibold mr-1.5">@{comment.replyToUser.username}</span>}
+        {comment.text}
+      </p>
+      <div className="flex items-center gap-2 pt-1 flex-wrap">
+        <ReactionBar target="comment" id={comment.id} compact/>
+        {!MOCK_AUTH&&onReply&&(
+          current
+            ?<button type="button" className="text-xs font-semibold text-outline hover:text-secondary px-1.5 py-0.5 rounded" onClick={()=>onReply(comment)}>{t('Trả lời','Reply')}</button>
+            :<a href={`/login?next=${encodeURIComponent(location.pathname+location.search)}`} className="text-xs font-semibold text-outline hover:text-secondary px-1.5 py-0.5 rounded">{t('Trả lời','Reply')}</a>
+        )}
+      </div>
       <SocialMessage error={error}/>
+      {children}
     </div>
   </div>);
 }
-export function CommentSection({postId,active=true}) {
-  const render=useLocalized(),{state,commit,loadComments,commentPages}=useSocial(),user=readDemoUser();
+export function CommentSection({postId,active=true,highlightCommentId=null,expandRootId=null}) {
+  const render=useLocalized(),{state,commit,loadComments,loadReplies,commentPages,replyPages,commentSorts,setCommentSort}=useSocial(),user=readDemoUser(),{language}=usePreferences();
+  const t=(vi,en)=>language==='en'?en:vi;
   const {subscription}=usePremium?.()||{};
   const effectiveUserTier=(subscription?.is_active?subscription.tier:null)||user?.membershipTier||user?.membership_tier||'free';
   const [text,setText]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const pending=useRef(false),draft=useRef(null);
-  const input=useRef(null);
+  const [replyTarget,setReplyTarget]=useState(null),[replyText,setReplyText]=useState(''),[replyBusy,setReplyBusy]=useState(false),[replyError,setReplyError]=useState('');
+  const [expandedThreads,setExpandedThreads]=useState({}),[loadingThreads,setLoadingThreads]=useState({});
+  const pending=useRef(false),draft=useRef(null),replyPending=useRef(false),replyDraft=useRef(null);
+  const input=useRef(null),replyInput=useRef(null);
   useEffect(()=>{draft.current=null},[text]);
+  useEffect(()=>{replyDraft.current=null},[replyText,replyTarget?.targetId]);
   const [readError,setReadError]=useState('');
+  const sort=commentSorts?.[postId]||'created_asc';
   const readPage=async(append=false)=>{
     setReadError('');
     try{await loadComments(postId,append)}
@@ -118,6 +135,20 @@ export function CommentSection({postId,active=true}) {
   useEffect(()=>{
     if(active&&!MOCK_AUTH&&!commentPages[postId])void readPage();
   },[postId,active]);
+  useEffect(()=>{
+    if(expandRootId&&active&&!MOCK_AUTH){
+      setExpandedThreads(prev=>({...prev,[expandRootId]:true}));
+      if(!replyPages[expandRootId])void loadReplies(expandRootId,false).catch(()=>{});
+    }
+  },[expandRootId,active]);
+  useEffect(()=>{
+    if(!highlightCommentId)return;
+    const timer=setTimeout(()=>{
+      const el=document.getElementById('comment-'+highlightCommentId);
+      el?.scrollIntoView({behavior:'smooth',block:'center'});
+    },250);
+    return()=>clearTimeout(timer);
+  },[highlightCommentId,state.comments.length]);
   const insert=emoji=>{
     const el=input.current,start=el.selectionStart,end=el.selectionEnd,next=text.slice(0,start)+emoji+text.slice(end);
     if(next.length>2000)return;
@@ -128,6 +159,40 @@ export function CommentSection({postId,active=true}) {
     event.preventDefault();if(pending.current)return;pending.current=true;setBusy(true);setError('');
     try{await commit({type:'comment',postId,text,id:MOCK_AUTH?'c-'+crypto.randomUUID():(draft.current??=crypto.randomUUID())});setText('')}catch(e){setError(e.message)}finally{pending.current=false;setBusy(false)}
   };
+  const openReply=comment=>{
+    const rootId=comment.parentCommentId||comment.id;
+    setReplyTarget({rootId,targetId:comment.id,targetUsername:comment.author});
+    setReplyError('');
+    setExpandedThreads(prev=>({...prev,[rootId]:true}));
+    requestAnimationFrame(()=>replyInput.current?.focus());
+  };
+  const sendReply=async event=>{
+    event.preventDefault();if(!replyTarget||replyPending.current)return;
+    replyPending.current=true;setReplyBusy(true);setReplyError('');
+    try{
+      await commit({type:'comment',postId,text:replyText,parentCommentId:replyTarget.targetId,id:replyDraft.current??=crypto.randomUUID()});
+      setReplyText('');setReplyTarget(null);
+      setExpandedThreads(prev=>({...prev,[replyTarget.rootId]:true}));
+    }catch(e){setReplyError(e.message)}finally{replyPending.current=false;setReplyBusy(false)}
+  };
+  const toggleReplies=async(rootId,expand)=>{
+    if(!expand){setExpandedThreads(prev=>({...prev,[rootId]:false}));return;}
+    setExpandedThreads(prev=>({...prev,[rootId]:true}));
+    if(!replyPages[rootId]){
+      setLoadingThreads(prev=>({...prev,[rootId]:true}));
+      try{await loadReplies(rootId,false)}finally{setLoadingThreads(prev=>({...prev,[rootId]:false}));}
+    }
+  };
+  const allComments=commentsFor(state,postId);
+  const rootComments=MOCK_AUTH?allComments:allComments.filter(c=>!c.parentCommentId);
+  const repliesByRoot={};
+  if(!MOCK_AUTH){
+    for(const c of allComments){
+      if(c.parentCommentId){
+        (repliesByRoot[c.parentCommentId]??=[]).push(c);
+      }
+    }
+  }
   return render(<div className="flex flex-col gap-3.5 pt-3 border-t border-surface-container-high/80 mt-1">
     <form onSubmit={send} className="flex items-center gap-2.5">
       {user?<UserAvatar src={user.avatar} alt={user.displayName} tier={effectiveUserTier} size="md"/>:<span className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-outline shrink-0">{icon('person')}</span>}
@@ -137,8 +202,71 @@ export function CommentSection({postId,active=true}) {
         <button type="submit" disabled={busy} className="px-3 py-1.5 rounded-lg bg-secondary-container text-on-secondary-container text-label-md font-label-md flex items-center gap-1 shrink-0">Gửi {icon('send',16)}</button>
       </div>
     </form>
+    {!MOCK_AUTH&&<div className="flex items-center justify-between gap-2 text-xs">
+      <label className="flex items-center gap-1.5 text-outline">
+        <span>{t('Sắp xếp:','Sort:')}</span>
+        <select aria-label={t('Sắp xếp bình luận','Sort comments')} value={sort} onChange={e=>setCommentSort(postId,e.target.value)} className="bg-surface-container border border-outline-variant rounded-lg px-2 py-1 text-on-surface text-xs">
+          <option value="created_asc">{t('Cũ nhất','Oldest')}</option>
+          <option value="created_desc">{t('Mới nhất','Newest')}</option>
+          <option value="reaction_desc">{t('Nhiều tương tác nhất','Most reactions')}</option>
+        </select>
+      </label>
+    </div>}
     <SocialMessage error={error}/>
     {readError&&<div><SocialMessage error={readError} read/><button type="button" onClick={()=>readPage(Boolean(commentPages[postId]))}>Thử lại</button></div>}
-    {commentsFor(state,postId).map(comment=><CommentRow key={comment.id} comment={comment}/>)}{!MOCK_AUTH&&commentPages[postId]?.page<commentPages[postId]?.total_pages&&<button type="button" disabled={busy} onClick={async()=>{setBusy(true);try{await readPage(true)}finally{setBusy(false)}}}>Xem thêm bình luận</button>}
+    {rootComments.map(comment=>{
+      const replies=repliesByRoot[comment.id]||[];
+      const expanded=Boolean(expandedThreads[comment.id]);
+      const replyPg=replyPages?.[comment.id];
+      const count=Math.max(comment.replyCount||0,replies.length);
+      return (
+        <CommentRow key={comment.id} comment={comment} onReply={openReply} highlighted={highlightCommentId===comment.id}>
+          {!MOCK_AUTH&&(count>0||expanded||replyTarget?.rootId===comment.id)&&(
+            <div className="mt-1.5 space-y-2">
+              {count>0&&!expanded&&(
+                <button type="button" className="text-xs font-semibold text-secondary hover:underline flex items-center gap-1" onClick={()=>toggleReplies(comment.id,true)}>
+                  {icon('subdirectory_arrow_right',15)}
+                  <span>{t(`Xem ${count} câu trả lời`,`View ${count} replies`)}</span>
+                </button>
+              )}
+              {expanded&&(
+                <div className="ml-4 pl-3 border-l border-outline-variant/50 space-y-2">
+                  {loadingThreads[comment.id]&&<p className="text-xs text-outline">{t('Đang tải câu trả lời...','Loading replies...')}</p>}
+                  {replies.map(reply=>(
+                    <CommentRow key={reply.id} comment={reply} isReply onReply={openReply} highlighted={highlightCommentId===reply.id}/>
+                  ))}
+                  <div className="flex items-center gap-3">
+                    {replyPg&&replyPg.page<replyPg.total_pages&&(
+                      <button type="button" className="text-xs font-semibold text-secondary hover:underline" onClick={()=>loadReplies(comment.id,true)}>
+                        {t('Xem thêm câu trả lời','Load more replies')}
+                      </button>
+                    )}
+                    {count>0&&(
+                      <button type="button" className="text-xs text-outline hover:text-on-surface" onClick={()=>toggleReplies(comment.id,false)}>
+                        {t('Thu gọn','Collapse')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              {replyTarget?.rootId===comment.id&&(
+                <form onSubmit={sendReply} className="ml-4 pl-3 border-l border-secondary/50 space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-xs text-outline">
+                    <span>{t('Đang trả lời','Replying to')} <strong className="text-secondary">@{replyTarget.targetUsername}</strong></span>
+                    <button type="button" className="hover:text-on-surface" onClick={()=>{setReplyTarget(null);setReplyError('')}}>{t('Hủy','Cancel')}</button>
+                  </div>
+                  <div className="flex items-center gap-2 bg-surface-container rounded-xl p-2 border border-outline-variant/60">
+                    <textarea ref={replyInput} rows={1} maxLength={2000} value={replyText} onChange={e=>setReplyText(e.target.value)} placeholder={t('Viết câu trả lời...','Write a reply...')} aria-label={t('Nội dung trả lời','Reply content')} className="w-full p-0 bg-transparent border-0 outline-none resize-none text-on-surface text-xs min-w-0"/>
+                    <button type="submit" disabled={replyBusy} className="px-2.5 py-1 rounded-lg bg-secondary-container text-on-secondary-container text-xs font-semibold shrink-0">{t('Gửi','Send')}</button>
+                  </div>
+                  <SocialMessage error={replyError}/>
+                </form>
+              )}
+            </div>
+          )}
+        </CommentRow>
+      );
+    })}
+    {!MOCK_AUTH&&commentPages[postId]?.page<commentPages[postId]?.total_pages&&<button type="button" disabled={busy} className="text-xs font-semibold text-secondary hover:underline self-start" onClick={async()=>{setBusy(true);try{await readPage(true)}finally{setBusy(false)}}}>{t('Xem thêm bình luận','Load more comments')}</button>}
   </div>);
 }

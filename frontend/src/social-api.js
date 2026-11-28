@@ -38,7 +38,11 @@ export function apiPost(value){
 }
 export function apiComment(value){
  apiId(value?.id);apiId(value?.post_id);if(typeof value.body!=='string'||!Number.isFinite(Date.parse(value.created_at)))bad();
- return {...apiAuthor(value.author),id:value.id,postId:value.post_id,text:value.body,createdAt:Date.parse(value.created_at),api:true};
+ return {...apiAuthor(value.author),id:value.id,postId:value.post_id,text:value.body,createdAt:Date.parse(value.created_at),
+  parentCommentId:value.parent_comment_id||null,replyToCommentId:value.reply_to_comment_id||null,
+  replyToUser:value.reply_to_user?{id:value.reply_to_user.id,username:value.reply_to_user.username,displayName:value.reply_to_user.display_name}:null,
+  replyCount:Number.isSafeInteger(value.reply_count)?value.reply_count:0,
+  interactions:value.interactions||null,api:true};
 }
 export function apiPage(value){
  const p=value?.pagination;if(!Array.isArray(value?.items)||!p||!['page','page_size','total','total_pages'].every(k=>Number.isSafeInteger(p[k])&&p[k]>=0)||p.page<1||p.page_size<1)bad();

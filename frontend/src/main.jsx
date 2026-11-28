@@ -38,6 +38,7 @@ import VerifyEmailPage from './components/VerifyEmailPage.jsx';
 import PendingVerificationScreen from './components/PendingVerificationScreen.jsx';
 import ErrorPage from './components/ErrorPage.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import PostDetailPage from './components/PostDetailPage.jsx';
 import { canAdmin } from './admin-api.js';
 
 const pages=import.meta.glob('./generated/*.js');
@@ -90,7 +91,7 @@ function App() {
       new URLSearchParams(location.search).has('pending_verification');
     const custom = isPending
       ? PendingVerificationScreen
-      : {'/admin':AdminPage,'/premium':PremiumPage,'/premium/checkout':PremiumCheckoutPage,'/premium/history':PaymentHistoryPage,'/forgot-password':ForgotPasswordPage,'/reset-password':ResetPasswordPage,'/verify-email':VerifyEmailPage}[page.path]||(!MOCK_AUTH&&((page.path.startsWith('/profile')||page.path.startsWith('/u/'))?ProfilePage:page.path==='/contact'?ContactPage:page.path==='/vault'?VaultPage:page.path==='/admin/contacts'?ContactInbox:null));
+      : {'/admin':AdminPage,'/premium':PremiumPage,'/premium/checkout':PremiumCheckoutPage,'/premium/history':PaymentHistoryPage,'/forgot-password':ForgotPasswordPage,'/reset-password':ResetPasswordPage,'/verify-email':VerifyEmailPage}[page.path]||(!MOCK_AUTH&&((page.path.startsWith('/profile')||page.path.startsWith('/u/'))?ProfilePage:/^\/posts\/[0-9a-f-]{36}$/i.test(page.path)?PostDetailPage:page.path==='/contact'?ContactPage:page.path==='/vault'?VaultPage:page.path==='/admin/contacts'?ContactInbox:null));
 
     const maintenance=page.path==='/rank'||MOCK_AUTH&&['/contact','/vault'].includes(page.path);
     const pageLoader=custom?Promise.resolve(custom):maintenance ? Promise.resolve(MaintenancePage) : pages[`./generated/${page.key}.js`]().then(mod=>mod.default);
@@ -135,7 +136,7 @@ function App() {
   const adminUnauthorized=!MOCK_AUTH&&['/admin','/admin/contacts'].includes(page.path)&&authState.status==='authenticated'&&!canAdmin(authState.user);
   // Reveal the header and page together after the lazy content and CSS are ready.
   if(!screen&&!failed&&!page.notFound&&!adminUnauthorized)return null;
-  const content=failed?<ErrorPage status={503} onRetry={()=>location.reload()}/>:(page.notFound||adminUnauthorized)?<ErrorPage status={404}/>:screen===MaintenancePage?<MaintenancePage />:[AdminPage,PremiumPage,PremiumCheckoutPage,PaymentHistoryPage,ForgotPasswordPage,ResetPasswordPage,ProfilePage,ContactPage,VaultPage,ContactInbox,PendingVerificationScreen].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />;
+  const content=failed?<ErrorPage status={503} onRetry={()=>location.reload()}/>:(page.notFound||adminUnauthorized)?<ErrorPage status={404}/>:screen===MaintenancePage?<MaintenancePage />:[AdminPage,PremiumPage,PremiumCheckoutPage,PaymentHistoryPage,ForgotPasswordPage,ResetPasswordPage,ProfilePage,PostDetailPage,ContactPage,VaultPage,ContactInbox,PendingVerificationScreen].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />;
   return render(<><EquippedBackground/><SiteHeader />{content}{page.path==='/'&&!page.notFound ? null : <SiteFooter />}<CookieConsent /></>);
 }
 

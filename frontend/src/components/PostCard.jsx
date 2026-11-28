@@ -34,7 +34,8 @@ export function PostHeader({post,variant,menu}) {
   ));
   const effectiveTier=(isCurrentAuthor&&subscription?.is_active?subscription.tier:null)||post.membershipTier||post.membership_tier||'free';
   const timeLabel=post.createdAt?relativeTime(post.createdAt,language):(post.timeLabel||'');
-  const profileHref=post.api&&post.author?'/profile/'+encodeURIComponent(post.author):null;
+  const profileHref=post.api&&post.author?'/u/'+encodeURIComponent(post.author):null;
+  const postHref=post.api?'/posts/'+post.id:null;
   const stopExplore=variant==='explore'?e=>e.stopPropagation():undefined;
   return render(<div className="flex items-center justify-between social-post-header">
     <div className="flex items-center gap-3 min-w-0 social-post-identity">{profileHref?<a href={profileHref} onClick={stopExplore} aria-label={`Hồ sơ ${post.authorName}`} className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-secondary"><UserAvatar src={post.avatar} alt={post.authorName} tier={effectiveTier} size="md"/></a>:<UserAvatar src={post.avatar} alt={post.authorName} tier={effectiveTier} size="md"/>}
@@ -42,14 +43,14 @@ export function PostHeader({post,variant,menu}) {
         <span className={`font-label-lg text-label-lg text-on-surface font-bold hover:underline cursor-pointer ${post.api?'inline-block max-w-full break-words':variant==='explore'?'flex flex-col whitespace-nowrap':''}`}>{profileHref?<a href={profileHref} onClick={stopExplore} translate="no">{post.authorName}</a>:variant==='explore'?<PostLink post={post}/>:post.authorName}{' '}{profileHref?<a href={profileHref} onClick={stopExplore} className="text-xs text-outline font-normal">{post.handle}</a>:<span className="text-xs text-outline font-normal">{post.handle}</span>}</span>
         <LevelPill level={post.level} size="md"/>
         <TitleBadge level={post.level} realm={post.realm} title={post.nickname} size="md"/>
-      </div><div className="flex items-center gap-2 text-outline font-body-sm text-body-sm">{variant==='profile'?<a href={'/#post-'+post.id} className="font-mono-tag text-mono-tag">{timeLabel}</a>:<span className="font-mono-tag text-mono-tag">{timeLabel}</span>}<span>·</span><PostCategory post={post} label={variant==='profile'?post.categoryLabel:undefined} className="text-secondary font-medium"/></div></div>
+      </div><div className="flex items-center gap-2 text-outline font-body-sm text-body-sm">{postHref?<a href={postHref} onClick={stopExplore} className="font-mono-tag text-mono-tag hover:underline">{timeLabel}</a>:<span className="font-mono-tag text-mono-tag">{timeLabel}</span>}<span>·</span><PostCategory post={post} label={variant==='profile'?post.categoryLabel:undefined} className="text-secondary font-medium"/></div></div>
     </div>{menu||<button type="button" className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors" aria-label="Tùy chọn bài viết">{icon('more_horiz')}</button>}
   </div>);
 }
-export function PostCard({post,variant,hidden,onExplore}) {
+export function PostCard({post,variant,hidden,onExplore,detail=false,highlightCommentId=null,expandRootId=null}) {
   const render=useLocalized(),{state,commit,categories}=useSocial(),{language}=usePreferences();
   const [editing,setEditing]=useState(false),[text,setText]=useState(post.content),[category,setCategory]=useState(post.category),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const [commentsOpen,setCommentsOpen]=useState(post.id==='khang');
+  const [commentsOpen,setCommentsOpen]=useState(detail||post.id==='khang');
   const commentCount=state.api?state.apiInteractions?.post?.[post.id]?.comments_count||0:commentsFor(state,post.id).length;
   const current=readDemoUser();
   const own=post.api&&current?.id&&post.authorId===current.id;
@@ -65,6 +66,6 @@ export function PostCard({post,variant,hidden,onExplore}) {
       <ReactionBar id={post.id}/>
       {variant!=='explore'&&<div className="flex items-center gap-2"><button type="button" className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-secondary/40 text-secondary hover:bg-secondary/10 transition-all" aria-label="Bình luận" aria-expanded={commentsOpen} onClick={()=>setCommentsOpen(v=>!v)}>{icon('chat_bubble_outline')}<span className="font-mono-counter text-mono-counter">{commentCount||null}</span></button><ShareButton postId={post.id} profile={variant==='profile'}/></div>}
     </div>
-    {variant!=='explore'&&<div hidden={!commentsOpen} style={!commentsOpen?{display:'none'}:undefined}><CommentSection postId={post.id} active={commentsOpen&&!hidden}/></div>}
+    {variant!=='explore'&&<div hidden={!commentsOpen} style={!commentsOpen?{display:'none'}:undefined}><CommentSection postId={post.id} active={commentsOpen&&!hidden} highlightCommentId={highlightCommentId} expandRootId={expandRootId}/></div>}
   </article>);
 }

@@ -14,8 +14,8 @@ export function SocialProvider({children}) {
   const [snapshot,setSnapshot]=useState(()=>({state:emptyState(),media:{}}));
   const [ready,setReady]=useState(false),[error,setError]=useState('');
   const [serverPosts,setServerPosts]=useState([]),[categories,setCategories]=useState(MOCK_AUTH?CATEGORIES:[]);
-  const [pagination,setPagination]=useState(null),[loading,setLoading]=useState(!MOCK_AUTH),[commentPages,setCommentPages]=useState({});
-  const query=useRef(readFilters(location.search,!MOCK_AUTH)),generation=useRef(0),page=useRef(1),appendFailed=useRef(false),uploads=useRef(new WeakMap());
+  const [pagination,setPagination]=useState(null),[loading,setLoading]=useState(!MOCK_AUTH),[commentPages,setCommentPages]=useState({}),[replyPages,setReplyPages]=useState({}),[commentSorts,setCommentSorts]=useState({});
+  const query=useRef(readFilters(location.search,!MOCK_AUTH)),generation=useRef(0),page=useRef(1),appendFailed=useRef(false),uploads=useRef(new WeakMap()),commentGen=useRef({}),replyGen=useRef({});
   const setInteraction=(target,id,value)=>{
     const parsed=apiInteractions(value,id,target);
     setSnapshot(v=>({...v,state:{...v.state,api:true,apiInteractions:{...v.state.apiInteractions,[target]:{...v.state.apiInteractions?.[target],[id]:parsed}}}}));
@@ -64,25 +64,51 @@ export function SocialProvider({children}) {
     }catch(e){if(active.current&&token===generation.current){appendFailed.current=append;setError(e.message);setReady(true);if(e.status===401)auth.refresh().catch(()=>{});}throw e;}
     finally{if(active.current&&token===generation.current)setLoading(false)}
   };
-  const loadComments=async(postId,append=false,pages=1)=>{
+  const loadComments=async(postId,append=false,pages=1,sortOverride=null)=>{
     if(MOCK_AUTH)return;
-    apiId(postId);const next=append?(commentPages[postId]?.page||1)+1:1;
+    apiId(postId);
+    const sort=sortOverride||commentSorts[postId]||'created_asc';
+    const next=append?(commentPages[postId]?.page||1)+1:1;
+    const token=(commentGen.current[postId]=(commentGen.current[postId]||0)+1);
     try{
       let result;
       const mapped=[];
-      for(let page=next;page<next+pages;page++){
-        result=apiPage(await auth.read('/posts/'+postId+'/comments?page_size=10&page='+page));
+      for(let p=next;p<next+pages;p++){
+        result=apiPage(await auth.read('/posts/'+postId+'/comments?page_size=10&page='+p+'&sort='+encodeURIComponent(sort)+'&include_interactions=true'));
         mapped.push(...result.items.map(apiComment));
-        if(page>=result.pagination.total_pages)break;
+        if(p>=result.pagination.total_pages)break;
       }
-      const values=await Promise.all(mapped.map(async row=>{
-        try{return [row.id,apiInteractions(await auth.read('/comments/'+row.id+'/interactions'),row.id,'comment')]}catch(e){if(e.status===404)return null;throw e;}
-      }));
-      if(!active.current)return;
-      const interactions=Object.fromEntries(values.filter(Boolean));
-      setSnapshot(v=>({...v,state:{...v.state,api:true,comments:[...new Map([...v.state.comments.filter(c=>append||c.postId!==postId),...mapped.filter(c=>interactions[c.id])].map(c=>[c.id,c])).values()],
+      if(!active.current||token!==commentGen.current[postId])return;
+      const interactions={};
+      for(const row of mapped){
+        if(row.interactions)interactions[row.id]=apiInteractions(row.interactions,row.id,'comment');
+      }
+      setSnapshot(v=>({...v,state:{...v.state,api:true,comments:[...new Map([...v.state.comments.filter(c=>append||c.postId!==postId||c.parentCommentId),...mapped].map(c=>[c.id,c])).values()],
         apiInteractions:{...v.state.apiInteractions,comment:{...v.state.apiInteractions?.comment,...interactions}}}}));
       setCommentPages(v=>({...v,[postId]:result.pagination}));
+    }catch(e){if(e.status===401)auth.refresh().catch(()=>{});throw e;}
+  };
+  const setCommentSort=async(postId,sort)=>{
+    setCommentSorts(v=>({...v,[postId]:sort}));
+    setCommentPages(v=>{const n={...v};delete n[postId];return n;});
+    await loadComments(postId,false,1,sort);
+  };
+  const loadReplies=async(commentId,append=false)=>{
+    if(MOCK_AUTH)return;
+    apiId(commentId);
+    const next=append?(replyPages[commentId]?.page||1)+1:1;
+    const token=(replyGen.current[commentId]=(replyGen.current[commentId]||0)+1);
+    try{
+      const result=apiPage(await auth.read('/comments/'+commentId+'/replies?page_size=10&page='+next+'&include_interactions=true'));
+      if(!active.current||token!==replyGen.current[commentId])return;
+      const mapped=result.items.map(apiComment);
+      const interactions={};
+      for(const row of mapped){
+        if(row.interactions)interactions[row.id]=apiInteractions(row.interactions,row.id,'comment');
+      }
+      setSnapshot(v=>({...v,state:{...v.state,api:true,comments:[...new Map([...v.state.comments.filter(c=>append||c.parentCommentId!==commentId),...mapped].map(c=>[c.id,c])).values()],
+        apiInteractions:{...v.state.apiInteractions,comment:{...v.state.apiInteractions?.comment,...interactions}}}}));
+      setReplyPages(v=>({...v,[commentId]:result.pagination}));
     }catch(e){if(e.status===401)auth.refresh().catch(()=>{});throw e;}
   };
   const apiCommit=async(action,file)=>{
@@ -104,7 +130,7 @@ export function SocialProvider({children}) {
     else if(action.type==='moderate-post')await auth.write('PATCH','/admin/posts/'+apiId(action.id),{status:action.status||'hidden',reason:action.reason||undefined});
     else if(action.type==='comment'){
       if(!action.text.trim()||action.text.length>2000)throw Error('INVALID_COMMENT');
-      result=await auth.write('POST','/posts/'+apiId(action.postId)+'/comments',{request_id:apiId(action.id),body:action.text});
+      result=await auth.write('POST','/posts/'+apiId(action.postId)+'/comments',{request_id:apiId(action.id),body:action.text,...(action.parentCommentId?{parent_comment_id:apiId(action.parentCommentId)}:{})});
     }else if(action.type==='delete-comment')await auth.write('DELETE','/comments/'+apiId(action.id));
     else if(action.type==='moderate-comment')await auth.write('PATCH','/admin/comments/'+apiId(action.id),{status:action.status||'hidden',reason:action.reason||undefined});
     else if(action.type==='react'){
@@ -119,25 +145,20 @@ export function SocialProvider({children}) {
     }else throw Error('INVALID_ACTION');
     window.dispatchEvent(new Event('aurameme:aura:invalidate'));
     if(['delete-post','moderate-post'].includes(action.type))setServerPosts(v=>v.filter(post=>post.id!==action.id));
-    if(['delete-comment','moderate-comment'].includes(action.type))setSnapshot(v=>({...v,state:{...v.state,comments:v.state.comments.filter(c=>c.id!==action.id)}}));
+    if(['delete-comment','moderate-comment'].includes(action.type))setSnapshot(v=>({...v,state:{...v.state,comments:v.state.comments.filter(c=>c.id!==action.id&&c.parentCommentId!==action.id)}}));
     setSnapshot(v=>({...v,state:{...v.state,revision:v.state.revision+1}}));
     // A failed read after a successful write must not report that the mutation failed.
     try{
-      if(['comment','delete-comment','moderate-comment'].includes(action.type)){
+      if(action.type==='comment'&&result){
+        const mapped=apiComment(result);
+        const emptyInt=apiInteractions({comment_id:mapped.id,reaction_counts:{like:0,love:0,laugh:0,fire:0,sad:0,angry:0},viewer_reaction:null,meme_reactions:[]},mapped.id,'comment');
+        setSnapshot(v=>({...v,state:{...v.state,api:true,
+          comments:[...new Map([...v.state.comments.map(c=>mapped.parentCommentId&&c.id===mapped.parentCommentId?{...c,replyCount:(c.replyCount||0)+1}:c),mapped].map(c=>[c.id,c])).values()],
+          apiInteractions:{...v.state.apiInteractions,comment:{...v.state.apiInteractions?.comment,[mapped.id]:emptyInt}}}}));
+        await readInteraction('post',action.postId);
+      }else if(['delete-comment','moderate-comment'].includes(action.type)){
         const postId=action.postId||snapshot.state.comments.find(c=>c.id===action.id)?.postId;
-        if(postId){
-          const loaded=commentPages[postId];
-          const pages=action.type==='comment'
-            ? Math.max(loaded?.page||1,Math.ceil(((loaded?.total||0)+1)/10))
-            : loaded?.page||1;
-          setCommentPages(previous=>{
-            const next={...previous};
-            delete next[postId];
-            return next;
-          });
-          await loadComments(postId,false,pages);
-          await readInteraction('post',postId);
-        }
+        if(postId)await readInteraction('post',postId);
       }else{await loadCategories();await loadFeed();}
     }catch{setError('Đã lưu thay đổi, nhưng chưa đồng bộ được dữ liệu hiển thị. Vui lòng tải lại.');}
     return result;
@@ -176,5 +197,5 @@ export function SocialProvider({children}) {
     try{channel.current?.postMessage('updated')}catch{}
     refresh().catch(()=>{if(active.current)setError('Đã lưu thay đổi, nhưng chưa đồng bộ được dữ liệu hiển thị. Vui lòng tải lại.');});
   };
-  return <SocialContext.Provider value={{...snapshot,posts:MOCK_AUTH?allPosts(snapshot.state,snapshot.media):serverPosts,categories,pagination,loading,commentPages,loadComments,loadFeed,loadOwnedMemes,loadMore:()=>loadFeed(query.current,true),retry:async()=>{if(!MOCK_AUTH&&appendFailed.current)return loadFeed(query.current,true);await refresh();if(!MOCK_AUTH)await loadFeed();},ready,error,commit}}>{children}</SocialContext.Provider>;
+  return <SocialContext.Provider value={{...snapshot,posts:MOCK_AUTH?allPosts(snapshot.state,snapshot.media):serverPosts,categories,pagination,loading,commentPages,replyPages,commentSorts,setCommentSort,loadComments,loadReplies,loadFeed,loadOwnedMemes,readInteraction,setInteraction,loadMore:()=>loadFeed(query.current,true),retry:async()=>{if(!MOCK_AUTH&&appendFailed.current)return loadFeed(query.current,true);await refresh();if(!MOCK_AUTH)await loadFeed();},ready,error,commit}}>{children}</SocialContext.Provider>;
 }

@@ -514,10 +514,17 @@ class Comment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    parent_comment_id: Mapped[UUID | None] = mapped_column(ForeignKey("comments.id", ondelete="RESTRICT"), index=True)
+    reply_to_comment_id: Mapped[UUID | None] = mapped_column(ForeignKey("comments.id", ondelete="RESTRICT"))
+    reply_to_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     __table_args__ = (
         CheckConstraint("btrim(body) <> ''", name="body_nonempty"),
         CheckConstraint("status IN ('visible','hidden','deleted')", name="status"),
         CheckConstraint("(status = 'deleted') = (deleted_at IS NOT NULL)", name="deleted_at"),
+        CheckConstraint("parent_comment_id IS NULL OR parent_comment_id <> id", name="no_self_parent"),
+        CheckConstraint("reply_to_comment_id IS NULL OR reply_to_comment_id <> id", name="no_self_reply_to"),
+        CheckConstraint("(parent_comment_id IS NULL) = (reply_to_comment_id IS NULL)", name="reply_parent_pair"),
+        Index("ix_comments_post_parent_created", "post_id", "parent_comment_id", "created_at", "id"),
     )
 
 
@@ -686,7 +693,7 @@ class UserFollow(Base):
     )
 
 
-DEMO_SCHEMA_HEAD = "0020_follow_notifications"
+DEMO_SCHEMA_HEAD = "0021_comment_replies"
 
 
 def reviewed_metadata(revision):

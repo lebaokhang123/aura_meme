@@ -10,9 +10,9 @@ def test_public_comments_query_contract():
     operation = app.openapi()["paths"]["/api/v1/posts/{post_id}/comments"]["get"]
     parameters = {item["name"]: item["schema"] for item in operation["parameters"]}
     assert {"search", "sort", "author", "page", "page_size"} <= parameters.keys()
-    assert parameters["sort"]["enum"] == ["created_asc", "created_desc"]
+    assert parameters["sort"]["enum"] == ["created_asc", "created_desc", "reaction_desc"]
     assert parameters["sort"]["default"] == "created_asc"
-    assert not operation.get("security")
+    assert not operation.get("security") or {} in operation.get("security", [])
 
 
 @pytest.mark.integration

@@ -32,9 +32,11 @@ function describeNotification(notif, t) {
       notifSnippet = postTitle ? `"${postTitle}"` : '';
     }
   } else if (notif.type === 'comment') {
-    iconName = 'chat_bubble';
+    iconName = notif.payload?.action === 'reply' ? 'reply' : 'chat_bubble';
     actorName = actor?.display_name || actor?.username || t('Thành viên AuraMeme', 'AuraMeme Member');
-    notifTitle = t('Đã bình luận vào bài viết của bạn', 'Commented on your post');
+    notifTitle = notif.payload?.action === 'reply'
+      ? t('Đã trả lời bình luận của bạn.', 'Replied to your comment.')
+      : t('Đã bình luận vào bài viết của bạn', 'Commented on your post');
     notifSnippet = commentText || body || (postTitle ? `"${postTitle}"` : '');
   } else if (notif.type === 'follow') {
     iconName = 'person_add';
@@ -513,9 +515,17 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
                   {selectedNotif.type === 'reaction'
                     ? t('Tương tác', 'Reaction')
                     : selectedNotif.type === 'comment'
-                    ? t('Bình luận', 'Comment')
+                    ? (selectedNotif.payload?.action === 'reply' ? t('Trả lời bình luận', 'Comment Reply') : t('Bình luận', 'Comment'))
                     : selectedNotif.type === 'moderation'
-                    ? t('Kiểm duyệt', 'Moderation')
+                    ? (selectedNotif.target_type === 'post' && selectedNotif.payload?.action === 'hidden'
+                        ? t('Bài viết bị ẩn', 'Post hidden')
+                        : selectedNotif.target_type === 'post' && selectedNotif.payload?.action === 'deleted'
+                        ? t('Bài viết bị xóa', 'Post deleted')
+                        : selectedNotif.target_type === 'comment' && selectedNotif.payload?.action === 'hidden'
+                        ? t('Bình luận bị ẩn', 'Comment hidden')
+                        : selectedNotif.target_type === 'comment' && selectedNotif.payload?.action === 'deleted'
+                        ? t('Bình luận bị xóa', 'Comment deleted')
+                        : t('Kiểm duyệt', 'Moderation'))
                     : selectedNotif.type === 'follow'
                     ? t('Theo dõi', 'Follow')
                     : t('Thông báo hệ thống', 'System Announcement')}
@@ -633,20 +643,21 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
                   onClick={() => {
                     handleCloseModal();
                     onClose?.();
-                    location.assign(`/#post-${selectedNotif.target_id}`);
+                    location.assign(`/posts/${selectedNotif.target_id}`);
                   }}
                 >
                   {symbol('arrow_outward')}
                   <span>{t('Xem bài viết', 'View post')}</span>
                 </button>
-              ) : (selectedNotif.target_type === 'comment' && selectedNotif.payload?.post_id) ? (
+              ) : (selectedNotif.target_type === 'comment' && selectedNotif.payload?.post_id && !(selectedNotif.type === 'moderation' && selectedNotif.payload?.action === 'deleted')) ? (
                 <button
                   type="button"
                   className="notification-modal-action-btn"
                   onClick={() => {
                     handleCloseModal();
                     onClose?.();
-                    location.assign(`/#post-${selectedNotif.payload.post_id}`);
+                    const cid = selectedNotif.payload?.comment_id || selectedNotif.target_id;
+                    location.assign(cid ? `/posts/${selectedNotif.payload.post_id}?comment=${encodeURIComponent(cid)}` : `/posts/${selectedNotif.payload.post_id}`);
                   }}
                 >
                   {symbol('arrow_outward')}
