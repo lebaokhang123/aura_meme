@@ -290,4 +290,4 @@ Checkout và History lấy detail cùng lịch sử success của tài khoản t
 
 ### MVP v1.0.0 API Freeze
 
-- Toàn bộ 93 đường dẫn API trên `app.main:app` đã được đóng băng cho bản phát hành MVP v1.0.0 và đồng bộ 1:1 với `docs/api/05-openapi.yaml`.
+- Toàn bộ 93 đường dẫn API trên `app.main:app` đã được đóng băng cho bản phát hành MVP v1.0.0 và đồng bộ 1:1 với `docs/api/05-openapi.yaml` (bao gồm `/api/v1/admin/orders/{order_id}/receipt.pdf` và `?format=png` sử dụng ReportLab/Pillow).

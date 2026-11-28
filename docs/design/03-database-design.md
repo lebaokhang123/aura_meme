@@ -808,4 +808,4 @@ Hotfix 23/11/2026 giữ schema 0014 và DBML. Khóa User trong transaction để
 ### Mốc đóng băng Schema MVP v1.0.0
 
 - Revision phát hành chính thức: `0021_comment_replies` (đã vá naming `op.f(...)` cho CHECK constraints tại `0019`, `0020`, `0021` trong PR #55).
-- Cổng kiểm thử migration từ DB trống (`backend/tests/test_migrations.py`): 64/64 PASS trên PostgreSQL cô lập.
+- Cổng kiểm thử migration từ DB trống (`backend/tests/test_migrations.py`): 64/64 PASS trên PostgreSQL cô lập; cài đặt runtime mới khởi tạo schema qua `alembic upgrade head` (yêu cầu biến môi trường DB đích hợp lệ).

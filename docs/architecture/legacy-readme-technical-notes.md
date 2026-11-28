@@ -49,4 +49,5 @@ Tài liệu này lưu trữ toàn bộ các ghi chú kỹ thuật nội bộ, ch
 
 - Mã nguồn phát hành dưới giấy phép **MIT License** (`Copyright (c) 2026 Lê Bảo Khang (lebaokhang123)`).
 - `.gitattributes` loại trừ `AGENTS.md`, `run.bat` và `run_qa.bat` khỏi Git release archives (`export-ignore`) nhưng vẫn giữ đầy đủ trong workspace phát triển.
-- Lưu ý phạm vi license bên thứ ba: `PyMuPDF==2.1` dùng AGPL-3.0 / Artifex Commercial License; `psycopg`/`psycopg-binary` dùng LGPL-3.0-only; asset/logo minh họa tuân theo phạm vi ghi nhận tại `frontend/ASSET_SOURCES.md` và `frontend/public/third-party-notices.txt`.
+- Đã thay thế `PyMuPDF` (AGPL-3.0) bằng `ReportLab` (BSD) và `Pillow` (MIT-CMU) cho sinh PDF và PNG preview biên lai; `psycopg`/`psycopg-binary` dùng `LGPL-3.0-only`; phạm vi third-party media/branding ghi nhận tại `frontend/ASSET_SOURCES.md` và `frontend/public/third-party-notices.txt`.
+- Kiểm thử từ source archive dùng `pytest -m "not integration" --ignore=tests/test_launcher.py -q` (do `run.bat` không nằm trong archive); workspace/CI vẫn chạy đầy đủ `tests/test_launcher.py`.

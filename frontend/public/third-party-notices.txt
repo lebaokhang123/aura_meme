@@ -1,4 +1,6 @@
-Lucian UX/UI Prompt background adaptations #363, #352 (Deep Sea), #226, #330
+AuraMeme Third-Party Notices
+
+1. Lucian UX/UI Prompt adaptations (#056, #219, #225, #226, #244, #267, #330, #352, #363, #401)
 Sources: https://lucianlabs.dev/uxui-prompt/
 License source: https://github.com/Seokwoooo/lucian-uxui-prompt/blob/main/LICENSE
 
@@ -23,3 +25,16 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+2. Embedded Google Roboto Fonts (frontend/src/fonts/roboto-fonts.js)
+- Roboto Regular & Roboto Bold TTF (embedded base64)
+- License: Apache License 2.0 (Google Fonts / Roboto)
+
+3. Backend & Frontend Runtime Dependencies
+- Backend: FastAPI, Pydantic, SQLAlchemy, Alembic (MIT); ReportLab (BSD), pypdf (BSD-3-Clause), Uvicorn, httpx (BSD-3-Clause); Pillow (MIT-CMU); python-multipart, opentelemetry-api (Apache-2.0); psycopg / psycopg-binary (LGPL-3.0-only).
+- Frontend: React, React DOM, Vite, jsPDF (MIT); @playwright/test (Apache-2.0, dev/test only).
+- Note: PyMuPDF (AGPL-3.0) has been removed from runtime, tests, and dependency manifests.
+
+4. Third-Party Media, Branding, and Font Boundary
+- The AuraMeme MIT License applies to project-authored source code and documentation only.
+- It does not grant third-party copyright or trademark rights over external payment brand marks (paypal.png, credit_card.png), demo meme/profile images, Google Fonts CDN assets, or Stitch reference exports (see frontend/ASSET_SOURCES.md).
