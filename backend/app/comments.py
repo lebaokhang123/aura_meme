@@ -67,6 +67,7 @@ class CommentLocateResponse(BaseModel):
     root_comment_id: UUID
     is_reply: bool
     root_comment: CommentResponse | None = None
+    target_comment: CommentResponse | None = None
 
 
 def comment_dto(
@@ -328,19 +329,30 @@ def locate_comment(post_id: UUID, comment_id: UUID, request: Request, reader=Dep
         raise AuthError(404, "NOT_FOUND", "Comment not found.")
     root_id = row.parent_comment_id or row.id
     from app.aura_runtime import public_is_admin_column, public_level_column
+    now = request.app.state.auth.now()
     root_row = db.execute(
-        select(Comment, User, Profile, public_level_column(request.app.state.auth.now()), public_is_admin_column())
+        select(Comment, User, Profile, public_level_column(now), public_is_admin_column())
         .join(User, User.id == Comment.author_id)
         .join(Profile, Profile.user_id == User.id)
         .where(Comment.id == root_id)
     ).one_or_none()
     hydrated = _hydrate_comments(db, [root_row], viewer_id, request, include_interactions=True, include_reply_counts=True)[0] if root_row else None
+    target_hydrated = None
+    if row.parent_comment_id is not None:
+        target_row = db.execute(
+            select(Comment, User, Profile, public_level_column(now), public_is_admin_column())
+            .join(User, User.id == Comment.author_id)
+            .join(Profile, Profile.user_id == User.id)
+            .where(Comment.id == row.id)
+        ).one_or_none()
+        target_hydrated = _hydrate_comments(db, [target_row], viewer_id, request, include_interactions=True, include_reply_counts=False)[0] if target_row else None
     return CommentLocateResponse(
         post_id=post_id,
         comment_id=row.id,
         root_comment_id=root_id,
         is_reply=row.parent_comment_id is not None,
         root_comment=hydrated,
+        target_comment=target_hydrated,
     )
 
 

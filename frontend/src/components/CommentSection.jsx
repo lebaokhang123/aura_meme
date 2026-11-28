@@ -148,7 +148,7 @@ export function CommentSection({postId,active=true,highlightCommentId=null,expan
       el?.scrollIntoView({behavior:'smooth',block:'center'});
     },250);
     return()=>clearTimeout(timer);
-  },[highlightCommentId,state.comments.length]);
+  },[highlightCommentId,expandRootId,Boolean(expandRootId&&expandedThreads[expandRootId]),state.comments.length]);
   const insert=emoji=>{
     const el=input.current,start=el.selectionStart,end=el.selectionEnd,next=text.slice(0,start)+emoji+text.slice(end);
     if(next.length>2000)return;

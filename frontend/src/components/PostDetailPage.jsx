@@ -12,13 +12,13 @@ export default function PostDetailPage() {
   const render = useLocalized();
   const { language } = usePreferences();
   const t = (vi, en) => (language === 'en' ? en : vi);
-  const { readInteraction, injectComment, state } = useSocial();
+  const { readInteraction, injectComment, injectPost, posts } = useSocial();
 
   const match = /^\/posts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i.exec(location.pathname);
   const postId = match?.[1] || null;
   const commentParam = new URLSearchParams(location.search).get('comment');
 
-  const [post, setPost] = useState(null);
+  const [postLoaded, setPostLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState(null);
   const [locate, setLocate] = useState(null);
@@ -32,6 +32,7 @@ export default function PostDetailPage() {
       return;
     }
     let active = true;
+    setPostLoaded(false);
     setLoading(true);
     setErrorStatus(null);
     setCommentUnavailable(false);
@@ -44,12 +45,14 @@ export default function PostDetailPage() {
       .then(async ([rawPost]) => {
         if (!active) return;
         const mapped = apiPost(rawPost);
-        setPost(mapped);
+        injectPost(mapped);
+        setPostLoaded(true);
         if (commentParam && /^[0-9a-f-]{36}$/i.test(commentParam)) {
           try {
             const loc = await auth.read(`/posts/${apiId(postId)}/comments/${apiId(commentParam)}/locate`);
             if (active) {
               if (loc?.root_comment) injectComment(loc.root_comment);
+              if (loc?.target_comment) injectComment(loc.target_comment);
               setLocate(loc);
             }
           } catch (e) {
@@ -68,8 +71,9 @@ export default function PostDetailPage() {
     return () => { active = false; };
   }, [postId, commentParam, revision]);
 
+  const post = posts.find(p => p.id === postId) || null;
   // Keep local post synced if edited or deleted via SocialContext
-  const deletedInSession = post && state.revision > 0 && errorStatus === 404;
+  const deletedInSession = postLoaded && !loading && !errorStatus && !post;
 
   if (errorStatus === 404 || deletedInSession) return <ErrorPage status={404} />;
   if (errorStatus) return <ErrorPage status={503} onRetry={() => setRevision(n => n + 1)} />;

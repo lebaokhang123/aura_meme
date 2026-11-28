@@ -291,14 +291,20 @@ def test_h07_visibility_locate_page2_sql_scaling_and_downgrade_guard(monkeypatch
             assert rep.status_code == 201
             reply_id = rep.json()["id"]
 
-            # 1. Locate returns root_comment directly even though target_root_id is on page 3
+            # 1. Locate returns root_comment AND target_comment directly even though target_root_id is on page 3
             loc = client.get(f"/api/v1/posts/{post_id}/comments/{reply_id}/locate")
             assert loc.status_code == 200
             loc_json = loc.json()
             assert loc_json["root_comment_id"] == target_root_id
             assert loc_json["root_comment"]["id"] == target_root_id
+            assert loc_json["target_comment"]["id"] == reply_id
+            assert loc_json["target_comment"]["parent_comment_id"] == target_root_id
+            loc_root = client.get(f"/api/v1/posts/{post_id}/comments/{target_root_id}/locate")
+            assert loc_root.status_code == 200
+            assert loc_root.json()["target_comment"] is None
 
-            # 2. Hide root -> reply hidden from user profile comments, comment reactions, replies, and locate
+            # 2. Hide root -> reply hidden from user profile comments, profile activity, comment reactions, replies, and locate
+            act_before = client.get(f"/api/v1/users/{u2_uname}/activity").json()["total"]
             csrf_admin = _login(client, ADMIN_EMAIL, ADMIN_PASSWORD)
             assert client.patch(f"/api/v1/admin/comments/{target_root_id}", json={"status": "hidden", "reason": "H07 hide check"}, headers={**ORIGIN, "X-CSRF-Token": csrf_admin}).status_code == 204
             assert client.get(f"/api/v1/comments/{reply_id}/reactions").status_code == 404
@@ -306,6 +312,8 @@ def test_h07_visibility_locate_page2_sql_scaling_and_downgrade_guard(monkeypatch
             assert client.get(f"/api/v1/posts/{post_id}/comments/{reply_id}/locate").status_code == 404
             u2_cmts = client.get(f"/api/v1/users/{u2_uname}/comments?page=1&page_size=50").json()["items"]
             assert reply_id not in [c["id"] for c in u2_cmts]
+            act_after = client.get(f"/api/v1/users/{u2_uname}/activity").json()["total"]
+            assert act_after == act_before - 1
 
             # Restore root so downgrade guard test sees a real reply row
             assert client.patch(f"/api/v1/admin/comments/{target_root_id}", json={"status": "visible", "reason": "H07 restore"}, headers={**ORIGIN, "X-CSRF-Token": csrf_admin}).status_code == 204
