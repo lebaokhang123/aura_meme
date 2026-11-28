@@ -66,6 +66,7 @@ class CommentLocateResponse(BaseModel):
     comment_id: UUID
     root_comment_id: UUID
     is_reply: bool
+    root_comment: CommentResponse | None = None
 
 
 def comment_dto(
@@ -306,30 +307,41 @@ def list_comment_replies(
 
 
 @router.get("/posts/{post_id}/comments/{comment_id}/locate", response_model=CommentLocateResponse, operation_id="locateComment",
-            responses={status: {"model": ErrorResponse} for status in (404, 422, 429, 500)})
-def locate_comment(post_id: UUID, comment_id: UUID, request: Request):
-    with request.app.state.auth_session_factory() as db:
-        require_public_post(db, post_id)
-        row = db.execute(
-            select(Comment)
-            .join(User, User.id == Comment.author_id)
-            .where(
-                Comment.id == comment_id,
-                Comment.post_id == post_id,
-                Comment.status == "visible",
-                Comment.deleted_at.is_(None),
-                User.status == "active",
-                _visible_parent_guard(),
-            )
-        ).scalar_one_or_none()
-        if row is None:
-            raise AuthError(404, "NOT_FOUND", "Comment not found.")
-        return CommentLocateResponse(
-            post_id=post_id,
-            comment_id=row.id,
-            root_comment_id=row.parent_comment_id or row.id,
-            is_reply=row.parent_comment_id is not None,
+            responses={status: {"model": ErrorResponse} for status in (404, 422, 429, 500)},
+            openapi_extra={"security": [{}, {"sessionCookie": []}]})
+def locate_comment(post_id: UUID, comment_id: UUID, request: Request, reader=Depends(interaction_reader, scope="function")):
+    db, viewer_id = reader
+    require_public_post(db, post_id)
+    row = db.execute(
+        select(Comment)
+        .join(User, User.id == Comment.author_id)
+        .where(
+            Comment.id == comment_id,
+            Comment.post_id == post_id,
+            Comment.status == "visible",
+            Comment.deleted_at.is_(None),
+            User.status == "active",
+            _visible_parent_guard(),
         )
+    ).scalar_one_or_none()
+    if row is None:
+        raise AuthError(404, "NOT_FOUND", "Comment not found.")
+    root_id = row.parent_comment_id or row.id
+    from app.aura_runtime import public_is_admin_column, public_level_column
+    root_row = db.execute(
+        select(Comment, User, Profile, public_level_column(request.app.state.auth.now()), public_is_admin_column())
+        .join(User, User.id == Comment.author_id)
+        .join(Profile, Profile.user_id == User.id)
+        .where(Comment.id == root_id)
+    ).one_or_none()
+    hydrated = _hydrate_comments(db, [root_row], viewer_id, request, include_interactions=True, include_reply_counts=True)[0] if root_row else None
+    return CommentLocateResponse(
+        post_id=post_id,
+        comment_id=row.id,
+        root_comment_id=root_id,
+        is_reply=row.parent_comment_id is not None,
+        root_comment=hydrated,
+    )
 
 
 @router.post("/posts/{post_id}/comments", status_code=201, response_model=CommentResponse,

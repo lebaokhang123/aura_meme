@@ -12,7 +12,7 @@ export default function PostDetailPage() {
   const render = useLocalized();
   const { language } = usePreferences();
   const t = (vi, en) => (language === 'en' ? en : vi);
-  const { readInteraction, state } = useSocial();
+  const { readInteraction, injectComment, state } = useSocial();
 
   const match = /^\/posts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i.exec(location.pathname);
   const postId = match?.[1] || null;
@@ -48,7 +48,10 @@ export default function PostDetailPage() {
         if (commentParam && /^[0-9a-f-]{36}$/i.test(commentParam)) {
           try {
             const loc = await auth.read(`/posts/${apiId(postId)}/comments/${apiId(commentParam)}/locate`);
-            if (active) setLocate(loc);
+            if (active) {
+              if (loc?.root_comment) injectComment(loc.root_comment);
+              setLocate(loc);
+            }
           } catch (e) {
             if (active && e.status === 404) setCommentUnavailable(true);
           }

@@ -238,3 +238,107 @@ def test_h07_reactions_replies_sorting_batch_notifications_and_locate():
             for pid in created_posts:
                 cleanup_client.delete(f"/api/v1/admin/posts/{pid}", headers={**ORIGIN, "X-CSRF-Token": csrf_admin})
         engine.dispose()
+
+
+def test_h07_visibility_locate_page2_sql_scaling_and_downgrade_guard(monkeypatch):
+    _ensure_test_db()
+    from alembic import command
+    from alembic.config import Config
+    from app.config import load_settings
+    from app.db import create_db_engine
+    from app.main import app
+    from app.models import Category, Comment, User
+
+    engine = create_db_engine(load_settings())
+    with Session(engine) as db:
+        u1 = db.execute(select(User).where(User.email == USER_1_EMAIL)).scalar_one()
+        u2 = db.execute(select(User).where(User.email == USER_2_EMAIL)).scalar_one()
+        u2_uname = u2.username
+        cat = db.execute(select(Category).where(Category.status == "active")).scalars().first()
+        cat_id = cat.id
+
+    created_posts = []
+    try:
+        with TestClient(app) as client:
+            csrf1 = _login(client, USER_1_EMAIL, USER_PASSWORD)
+            pr = client.post(
+                "/api/v1/posts",
+                json={"title": f"H07 Scale Post {uuid4().hex[:6]}", "content": "Scale content", "category_id": str(cat_id), "status": "published"},
+                headers={**ORIGIN, "X-CSRF-Token": csrf1},
+            )
+            assert pr.status_code == 201
+            post_id = pr.json()["id"]
+            created_posts.append(post_id)
+
+            # Create 25 root comments + 1 reply on the LAST root comment (which is on page 3 at page_size=10 when created_asc)
+            root_ids = []
+            for i in range(25):
+                cr = client.post(
+                    f"/api/v1/posts/{post_id}/comments",
+                    json={"body": f"Scale root {i:02d}"},
+                    headers={**ORIGIN, "X-CSRF-Token": csrf1},
+                )
+                assert cr.status_code == 201
+                root_ids.append(cr.json()["id"])
+
+            csrf2 = _login(client, USER_2_EMAIL, USER_PASSWORD)
+            target_root_id = root_ids[-1]
+            rep = client.post(
+                f"/api/v1/posts/{post_id}/comments",
+                json={"body": "Page 3 reply", "parent_comment_id": target_root_id},
+                headers={**ORIGIN, "X-CSRF-Token": csrf2},
+            )
+            assert rep.status_code == 201
+            reply_id = rep.json()["id"]
+
+            # 1. Locate returns root_comment directly even though target_root_id is on page 3
+            loc = client.get(f"/api/v1/posts/{post_id}/comments/{reply_id}/locate")
+            assert loc.status_code == 200
+            loc_json = loc.json()
+            assert loc_json["root_comment_id"] == target_root_id
+            assert loc_json["root_comment"]["id"] == target_root_id
+
+            # 2. Hide root -> reply hidden from user profile comments, comment reactions, replies, and locate
+            csrf_admin = _login(client, ADMIN_EMAIL, ADMIN_PASSWORD)
+            assert client.patch(f"/api/v1/admin/comments/{target_root_id}", json={"status": "hidden", "reason": "H07 hide check"}, headers={**ORIGIN, "X-CSRF-Token": csrf_admin}).status_code == 204
+            assert client.get(f"/api/v1/comments/{reply_id}/reactions").status_code == 404
+            assert client.get(f"/api/v1/comments/{target_root_id}/replies").status_code == 404
+            assert client.get(f"/api/v1/posts/{post_id}/comments/{reply_id}/locate").status_code == 404
+            u2_cmts = client.get(f"/api/v1/users/{u2_uname}/comments?page=1&page_size=50").json()["items"]
+            assert reply_id not in [c["id"] for c in u2_cmts]
+
+            # Restore root so downgrade guard test sees a real reply row
+            assert client.patch(f"/api/v1/admin/comments/{target_root_id}", json={"status": "visible", "reason": "H07 restore"}, headers={**ORIGIN, "X-CSRF-Token": csrf_admin}).status_code == 204
+
+            # 3. Measure SQL query count for page_size=10, 20, 50 (O(1) constant queries)
+            counts = {}
+            for ps in (10, 20, 50):
+                sql_list = []
+                def _hook(conn, cursor, stmt, params, ctx, em):
+                    sql_list.append(stmt)
+                event.listen(app.state.engine, "before_cursor_execute", _hook)
+                try:
+                    res = client.get(f"/api/v1/posts/{post_id}/comments?page=1&page_size={ps}&include_interactions=true")
+                finally:
+                    event.remove(app.state.engine, "before_cursor_execute", _hook)
+                assert res.status_code == 200
+                counts[ps] = len(sql_list)
+            assert counts[10] == counts[20] == counts[50] <= 18, f"Expected O(1) SQL counts, got {counts}"
+
+        # 4. Verify 0021 downgrade fails closed when reply rows exist
+        orig_db_url = os.environ["DATABASE_URL"]
+        monkeypatch.setenv("DATABASE_URL", orig_db_url.replace("/aurameme_test", "/aurameme_dev"))
+        try:
+            cfg = Config(str(ROOT / "backend" / "alembic.ini"))
+            with engine.begin() as conn:
+                cfg.attributes["connection"] = conn
+                with pytest.raises(RuntimeError, match="Refusing downgrade: comment replies exist"):
+                    command.downgrade(cfg, "0020_follow_notifications")
+        finally:
+            monkeypatch.setenv("DATABASE_URL", orig_db_url)
+    finally:
+        with TestClient(app) as cleanup_client:
+            csrf_admin = _login(cleanup_client, ADMIN_EMAIL, ADMIN_PASSWORD)
+            for pid in created_posts:
+                cleanup_client.delete(f"/api/v1/admin/posts/{pid}", headers={**ORIGIN, "X-CSRF-Token": csrf_admin})
+        engine.dispose()

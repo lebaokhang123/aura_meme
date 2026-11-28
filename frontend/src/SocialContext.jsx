@@ -88,6 +88,13 @@ export function SocialProvider({children}) {
       setCommentPages(v=>({...v,[postId]:result.pagination}));
     }catch(e){if(e.status===401)auth.refresh().catch(()=>{});throw e;}
   };
+  const injectComment=(rawComment)=>{
+    if(MOCK_AUTH||!rawComment)return;
+    const mapped=apiComment(rawComment);
+    setSnapshot(v=>({...v,state:{...v.state,api:true,
+      comments:[...new Map([mapped,...v.state.comments].map(c=>[c.id,c])).values()],
+      apiInteractions:{...v.state.apiInteractions,comment:{...v.state.apiInteractions?.comment,...(mapped.interactions?{[mapped.id]:apiInteractions(mapped.interactions,mapped.id,'comment')}:{})}}}}));
+  };
   const setCommentSort=async(postId,sort)=>{
     setCommentSorts(v=>({...v,[postId]:sort}));
     setCommentPages(v=>{const n={...v};delete n[postId];return n;});
@@ -197,5 +204,5 @@ export function SocialProvider({children}) {
     try{channel.current?.postMessage('updated')}catch{}
     refresh().catch(()=>{if(active.current)setError('Đã lưu thay đổi, nhưng chưa đồng bộ được dữ liệu hiển thị. Vui lòng tải lại.');});
   };
-  return <SocialContext.Provider value={{...snapshot,posts:MOCK_AUTH?allPosts(snapshot.state,snapshot.media):serverPosts,categories,pagination,loading,commentPages,replyPages,commentSorts,setCommentSort,loadComments,loadReplies,loadFeed,loadOwnedMemes,readInteraction,setInteraction,loadMore:()=>loadFeed(query.current,true),retry:async()=>{if(!MOCK_AUTH&&appendFailed.current)return loadFeed(query.current,true);await refresh();if(!MOCK_AUTH)await loadFeed();},ready,error,commit}}>{children}</SocialContext.Provider>;
+  return <SocialContext.Provider value={{...snapshot,posts:MOCK_AUTH?allPosts(snapshot.state,snapshot.media):serverPosts,categories,pagination,loading,commentPages,replyPages,commentSorts,setCommentSort,loadComments,loadReplies,injectComment,loadFeed,loadOwnedMemes,readInteraction,setInteraction,loadMore:()=>loadFeed(query.current,true),retry:async()=>{if(!MOCK_AUTH&&appendFailed.current)return loadFeed(query.current,true);await refresh();if(!MOCK_AUTH)await loadFeed();},ready,error,commit}}>{children}</SocialContext.Provider>;
 }
