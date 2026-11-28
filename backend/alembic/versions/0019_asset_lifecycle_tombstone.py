@@ -87,12 +87,12 @@ def upgrade():
         'fk_asset_items_deleted_by_users', 'asset_items', 'users',
         ['deleted_by'], ['id'], ondelete='RESTRICT',
     )
-    op.create_check_constraint('ck_asset_items_deleted_inactive', 'asset_items', 'deleted_at IS NULL OR NOT active')
+    op.create_check_constraint(op.f('ck_asset_items_deleted_inactive'), 'asset_items', 'deleted_at IS NULL OR NOT active')
     op.create_index('ix_asset_items_deleted_at', 'asset_items', ['deleted_at'])
 
     op.add_column('case_opens', sa.Column('reward_rarity', sa.Text(), nullable=True))
     op.create_check_constraint(
-        'ck_case_opens_reward_rarity', 'case_opens',
+        op.f('ck_case_opens_reward_rarity'), 'case_opens',
         "reward_rarity IS NULL OR reward_rarity IN ('D','C','B','A','S')",
     )
 
@@ -119,11 +119,11 @@ def downgrade():
         'fk_case_pool_items_asset_rarity', 'case_pool_items', 'asset_items',
         ['asset_id', 'rarity'], ['id', 'rarity'], ondelete='RESTRICT',
     )
-    op.drop_constraint('ck_case_opens_reward_rarity', 'case_opens', type_='check')
+    op.drop_constraint(op.f('ck_case_opens_reward_rarity'), 'case_opens', type_='check')
     op.drop_column('case_opens', 'reward_rarity')
 
     op.drop_index('ix_asset_items_deleted_at', table_name='asset_items')
-    op.drop_constraint('ck_asset_items_deleted_inactive', 'asset_items', type_='check')
+    op.drop_constraint(op.f('ck_asset_items_deleted_inactive'), 'asset_items', type_='check')
     op.drop_constraint('fk_asset_items_deleted_by_users', 'asset_items', type_='foreignkey')
     op.drop_column('asset_items', 'deleted_by')
     op.drop_column('asset_items', 'deleted_at')

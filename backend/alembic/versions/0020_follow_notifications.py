@@ -15,14 +15,14 @@ depends_on = None
 
 def upgrade():
     op.execute("SET LOCAL lock_timeout = '5s'")
-    op.drop_constraint('ck_notifications_notification_type', 'notifications', type_='check')
+    op.drop_constraint(op.f('ck_notifications_notification_type'), 'notifications', type_='check')
     op.create_check_constraint(
-        'ck_notifications_notification_type', 'notifications',
+        op.f('ck_notifications_notification_type'), 'notifications',
         "type IN ('reaction','comment','moderation','announcement','follow')",
     )
-    op.drop_constraint('ck_notifications_notification_target_type', 'notifications', type_='check')
+    op.drop_constraint(op.f('ck_notifications_notification_target_type'), 'notifications', type_='check')
     op.create_check_constraint(
-        'ck_notifications_notification_target_type', 'notifications',
+        op.f('ck_notifications_notification_target_type'), 'notifications',
         "target_type IN ('post','comment','system','user')",
     )
 
@@ -32,13 +32,13 @@ def downgrade():
     conn = op.get_bind()
     if conn.execute(sa.text("SELECT 1 FROM notifications WHERE type = 'follow' OR target_type = 'user' LIMIT 1")).first() is not None:
         raise RuntimeError("Refusing downgrade: follow notifications exist; preserve data or remove follow rows first.")
-    op.drop_constraint('ck_notifications_notification_type', 'notifications', type_='check')
+    op.drop_constraint(op.f('ck_notifications_notification_type'), 'notifications', type_='check')
     op.create_check_constraint(
-        'ck_notifications_notification_type', 'notifications',
+        op.f('ck_notifications_notification_type'), 'notifications',
         "type IN ('reaction','comment','moderation','announcement')",
     )
-    op.drop_constraint('ck_notifications_notification_target_type', 'notifications', type_='check')
+    op.drop_constraint(op.f('ck_notifications_notification_target_type'), 'notifications', type_='check')
     op.create_check_constraint(
-        'ck_notifications_notification_target_type', 'notifications',
+        op.f('ck_notifications_notification_target_type'), 'notifications',
         "target_type IN ('post','comment','system')",
     )
