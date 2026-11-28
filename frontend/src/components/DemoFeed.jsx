@@ -96,7 +96,7 @@ export function DemoFeed({ variant }) {
   const { filters, update, url,targetId,missingPost } = useFeed();
   const {posts,error,ready,loading,retry}=useSocial();
   const matches = MOCK_AUTH?selectPosts(filters,posts):posts;
-  const selected = (MOCK_AUTH && variant==='explore' && !filters.q)?matches.slice(0,3):matches;
+  const selected = variant==='explore'?matches.slice(0,6):matches;
   const visible = new Set(selected.map(post => post.id));
   // Preserve comment drafts while switching filters.
   const ordered = [...selected, ...posts.filter(post => !visible.has(post.id))];
@@ -134,7 +134,6 @@ export function DemoFeed({ variant }) {
     {error&&<div role="alert" className="col-span-full text-error font-body-sm text-body-sm">{error}<button type="button" onClick={()=>retry().catch(()=>{})}>Thử lại</button></div>}{!MOCK_AUTH&&loading&&<p role="status" className="col-span-full">Đang tải bài viết...</p>}
     {missingPost&&<div role="status" className="col-span-full text-on-surface-variant font-body-sm text-body-sm">Không tìm thấy bài trong dữ liệu demo của trình duyệt này.</div>}
     {ordered.map(post=><PostCard key={post.id} post={post} variant={variant} hidden={!visible.has(post.id)} onExplore={variant==='explore'?event=>{if(!event.target.closest('button,a,input,select,textarea')&&!getSelection()?.toString())location.assign(url('/',`post-${post.id}`))}:undefined}/>)}
-    {!MOCK_AUTH&&variant==='explore'&&<div className="col-span-full"><FeedEnd/></div>}
     {ready&&!loading&&!error&&!selected.length && <div role="status" className="col-span-full bg-surface-container-low rounded-xl p-4 text-on-surface-variant font-body-md text-body-md">
       <p>{t('Không tìm thấy bài viết phù hợp.', 'No matching posts found.')}</p><button type="button" className="text-secondary font-label-md text-label-md mt-3" onClick={() => update({ category: '', q: '' })}>{t('Xóa bộ lọc', 'Clear filter')}</button>
     </div>}
