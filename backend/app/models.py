@@ -133,6 +133,7 @@ class CaseOpen(Base):
     case_id: Mapped[UUID] = mapped_column(Uuid)
     loot_table_id: Mapped[UUID] = mapped_column(Uuid)
     reward_asset_id: Mapped[UUID] = mapped_column(Uuid)
+    reward_rarity: Mapped[str | None] = mapped_column(Text)
     earned_xp_at_open: Mapped[int] = mapped_column(BigInteger)
     cost_khi_van: Mapped[int] = mapped_column(BigInteger)
     wallet_transaction_id: Mapped[UUID | None] = mapped_column(Uuid, unique=True)
@@ -151,6 +152,7 @@ class CaseOpen(Base):
         CheckConstraint("NOT is_daily_free OR cost_khi_van=0", name="free_cost"),
         CheckConstraint("effective_day = ((created_at AT TIME ZONE 'Asia/Ho_Chi_Minh') - interval '7 hours')::date", name="effective_day"),
         CheckConstraint("jsonb_typeof(decision_trace)='object'", name="trace_object"),
+        CheckConstraint("reward_rarity IS NULL OR reward_rarity IN ('D','C','B','A','S')", name="reward_rarity"),
         Index("uq_case_opens_daily_free", "user_id", "case_id", "effective_day", unique=True, postgresql_where=text("is_daily_free")),
         Index("ix_case_opens_user_created_id", "user_id", "created_at", "id"),
     )
@@ -233,12 +235,11 @@ class CaseLootRarity(Base):
 class CasePoolItem(Base):
     __tablename__ = "case_pool_items"
     loot_table_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    asset_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    asset_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("asset_items.id", ondelete="RESTRICT", name="fk_case_pool_items_asset_id"), primary_key=True)
     rarity: Mapped[str] = mapped_column(Text)
     item_weight: Mapped[int] = mapped_column(Integer)
     __table_args__ = (
         ForeignKeyConstraint(["loot_table_id", "rarity"], ["case_loot_rarities.loot_table_id", "case_loot_rarities.rarity"], ondelete="RESTRICT", name="fk_case_pool_items_bucket"),
-        ForeignKeyConstraint(["asset_id", "rarity"], ["asset_items.id", "asset_items.rarity"], ondelete="RESTRICT", name="fk_case_pool_items_asset_rarity"),
         CheckConstraint("item_weight > 0", name="item_weight"),
     )
 
@@ -279,6 +280,8 @@ class AssetItem(Base):
     effect_key: Mapped[str | None] = mapped_column(Text, deferred=True)
     source_rights: Mapped[dict] = mapped_column(JSONB)
     active: Mapped[bool] = mapped_column(Boolean)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_by: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT", name="fk_asset_items_deleted_by_users"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
@@ -291,6 +294,8 @@ class AssetItem(Base):
         CheckConstraint("btrim(slug) <> '' AND btrim(media_key) <> '' AND btrim(collection) <> ''", name="nonempty"),
         CheckConstraint("jsonb_typeof(source_rights) = 'object'", name="rights_object"),
         CheckConstraint("NOT active OR coalesce(source_rights->>'review_status' = 'approved', false)", name="active_rights"),
+        CheckConstraint("deleted_at IS NULL OR NOT active", name="deleted_inactive"),
+        Index("ix_asset_items_deleted_at", "deleted_at"),
     )
 
 
@@ -509,10 +514,17 @@ class Comment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    parent_comment_id: Mapped[UUID | None] = mapped_column(ForeignKey("comments.id", ondelete="RESTRICT"), index=True)
+    reply_to_comment_id: Mapped[UUID | None] = mapped_column(ForeignKey("comments.id", ondelete="RESTRICT"))
+    reply_to_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     __table_args__ = (
         CheckConstraint("btrim(body) <> ''", name="body_nonempty"),
         CheckConstraint("status IN ('visible','hidden','deleted')", name="status"),
         CheckConstraint("(status = 'deleted') = (deleted_at IS NOT NULL)", name="deleted_at"),
+        CheckConstraint("parent_comment_id IS NULL OR parent_comment_id <> id", name="no_self_parent"),
+        CheckConstraint("reply_to_comment_id IS NULL OR reply_to_comment_id <> id", name="no_self_reply_to"),
+        CheckConstraint("(parent_comment_id IS NULL) = (reply_to_comment_id IS NULL)", name="reply_parent_pair"),
+        Index("ix_comments_post_parent_created", "post_id", "parent_comment_id", "created_at", "id"),
     )
 
 
@@ -566,8 +578,8 @@ class Notification(Base):
         Index("ix_notifications_recipient_created", "recipient_user_id", "created_at"),
         Index("ix_notifications_recipient_read", "recipient_user_id", "read_at"),
         UniqueConstraint("dedupe_key", name="uq_notifications_dedupe_key"),
-        CheckConstraint("type IN ('reaction','comment','moderation','announcement')", name="notification_type"),
-        CheckConstraint("target_type IN ('post','comment','system')", name="notification_target_type"),
+        CheckConstraint("type IN ('reaction','comment','moderation','announcement','follow')", name="notification_type"),
+        CheckConstraint("target_type IN ('post','comment','system','user')", name="notification_target_type"),
     )
 
 
@@ -681,7 +693,7 @@ class UserFollow(Base):
     )
 
 
-DEMO_SCHEMA_HEAD = "0018_canonical_asset_filenames"
+DEMO_SCHEMA_HEAD = "0021_comment_replies"
 
 
 def reviewed_metadata(revision):

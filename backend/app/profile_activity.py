@@ -9,6 +9,7 @@ from sqlalchemy import Date, func, select
 
 from app.auth_schemas import ErrorResponse
 from app.blog import public_posts
+from app.comments import _visible_parent_guard
 from app.models import Comment, Post, Profile, User
 from app.security import AuthError
 
@@ -53,6 +54,7 @@ def public_user_activity(request: Request, username: str = Path(min_length=3, ma
         comment_day = func.timezone(TIMEZONE, Comment.created_at).cast(Date)
         comments = dict(db.execute(select(comment_day, func.count()).where(
             Comment.author_id == owner, Comment.status == "visible", Comment.deleted_at.is_(None),
+            _visible_parent_guard(),
             Comment.created_at >= since, Comment.created_at <= now,
             Comment.post_id.in_(public_posts().with_only_columns(Post.id))).group_by(comment_day)).all())
     days = []

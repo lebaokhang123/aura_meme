@@ -7,7 +7,7 @@ export function ShareButton({postId,profile=false}) {
   const pending=useRef(false);
   const share=async()=>{
     if(pending.current)return;pending.current=true;setBusy(true);setMessage('');setManual('');
-    const url=new URL('/',location.origin);url.hash='post-'+postId;
+    const url=new URL('/posts/'+postId,location.origin);
     try{
       if(navigator.share&&(!navigator.canShare||navigator.canShare({url:url.href}))){
         try{await navigator.share({title:'AuraMeme',url:url.href});setMessage('Đã mở chia sẻ.');return;}

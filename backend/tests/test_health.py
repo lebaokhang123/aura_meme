@@ -29,7 +29,8 @@ def test_health_and_openapi_without_a_database(monkeypatch):
                                           "/api/v1/admin/categories", "/api/v1/admin/categories/{category_id}",
                                           "/api/v1/posts", "/api/v1/posts/{post_id}", "/api/v1/media", "/api/v1/media/{media_id}",
                                           "/api/v1/posts/{post_id}/interactions", "/api/v1/users/me/bookmarks",
-                                          "/api/v1/posts/{post_id}/comments", "/api/v1/comments/{comment_id}",
+                                          "/api/v1/posts/{post_id}/comments", "/api/v1/posts/{post_id}/comments/{comment_id}/locate", "/api/v1/comments/{comment_id}",
+                                          "/api/v1/comments/{comment_id}/replies",
                                           "/api/v1/comments/{comment_id}/reactions", "/api/v1/comments/{comment_id}/interactions", "/api/v1/admin/comments/{comment_id}",
                                           "/api/v1/admin/users", "/api/v1/admin/users/{user_id}",
                                           "/api/v1/admin/users/{user_id}/roles", "/api/v1/admin/users/{user_id}/restore", "/api/v1/admin/posts",
@@ -38,6 +39,7 @@ def test_health_and_openapi_without_a_database(monkeypatch):
                                           "/api/v1/users/me/posts", "/api/v1/users/me/posts/{post_id}",
                                           "/api/v1/posts/{post_id}/reactions", "/api/v1/posts/{post_id}/bookmark", "/api/v1/aura/progress", "/api/v1/leaderboard", "/api/v1/aura/check-in", "/api/v1/inventory/me", "/api/v1/inventory/equipment/{slot_kind}", "/api/v1/catalog/assets/{asset_id}", "/api/v1/vault/cases", "/api/v1/vault/cases/{case_id}", "/api/v1/vault/cases/{case_id}/open", "/api/v1/catalog", "/api/v1/inventory/equipment", "/api/v1/vault/opens/by-request",
                                           "/api/v1/notifications", "/api/v1/notifications/unread-count", "/api/v1/notifications/{notification_id}", "/api/v1/notifications/{notification_id}/read", "/api/v1/notifications/read-all",
+                                          "/api/v1/presence/heartbeat", "/api/v1/admin/presence",
                                           "/api/v1/premium/status", "/api/v1/premium/orders", "/api/v1/premium/orders/successful", "/api/v1/premium/orders/{order_code}", "/api/v1/premium/orders/{order_code}/init-paypal", "/api/v1/premium/orders/{order_code}/simulate", "/api/v1/premium/orders/{order_code}/capture", "/api/v1/premium/paypal/webhook", "/api/v1/premium/vnpay-return", "/api/v1/premium/vnpay-ipn"}
         assert contract["paths"]["/health"]["get"]["operationId"] == "health"
         model = contract["components"]["schemas"]["HealthResponse"]

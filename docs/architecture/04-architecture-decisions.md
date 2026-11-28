@@ -194,3 +194,120 @@ Kiểm thử Checkpoint 3 có worker commit thật. Khởi tạo PostgreSQL mớ
 Fixture đối chiếu danh tính, marker, revision, role và schema rỗng trước khi ghi. Ca mở rương và duyệt Admin đi qua HTTP, CSRF, session và transaction dependency thật. Dữ liệu rollback dùng một transaction, runner thay thế DB fixture của từng ca commit bằng bản clone của template sạch, giữ trigger append-only. Lệnh từ backend: python tests/run_final_polish_disposable.py --image <image-đã-cài-requirements-ci> --repeat 2 --regressions. Runner chỉ dừng container định danh do nó tạo.
 
 CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute dừng trước mutation nếu bất kỳ mục eligible nào bị chặn do thiếu policy. Execute trên demo là gate riêng của Owner.
+
+
+## Hardening H02 — Authentication & Security Stabilization (27/11/2026)
+
+- **Nhánh & Baseline:** `fix/h02-auth-security` từ `origin/dev@98ddc31` (bảo toàn `test/system-simulation@ee1fd45` cho H01).
+- **Sửa lỗi đồng bộ Authentication đa tab:**
+  - Nguyên nhân: `frontend/src/auth.js` reload tab khi `BroadcastChannel('aurameme-auth')` thông báo thay đổi, nhưng `frontend/src/main.jsx` chỉ redirect `protectedPage` khi thành `guest`, thiếu redirect cho `/login` và `/register` khi `authState.status === 'authenticated'`.
+  - Thay đổi tối thiểu: thêm [auth-routing.js](../../frontend/src/auth-routing.js) (`resolveAuthRedirect`, `isProtectedPath`) sử dụng `safeReturnUrl`, lắng nghe `pageshow` (`ev.persisted`) trong [auth.js](../../frontend/src/auth.js) cho back/forward cache, và áp dụng redirect + render guard trong [main.jsx](../../frontend/src/main.jsx) khi `authState.status === 'authenticated'` trên `/login` hoặc `/register` (giữ nguyên `/verify-email`, `/reset-password`, `/forgot-password`).
+  - Bảo mật: không truyền token/cookie qua `BroadcastChannel`, không tin `localStorage`, giữ server `/api/v1/users/me` và `guest_guard` là nguồn xác thực duy nhất.
+- **Hiệu chỉnh benchmark H04 (ghi nhận từ audit `perf_baseline.py` H01):**
+  - H01 `perf_baseline.py` dùng chung `httpx.AsyncClient` không tách session/cookie theo từng virtual user, chưa có think time giữa các request trong `run_stage`, thời lượng mỗi mức tải ngắn (4s), chưa đo riêng authenticated write workload. Sẽ hiệu chỉnh các tham số này trong H04 (không tối ưu sản phẩm ở H02).
+- **Learning Check:** `PENDING OWNER`.
+
+
+## Hardening H03 — Product Reliability & Error Handling (27/11/2026)
+
+- **Nhánh & Baseline:** `fix/h03-product-reliability` từ `origin/dev@b20122c` (sau PR #46 H02 và CI `45914443441` PASS 3/3).
+- **H03.1 — Admin Users Email:**
+  - `frontend/src/admin-api.js`: giữ trường `email` cho `resource === 'users'` (giới hạn 254 ký tự), giữ nguyên việc loại bỏ `password_hash` và `email` trên `contacts`.
+  - `frontend/src/components/AdminPage.jsx` & `frontend/src/workspace.css`: hiển thị `.admin-user-email` dưới `@username` và trên `.admin-role-list`, hỗ trợ ngắt dòng an toàn (`overflow-wrap: anywhere`) trên mobile và Dark/Light mode. Public profile/feed/search không thay đổi và không lộ email.
+- **H03.2 — Email MIME Inline Logo:**
+  - `backend/app/email_service.py`: loại bỏ `filename="aurameme-logo.png"` khỏi `html_part.add_related(..., disposition="inline")` và bổ sung `X-Attachment-Id: aurameme-logo` để tránh client Gmail nhận diện inline logo thành chip attachment. Giữ `cid:aurameme-logo` khớp `<aurameme-logo>` (tương thích toàn bộ test hiện hành) và bảo toàn PDF attachment trong Premium receipt.
+  - Gmail visual acceptance trên inbox thật vẫn ở trạng thái `PENDING OWNER`.
+- **H03.3 — Error Pages, Strict Routing & Error Boundary:**
+  - Thêm `frontend/src/components/ErrorPage.jsx` (403, 404, 500, 503; cyber-clean gradient tím/cyan; VI/EN; Dark/Light; `prefers-reduced-motion`; không lộ stack trace/DSN/token) và `frontend/src/components/ErrorBoundary.jsx`.
+  - `frontend/src/runtime.js`: thay `PAGE[path] || 'home'` bằng `isKnownRoute(path)` (kiểm kê rõ static routes + `PROFILE_ROUTE`), route không hợp lệ trả `notFound: true` và render `ErrorPage` 404.
+  - `frontend/src/main.jsx` & `frontend/src/components/AdminPage.jsx`: USER đã đăng nhập truy cập `/admin` hoặc `/admin/contacts` nhận `ErrorPage` 404 chung (không lộ chi tiết khu quản trị), trong khi backend API vẫn giữ nguyên `403 FORBIDDEN`. Guest vẫn được redirect `/login?next=...` theo H02.
+  - Lưu ý kiến trúc: `ErrorPage` là client-side UI trong SPA; HTTP status thực tế từ static hosting vẫn do Nginx/reverse proxy quyết định (không thay đổi hạ tầng trong H03).
+- **Learning Check:** `PENDING OWNER`.
+
+
+## ADR-H04: Batch Query Cho Feed Interactions (`read_post_states`) & Danh Gia Index/Search
+
+- **Trang thai:** Da chap thuan & Trien khai tren nhanh `perf/h04-feed-optimization`.
+- **Van de:** `GET /api/v1/posts?include_interactions=true` goi `read_post_state` theo vong lap tung bai viet (`N+1` queries: 27 SQL o `page_size=20`, 107 SQL o `page_size=100` cho Guest; 32 -> 112 SQL cho Auth), lam p50/p95 tang manh va kich hoat safe-stop o 25 VUs (`p95 = 6709.51 ms`).
+- **Quyet dinh:**
+  1. Them `read_post_states(post_ids, db, viewer_id, request, meme_states=None)` trong `backend/app/interactions.py`, dung `WHERE post_id IN (...)` + `GROUP BY` de gom reaction counts, comment counts, viewer reaction, va viewer bookmarks thanh hang so `O(1)` truy van (9 SQL cho Guest, 16 SQL cho Auth bat ke `page_size` 10/20/50/100), bo qua 2 truy van viewer khi `viewer_id is None`.
+  2. Giu nguyen `read_post_state` cho endpoint don le `/api/v1/posts/{id}/interactions` va xac minh 100% parity qua PostgreSQL integration test (`backend/tests/test_h04_batch_interactions.py`).
+  3. **Danh gia Search & Index:** Khong them migration/index moi o H04 vi: (a) `searchable(col)` dung `translate(translate(lower(...)))` + `ILIKE '%...%'` nen B-tree index thong thuong khong co tac dung; (b) giu nguyen Offset Pagination contract va tim kiem tieng Viet substring hien hanh; (c) giu nguyen `SELECT ... FOR UPDATE` tren `auth_sessions` de bao toan an toan xac thuc & single-flight session.
+  4. **Learning Check:** `PENDING OWNER`.
+- **H04 Final Query Count & Benchmark Caveats (Safety Gate):**
+  - **Final SQL query count:** `Guest 10`, `Auth 17`, on dinh theo `page_size` `10/20/50/100` (bao gom `public_posts` visibility guard trong `read_post_states`).
+  - **Pham vi benchmark:** Cac so lieu latency/RPS BEFORE/AFTER hien co duoc do truoc khi bo sung visibility guard cuoi; khong tuyen bo final candidate da duoc benchmark day du lai.
+  - **Gioi han he thong:** HTTP 429 tu rate limiter tren loopback IP o 10-25 VUs va `feed_search` (~1.5s-1.9s) van la gioi han can theo doi.
+  - **Test Harness Safety Gate:** Dung chung `scripts/h04/safety_guard.py` (fail-closed kiem tra container `aurameme-h01-sim-pg`, port mapping `127.0.0.1:55450`, DB `aurameme_test`, revision `0018_canonical_asset_filenames`, synthetic fixture marker, SMTP sandbox, va owned uvicorn subprocess tren cong rieng `18080`).
+
+
+## ADR-H05: Admin Presence Monitoring (`feat/h05-admin-presence`)
+
+- **Trang thai:** Da chap thuan & Trien khai tren nhanh `feat/h05-admin-presence`.
+- **Van de:** Admin can theo doi so luong thanh vien va khach dang hoat dong gan thoi gian thuc ma khong tao database migration, khong ghi tung heartbeat vao PostgreSQL, khong dung WebSocket/SSE/Redis, va khong lam lo du lieu dinh danh ca nhan.
+- **Quyet dinh:**
+  1. **Single-process In-Memory Store (`PresenceStore` trong `backend/app/presence.py`):** Dung `OrderedDict` ket hop `threading.Lock`, `ttl_seconds=90`, va `max_entries=16384` cho moi loai (`_user_sessions`, `_guest_tokens`). Lazy prune cac ban ghi het han truoc khi ghi/doc va O(1) eviction khi day bo nho.
+  2. **Identity & Privacy:**
+     - Authenticated user: Xac thuc qua `am_session` cookie (read-only `SELECT` 1 truy van, khong `FOR UPDATE`, khong ghi DB); luu `(session_id) -> (user_id, expiry)` de nhieu tab/nhieu thiet bi cua cung 1 user chi dem **1** `distinct user_id`, va logout 1 thiet bi chi xoa `session_id` do.
+     - Guest: Cap random token 32-byte vao cookie `am_guest` (`HttpOnly`, `SameSite=Lax`), chi luu `sha256` digest; khong dung IP hay browser fingerprint. Khi guest dang nhap, tu dong xoa `guest_digest` khoi `_guest_tokens` de tranh dem trung.
+  3. **API & Frontend:**
+     - `POST /api/v1/presence/heartbeat`: Origin guard + rate limit (12/60s per identity + `AuthBoundaryMiddleware`), `0 SQL` cho Guest, `1 read-only SELECT` cho Auth.
+     - `GET /api/v1/admin/presence`: Guard `require_role("ADMIN")`, `Cache-Control: no-store`, chi tra tong hop (`active_total`, `active_users`, `active_guests`, `window_seconds`, `generated_at`).
+     - Frontend `startPresenceHeartbeat` (30s interval, tam dung khi `hidden`, ton trong HTTP 429 `Retry-After`) va Admin Overview tab (polling 15s khi co quyen & dang xem).
+  4. **Gioi han:** Chi chinh xac trong pham vi single-process (`workers=1`); neu scale multi-worker trong tuong lai, huong nang cap la Redis TTL (`SET EX` / `ZSET`).
+  5. **Learning Check:** `PENDING OWNER`.
+
+
+## ADR-H07: Final Social Interaction Polish (`feat/h07-social-interaction-polish`)
+
+- **Trang thai:** Da trien khai tren nhanh `feat/h07-social-interaction-polish` (tinh nang cuoi cung truoc Feature Freeze).
+- **Quyet dinh:**
+  1. **H07.1 Reaction Details:** Tach rieng hanh vi click reaction pill / `+N` (mo `ReactionDetailsModal` chi doc, khong doi reaction cua viewer) voi nut `+` (mo picker them/doi/bo reaction). Backend cung cap `GET /posts/{id}/reactions` va `GET /comments/{id}/reactions` qua helper dung chung `list_target_reactions`, tuan thu visibility H06.
+  2. **H07.2 Single-Level Comment Replies (`0021_comment_replies`):** Them `parent_comment_id`, `reply_to_comment_id`, `reply_to_user_id` vao `comments` voi `ON DELETE RESTRICT` + check constraints chong self-reference. Reply vao comment con van neo ve root thread nhung giu `reply_to_comment_id`/`reply_to_user_id`. An/xoa comment goc tu dong an toan bo thread khoi public reads (`replies`, `locate`, `comments_count`).
+  3. **H07.3 Comment Sorting & Batching:** Bo sung `sort=reaction_desc` tren DB va `include_interactions=true` qua `read_comment_states()` (O(1) SQL queries thay cho N+1 HTTP calls `/comments/{id}/interactions`). Cap nhat state cuc bo sau create/reply/delete.
+  4. **H07.4 Notifications:** Them reply notification (`type='comment'`, `payload.action='reply'`, khong trung khi reply target dong thoi la chu bai viet) va comment reaction notification (`dedupe_key=comment-reaction:{cid}:{uid}`, khong EXP). Hoan thien badge kiem duyet cu the trong `NotificationsDropdown.jsx`.
+  5. **H07.5 Post Detail & Share:** Bo sung route `/posts/{UUID}` (`PostDetailPage.jsx`), endpoint `/locate`, canonical share link `/posts/{UUID}`, van giu ho tro deep link cu `/#post-UUID`.
+  6. **Learning Check:** `PENDING OWNER`.
+
+- **Bo sung Final Preflight (Eventual Consistency & ORM Lifecycle):**
+  - **Session revocation & eventual consistency:** `heartbeat()` kiem tra day du `revoked_at`, `expires_at` (idle expiry), `created_at + ABSOLUTE_SECONDS` (absolute expiry), va `User.status == "active"`. Khi user `logout()`, `remove_session(session_id)` xoa ngay lap tuc khoi `PresenceStore`; tuy nhien neu session bi revoke tu xa hoac user bi khoa boi Admin, ban ghi presence cu co the ton tai toi da `TTL = 90s` truoc khi tu het han.
+  - **Bounded capacity:** `max_entries = 16384` gioi han bo nho tren RAM, khong dong nghia ho tro `16.384 concurrent users` (nhieu session/thiet bi cua cung user hoac guest churn co the chiem nhieu entry).
+
+
+## ADR-H06: Final Asset Lifecycle, Rarity Versioning, Tombstone & Founder Authority (`fix/h06-asset-lifecycle`)
+
+- **Trang thai:** Da chap thuan & Trien khai tren nhanh `fix/h06-asset-lifecycle` (thay the quy tac bao ve co dinh 75 vat pham goc va `RARITY_IMMUTABLE` truoc do).
+- **Van de:** Admin can quan ly toan dien ca vat pham goc lan vat pham tai len (doi ten, doi hang D/C/B/A/S, ngung luu hanh, khoi phuc) ngay ca khi da so huu/trang bi/mo ruong, va rieng Founder Khang Dev co quyen xoa vinh vien vat pham da luu tru, nhung van bao toan toan ven tham chieu (`fk_case_opens_pool_reward`, `aurameme_odds_guard`, `aurameme_equipment_guard`) va lich su mo ruong.
+- **Quyet dinh:**
+  1. **Migration `0019_asset_lifecycle_tombstone`:**
+     - Them tombstone `asset_items.deleted_at` / `deleted_by` (`FK users.id ON DELETE RESTRICT`, `CHECK (deleted_at IS NULL OR NOT active)`).
+     - Them `case_opens.reward_rarity` (luu snapshot hang tai thoi diem mo ruong) va thay `fk_case_pool_items_asset_rarity` bang `fk_case_pool_items_asset_id` (`asset_id -> asset_items.id ON DELETE RESTRICT`) de cac bang `case_pool_items` da `retired` giu nguyen hang lich su khi `asset_items.rarity` thay doi.
+     - Cap nhat `aurameme_equipment_guard()`: cho phep doi `rarity` khi da co trong `user_inventory` (van khoa doi `kind`), va chan deactivate/tombstone neu `user_equipment` van dang tro toi.
+  2. **RBAC & Founder Authority:** Moi `ADMIN` duoc doi ten, doi hang, duyet/tu choi, ngung luu hanh (`archive`), khoi phuc (`approve`). Rieng `DELETE /api/v1/admin/assets/{id}` chi cho phep `KHANG_DEV_ID` (`403 FORBIDDEN` cho Admin khac), chi ap dung khi dang `Archived` (`409 ASSET_NOT_ARCHIVED`), va bat buoc nhap xac nhan `XÓA VĨNH VIỄN`.
+  3. **Vault Pool Versioning & Empty Bucket Policy:** Moi thay doi (`archive`, `reject`, `permanent_delete`, `rarity` change, `approve`/`restore`) tao `CaseLootTable` phien ban moi (`odds_version + 1`), giu nguyen trong so D/C/B/A/S (`6890, 2000, 1000, 100, 10`). Khi `approve`/`restore`, `_version_published_pool(mode='include')` tu dong dua vat pham vao cac `CaseDefinition` runtime dang hoat dong (`runtime_kind == asset.kind`). `load_runtime_pool` giu nguyen kiem tra `catalog_manifest_sha256` cho vat pham manifest va kiem tra `reviewed_source_rights` + `uploaded_by` cho vat pham `admin-upload`. `catalog_activation.py` & `catalog.py` bo qua khong ghi de vat pham co `admin_managed=True` hoac `deleted_at IS NOT NULL`. Neu mot bucket bi rong, thao tac quan ly van thanh cong kem `pool_warnings` cho Admin va ruong bi anh huong tam ngung mo (`503 NOT_READY`) cho den khi duoc bo sung.
+  4. **Tombstone Isolation:** Toan bo truy van runtime (`inventory`, `vault/catalog`, `equipment`, `meme_reactions`, `vault_privilege` Founder reconciliation, `admin/assets`) loc `deleted_at IS NULL`, bao toan `CaseOpen`, `InventoryGrant`, EXP, wallet va `AdminAuditLog`.
+  5. **Migration & Rollback Safety (`0018 -> 0019`):** Truoc khi nang cap `aurameme_demo` hoac moi truong chinh len `0019_asset_lifecycle_tombstone`, bat buoc `pg_dump -Fc` ban sao luu pre-0019. `downgrade()` cua `0019` duoc thiet ke fail-closed: sau khi da phat sinh du lieu tombstone (`deleted_at IS NOT NULL`) hoac thay doi rarity lich su (`case_pool_items.rarity <> asset_items.rarity`), lenh `alembic downgrade` se bi chan de bao ve du lieu lich su; khi can rollback bat buoc phuc hoi tu ban backup `pg_restore`.
+  6. **Learning Check:** `PENDING OWNER`.
+
+
+## ADR-H06-Polish: Notification Localization, Follow Notification & Admin Search/Date Filter (`fix/h06-notification-admin-search`)
+
+- **Trang thai:** Da chap thuan & Trien khai tren nhanh `fix/h06-notification-admin-search`.
+- **Quyet dinh:**
+  1. **Migration `0020_follow_notifications`:** Mo rong check constraint `ck_notifications_notification_type` them `'follow'` va `ck_notifications_notification_target_type` them `'user'`; `downgrade()` chan fail-closed neu da co du lieu `follow`/`user`.
+  2. **Follow Notification (`account.py`):** Khi `follow_user()` tao moi `UserFollow` (`existing is None`, da loai tru self-follow), goi `create_notification` trong cung transaction voi `dedupe_key = f"follow:{follower_id}:{followee_id}"` de chong spam khi unfollow/refollow ma khong anh huong quy tac chong farm `+10 EXP` (`follow-v1:{follower_id}`).
+  3. **Notification UI (`NotificationsDropdown.jsx`):** Dong bo `describeNotification()` giua dropdown va modal; hien thi chinh xac hanh dong kiem duyet (`hidden`/`deleted` x `post`/`comment`), an nut `Xem bài viết` doi voi bai viet da bi an/xoa, bo ma tieng Anh tho `(${reactionType})`, phan biet `reaction` vao bai viet vs binh luan, va bo sung loai `follow` kem nut `Xem trang cá nhân` (`/u/<username>`).
+  4. **Admin Search & Posts Date Range (`blog.py`, `admin_posts.py`, `admin_workspace.py`, `admin_users.py`, `AdminPage.jsx`):** Tai su dung helper `build_search_filter` (khong dau tieng Viet + ho tro `@username`) cho Admin Posts, Comments (join `Post`), Categories va Users. `GET /api/v1/admin/posts` bo sung `date_from`/`date_to` (`YYYY-MM-DD`, kiem tra `date_from <= date_to`) quy doi nua mo `[start, next_day)` theo mui gio `Asia/Ho_Chi_Minh`.
+  5. **Learning Check:** `PENDING OWNER`.
+
+
+## ADR-H07: Final Social Interaction Polish (`feat/h07-social-interaction-polish`)
+
+- **Trang thai:** Da trien khai tren nhanh `feat/h07-social-interaction-polish` (tinh nang cuoi cung truoc Feature Freeze).
+- **Quyet dinh:**
+  1. **H07.1 Reaction Details:** Tach rieng hanh vi click reaction pill / `+N` (mo `ReactionDetailsModal` chi doc, khong doi reaction cua viewer) voi nut `+` (mo picker them/doi/bo reaction). Backend cung cap `GET /posts/{id}/reactions` va `GET /comments/{id}/reactions` qua helper dung chung `list_target_reactions`, tuan thu visibility H06.
+  2. **H07.2 Single-Level Comment Replies (`0021_comment_replies`):** Them `parent_comment_id`, `reply_to_comment_id`, `reply_to_user_id` vao `comments` voi `ON DELETE RESTRICT` + check constraints chong self-reference. Reply vao comment con van neo ve root thread nhung giu `reply_to_comment_id`/`reply_to_user_id`. An/xoa comment goc tu dong an toan bo thread khoi public reads (`replies`, `locate`, `comments_count`).
+  3. **H07.3 Comment Sorting & Batching:** Bo sung `sort=reaction_desc` tren DB va `include_interactions=true` qua `read_comment_states()` (O(1) SQL queries thay cho N+1 HTTP calls `/comments/{id}/interactions`). Cap nhat state cuc bo sau create/reply/delete.
+  4. **H07.4 Notifications:** Them reply notification (`type='comment'`, `payload.action='reply'`, khong trung khi reply target dong thoi la chu bai viet) va comment reaction notification (`dedupe_key=comment-reaction:{cid}:{uid}`, khong EXP). Hoan thien badge kiem duyet cu the trong `NotificationsDropdown.jsx`.
+  5. **H07.5 Post Detail & Share:** Bo sung route `/posts/{UUID}` (`PostDetailPage.jsx`), endpoint `/locate`, canonical share link `/posts/{UUID}`, van giu ho tro deep link cu `/#post-UUID`.
+  6. **Learning Check:** `PENDING OWNER`.

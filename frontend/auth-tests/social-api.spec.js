@@ -241,20 +241,39 @@ test('PostCard and CommentRow display validated Level and Chức danh for Admin 
  await expect(kienComment).toContainText('Sáng Thế Thần');
 });
 
-test('Explore keeps loaded API results when retrying the next page',async({page,context})=>{
+test('Home keeps loaded API results when retrying the next page',async({page,context})=>{
  const api=await server(context);
  api.paginate=true;
  api.posts=Array.from({length:21},(_,i)=>({
   id:'00000000-0000-4000-8000-'+String(i+100).padStart(12,'0'),
-  title:'Explore fixture '+i,content:'Synthetic post '+i,counts:counts(),reaction:null
+  title:'Home fixture '+i,content:'Synthetic post '+i,counts:counts(),reaction:null
  }));
- await page.goto('/explore');
+ await page.goto('/');
  await expect(page.locator('article[data-post-id]:visible')).toHaveCount(20);
  api.failFeedOnce=true;
  await page.getByRole('button',{name:'Xem thêm bài viết'}).click();
  await page.getByRole('alert').getByRole('button',{name:'Thử lại'}).click();
  await expect(page.locator('article[data-post-id]:visible')).toHaveCount(21);
  expect(api.requests.filter(request=>request.p==='/posts').map(request=>request.query.page)).toEqual(['1','2','2']);
+});
+
+test('Explore caps at 6 posts with page_size=6 and omits load more across filters',async({page,context})=>{
+ const api=await server(context);
+ api.paginate=true;
+ api.posts=Array.from({length:15},(_,i)=>({
+  id:'00000000-0000-4000-8000-'+String(i+200).padStart(12,'0'),
+  title:'Explore fixture '+i,content:'Explore synthetic post '+i,counts:counts(),reaction:null
+ }));
+ await page.goto('/explore');
+ await expect(page.locator('article[data-post-id]:visible')).toHaveCount(6);
+ await expect(page.getByRole('button',{name:'Xem thêm bài viết'})).toHaveCount(0);
+ expect(api.requests.find(r=>r.p==='/posts')?.query.page_size).toBe('6');
+ await page.getByRole('button',{name:'#Anime'}).click();
+ await expect(page.locator('article[data-post-id]:visible')).toHaveCount(6);
+ await page.getByRole('searchbox',{name:'Tìm kiếm meme, tác giả, thẻ'}).fill('Explore');
+ await page.getByRole('searchbox',{name:'Tìm kiếm meme, tác giả, thẻ'}).press('Enter');
+ await expect(page.locator('article[data-post-id]:visible')).toHaveCount(6);
+ expect(api.requests.filter(r=>r.p==='/posts').every(r=>r.query.page_size==='6')).toBe(true);
 });
 
 test('reopening paginated comments keeps both pages and a write refreshes them',async({page,context})=>{
@@ -281,7 +300,7 @@ test('reopening paginated comments keeps both pages and a write refreshes them',
  await card.getByLabel('Nội dung bình luận').fill('New comment in page two');
  await card.getByRole('button',{name:'Gửi',exact:true}).click();
  await expect(card.locator('[data-comment-id]')).toHaveCount(13);
- expect(reads()).toEqual(['1','2','1','2']);
+ expect(reads()).toEqual(['1','2']);
 });
 
 test('switching accounts updates Composer without changing another author',async({page,context})=>{

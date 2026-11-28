@@ -14,14 +14,14 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from python_multipart import MultipartParser
 from python_multipart.exceptions import MultipartParseError
 from python_multipart.multipart import parse_options_header
-from sqlalchemy import case, delete, or_, select, text
+from sqlalchemy import case, delete, event, func, or_, select, text
 from sqlalchemy.orm import undefer
 from starlette.requests import ClientDisconnect
 
-from app.admin_users import require_admin_mutation
+from app.admin_users import KHANG_DEV_ID, require_admin_mutation
 from app.auth import CSRF_HEADER, ERRORS
 from app.auth_schemas import ErrorResponse
-from app.blog import page_rows
+from app.blog import build_search_filter, page_rows
 from app.blog_schemas import Pagination, StrictInput
 from app.comments import CommentResponse, comment_dto
 from app.config import CatalogSettings
@@ -30,6 +30,10 @@ from app.media import image_response, validate_image
 from app.models import (
     AdminAuditLog,
     AssetItem,
+    CaseDefinition,
+    CaseLootRarity,
+    CaseLootTable,
+    CaseOpen,
     CasePoolItem,
     Comment,
     MediaUpload,
@@ -42,7 +46,9 @@ from app.models import (
 )
 from app.permissions import require_role
 from app.security import AuthError
+from app.vault import RARITIES
 from app.vault_runtime import schema_ready
+from app.vault_v1_policy import EFFECT_KEYS
 
 router = APIRouter(prefix='/api/v1/admin', tags=['Admin'])
 ReviewStatus = Literal['pending', 'approved', 'rejected', 'unknown']
@@ -74,11 +80,24 @@ class AdminAsset(BaseModel):
     active: bool
     review_status: ReviewStatus
     filename: str | None = None
+    system_protected: bool = False
+    pool_warnings: list[str] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
 class AdminAssetPage(BaseModel):
     items: list[AdminAsset]
     pagination: Pagination
+
+
+class AdminAssetPermanentDeleteInput(StrictInput):
+    confirm_text: str = Field(min_length=1, max_length=64)
+
+
+class AdminAssetPermanentDeleteResponse(BaseModel):
+    id: UUID
+    deleted_at: datetime
+    media_file_removed: bool = False
+    pool_warnings: list[str] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
 class AdminAssetPatch(StrictInput):
@@ -120,7 +139,12 @@ class AdminOrderPage(BaseModel):
     pagination: Pagination
 
 
-def _admin_asset_dto(asset: AssetItem, *, include_display: bool = True) -> AdminAsset:
+def _admin_asset_dto(
+    asset: AssetItem,
+    *,
+    include_display: bool = True,
+    pool_warnings: list[str] | None = None,
+) -> AdminAsset:
     rights = asset.source_rights if isinstance(asset.source_rights, dict) else {}
     rev = rights.get('review_status', 'unknown')
     if rev not in ('pending', 'approved', 'rejected'):
@@ -146,6 +170,8 @@ def _admin_asset_dto(asset: AssetItem, *, include_display: bool = True) -> Admin
         active=bool(asset.active),
         review_status=rev,
         filename=fn,
+        system_protected=False,
+        pool_warnings=list(pool_warnings or []),
     )
 
 
@@ -371,9 +397,14 @@ def comments(
 ):
     if search is not None and '\x00' in search:
         raise AuthError(422, 'VALIDATION_ERROR', 'Invalid query text.')
-    statement = select(Comment, User, Profile).join(User, User.id == Comment.author_id).join(Profile, Profile.user_id == User.id)
-    if search is not None:
-        statement = statement.where(Comment.body.icontains(search, autoescape=True))
+    statement = (
+        select(Comment, User, Profile)
+        .join(User, User.id == Comment.author_id)
+        .join(Profile, Profile.user_id == User.id)
+        .join(Post, Post.id == Comment.post_id)
+    )
+    if (clause := build_search_filter(search, (Comment.body, Profile.display_name, Post.title), username_column=User.username)) is not None:
+        statement = statement.where(clause)
     if status is not None:
         statement = statement.where(Comment.status == status)
     if post_id is not None:
@@ -391,6 +422,7 @@ def assets(
     rarity: RarityCode | None = None,
     active: bool | None = None,
     review_status: ReviewStatus | None = None,
+    lifecycle_status: Literal['pending', 'active', 'archived', 'rejected'] | None = None,
     account=Depends(require_role('ADMIN')),
 ):
     if search is not None and '\x00' in search:
@@ -408,7 +440,7 @@ def assets(
             AssetItem.rarity,
             AssetItem.active,
             reviewed.label('review_status'),
-        )
+        ).where(AssetItem.deleted_at.is_(None))
         if search is not None:
             statement = statement.where(
                 or_(
@@ -424,7 +456,7 @@ def assets(
             AssetItem.rarity,
             AssetItem.active,
             reviewed.label('review_status'),
-        )
+        ).where(AssetItem.deleted_at.is_(None))
         if search is not None:
             statement = statement.where(AssetItem.slug.icontains(search, autoescape=True))
     if kind is not None:
@@ -435,8 +467,16 @@ def assets(
         statement = statement.where(AssetItem.active == active)
     if review_status is not None:
         statement = statement.where(reviewed == review_status)
+    if lifecycle_status == 'pending':
+        statement = statement.where(reviewed == 'pending')
+    elif lifecycle_status == 'active':
+        statement = statement.where(reviewed == 'approved', AssetItem.active.is_(True))
+    elif lifecycle_status == 'archived':
+        statement = statement.where(reviewed == 'approved', AssetItem.active.is_(False))
+    elif lifecycle_status == 'rejected':
+        statement = statement.where(reviewed == 'rejected')
     rows, pagination = page_rows(account.db, statement.order_by(AssetItem.created_at.desc(), AssetItem.slug, AssetItem.id), page, page_size)
-    return AdminAssetPage(items=[AdminAsset(**row._mapping) for row in rows], pagination=pagination)
+    return AdminAssetPage(items=[AdminAsset(**row._mapping, system_protected=False) for row in rows], pagination=pagination)
 
 
 @router.get(
@@ -451,7 +491,7 @@ def assets(
 )
 def admin_asset_image(asset_id: UUID, account=Depends(require_role('ADMIN'))):
     asset = account.db.scalar(select(AssetItem).where(AssetItem.id == asset_id).with_for_update(read=True))
-    if asset is None or asset.kind == 'background':
+    if asset is None or asset.deleted_at is not None or asset.kind == 'background':
         raise AuthError(404, 'NOT_FOUND', 'Asset image not available.')
     try:
         png_bytes = catalog_png(asset)
@@ -575,6 +615,205 @@ async def admin_upload_assets(request: Request, account=Depends(require_admin_mu
     return AdminAssetUploadResponse(uploaded_count=len(created_items), items=created_items)
 
 
+def _empty_bucket_warning(db, table_id: UUID, case_id: UUID) -> str | None:
+    from app.catalog_rights import reviewed_source_rights_sql
+
+    case_row = db.get(CaseDefinition, case_id)
+    case_label = case_row.label if case_row else str(case_id)
+    counts = dict(
+        db.execute(
+            select(CasePoolItem.rarity, func.count(CasePoolItem.asset_id))
+            .join(AssetItem, AssetItem.id == CasePoolItem.asset_id)
+            .where(
+                CasePoolItem.loot_table_id == table_id,
+                AssetItem.active.is_(True),
+                AssetItem.deleted_at.is_(None),
+                reviewed_source_rights_sql(AssetItem.source_rights),
+            )
+            .group_by(CasePoolItem.rarity)
+        ).all()
+    )
+    empty_rars = [r for r in RARITIES if counts.get(r, 0) == 0]
+    if not empty_rars:
+        return None
+    return (
+        f"Rương '{case_label}' hiện chưa có vật phẩm hợp lệ ở bậc {', '.join(empty_rars)} "
+        "nên tạm thời không thể mở cho đến khi bổ sung."
+    )
+
+
+def _clone_and_publish_table(
+    db,
+    table: CaseLootTable,
+    now: datetime,
+    *,
+    exclude_asset_id: UUID | None = None,
+    override_rarity: tuple[UUID, str] | None = None,
+    include_item: tuple[UUID, str] | None = None,
+) -> CaseLootTable:
+    max_any_version = db.scalar(
+        select(func.max(CaseLootTable.odds_version)).where(
+            CaseLootTable.case_id == table.case_id,
+            CaseLootTable.band_no == table.band_no,
+        )
+    ) or table.odds_version
+    new_table = CaseLootTable(
+        id=uuid4(),
+        case_id=table.case_id,
+        odds_version=max_any_version + 1,
+        band_no=table.band_no,
+        min_earned_xp=table.min_earned_xp,
+        max_earned_xp=table.max_earned_xp,
+        policy_id=table.policy_id,
+        status='draft',
+        active_from=now,
+        created_at=now,
+    )
+    db.add(new_table)
+    db.flush()
+    for r_row in db.scalars(select(CaseLootRarity).where(CaseLootRarity.loot_table_id == table.id)):
+        db.add(
+            CaseLootRarity(
+                loot_table_id=new_table.id,
+                rarity=r_row.rarity,
+                weight_bps=r_row.weight_bps,
+            )
+        )
+    seen_ids: set[UUID] = set()
+    for p_item in db.scalars(select(CasePoolItem).where(CasePoolItem.loot_table_id == table.id)):
+        if exclude_asset_id is not None and p_item.asset_id == exclude_asset_id:
+            continue
+        rarity_val = override_rarity[1] if (override_rarity and p_item.asset_id == override_rarity[0]) else p_item.rarity
+        db.add(
+            CasePoolItem(
+                loot_table_id=new_table.id,
+                asset_id=p_item.asset_id,
+                rarity=rarity_val,
+                item_weight=p_item.item_weight,
+            )
+        )
+        seen_ids.add(p_item.asset_id)
+    if include_item is not None and include_item[0] not in seen_ids:
+        db.add(
+            CasePoolItem(
+                loot_table_id=new_table.id,
+                asset_id=include_item[0],
+                rarity=include_item[1],
+                item_weight=1,
+            )
+        )
+    table.status = 'retired'
+    db.flush()
+    new_table.status = 'published'
+    db.flush()
+    return new_table
+
+
+def _version_published_pool(
+    db,
+    asset: AssetItem,
+    now: datetime,
+    *,
+    mode: Literal['remove', 'move_rarity', 'include'],
+    new_rarity: str | None = None,
+) -> list[str]:
+    """Version active Vault loot tables cleanly without mutating immutable published history."""
+    warnings: list[str] = []
+    if mode in ('remove', 'move_rarity'):
+        refs = list(
+            db.execute(
+                select(CasePoolItem, CaseLootTable)
+                .join(CaseLootTable, CaseLootTable.id == CasePoolItem.loot_table_id)
+                .where(CasePoolItem.asset_id == asset.id)
+                .with_for_update()
+            ).all()
+        )
+        for pool_ref, table in refs:
+            if table.status == 'draft':
+                if mode == 'remove':
+                    db.delete(pool_ref)
+                elif mode == 'move_rarity' and new_rarity is not None:
+                    pool_ref.rarity = new_rarity
+                continue
+            if table.status != 'published':
+                continue
+            latest_version = db.scalar(
+                select(func.max(CaseLootTable.odds_version)).where(
+                    CaseLootTable.case_id == table.case_id,
+                    CaseLootTable.band_no == table.band_no,
+                    CaseLootTable.status == 'published',
+                )
+            )
+            if table.odds_version != latest_version:
+                continue
+            new_table = _clone_and_publish_table(
+                db,
+                table,
+                now,
+                exclude_asset_id=asset.id if mode == 'remove' else None,
+                override_rarity=(asset.id, new_rarity) if (mode == 'move_rarity' and new_rarity is not None) else None,
+            )
+            warn = _empty_bucket_warning(db, new_table.id, table.case_id)
+            if warn:
+                warnings.append(warn)
+        return warnings
+
+    # mode == 'include' (on approve/restore): add or return asset to active runtime case pool
+    if asset.kind not in ('avatar', 'background'):
+        return warnings
+    prior_case_ids = list(
+        db.scalars(
+            select(CaseLootTable.case_id)
+            .join(CasePoolItem, CasePoolItem.loot_table_id == CaseLootTable.id)
+            .where(CasePoolItem.asset_id == asset.id)
+            .distinct()
+        )
+    )
+    active_runtime_case_ids = list(
+        db.scalars(
+            select(CaseDefinition.id).where(
+                CaseDefinition.runtime_kind == asset.kind,
+                CaseDefinition.status == 'active',
+                CaseDefinition.cost_khi_van == 0,
+            )
+        )
+    )
+    target_case_ids = list(dict.fromkeys([*prior_case_ids, *active_runtime_case_ids]))
+    if not target_case_ids:
+        return warnings
+    for cid in target_case_ids:
+        latest_pub = db.scalar(
+            select(CaseLootTable)
+            .where(
+                CaseLootTable.case_id == cid,
+                CaseLootTable.status == 'published',
+            )
+            .order_by(CaseLootTable.odds_version.desc())
+            .with_for_update()
+            .limit(1)
+        )
+        if latest_pub is None:
+            continue
+        exists_in_latest = db.scalar(
+            select(CasePoolItem.asset_id).where(
+                CasePoolItem.loot_table_id == latest_pub.id,
+                CasePoolItem.asset_id == asset.id,
+            )
+        )
+        if exists_in_latest is not None:
+            continue
+        new_table = _clone_and_publish_table(
+            db,
+            latest_pub,
+            now,
+            include_item=(asset.id, asset.rarity),
+        )
+        warn = _empty_bucket_warning(db, new_table.id, cid)
+        if warn:
+            warnings.append(warn)
+    return warnings
+
+
 @router.patch(
     '/assets/{asset_id}',
     response_model=AdminAsset,
@@ -594,7 +833,7 @@ def admin_update_asset(
     if has_v1:
         stmt = stmt.options(undefer(AssetItem.display_name), undefer(AssetItem.effect_key))
     asset = db.scalar(stmt)
-    if asset is None:
+    if asset is None or asset.deleted_at is not None:
         raise AuthError(404, 'NOT_FOUND', 'Asset not found.')
 
     values = payload.model_dump(exclude_unset=True)
@@ -607,9 +846,11 @@ def admin_update_asset(
     before = {
         'display_name': getattr(asset, 'display_name', None) if has_v1 else asset.slug,
         'rarity': asset.rarity,
+        'effect_key': getattr(asset, 'effect_key', None) if has_v1 else None,
         'review_status': old_review,
         'active': asset.active,
     }
+    pool_warnings: list[str] = []
 
     if 'display_name' in values and values['display_name'] is not None:
         if has_v1:
@@ -618,75 +859,56 @@ def admin_update_asset(
             asset.slug = values['display_name'].lower().replace('_', '-')
 
     if 'rarity' in values and values['rarity'] is not None and values['rarity'] != asset.rarity:
-        if asset.kind == 'background':
-            raise AuthError(409, 'CONFLICT', 'Không thể thay đổi hạng của Background hệ thống.')
         new_rarity = values['rarity']
-        pool_refs = list(db.scalars(select(CasePoolItem).where(CasePoolItem.asset_id == asset.id).with_for_update()))
-        for pool_ref in pool_refs:
-            from sqlalchemy import func
-            rem_count = db.scalar(
-                select(func.count(CasePoolItem.asset_id)).where(
-                    CasePoolItem.loot_table_id == pool_ref.loot_table_id,
-                    CasePoolItem.rarity == asset.rarity,
-                    CasePoolItem.asset_id != asset.id,
-                )
-            )
-            if rem_count == 0:
-                raise AuthError(409, 'CONFLICT', f'Không thể đổi hạng: bậc {asset.rarity} trong rương sẽ bị rỗng.')
-        for pool_ref in pool_refs:
-            db.delete(pool_ref)
-        db.flush()
         asset.rarity = new_rarity
+        if has_v1 and asset.kind == 'background':
+            asset.effect_key = EFFECT_KEYS[RARITIES.index(new_rarity)]
         db.flush()
-        for pool_ref in pool_refs:
-            db.add(
-                CasePoolItem(
-                    loot_table_id=pool_ref.loot_table_id,
-                    asset_id=asset.id,
-                    rarity=new_rarity,
-                    item_weight=pool_ref.item_weight,
-                )
-            )
+        pool_warnings.extend(_version_published_pool(db, asset, now, mode='move_rarity', new_rarity=new_rarity))
 
     action = values.get('action')
     audit_action = 'asset.update'
     if action == 'approve':
-        if asset.kind == 'background':
-            raise AuthError(409, 'CONFLICT', 'Background hệ thống đã được cấu hình cố định.')
+        if has_v1 and not (asset.display_name and asset.display_name.strip()):
+            raise AuthError(409, 'INVALID_ASSET_METADATA', 'Vật phẩm phải có tên hiển thị hợp lệ trước khi duyệt hoặc khôi phục.')
+        if not isinstance(rights, dict) or not rights.get('proof') or rights.get('rights_revoked') is True:
+            raise AuthError(409, 'INVALID_SOURCE_RIGHTS', 'Vật phẩm chưa đáp ứng đủ điều kiện bản quyền để kích hoạt.')
         rights['review_status'] = 'approved'
         rights['name_review_status'] = 'approved'
         asset.source_rights = rights
         asset.active = True
-        audit_action = 'asset.approve'
+        db.flush()
+        audit_action = 'asset.restore' if (old_review == 'approved' and not before['active']) else 'asset.approve'
         from app.vault_privilege import grant_khang_dev_single_asset_if_eligible
         grant_khang_dev_single_asset_if_eligible(db, asset, now, actor_id=account.user.id)
+        pool_warnings.extend(_version_published_pool(db, asset, now, mode='include'))
     elif action == 'reject':
-        if asset.kind == 'background':
-            raise AuthError(409, 'CONFLICT', 'Không thể từ chối hoặc xóa Background gốc của hệ thống.')
+        db.execute(delete(UserEquipment).where(UserEquipment.asset_id == asset.id))
+        db.flush()
+        pool_warnings.extend(_version_published_pool(db, asset, now, mode='remove'))
         rights['review_status'] = 'rejected'
         asset.source_rights = rights
         asset.active = False
-        db.execute(delete(UserEquipment).where(UserEquipment.asset_id == asset.id))
-        db.execute(delete(CasePoolItem).where(CasePoolItem.asset_id == asset.id))
         audit_action = 'asset.reject'
     elif action == 'archive':
-        if asset.kind == 'background':
-            raise AuthError(409, 'CONFLICT', '5 Background gốc của hệ thống được bảo vệ và không thể xóa.')
-        if asset.collection != 'admin-upload' and old_review == 'approved':
-            raise AuthError(409, 'CONFLICT', '70 Meme gốc của Bảo Khố MVP được bảo vệ và không thể xóa.')
-        rights['review_status'] = 'rejected'
+        # Unequip all users first to satisfy aurameme_equipment_guard before setting active=False.
+        db.execute(delete(UserEquipment).where(UserEquipment.asset_id == asset.id))
+        db.flush()
+        pool_warnings.extend(_version_published_pool(db, asset, now, mode='remove'))
+        if old_review == 'approved':
+            rights['review_status'] = 'approved'
         asset.source_rights = rights
         asset.active = False
-        db.execute(delete(UserEquipment).where(UserEquipment.asset_id == asset.id))
-        db.execute(delete(CasePoolItem).where(CasePoolItem.asset_id == asset.id))
         audit_action = 'asset.archive'
 
+    asset.source_rights = dict(asset.source_rights or {}) | {'admin_managed': True}
     asset.updated_at = now
     db.flush()
 
     after = {
         'display_name': getattr(asset, 'display_name', None) if has_v1 else asset.slug,
         'rarity': asset.rarity,
+        'effect_key': getattr(asset, 'effect_key', None) if has_v1 else None,
         'review_status': asset.source_rights.get('review_status', 'unknown'),
         'active': asset.active,
     }
@@ -703,7 +925,110 @@ def admin_update_asset(
         )
     )
     db.flush()
-    return _admin_asset_dto(asset, include_display=has_v1)
+    return _admin_asset_dto(asset, include_display=has_v1, pool_warnings=list(dict.fromkeys(pool_warnings)))
+
+
+@router.delete(
+    '/assets/{asset_id}',
+    response_model=AdminAssetPermanentDeleteResponse,
+    operation_id='adminPermanentDeleteAsset',
+    responses=ERRORS | {404: {'model': ErrorResponse}},
+    openapi_extra=CSRF_HEADER,
+)
+def admin_permanent_delete_asset(
+    asset_id: UUID,
+    payload: AdminAssetPermanentDeleteInput,
+    request: Request,
+    account=Depends(require_admin_mutation, scope='function'),
+):
+    if account.user.id != KHANG_DEV_ID:
+        raise AuthError(403, 'FORBIDDEN', 'Chỉ Founder Khang Dev mới có quyền xóa vĩnh viễn vật phẩm.')
+
+    if payload.confirm_text.strip() != 'XÓA VĨNH VIỄN':
+        raise AuthError(422, 'VALIDATION_ERROR', 'Vui lòng nhập chính xác cụm từ xác nhận: XÓA VĨNH VIỄN.')
+
+    db = account.db
+    has_v1 = schema_ready(db)
+    stmt = select(AssetItem).where(AssetItem.id == asset_id).with_for_update().execution_options(populate_existing=True)
+    if has_v1:
+        stmt = stmt.options(undefer(AssetItem.display_name), undefer(AssetItem.effect_key))
+    asset = db.scalar(stmt)
+    if asset is None or asset.deleted_at is not None:
+        raise AuthError(404, 'NOT_FOUND', 'Asset not found.')
+
+    rights = dict(asset.source_rights or {})
+    if asset.active or rights.get('review_status') != 'approved':
+        raise AuthError(409, 'ASSET_NOT_ARCHIVED', 'Chỉ có thể xóa vĩnh viễn vật phẩm đang ở trạng thái Ngừng lưu hành (Archived).')
+
+    now = request.app.state.auth.now()
+    before = {
+        'display_name': getattr(asset, 'display_name', None) if has_v1 else asset.slug,
+        'rarity': asset.rarity,
+        'review_status': rights.get('review_status', 'unknown'),
+        'active': asset.active,
+        'deleted_at': None,
+    }
+
+    db.execute(delete(UserEquipment).where(UserEquipment.asset_id == asset.id))
+    db.flush()
+    pool_warnings = _version_published_pool(db, asset, now, mode='remove')
+
+    asset.active = False
+    asset.deleted_at = now
+    asset.deleted_by = account.user.id
+    asset.source_rights = dict(asset.source_rights or {}) | {'admin_managed': True}
+    asset.updated_at = now
+    db.flush()
+
+    media_cleanup_scheduled = False
+    if asset.collection == 'admin-upload':
+        m = re.fullmatch(r'catalog/([a-f0-9]{64})\.(png|jpg|webp)', asset.media_key or '')
+        if m:
+            other_refs = db.scalar(
+                select(func.count()).select_from(AssetItem).where(
+                    AssetItem.media_key == asset.media_key,
+                    AssetItem.id != asset.id,
+                    AssetItem.deleted_at.is_(None),
+                )
+            )
+            if other_refs == 0:
+                candidate_path = CatalogSettings().catalog_storage_root / f'{m[1]}.{m[2]}'
+                if candidate_path.is_file():
+                    media_cleanup_scheduled = True
+
+                    def _unlink_after_commit(_session, target=candidate_path):
+                        try:
+                            if target.is_file():
+                                target.unlink()
+                        except OSError:
+                            pass
+
+                    event.listen(db, 'after_commit', _unlink_after_commit, once=True)
+
+    db.add(
+        AdminAuditLog(
+            id=uuid4(),
+            actor_id=account.user.id,
+            action='asset.permanent_delete',
+            target_type='asset',
+            target_id=str(asset.id),
+            before_json=before,
+            after_json={
+                'active': False,
+                'deleted_at': now.isoformat(),
+                'deleted_by': str(account.user.id),
+                'media_file_removed': media_cleanup_scheduled,
+            },
+            created_at=now,
+        )
+    )
+    db.flush()
+    return AdminAssetPermanentDeleteResponse(
+        id=asset.id,
+        deleted_at=now,
+        media_file_removed=media_cleanup_scheduled,
+        pool_warnings=list(dict.fromkeys(pool_warnings)),
+    )
 
 
 @router.get(

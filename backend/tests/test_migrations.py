@@ -28,7 +28,7 @@ AURA_TABLES = P0_TABLES | {"post_reactions", "post_bookmarks", "reward_policy_ve
 TABLES = AURA_TABLES | {"aura_reward_events", "comment_reactions", "wallets", "wallet_transactions", "daily_checkins", "asset_items", "user_inventory", "user_equipment", "case_definitions", "case_loot_tables", "case_loot_rarities", "case_pool_items", "case_opens", "inventory_grants"}
 TABLES |= {"notifications", "subscription_orders", "user_subscriptions"}
 TABLES |= {"user_oauth_identities", "password_reset_tokens", "account_verifications", "user_follows"}
-REVISION = "0018_canonical_asset_filenames"
+REVISION = "0021_comment_replies"
 
 
 def config():

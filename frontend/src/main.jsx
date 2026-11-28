@@ -6,11 +6,12 @@ import {createRoot} from 'react-dom/client';
 import { resolveScreen, initLegacyEffects, attachNavigation, prepareAuthForm, showDemoMessage } from './runtime.js';
 import {AuthBoundary} from './AuthBoundary.jsx';
 import {auth,MOCK_AUTH} from './auth.js';
+import {startPresenceHeartbeat} from './presence.js';
 import {authMessage} from './auth-client.js';
 import {ProfilePage,ContactPage,ContactInbox} from './components/AccountPages.jsx';
 import './account-pages.css';
 import './profile-page.css';
-import {loginUrl} from './return-url.js';
+import { isProtectedPath, resolveAuthRedirect } from './auth-routing.js';
 import {usePreferences} from './PreferencesContext.jsx';
 import { applyDemoIdentity } from './demo.js';
 import { SiteHeader, SiteFooter, MaintenancePage } from './components/SiteShell.jsx';
@@ -35,6 +36,10 @@ import ForgotPasswordPage from './components/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './components/ResetPasswordPage.jsx';
 import VerifyEmailPage from './components/VerifyEmailPage.jsx';
 import PendingVerificationScreen from './components/PendingVerificationScreen.jsx';
+import ErrorPage from './components/ErrorPage.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
+import PostDetailPage from './components/PostDetailPage.jsx';
+import { canAdmin } from './admin-api.js';
 
 const pages=import.meta.glob('./generated/*.js');
 const cssFiles=import.meta.glob('./generated/*.css',{query:'?raw',import:'default'});
@@ -86,7 +91,7 @@ function App() {
       new URLSearchParams(location.search).has('pending_verification');
     const custom = isPending
       ? PendingVerificationScreen
-      : {'/admin':AdminPage,'/premium':PremiumPage,'/premium/checkout':PremiumCheckoutPage,'/premium/history':PaymentHistoryPage,'/forgot-password':ForgotPasswordPage,'/reset-password':ResetPasswordPage,'/verify-email':VerifyEmailPage}[page.path]||(!MOCK_AUTH&&((page.path.startsWith('/profile')||page.path.startsWith('/u/'))?ProfilePage:page.path==='/contact'?ContactPage:page.path==='/vault'?VaultPage:page.path==='/admin/contacts'?ContactInbox:null));
+      : {'/admin':AdminPage,'/premium':PremiumPage,'/premium/checkout':PremiumCheckoutPage,'/premium/history':PaymentHistoryPage,'/forgot-password':ForgotPasswordPage,'/reset-password':ResetPasswordPage,'/verify-email':VerifyEmailPage}[page.path]||(!MOCK_AUTH&&((page.path.startsWith('/profile')||page.path.startsWith('/u/'))?ProfilePage:/^\/posts\/[0-9a-f-]{36}$/i.test(page.path)?PostDetailPage:page.path==='/contact'?ContactPage:page.path==='/vault'?VaultPage:page.path==='/admin/contacts'?ContactInbox:null));
 
     const maintenance=page.path==='/rank'||MOCK_AUTH&&['/contact','/vault'].includes(page.path);
     const pageLoader=custom?Promise.resolve(custom):maintenance ? Promise.resolve(MaintenancePage) : pages[`./generated/${page.key}.js`]().then(mod=>mod.default);
@@ -110,6 +115,7 @@ function App() {
     return()=>{stopped=true;cleanup()};
   },[page.key,screen]);
   useEffect(()=>attachNavigation(),[]);
+  useEffect(()=>{if(!MOCK_AUTH)return startPresenceHeartbeat();},[]);
   useEffect(()=>{
     if(!MOCK_AUTH&&screen&&page.path==='/login'&&screen!==PendingVerificationScreen){
       const params=new URLSearchParams(location.search);
@@ -123,14 +129,17 @@ function App() {
 
   useEffect(()=>{if(screen)prepareAuthForm();},[screen,language]);
   useEffect(()=>{if(!MOCK_AUTH&&authState.error)showDemoMessage(authMessage(authState.error,language));},[authState.error]);
-  const protectedPage=['/admin','/contact','/vault','/admin/contacts','/profile','/premium','/premium/checkout','/premium/history'].includes(page.path);
-  useEffect(()=>{if(!MOCK_AUTH&&protectedPage&&authState.status==='guest')location.replace(loginUrl());},[protectedPage,authState.status]);
-  if(!MOCK_AUTH&&protectedPage&&authState.status!=='authenticated')return null;
+  const protectedPage=isProtectedPath(page.path);
+  const authRedirect=resolveAuthRedirect({path:page.path,search:location.search,status:authState.status,mockAuth:MOCK_AUTH});
+  useEffect(()=>{if(authRedirect)location.replace(authRedirect);},[authRedirect]);
+  if(!MOCK_AUTH&&((protectedPage&&authState.status!=='authenticated')||authRedirect))return null;
+  const adminUnauthorized=!MOCK_AUTH&&['/admin','/admin/contacts'].includes(page.path)&&authState.status==='authenticated'&&!canAdmin(authState.user);
   // Reveal the header and page together after the lazy content and CSS are ready.
-  if(!screen&&!failed)return null;
-  return render(<><EquippedBackground/><SiteHeader />{failed ? <main role="alert">Không tải được trang. <button type="button" onClick={()=>location.reload()}>Tải lại</button></main> : screen===MaintenancePage ? <MaintenancePage /> : [AdminPage,PremiumPage,PremiumCheckoutPage,PaymentHistoryPage,ForgotPasswordPage,ResetPasswordPage,ProfilePage,ContactPage,VaultPage,ContactInbox,PendingVerificationScreen].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />}{page.path==='/' ? null : <SiteFooter />}<CookieConsent /></>);
+  if(!screen&&!failed&&!page.notFound&&!adminUnauthorized)return null;
+  const content=failed?<ErrorPage status={503} onRetry={()=>location.reload()}/>:(page.notFound||adminUnauthorized)?<ErrorPage status={404}/>:screen===MaintenancePage?<MaintenancePage />:[AdminPage,PremiumPage,PremiumCheckoutPage,PaymentHistoryPage,ForgotPasswordPage,ResetPasswordPage,ProfilePage,PostDetailPage,ContactPage,VaultPage,ContactInbox,PendingVerificationScreen].includes(screen)?React.createElement(screen):<LocalizedPage component={screen} />;
+  return render(<><EquippedBackground/><SiteHeader />{content}{page.path==='/'&&!page.notFound ? null : <SiteFooter />}<CookieConsent /></>);
 }
 
 import {PremiumProvider} from './PremiumContext.jsx';
 applyPreferences(readPreferences());
-createRoot(document.getElementById('root')).render(<PreferencesProvider><AuthBoundary><SocialProvider><FeedProvider><PremiumProvider><App /></PremiumProvider></FeedProvider></SocialProvider></AuthBoundary></PreferencesProvider>);
+createRoot(document.getElementById('root')).render(<PreferencesProvider><ErrorBoundary><AuthBoundary><SocialProvider><FeedProvider><PremiumProvider><App /></PremiumProvider></FeedProvider></SocialProvider></AuthBoundary></ErrorBoundary></PreferencesProvider>);

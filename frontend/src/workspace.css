@@ -139,6 +139,7 @@
 .admin-row-status { min-width:0; }.admin-row-status .workspace-badge { font-size:10px; padding:4px 8px; white-space:normal; gap:6px; }.admin-row-status .workspace-badge:before { content:''; width:5px; height:5px; flex-shrink:0; border-radius:50%; background:currentColor; opacity:.85; }
 .admin-row-status .workspace-badge[data-status=locked],.admin-row-status .workspace-badge[data-status=hidden] { color:var(--am-error); }.admin-row-status .workspace-meta { font-size:10px; line-height:1.7; display:block; }
 .admin-identity { display:flex; align-items:center; gap:12px; min-width:0; }.admin-identity>div{min-width:0}.admin-initial { width:36px; height:36px; display:grid; place-items:center; flex-shrink:0; background:var(--am-surface-container-high); color:var(--am-secondary); border:1px solid var(--am-outline-variant); border-radius:11px; font:700 15px 'Plus Jakarta Sans',sans-serif; }.admin-identity p { font-size:11px; color:var(--am-on-surface-variant); }
+.admin-user-email { margin-top:2px; overflow-wrap:anywhere; word-break:break-word; }
 .admin-role-list { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px!important; }.admin-role-list span { font:500 8px/16px 'JetBrains Mono',monospace; padding:0 5px; border-radius:4px; border:1px solid var(--am-outline-variant); }.admin-role-list [data-role=ADMIN] { color:var(--am-secondary); background:color-mix(in srgb,var(--am-secondary) 8%,transparent); border-color:color-mix(in srgb,var(--am-secondary) 25%,transparent); }
 .admin-list-panel[data-resource=audit-logs] .admin-column-head,.admin-list-panel[data-resource=audit-logs] .workspace-row { grid-template-columns:minmax(0,1fr) 140px 0; }
 .admin-list-panel :is(.workspace-error,.workspace-success) { margin:0 24px 20px; }.admin-list-panel .workspace-error{font-size:12px}
@@ -939,3 +940,63 @@
 
 
 
+
+
+/* H05 Admin Presence Overview */
+.admin-presence-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.admin-presence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.admin-presence-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--am-outline-variant);
+  background: var(--am-surface-container-low);
+}
+.admin-presence-card.is-total {
+  border-color: var(--am-primary);
+}
+.admin-presence-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--am-on-surface-variant);
+}
+.admin-presence-value {
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 800;
+  color: var(--am-on-surface);
+  font-variant-numeric: tabular-nums;
+}
+.admin-presence-stale {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--am-on-surface);
+  font-size: 13px;
+}
+.admin-presence-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .admin-presence-grid {
+    grid-template-columns: 1fr;
+  }
+}

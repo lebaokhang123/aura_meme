@@ -10,6 +10,7 @@ from app.models import AuthSession, Profile, User, UserFollow
 from app.permissions import require_account_csrf, require_authenticated_user
 from app.security import AuthError
 from app.media import media_url
+from app.notifications import create_notification
 
 
 router = APIRouter(prefix="/api/v1/users", tags=["Account"])
@@ -216,6 +217,17 @@ def follow_user(request: Request, username: str = Path(min_length=3, max_length=
     if existing is None:
         db.add(UserFollow(follower_id=account.user.id, followee_id=target_user.id, created_at=now))
         db.flush()
+        create_notification(
+            db,
+            recipient_user_id=target_user.id,
+            actor_user_id=account.user.id,
+            type="follow",
+            target_type="user",
+            target_id=account.user.id,
+            payload={"follower_username": account.user.username},
+            dedupe_key=f"follow:{account.user.id}:{target_user.id}",
+            now=now,
+        )
 
         # Award +10 EXP to target_user once in history (anti-farm)
         event_key = f"follow-v1:{account.user.id}"

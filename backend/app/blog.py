@@ -34,6 +34,25 @@ _ACCENTS={chr(n):search_text(chr(n)) for n in [*range(0xc0,0x250),*range(0x1e00,
 def searchable(column):
     return func.translate(func.translate(func.lower(column),"".join(_ACCENTS),"".join(_ACCENTS.values())), "".join(chr(n) for n in range(0x300,0x370)), "")
 
+
+def search_match(column, term: str):
+    return searchable(column).contains(search_text(term), autoescape=True)
+
+
+def build_search_filter(search: str | None, columns, *, username_column=None):
+    """Build case- and Vietnamese-accent-insensitive OR filter across columns."""
+    if search is None:
+        return None
+    term = search.strip()
+    if not term:
+        return None
+    filters = [search_match(col, term) for col in columns]
+    if username_column is not None:
+        username_term = term.lstrip("@")
+        if username_term:
+            filters.append(search_match(username_column, username_term))
+    return or_(*filters)
+
 def page_rows(db, statement, page, size):
     total = db.scalar(select(func.count()).select_from(statement.order_by(None).subquery()))
     offset = (page - 1) * size
@@ -116,8 +135,8 @@ def admin_list_categories(page: int = Query(1, ge=1), page_size: int = Query(20,
     statement = select(Category)
     if status is not None:
         statement = statement.where(Category.status == status)
-    if search is not None:
-        statement = statement.where(or_(Category.name.icontains(search, autoescape=True), Category.slug.icontains(search, autoescape=True)))
+    if (clause := build_search_filter(search, (Category.name, Category.slug))) is not None:
+        statement = statement.where(clause)
     return category_list(account.db, statement, page, page_size, sort)
 
 
@@ -237,19 +256,20 @@ def list_posts(request: Request, page: int = Query(1, ge=1), page_size: int = Qu
     user_ids = {row[1].id for row in rows}
     from app.membership import read_users_membership_tiers
     tiers = read_users_membership_tiers(db, user_ids, request.app.state.auth.now())
-    meme_states={}
+    interaction_states={}
     if include_interactions:
+        from app.interactions import read_post_states
         from app.meme_reactions import meme_reaction_states
-        meme_states=meme_reaction_states(db,PostReaction,[row[0].id for row in rows],viewer_id,request)
+        post_ids=[row[0].id for row in rows]
+        meme_states=meme_reaction_states(db,PostReaction,post_ids,viewer_id,request)
+        interaction_states=read_post_states(post_ids,db,viewer_id,request,meme_states=meme_states)
     items=[]
     for row in rows:
         dto=post_dto(*row, membership_tier=tiers.get(row[1].id, "free"))
         if include_interactions:
-            from app.interactions import read_post_state
-            try:dto.interactions=read_post_state(dto.id,db,viewer_id,request,meme_states.get(dto.id,{}))
-            except AuthError as error:
-                if error.status==404:continue
-                raise
+            if dto.id not in interaction_states:
+                continue
+            dto.interactions=interaction_states[dto.id]
         items.append(dto)
     return PostPage(items=items,pagination=pagination)
 

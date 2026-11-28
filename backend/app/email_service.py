@@ -231,9 +231,11 @@ class EmailService:
                     maintype="image",
                     subtype="png",
                     cid=f"<{LOGO_CID}>",
-                    filename="aurameme-logo.png",
                     disposition="inline",
                 )
+                for rel_part in html_part.iter_attachments():
+                    if rel_part.get("Content-ID") == f"<{LOGO_CID}>":
+                        rel_part["X-Attachment-Id"] = LOGO_CID
 
         # Attach binary attachments (e.g., application/pdf receipt)
         for att in attachments or ():

@@ -84,8 +84,8 @@ def resolve_reward_policy_id(db: Session, asset_id: UUID | None = None, now: dat
 
 
 def is_asset_eligible_for_privilege(asset: AssetItem | None) -> bool:
-    """Check if an asset is active, approved, and has valid source rights."""
-    if asset is None or not getattr(asset, "active", False):
+    """Check if an asset is active, non-deleted, approved, and has valid source rights."""
+    if asset is None or not getattr(asset, "active", False) or isinstance(getattr(asset, "deleted_at", None), datetime):
         return False
     if getattr(asset, "kind", None) not in ("avatar", "background"):
         return False
@@ -301,6 +301,7 @@ def sync_khang_dev_vault_privilege(
         select(AssetItem)
         .where(
             AssetItem.active.is_(True),
+            AssetItem.deleted_at.is_(None),
             AssetItem.kind.in_(("avatar", "background")),
         )
         .order_by(AssetItem.kind, AssetItem.rarity, AssetItem.slug)

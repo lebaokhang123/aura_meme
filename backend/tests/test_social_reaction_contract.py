@@ -27,8 +27,9 @@ def test_six_reaction_contracts_and_session_security():
     assert variants[1]["const"]=="meme"
     assert set(schemas["ReactionCounts"]["properties"])==set(KINDS)
     path=contract["paths"]["/api/v1/comments/{comment_id}/reactions"]
-    assert set(path)=={"put","delete"}
-    for item in path.values():
+    assert set(path)=={"get","put","delete"}
+    for method in ("put","delete"):
+        item=path[method]
         assert item["security"]==[{"sessionCookie":[]}]
         assert {"401","403","404","422"}<=set(item["responses"])
     read=contract["paths"]["/api/v1/comments/{comment_id}/interactions"]["get"]

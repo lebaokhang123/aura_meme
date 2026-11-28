@@ -14,8 +14,8 @@ export function SocialProvider({children}) {
   const [snapshot,setSnapshot]=useState(()=>({state:emptyState(),media:{}}));
   const [ready,setReady]=useState(false),[error,setError]=useState('');
   const [serverPosts,setServerPosts]=useState([]),[categories,setCategories]=useState(MOCK_AUTH?CATEGORIES:[]);
-  const [pagination,setPagination]=useState(null),[loading,setLoading]=useState(!MOCK_AUTH),[commentPages,setCommentPages]=useState({});
-  const query=useRef(readFilters(location.search,!MOCK_AUTH)),generation=useRef(0),page=useRef(1),appendFailed=useRef(false),uploads=useRef(new WeakMap());
+  const [pagination,setPagination]=useState(null),[loading,setLoading]=useState(!MOCK_AUTH),[commentPages,setCommentPages]=useState({}),[replyPages,setReplyPages]=useState({}),[commentSorts,setCommentSorts]=useState({});
+  const query=useRef(readFilters(location.search,!MOCK_AUTH)),generation=useRef(0),page=useRef(1),appendFailed=useRef(false),uploads=useRef(new WeakMap()),commentGen=useRef({}),replyGen=useRef({});
   const setInteraction=(target,id,value)=>{
     const parsed=apiInteractions(value,id,target);
     setSnapshot(v=>({...v,state:{...v.state,api:true,apiInteractions:{...v.state.apiInteractions,[target]:{...v.state.apiInteractions?.[target],[id]:parsed}}}}));
@@ -41,11 +41,12 @@ export function SocialProvider({children}) {
   const loadFeed=async(filters=query.current,append=false)=>{
     if(MOCK_AUTH)return;
     if(!profileUsername&&!['/','/explore'].includes(location.pathname)){setLoading(false);setReady(true);return;}
-    query.current=filters;const token=++generation.current,next=append?page.current+1:1;
+    const isExplore=!profileUsername&&location.pathname==='/explore';
+    query.current=filters;const token=++generation.current,next=isExplore?1:(append?page.current+1:1);
     appendFailed.current=false;
     setLoading(true);setError('');
     try{
-      const search=new URLSearchParams({page:String(next),page_size:'20',include_interactions:'true',sort:filters.sort==='hot'?'reaction_desc':'created_desc'});
+      const search=new URLSearchParams({page:String(next),page_size:isExplore?'6':'20',include_interactions:'true',sort:filters.sort==='hot'?'reaction_desc':'created_desc'});
       if(profileUsername){search.set('author',profileUsername);search.set('sort','created_desc');}
       else{if(filters.q)search.set('search',filters.q);if(filters.category)search.set('category',filters.category);}
       const result=apiPage(await auth.read('/posts?'+search)),mapped=result.items.map(apiPost);
@@ -58,31 +59,69 @@ export function SocialProvider({children}) {
       }));
       if(!active.current||token!==generation.current)return;
       const valid=Object.fromEntries(interactions.filter(Boolean));
-      setServerPosts(previous=>[...new Map([...(append?previous:[]),...mapped.filter(v=>valid[v.id])].map(v=>[v.id,v])).values()]);
-      setSnapshot(v=>({...v,state:{...v.state,api:true,apiInteractions:{...v.state.apiInteractions,post:{...(append?v.state.apiInteractions?.post:{}),...valid}}}}));
+      const nextItems=mapped.filter(v=>valid[v.id]).slice(0,isExplore?6:undefined);
+      setServerPosts(previous=>[...new Map([...(!isExplore&&append?previous:[]),...nextItems].map(v=>[v.id,v])).values()]);
+      setSnapshot(v=>({...v,state:{...v.state,api:true,apiInteractions:{...v.state.apiInteractions,post:{...(!isExplore&&append?v.state.apiInteractions?.post:{}),...valid}}}}));
       page.current=next;setPagination(result.pagination);setReady(true);
     }catch(e){if(active.current&&token===generation.current){appendFailed.current=append;setError(e.message);setReady(true);if(e.status===401)auth.refresh().catch(()=>{});}throw e;}
     finally{if(active.current&&token===generation.current)setLoading(false)}
   };
-  const loadComments=async(postId,append=false,pages=1)=>{
+  const loadComments=async(postId,append=false,pages=1,sortOverride=null)=>{
     if(MOCK_AUTH)return;
-    apiId(postId);const next=append?(commentPages[postId]?.page||1)+1:1;
+    apiId(postId);
+    const sort=sortOverride||commentSorts[postId]||'created_asc';
+    const next=append?(commentPages[postId]?.page||1)+1:1;
+    const token=(commentGen.current[postId]=(commentGen.current[postId]||0)+1);
     try{
       let result;
       const mapped=[];
-      for(let page=next;page<next+pages;page++){
-        result=apiPage(await auth.read('/posts/'+postId+'/comments?page_size=10&page='+page));
+      for(let p=next;p<next+pages;p++){
+        result=apiPage(await auth.read('/posts/'+postId+'/comments?page_size=10&page='+p+'&sort='+encodeURIComponent(sort)+'&include_interactions=true'));
         mapped.push(...result.items.map(apiComment));
-        if(page>=result.pagination.total_pages)break;
+        if(p>=result.pagination.total_pages)break;
       }
-      const values=await Promise.all(mapped.map(async row=>{
-        try{return [row.id,apiInteractions(await auth.read('/comments/'+row.id+'/interactions'),row.id,'comment')]}catch(e){if(e.status===404)return null;throw e;}
-      }));
-      if(!active.current)return;
-      const interactions=Object.fromEntries(values.filter(Boolean));
-      setSnapshot(v=>({...v,state:{...v.state,api:true,comments:[...new Map([...v.state.comments.filter(c=>append||c.postId!==postId),...mapped.filter(c=>interactions[c.id])].map(c=>[c.id,c])).values()],
+      if(!active.current||token!==commentGen.current[postId])return;
+      const interactions={};
+      for(const row of mapped){
+        if(row.interactions)interactions[row.id]=apiInteractions(row.interactions,row.id,'comment');
+      }
+      setSnapshot(v=>({...v,state:{...v.state,api:true,comments:[...new Map([...v.state.comments.filter(c=>append||c.postId!==postId||c.parentCommentId||c._located),...mapped].map(c=>[c.id,c])).values()],
         apiInteractions:{...v.state.apiInteractions,comment:{...v.state.apiInteractions?.comment,...interactions}}}}));
       setCommentPages(v=>({...v,[postId]:result.pagination}));
+    }catch(e){if(e.status===401)auth.refresh().catch(()=>{});throw e;}
+  };
+  const injectComment=(rawComment)=>{
+    if(MOCK_AUTH||!rawComment)return;
+    const mapped={...apiComment(rawComment),_located:true};
+    setSnapshot(v=>({...v,state:{...v.state,api:true,
+      comments:[...new Map([mapped,...v.state.comments].map(c=>[c.id,c])).values()],
+      apiInteractions:{...v.state.apiInteractions,comment:{...v.state.apiInteractions?.comment,...(mapped.interactions?{[mapped.id]:apiInteractions(mapped.interactions,mapped.id,'comment')}:{})}}}}));
+  };
+  const injectPost=(mappedPost)=>{
+    if(MOCK_AUTH||!mappedPost?.id)return;
+    setServerPosts(prev=>[...new Map([...prev,mappedPost].map(p=>[p.id,p])).values()]);
+  };
+  const setCommentSort=async(postId,sort)=>{
+    setCommentSorts(v=>({...v,[postId]:sort}));
+    setCommentPages(v=>{const n={...v};delete n[postId];return n;});
+    await loadComments(postId,false,1,sort);
+  };
+  const loadReplies=async(commentId,append=false)=>{
+    if(MOCK_AUTH)return;
+    apiId(commentId);
+    const next=append?(replyPages[commentId]?.page||1)+1:1;
+    const token=(replyGen.current[commentId]=(replyGen.current[commentId]||0)+1);
+    try{
+      const result=apiPage(await auth.read('/comments/'+commentId+'/replies?page_size=10&page='+next+'&include_interactions=true'));
+      if(!active.current||token!==replyGen.current[commentId])return;
+      const mapped=result.items.map(apiComment);
+      const interactions={};
+      for(const row of mapped){
+        if(row.interactions)interactions[row.id]=apiInteractions(row.interactions,row.id,'comment');
+      }
+      setSnapshot(v=>({...v,state:{...v.state,api:true,comments:[...new Map([...v.state.comments.filter(c=>append||c.parentCommentId!==commentId||c._located),...mapped].map(c=>[c.id,c])).values()],
+        apiInteractions:{...v.state.apiInteractions,comment:{...v.state.apiInteractions?.comment,...interactions}}}}));
+      setReplyPages(v=>({...v,[commentId]:result.pagination}));
     }catch(e){if(e.status===401)auth.refresh().catch(()=>{});throw e;}
   };
   const apiCommit=async(action,file)=>{
@@ -104,7 +143,7 @@ export function SocialProvider({children}) {
     else if(action.type==='moderate-post')await auth.write('PATCH','/admin/posts/'+apiId(action.id),{status:action.status||'hidden',reason:action.reason||undefined});
     else if(action.type==='comment'){
       if(!action.text.trim()||action.text.length>2000)throw Error('INVALID_COMMENT');
-      result=await auth.write('POST','/posts/'+apiId(action.postId)+'/comments',{request_id:apiId(action.id),body:action.text});
+      result=await auth.write('POST','/posts/'+apiId(action.postId)+'/comments',{request_id:apiId(action.id),body:action.text,...(action.parentCommentId?{parent_comment_id:apiId(action.parentCommentId)}:{})});
     }else if(action.type==='delete-comment')await auth.write('DELETE','/comments/'+apiId(action.id));
     else if(action.type==='moderate-comment')await auth.write('PATCH','/admin/comments/'+apiId(action.id),{status:action.status||'hidden',reason:action.reason||undefined});
     else if(action.type==='react'){
@@ -118,33 +157,48 @@ export function SocialProvider({children}) {
       return;
     }else throw Error('INVALID_ACTION');
     window.dispatchEvent(new Event('aurameme:aura:invalidate'));
+    if(action.type==='update-post'&&result){
+      const updated=apiPost(result);
+      setServerPosts(v=>v.map(post=>post.id===action.id?updated:post));
+    }
     if(['delete-post','moderate-post'].includes(action.type))setServerPosts(v=>v.filter(post=>post.id!==action.id));
-    if(['delete-comment','moderate-comment'].includes(action.type))setSnapshot(v=>({...v,state:{...v.state,comments:v.state.comments.filter(c=>c.id!==action.id)}}));
+    if(['delete-comment','moderate-comment'].includes(action.type))setSnapshot(v=>{
+      const target=v.state.comments.find(c=>c.id===action.id);
+      const nextComments=v.state.comments
+        .filter(c=>c.id!==action.id&&c.parentCommentId!==action.id)
+        .map(c=>target?.parentCommentId&&c.id===target.parentCommentId?{...c,replyCount:Math.max(0,(c.replyCount||0)-1)}:c);
+      return {...v,state:{...v.state,comments:nextComments}};
+    });
     setSnapshot(v=>({...v,state:{...v.state,revision:v.state.revision+1}}));
     // A failed read after a successful write must not report that the mutation failed.
     try{
-      if(['comment','delete-comment','moderate-comment'].includes(action.type)){
+      if(action.type==='comment'&&result){
+        const mapped=apiComment(result);
+        const emptyInt=apiInteractions({comment_id:mapped.id,reaction_counts:{like:0,love:0,laugh:0,fire:0,sad:0,angry:0},viewer_reaction:null,meme_reactions:[]},mapped.id,'comment');
+        setSnapshot(v=>{
+          const already=v.state.comments.some(c=>c.id===mapped.id);
+          const nextComments=[...new Map([
+            ...v.state.comments.map(c=>!already&&mapped.parentCommentId&&c.id===mapped.parentCommentId?{...c,replyCount:(c.replyCount||0)+1}:c),
+            mapped,
+          ].map(c=>[c.id,c])).values()];
+          return {...v,state:{...v.state,api:true,comments:nextComments,
+            apiInteractions:{...v.state.apiInteractions,comment:{...v.state.apiInteractions?.comment,[mapped.id]:v.state.apiInteractions?.comment?.[mapped.id]||emptyInt}}}};
+        });
+        await readInteraction('post',action.postId);
+      }else if(['delete-comment','moderate-comment'].includes(action.type)){
         const postId=action.postId||snapshot.state.comments.find(c=>c.id===action.id)?.postId;
-        if(postId){
-          const loaded=commentPages[postId];
-          const pages=action.type==='comment'
-            ? Math.max(loaded?.page||1,Math.ceil(((loaded?.total||0)+1)/10))
-            : loaded?.page||1;
-          setCommentPages(previous=>{
-            const next={...previous};
-            delete next[postId];
-            return next;
-          });
-          await loadComments(postId,false,pages);
-          await readInteraction('post',postId);
-        }
+        if(postId)await readInteraction('post',postId);
       }else{await loadCategories();await loadFeed();}
     }catch{setError('Đã lưu thay đổi, nhưng chưa đồng bộ được dữ liệu hiển thị. Vui lòng tải lại.');}
     return result;
   };
   const urls=useRef(new Map()),channel=useRef(null),active=useRef(true),loaded=useRef(false);
   const refresh=async()=>{
-    if(!MOCK_AUTH){if(!profileUsername&&!['/','/explore'].includes(location.pathname)){setReady(true);return;}await loadCategories();return;}
+    if(!MOCK_AUTH){
+      const onPostDetail=/^\/posts\/[0-9a-f-]{36}\/?$/i.test(location.pathname);
+      if(!profileUsername&&!onPostDetail&&!['/','/explore'].includes(location.pathname)){setReady(true);return;}
+      await loadCategories();return;
+    }
     const result=await loadSocial();if(!active.current)return;
     const media={};
     for(const [id,blob] of Object.entries(result.files)){
@@ -176,5 +230,5 @@ export function SocialProvider({children}) {
     try{channel.current?.postMessage('updated')}catch{}
     refresh().catch(()=>{if(active.current)setError('Đã lưu thay đổi, nhưng chưa đồng bộ được dữ liệu hiển thị. Vui lòng tải lại.');});
   };
-  return <SocialContext.Provider value={{...snapshot,posts:MOCK_AUTH?allPosts(snapshot.state,snapshot.media):serverPosts,categories,pagination,loading,commentPages,loadComments,loadFeed,loadOwnedMemes,loadMore:()=>loadFeed(query.current,true),retry:async()=>{if(!MOCK_AUTH&&appendFailed.current)return loadFeed(query.current,true);await refresh();if(!MOCK_AUTH)await loadFeed();},ready,error,commit}}>{children}</SocialContext.Provider>;
+  return <SocialContext.Provider value={{...snapshot,posts:MOCK_AUTH?allPosts(snapshot.state,snapshot.media):serverPosts,categories,pagination,loading,commentPages,replyPages,commentSorts,setCommentSort,loadComments,loadReplies,injectComment,injectPost,loadFeed,loadOwnedMemes,readInteraction,setInteraction,loadMore:()=>location.pathname==='/explore'?Promise.resolve():loadFeed(query.current,true),retry:async()=>{if(!MOCK_AUTH&&appendFailed.current&&location.pathname!=='/explore')return loadFeed(query.current,true);await refresh();if(!MOCK_AUTH)await loadFeed();},ready,error,commit}}>{children}</SocialContext.Provider>;
 }

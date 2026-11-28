@@ -799,3 +799,8 @@ Các điểm dưới đây là **tham số nghiệp vụ chưa phê duyệt chí
 
 
 Hotfix 23/11/2026 giữ schema 0014 và DBML. Khóa User trong transaction để serialize create-order, rồi khóa pending theo user+tier. Không có migration, thao tác sửa tier hay dọn giao dịch lịch sử.
+
+
+### H07 Comment Replies (`0021_comment_replies`)
+
+`comments` bổ sung `parent_comment_id` (`UUID`, FK `comments.id ON DELETE RESTRICT`, index), `reply_to_comment_id` (`UUID`, FK `comments.id ON DELETE RESTRICT`), `reply_to_user_id` (`UUID`, FK `users.id ON DELETE SET NULL`), kèm các constraint `ck_comments_no_self_parent`, `ck_comments_no_self_reply_to`, `ck_comments_reply_parent_pair` và composite index `ix_comments_post_parent_created (post_id, parent_comment_id, created_at, id)`. Bình luận trả lời chỉ 1 cấp (reply vào comment con vẫn neo về `parent_comment_id` gốc); không xóa vật lý bằng CASCADE để bảo toàn lịch sử kiểm duyệt và Aura. `downgrade()` chặn fail-closed nếu còn dữ liệu reply.

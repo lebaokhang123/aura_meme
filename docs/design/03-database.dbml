@@ -128,9 +128,16 @@ Table comments {
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
   deleted_at timestamptz [note: 'Chưa soft delete']
+  parent_comment_id uuid [note: 'H07 | Bình luận gốc của thread (1 cấp)']
+  reply_to_comment_id uuid [note: 'H07 | Bình luận thực sự được trả lời']
+  reply_to_user_id uuid [note: 'H07 | Tác giả bình luận được trả lời']
 
   Note: 'P0 | Bài viết, danh mục, bình luận, media, liên hệ'
 }
+
+Ref: comments.parent_comment_id > comments.id [delete: restrict]
+Ref: comments.reply_to_comment_id > comments.id [delete: restrict]
+Ref: comments.reply_to_user_id > users.id [delete: set null]
 
 Table post_reactions {
   post_id uuid [not null]
@@ -318,6 +325,8 @@ Table asset_items {
   effect_key text [note: 'Optional approved background effect']
   source_rights jsonb [not null, note: 'source/author/license/attribution/review_status']
   active boolean [not null]
+  deleted_at timestamptz [note: 'Tombstone H06: NULL khi chưa xóa vĩnh viễn']
+  deleted_by uuid [note: 'FK users.id (Founder Khang Dev) khi xóa vĩnh viễn']
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 
@@ -377,7 +386,7 @@ Table case_loot_rarities {
 Table case_pool_items {
   loot_table_id uuid [not null]
   asset_id uuid [not null]
-  rarity text [not null, note: 'FK; FK phải đồng nhất rarity của asset và bucket']
+  rarity text [not null, note: 'FK bucket; lưu hạng tại thời điểm phiên bản bảng rương được tạo']
   item_weight integer [not null, note: '> 0 trong bucket']
 
   indexes {
@@ -394,6 +403,7 @@ Table case_opens {
   case_id uuid [not null]
   loot_table_id uuid [not null, note: 'FK; FK ràng buộc case và phiên bản cụ thể']
   reward_asset_id uuid [not null, note: 'FK; Phải có trong đúng pool']
+  reward_rarity text [note: 'Snapshot hạng tại thời điểm mở rương (D/C/B/A/S)']
   earned_xp_at_open bigint [not null, note: 'Snapshot gốc, không cộng VIP']
   cost_khi_van bigint [not null, note: 'Chi phí đã trừ, snapshot']
   wallet_transaction_id uuid [unique, note: 'FK; NULL chỉ khi cost=0']
@@ -593,15 +603,15 @@ Table notifications {
   id uuid [not null, pk]
   recipient_user_id uuid [not null]
   actor_user_id uuid
-  type text [not null]
-  target_type text [not null]
+  type text [not null, note: "reaction | comment | moderation | announcement | follow"]
+  target_type text [not null, note: "post | comment | system | user"]
   target_id uuid
   payload jsonb [not null]
   created_at timestamptz [not null]
   read_at timestamptz
   dedupe_key text [unique]
 
-  Note: 'P2 | Hệ thống thông báo cá nhân'
+  Note: 'P2 | Hệ thống thông báo cá nhân (bao gồm follow notification từ migration 0020)'
 }
 
 Table subscription_orders {
@@ -740,11 +750,12 @@ Ref: wallet_transactions.policy_id > reward_policy_versions.id [delete: restrict
 Ref: wallet_transactions.(user_id, reverses_id) > wallet_transactions.(user_id, id) [delete: restrict]
 
 // vault_inventory
+Ref: asset_items.deleted_by > users.id [delete: restrict]
 Ref: case_loot_tables.case_id > case_definitions.id [delete: restrict]
 Ref: case_loot_tables.policy_id > reward_policy_versions.id [delete: restrict]
 Ref: case_loot_rarities.loot_table_id > case_loot_tables.id [delete: restrict]
 Ref: case_pool_items.(loot_table_id, rarity) > case_loot_rarities.(loot_table_id, rarity) [delete: restrict]
-Ref: case_pool_items.(asset_id, rarity) > asset_items.(id, rarity) [delete: restrict]
+Ref: case_pool_items.asset_id > asset_items.id [delete: restrict]
 Ref: case_opens.user_id > users.id [delete: restrict]
 Ref: case_opens.(case_id, loot_table_id) > case_loot_tables.(case_id, id) [delete: restrict]
 Ref: case_opens.(loot_table_id, reward_asset_id) > case_pool_items.(loot_table_id, asset_id) [delete: restrict]

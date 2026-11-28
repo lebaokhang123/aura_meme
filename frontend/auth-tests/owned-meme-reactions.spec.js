@@ -39,6 +39,10 @@ async function api(context,{guest=false,failInventory=false,malformedRead=false}
   }
   if(path.endsWith('/reactions')){
    if(guest)return fail(401,'UNAUTHORIZED');
+   if(method==='GET'){
+    const memeItem=states[kind].meme?[{asset:states[kind].meme===aid?first:second,count:1}]:[];
+    return send(200,{items:[],pagination:{page:1,page_size:20,total:0,total_pages:0},reaction_counts:{like:0,love:0,laugh:0,fire:0,sad:0,angry:0},meme_reactions:memeItem});
+   }
    expect(req.headers()['x-csrf-token']).toBe('owned-fixture-csrf');
    states[kind]={reaction:method==='DELETE'||body.reaction_type==='meme'?null:body.reaction_type,meme:method==='DELETE'||body.reaction_type!=='meme'?null:body.meme_asset_id};
    return send(method==='DELETE'?204:200,{reaction_type:states[kind].meme?'meme':states[kind].reaction});
@@ -64,10 +68,20 @@ for(const [width,path] of [[375,'/'],[768,'/explore'],[1440,'/']])test(`owned Me
  await picker.getByRole('button',{name:'Thả Meme Chó thử',exact:true}).click();
  await expect(card.locator(`[data-reaction-pill="meme-${bid}"]`)).toHaveAttribute('aria-pressed','true');
  await page.reload();await expect(card.locator(`[data-reaction-pill="meme-${bid}"]`)).toHaveAttribute('aria-pressed','true');
- await card.locator(`[data-reaction-pill="meme-${bid}"]`).click();await expect(card.locator(`[data-reaction-pill="meme-${bid}"]`)).toHaveCount(0);
+ await card.locator(`[data-reaction-pill="meme-${bid}"]`).click();
+ await expect(page.locator('[role="dialog"][aria-label="Biểu cảm"]')).toBeVisible();
+ await expect(card.locator(`[data-reaction-pill="meme-${bid}"]`)).toHaveCount(1);
+ await page.keyboard.press('Escape');
+ await card.getByRole('button',{name:'Thả biểu cảm',exact:true}).click();
+ await picker.getByRole('button',{name:'Meme của tôi',exact:true}).click();
+ await picker.getByRole('button',{name:'Xem thêm Meme',exact:true}).click();
+ await picker.getByRole('button',{name:'Thả Meme Chó thử',exact:true}).click();
+ await expect(card.locator(`[data-reaction-pill="meme-${bid}"]`)).toHaveCount(0);
  if(path==='/explore')await page.goto('/');
  await card.getByRole('button',{name:'Bình luận',exact:true}).click();
  const comment=card.locator(`[data-comment-id="${cid}"]`);await expect(comment).toBeVisible();
+ const cookieDismiss=page.locator('.am-cookie-root button').first();
+ if(await cookieDismiss.isVisible().catch(()=>false))await cookieDismiss.click();
  await comment.getByRole('button',{name:'Thả biểu cảm bình luận',exact:true}).click();
  await picker.getByRole('button',{name:'Meme của tôi',exact:true}).click();
  await picker.getByRole('button',{name:'Thả Meme Mèo thử',exact:true}).click();
