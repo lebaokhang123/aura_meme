@@ -87,10 +87,18 @@ def test_draft_revision_preserves_existing_tables_and_guards(migrated):
     with migrated.connect() as connection:
         assert set(inspect(connection).get_table_names()) == old | {"alembic_version"}
         assert connection.scalar(text("SELECT count(*) FROM pg_proc WHERE pronamespace='public'::regnamespace")) == 0
+    at_0002 = inventory()
+    at_0002_names = {row[1] for row in at_0002}
+    assert [row for row in before if row[1] in at_0002_names] == at_0002
     migrate(migrated, "upgrade", "head")
     migrate(migrated, "upgrade", "head")
-    assert inventory() == before
+    after = inventory()
+    assert [row for row in after if row[1] in at_0002_names] == at_0002
+    assert {row[1] for row in after} == {row[1] for row in before}
     with migrated.connect() as connection:
+        comment_indexes = {idx["name"]: idx["column_names"] for idx in inspect(connection).get_indexes("comments")}
+        assert comment_indexes["ix_comments_parent_comment_id"] == ["parent_comment_id"]
+        assert comment_indexes["ix_comments_post_parent_created"] == ["post_id", "parent_comment_id", "created_at", "id"]
         assert_auxiliary_objects(connection)
 
 

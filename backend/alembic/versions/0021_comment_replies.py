@@ -33,15 +33,15 @@ def upgrade():
     )
 
     op.create_check_constraint(
-        'ck_comments_no_self_parent', 'comments',
+        op.f('ck_comments_no_self_parent'), 'comments',
         'parent_comment_id IS NULL OR parent_comment_id <> id',
     )
     op.create_check_constraint(
-        'ck_comments_no_self_reply_to', 'comments',
+        op.f('ck_comments_no_self_reply_to'), 'comments',
         'reply_to_comment_id IS NULL OR reply_to_comment_id <> id',
     )
     op.create_check_constraint(
-        'ck_comments_reply_parent_pair', 'comments',
+        op.f('ck_comments_reply_parent_pair'), 'comments',
         '(parent_comment_id IS NULL) = (reply_to_comment_id IS NULL)',
     )
 
@@ -61,9 +61,9 @@ def downgrade():
     op.drop_index('ix_comments_post_parent_created', table_name='comments')
     op.drop_index('ix_comments_parent_comment_id', table_name='comments')
 
-    op.drop_constraint('ck_comments_reply_parent_pair', 'comments', type_='check')
-    op.drop_constraint('ck_comments_no_self_reply_to', 'comments', type_='check')
-    op.drop_constraint('ck_comments_no_self_parent', 'comments', type_='check')
+    op.drop_constraint(op.f('ck_comments_reply_parent_pair'), 'comments', type_='check')
+    op.drop_constraint(op.f('ck_comments_no_self_reply_to'), 'comments', type_='check')
+    op.drop_constraint(op.f('ck_comments_no_self_parent'), 'comments', type_='check')
 
     op.drop_constraint('fk_comments_reply_to_user_id_users', 'comments', type_='foreignkey')
     op.drop_constraint('fk_comments_reply_to_comment_id_comments', 'comments', type_='foreignkey')
