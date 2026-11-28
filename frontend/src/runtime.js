@@ -8,14 +8,15 @@ const ROUTES = {'trang-chu':'/','kham-pha':'/explore','gioi-thieu':'/about','lie
 const PAGE = {'/':'home','/explore':'explore','/about':'about','/contact':'contact','/rank':'rank','/vault':'vault','/admin':'about','/premium':'about','/premium/checkout':'about','/premium/history':'about','/forgot-password':'about','/reset-password':'about','/verify-email':'about'};
 const PAGE_BODY_CLASS = {"guest-home": "bg-surface font-body-md text-on-surface antialiased selection:bg-secondary-container selection:text-on-secondary-container", "guest-explore": "bg-background font-body-md text-body-md text-on-surface antialiased", "guest-about": "bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-secondary-container selection:text-on-secondary-container", "guest-contact": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "guest-rank": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "guest-vault": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "user-home": "bg-surface font-body-md text-on-surface antialiased selection:bg-secondary-container selection:text-on-secondary-container", "user-explore": "bg-background font-body-md text-body-md text-on-surface antialiased", "user-about": "bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-secondary-container selection:text-on-secondary-container", "user-contact": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "user-rank": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "user-vault": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "login": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col", "register": "bg-background font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"};
 const PROFILE_ROUTE = /^\/(?:profile(?:\/[a-z0-9_]{3,32})?|u\/[a-z0-9_]{3,32})$/;
+const POST_DETAIL_ROUTE = /^\/posts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function isKnownRoute(path){
- return path==='/login'||path==='/register'||path==='/admin/contacts'||Boolean(PAGE[path])||PROFILE_ROUTE.test(path);
+ return path==='/login'||path==='/register'||path==='/admin/contacts'||Boolean(PAGE[path])||PROFILE_ROUTE.test(path)||POST_DETAIL_ROUTE.test(path);
 }
 export function resolveScreen(){
  const path=location.pathname.replace(/\/$/,'')||'/';
  const authed=readDemoUser()!==null;
  const known=isKnownRoute(path);
- const resolvedPage=PAGE[path]||(PROFILE_ROUTE.test(path)||path==='/admin/contacts'?'about':'home');
+ const resolvedPage=PAGE[path]||(PROFILE_ROUTE.test(path)||POST_DETAIL_ROUTE.test(path)||path==='/admin/contacts'?'about':'home');
  const key=path==='/login'?'login':path==='/register'?'register':(authed?'user':'guest')+'-'+resolvedPage;
  return {key,bodyClass:PAGE_BODY_CLASS[key],authed,path,notFound:!known};
 }

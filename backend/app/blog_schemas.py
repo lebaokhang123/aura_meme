@@ -44,6 +44,27 @@ class PostInteractions(ReactionState):
     bookmarked: bool
 
 
+class CommentInteractions(ReactionState):
+    comment_id: UUID
+    reaction_counts: ReactionCounts
+    viewer_reaction: ReactionType | None
+
+
+class ReactionActorItem(BaseModel):
+    user: UserPublic
+    reaction_type: ReactionType | Literal["meme"]
+    meme_asset: Asset | None = Field(default=None, exclude_if=lambda value: value is None)
+    created_at: datetime
+    updated_at: datetime
+
+
+class ReactionListPage(BaseModel):
+    items: list[ReactionActorItem]
+    pagination: "Pagination"
+    reaction_counts: ReactionCounts
+    meme_reactions: list[MemeReactionCount] = Field(default_factory=list)
+
+
 class StrictInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

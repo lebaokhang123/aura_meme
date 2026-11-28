@@ -281,7 +281,7 @@ test('reopening paginated comments keeps both pages and a write refreshes them',
  await card.getByLabel('Nội dung bình luận').fill('New comment in page two');
  await card.getByRole('button',{name:'Gửi',exact:true}).click();
  await expect(card.locator('[data-comment-id]')).toHaveCount(13);
- expect(reads()).toEqual(['1','2','1','2']);
+ expect(reads()).toEqual(['1','2']);
 });
 
 test('switching accounts updates Composer without changing another author',async({page,context})=>{

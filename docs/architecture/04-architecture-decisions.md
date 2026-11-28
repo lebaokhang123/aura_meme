@@ -257,6 +257,18 @@ CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute 
   4. **Gioi han:** Chi chinh xac trong pham vi single-process (`workers=1`); neu scale multi-worker trong tuong lai, huong nang cap la Redis TTL (`SET EX` / `ZSET`).
   5. **Learning Check:** `PENDING OWNER`.
 
+
+## ADR-H07: Final Social Interaction Polish (`feat/h07-social-interaction-polish`)
+
+- **Trang thai:** Da trien khai tren nhanh `feat/h07-social-interaction-polish` (tinh nang cuoi cung truoc Feature Freeze).
+- **Quyet dinh:**
+  1. **H07.1 Reaction Details:** Tach rieng hanh vi click reaction pill / `+N` (mo `ReactionDetailsModal` chi doc, khong doi reaction cua viewer) voi nut `+` (mo picker them/doi/bo reaction). Backend cung cap `GET /posts/{id}/reactions` va `GET /comments/{id}/reactions` qua helper dung chung `list_target_reactions`, tuan thu visibility H06.
+  2. **H07.2 Single-Level Comment Replies (`0021_comment_replies`):** Them `parent_comment_id`, `reply_to_comment_id`, `reply_to_user_id` vao `comments` voi `ON DELETE RESTRICT` + check constraints chong self-reference. Reply vao comment con van neo ve root thread nhung giu `reply_to_comment_id`/`reply_to_user_id`. An/xoa comment goc tu dong an toan bo thread khoi public reads (`replies`, `locate`, `comments_count`).
+  3. **H07.3 Comment Sorting & Batching:** Bo sung `sort=reaction_desc` tren DB va `include_interactions=true` qua `read_comment_states()` (O(1) SQL queries thay cho N+1 HTTP calls `/comments/{id}/interactions`). Cap nhat state cuc bo sau create/reply/delete.
+  4. **H07.4 Notifications:** Them reply notification (`type='comment'`, `payload.action='reply'`, khong trung khi reply target dong thoi la chu bai viet) va comment reaction notification (`dedupe_key=comment-reaction:{cid}:{uid}`, khong EXP). Hoan thien badge kiem duyet cu the trong `NotificationsDropdown.jsx`.
+  5. **H07.5 Post Detail & Share:** Bo sung route `/posts/{UUID}` (`PostDetailPage.jsx`), endpoint `/locate`, canonical share link `/posts/{UUID}`, van giu ho tro deep link cu `/#post-UUID`.
+  6. **Learning Check:** `PENDING OWNER`.
+
 - **Bo sung Final Preflight (Eventual Consistency & ORM Lifecycle):**
   - **Session revocation & eventual consistency:** `heartbeat()` kiem tra day du `revoked_at`, `expires_at` (idle expiry), `created_at + ABSOLUTE_SECONDS` (absolute expiry), va `User.status == "active"`. Khi user `logout()`, `remove_session(session_id)` xoa ngay lap tuc khoi `PresenceStore`; tuy nhien neu session bi revoke tu xa hoac user bi khoa boi Admin, ban ghi presence cu co the ton tai toi da `TTL = 90s` truoc khi tu het han.
   - **Bounded capacity:** `max_entries = 16384` gioi han bo nho tren RAM, khong dong nghia ho tro `16.384 concurrent users` (nhieu session/thiet bi cua cung user hoac guest churn co the chiem nhieu entry).
@@ -287,3 +299,15 @@ CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute 
   3. **Notification UI (`NotificationsDropdown.jsx`):** Dong bo `describeNotification()` giua dropdown va modal; hien thi chinh xac hanh dong kiem duyet (`hidden`/`deleted` x `post`/`comment`), an nut `Xem bài viết` doi voi bai viet da bi an/xoa, bo ma tieng Anh tho `(${reactionType})`, phan biet `reaction` vao bai viet vs binh luan, va bo sung loai `follow` kem nut `Xem trang cá nhân` (`/u/<username>`).
   4. **Admin Search & Posts Date Range (`blog.py`, `admin_posts.py`, `admin_workspace.py`, `admin_users.py`, `AdminPage.jsx`):** Tai su dung helper `build_search_filter` (khong dau tieng Viet + ho tro `@username`) cho Admin Posts, Comments (join `Post`), Categories va Users. `GET /api/v1/admin/posts` bo sung `date_from`/`date_to` (`YYYY-MM-DD`, kiem tra `date_from <= date_to`) quy doi nua mo `[start, next_day)` theo mui gio `Asia/Ho_Chi_Minh`.
   5. **Learning Check:** `PENDING OWNER`.
+
+
+## ADR-H07: Final Social Interaction Polish (`feat/h07-social-interaction-polish`)
+
+- **Trang thai:** Da trien khai tren nhanh `feat/h07-social-interaction-polish` (tinh nang cuoi cung truoc Feature Freeze).
+- **Quyet dinh:**
+  1. **H07.1 Reaction Details:** Tach rieng hanh vi click reaction pill / `+N` (mo `ReactionDetailsModal` chi doc, khong doi reaction cua viewer) voi nut `+` (mo picker them/doi/bo reaction). Backend cung cap `GET /posts/{id}/reactions` va `GET /comments/{id}/reactions` qua helper dung chung `list_target_reactions`, tuan thu visibility H06.
+  2. **H07.2 Single-Level Comment Replies (`0021_comment_replies`):** Them `parent_comment_id`, `reply_to_comment_id`, `reply_to_user_id` vao `comments` voi `ON DELETE RESTRICT` + check constraints chong self-reference. Reply vao comment con van neo ve root thread nhung giu `reply_to_comment_id`/`reply_to_user_id`. An/xoa comment goc tu dong an toan bo thread khoi public reads (`replies`, `locate`, `comments_count`).
+  3. **H07.3 Comment Sorting & Batching:** Bo sung `sort=reaction_desc` tren DB va `include_interactions=true` qua `read_comment_states()` (O(1) SQL queries thay cho N+1 HTTP calls `/comments/{id}/interactions`). Cap nhat state cuc bo sau create/reply/delete.
+  4. **H07.4 Notifications:** Them reply notification (`type='comment'`, `payload.action='reply'`, khong trung khi reply target dong thoi la chu bai viet) va comment reaction notification (`dedupe_key=comment-reaction:{cid}:{uid}`, khong EXP). Hoan thien badge kiem duyet cu the trong `NotificationsDropdown.jsx`.
+  5. **H07.5 Post Detail & Share:** Bo sung route `/posts/{UUID}` (`PostDetailPage.jsx`), endpoint `/locate`, canonical share link `/posts/{UUID}`, van giu ho tro deep link cu `/#post-UUID`.
+  6. **Learning Check:** `PENDING OWNER`.

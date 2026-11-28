@@ -58,7 +58,7 @@ test('share only acknowledges clipboard success and shared hashes rescue hidden 
  await page.addInitScript(()=>{navigator.share=undefined;Object.defineProperty(navigator,'clipboard',{value:{writeText:async value=>{window.__copied=value}}})});
  await page.goto('/');await ready(page);await page.locator('#post-khang').getByRole('button',{name:'Chia sẻ',exact:true}).click();
  await expect(page.getByRole('status').filter({hasText:'Đã sao chép liên kết.'})).toBeVisible();
- expect(await page.evaluate(()=>window.__copied)).toBe('http://127.0.0.1:4186/#post-khang');
+ expect(await page.evaluate(()=>window.__copied)).toBe('http://127.0.0.1:4186/posts/khang');
  await page.goto('/?category=Anime&q=hidden#post-khang');await ready(page);
  await expect(page.locator('#post-khang')).toBeVisible();await expect(page.locator('#post-khang')).toBeInViewport();
  await expect(page).toHaveURL('/#post-khang');
@@ -130,7 +130,7 @@ test('share cancellation and clipboard failure never show copied success',async(
  await expect(page.getByText('Đã sao chép liên kết.',{exact:true})).toHaveCount(0);
  await page.evaluate(()=>{navigator.share=undefined});
  await page.locator('#post-khang').getByRole('button',{name:'Chia sẻ',exact:true}).click();
- await expect(page.getByRole('textbox',{name:'Liên kết bài viết'})).toHaveValue('http://127.0.0.1:4186/#post-khang');
+ await expect(page.getByRole('textbox',{name:'Liên kết bài viết'})).toHaveValue('http://127.0.0.1:4186/posts/khang');
  await expect(page.getByText('Đã sao chép liên kết.',{exact:true})).toHaveCount(0);
 });
 test('all three accounts have independent selections and atomic rapid actions do not duplicate counts',async({page})=>{

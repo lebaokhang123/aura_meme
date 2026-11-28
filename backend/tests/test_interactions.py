@@ -145,9 +145,12 @@ def test_reaction_check_and_composite_pk_are_enforced(target):
 def test_interaction_openapi_matches_existing_contract():
     from app.main import app
     contract = app.openapi()
-    for suffix, operations in [("reactions", ("setReaction", "removeReaction")), ("bookmark", ("savePost", "unsavePost"))]:
+    for suffix, expected_methods, operations in [
+        ("reactions", {"get", "put", "delete"}, ("setReaction", "removeReaction")),
+        ("bookmark", {"put", "delete"}, ("savePost", "unsavePost")),
+    ]:
         paths = contract["paths"]["/api/v1/posts/{post_id}/" + suffix]
-        assert set(paths) == {"put", "delete"}
+        assert set(paths) == expected_methods
         for method, operation in zip(("put", "delete"), operations):
             item = paths[method]
             assert item["operationId"] == operation and item["security"] == [{"sessionCookie": []}]

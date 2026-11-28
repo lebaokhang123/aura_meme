@@ -652,7 +652,7 @@ def verify_test_connection(conn):
         "FROM pg_roles WHERE rolname=current_user"
     )):
         pytest.fail("Safety violation: disposable test role is privileged.", pytrace=False)
-    if conn.scalar(text("SELECT version_num FROM alembic_version")) != "0020_follow_notifications":
+    if conn.scalar(text("SELECT version_num FROM alembic_version")) != "0021_comment_replies":
         pytest.fail("Safety violation: unexpected schema revision.", pytrace=False)
     if set(inspect(conn).get_table_names(schema="public")) != set(Base.metadata.tables) | {"alembic_version"}:
         pytest.fail("Safety violation: unexpected test schema.", pytrace=False)

@@ -8,10 +8,12 @@ import {useCopy} from './account-ui.jsx';
 import {useLocalized} from '../localize.jsx';
 import {icon,pillClass,SocialMessage} from './social-ui.jsx';
 import {PickerMarkup} from '../generated/social-stitch.jsx';
+import {ReactionDetailsModal} from './ReactionDetailsModal.jsx';
 
 export function ReactionBar({target='post',id,compact=false,onPick}) {
   const t=useCopy(),render=useLocalized(),{state,commit,ready,loadOwnedMemes}=useSocial(),user=readDemoUser();
   const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [details,setDetails]=useState(null);
   const root=useRef(null),trigger=useRef(null),popup=useRef(null),pending=useRef(false);
   const [position,setPosition]=useState({left:16,top:90,width:340});
   const [ownedTab,setOwnedTab]=useState(false),[owned,setOwned]=useState([]),[ownedPage,setOwnedPage]=useState(null),[ownedLoading,setOwnedLoading]=useState(false),[ownedError,setOwnedError]=useState('');
@@ -57,12 +59,11 @@ export function ReactionBar({target='post',id,compact=false,onPick}) {
     if(pending.current)return;pending.current=true;setBusy(true);setError('');
     try{if(onPick){if(!user)throw Error('LOGIN_REQUIRED');onPick(REACTIONS.find(r=>r.id===reaction).emoji);}else await commit({type:'react',target,id,reaction,...(memeAssetId?{memeAssetId}:{})});setOpen(false);}catch(e){setError(e.message)}finally{pending.current=false;setBusy(false)}
   };
-  const pickPill=reaction=>{
-    if(reaction.assetId){
-      if(selected===reaction.id)return react('meme',reaction.assetId);
-      setOwnedTab(true);setOpen(true);
-    }else if(REACTIONS.some(r=>r.id===reaction.id))react(reaction.id);
-    else setOpen(true);
+  const openDetails=(reaction)=>{
+    if(MOCK_AUTH){setOpen(true);return;}
+    if(!reaction){setDetails({type:'all',memeId:null});return;}
+    if(reaction.assetId){setDetails({type:'meme',memeId:reaction.assetId});return;}
+    setDetails({type:reaction.id,memeId:null});
   };
   const adapt=node=>{
     if(Array.isArray(node))return node.map((n,index)=>{const result=adapt(n);return React.isValidElement(result)?React.cloneElement(result,{key:index}):result});
@@ -95,11 +96,11 @@ export function ReactionBar({target='post',id,compact=false,onPick}) {
   </div>;
   return render(<div className="relative min-w-0" ref={root}>
     <div className={`flex items-center gap-1.5 flex-wrap ${compact?'':'social-post-reactions'}`}>
-      {visible.map(reaction=><button type="button" key={reaction.id} className={compact?'flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container hover:bg-surface-container-high border border-surface-container-high hover:border-secondary/40 text-on-surface transition-all cursor-pointer active:scale-95':pillClass} aria-label={reaction.label} aria-pressed={selected===reaction.id} data-reaction-pill={reaction.id} onClick={()=>pickPill(reaction)} disabled={busy}>
+      {visible.map(reaction=><button type="button" key={reaction.id} className={compact?'flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container hover:bg-surface-container-high border border-surface-container-high hover:border-secondary/40 text-on-surface transition-all cursor-pointer active:scale-95':pillClass} aria-label={reaction.label} aria-pressed={selected===reaction.id} data-reaction-pill={reaction.id} onClick={()=>openDetails(reaction)} disabled={busy}>
         {reaction.src?<img className="w-4 h-4 object-cover rounded-full" src={reaction.src} alt=""/>:<span>{reaction.emoji}</span>}<span className={compact?'font-mono-tag text-mono-tag text-on-surface':'font-mono-counter text-mono-counter text-on-surface'}>{reaction.count}</span>
       </button>)}
       <div className="relative flex items-center gap-1.5 shrink-0 social-reaction-actions">
-        {counts.length>5&&<button type="button" className="text-secondary font-label-sm text-label-sm shrink-0" aria-label="Xem tất cả reaction" onClick={()=>setOpen(true)}>+{counts.length-5}</button>}
+        {counts.length>5&&<button type="button" className="text-secondary font-label-sm text-label-sm shrink-0" aria-label="Xem tất cả reaction" onClick={()=>openDetails(null)}>+{counts.length-5}</button>}
         <button ref={trigger} id={primary?'btn-toggle-reaction-popover':undefined} type="button" className={`flex items-center justify-center ${compact?'w-6 h-6':'w-8 h-8'} rounded-full bg-surface-container-high hover:bg-surface-container-highest text-secondary transition-all shadow-sm border border-secondary/30 active:scale-95`} aria-label={onPick?'Chèn emoji':compact?'Thả biểu cảm bình luận':'Thả biểu cảm'} aria-controls={popoverId} aria-expanded={open} onClick={()=>{setOpen(v=>!v);setError('')}}>{icon(onPick?'sentiment_satisfied':'add_reaction',compact?16:20)}</button>
         {open&&createPortal(render(<div ref={popup} id={popoverId} className="social-picker-position" style={position} role="dialog" aria-label="Bộ chọn reaction">
           {picker}
@@ -113,5 +114,6 @@ export function ReactionBar({target='post',id,compact=false,onPick}) {
       </div>
     </div>
     {!open&&<SocialMessage error={error}/>}
+    {details&&<ReactionDetailsModal target={target} id={id} initialType={details.type} initialMemeId={details.memeId} onClose={()=>setDetails(null)}/>}
   </div>);
 }

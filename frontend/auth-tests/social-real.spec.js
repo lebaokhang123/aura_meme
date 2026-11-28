@@ -39,7 +39,7 @@ test('crud text, category/search/Hot, emoji comment, reaction, edit, delete and 
   expect(result.status(),kind+' reaction HTTP status').toBe(200);
   await expect(card.locator('[data-reaction-pill='+kind+']')).toContainText('1');await expect(card.locator('[data-reaction-pill]')).toHaveCount(1);
  }
- await card.locator('[data-reaction-pill=angry]').click();await expect(card.locator('[data-reaction-pill]')).toHaveCount(0);
+ await card.getByRole('button',{name:'Thả biểu cảm',exact:true}).click();await page.locator('[data-reaction=angry]').click();await expect(card.locator('[data-reaction-pill]')).toHaveCount(0);
  await card.getByRole('button',{name:'Bình luận',exact:true}).click();
  await card.getByLabel('Nội dung bình luận').fill('Social E2E Comment 🔥');await card.getByRole('button',{name:/^Gửi/}).click();
  const row=card.locator('[data-comment-id]').filter({hasText:'Social E2E Comment'});await expect(row).toHaveCount(1);
@@ -47,7 +47,7 @@ test('crud text, category/search/Hot, emoji comment, reaction, edit, delete and 
   await row.getByRole('button',{name:'Thả biểu cảm bình luận'}).click();await page.locator('[data-reaction='+kind+']').click();
   await expect(row.locator('[data-reaction-pill='+kind+']')).toContainText('1');await expect(row.locator('[data-reaction-pill]')).toHaveCount(1);
  }
- await row.locator('[data-reaction-pill=angry]').click();await expect(row.locator('[data-reaction-pill]')).toHaveCount(0);
+ await row.getByRole('button',{name:'Thả biểu cảm bình luận'}).click();await page.locator('[data-reaction=angry]').click();await expect(row.locator('[data-reaction-pill]')).toHaveCount(0);
  await page.goto('/?q=cong+nghe&category=gaming&sort=hot');await expect(page.locator('[data-post-id]')).toHaveCount(1);
  await page.reload();await expect(page.locator('[data-post-id]')).toHaveCount(1);
  const edited=page.locator('[data-post-id="'+id+'"]');await edited.getByRole('button',{name:'Tùy chọn bài viết'}).click();await page.getByRole('menuitem',{name:'Sửa bài',exact:true}).click();

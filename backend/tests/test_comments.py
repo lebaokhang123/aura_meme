@@ -231,14 +231,14 @@ def test_comment_openapi_contract():
     contract = app.openapi()
     nested = contract["paths"]["/api/v1/posts/{post_id}/comments"]
     assert set(nested) == {"get", "post"}
-    assert not nested["get"].get("security")
+    assert not nested["get"].get("security") or {} in nested["get"].get("security", [])
     assert nested["post"]["security"] == [{"sessionCookie": []}]
     delete = contract["paths"]["/api/v1/comments/{comment_id}"]
     assert set(delete) == {"delete"}
     assert delete["delete"]["operationId"] == "deleteComment"
     assert "204" in delete["delete"]["responses"]
     assert nested["get"]["operationId"] == "listComments" and nested["post"]["operationId"] == "addComment"
-    assert {item["name"] for item in nested["get"]["parameters"]} == {"post_id", "page", "page_size", "search", "sort", "author"}
+    assert {item["name"] for item in nested["get"]["parameters"]} == {"post_id", "page", "page_size", "search", "sort", "author", "include_interactions"}
     for operation in [nested["post"], delete["delete"]]:
         assert {"name": "X-CSRF-Token", "in": "header", "required": True, "schema": {"type": "string"}} in operation["parameters"]
         assert {"401", "403", "404", "422", "429", "500"} <= set(operation["responses"])

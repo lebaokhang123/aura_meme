@@ -128,9 +128,16 @@ Table comments {
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
   deleted_at timestamptz [note: 'Chưa soft delete']
+  parent_comment_id uuid [note: 'H07 | Bình luận gốc của thread (1 cấp)']
+  reply_to_comment_id uuid [note: 'H07 | Bình luận thực sự được trả lời']
+  reply_to_user_id uuid [note: 'H07 | Tác giả bình luận được trả lời']
 
   Note: 'P0 | Bài viết, danh mục, bình luận, media, liên hệ'
 }
+
+Ref: comments.parent_comment_id > comments.id [delete: restrict]
+Ref: comments.reply_to_comment_id > comments.id [delete: restrict]
+Ref: comments.reply_to_user_id > users.id [delete: set null]
 
 Table post_reactions {
   post_id uuid [not null]
