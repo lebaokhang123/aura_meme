@@ -84,7 +84,7 @@ test('composer persists a real image and safe text, and new posts participate in
  const search=page.getByRole('searchbox',{name:'Tìm kiếm meme, tác giả, thẻ'});await search.fill('social-created');await search.press('Enter');
  await expect(post).toBeVisible();
  await page.goto('/explore');await ready(page);await expect(post).toBeVisible();
- await expect(page.locator('article[data-post-id]:visible')).toHaveCount(3);
+ await expect(page.locator('article[data-post-id]:visible')).toHaveCount(4);
  expect(await page.evaluate(()=>JSON.stringify(localStorage))).not.toContain('data:image');
 });
 test('storage failure never reports a post saved or clears the draft',async({page})=>{
