@@ -1,5 +1,6 @@
 // AuraMeme - M0.3 Database Design (DBML)
 // Canonical specification: docs/design/03-database-design.md
+// MVP v1.0.0 Release Baseline: revision 0021_comment_replies
 // One PostgreSQL database, 7 logical groups. TableGroup DOES NOT create SQL schemas.
 // P0: university blog | P1: Aura & Vault | P2: extensions.
 // This is a DESIGN, not evidence of executed migrations.

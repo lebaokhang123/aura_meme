@@ -1,2 +1,8 @@
 # Stitch originals are byte-verified by manifest.json on every platform.
 frontend/public/stitch-original/** -text
+
+# Exclude local agent/launcher files from git release archives while keeping them in the workspace.
+AGENTS.md export-ignore
+run.bat export-ignore
+run_qa.bat export-ignore
+

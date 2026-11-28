@@ -804,3 +804,8 @@ Hotfix 23/11/2026 giữ schema 0014 và DBML. Khóa User trong transaction để
 ### H07 Comment Replies (`0021_comment_replies`)
 
 `comments` bổ sung `parent_comment_id` (`UUID`, FK `comments.id ON DELETE RESTRICT`, index), `reply_to_comment_id` (`UUID`, FK `comments.id ON DELETE RESTRICT`), `reply_to_user_id` (`UUID`, FK `users.id ON DELETE SET NULL`), kèm các constraint `ck_comments_no_self_parent`, `ck_comments_no_self_reply_to`, `ck_comments_reply_parent_pair` và composite index `ix_comments_post_parent_created (post_id, parent_comment_id, created_at, id)`. Bình luận trả lời chỉ 1 cấp (reply vào comment con vẫn neo về `parent_comment_id` gốc); không xóa vật lý bằng CASCADE để bảo toàn lịch sử kiểm duyệt và Aura. `downgrade()` chặn fail-closed nếu còn dữ liệu reply.
+
+### Mốc đóng băng Schema MVP v1.0.0
+
+- Revision phát hành chính thức: `0021_comment_replies` (đã vá naming `op.f(...)` cho CHECK constraints tại `0019`, `0020`, `0021` trong PR #55).
+- Cổng kiểm thử migration từ DB trống (`backend/tests/test_migrations.py`): 64/64 PASS trên PostgreSQL cô lập; cài đặt runtime mới khởi tạo schema qua `alembic upgrade head` (yêu cầu biến môi trường DB đích hợp lệ).

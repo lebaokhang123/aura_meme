@@ -7,6 +7,7 @@ argon2-cffi==25.1.0
 argon2-cffi-bindings==26.1.0
 certifi==2026.10.23
 cffi==2.1.1
+charset-normalizer==3.5.3
 click==8.5.0
 colorama==0.4.6
 dnspython==2.9.1
@@ -24,6 +25,7 @@ opentelemetry-api==1.45.2
 packaging==26.3
 pillow==13.0.0
 pluggy==1.7.0
+psutil==7.2.2
 psycopg==3.3.6
 psycopg-binary==3.3.6
 pycparser==3.12
@@ -31,11 +33,11 @@ pydantic==2.14.2
 pydantic-settings==2.16.2
 pydantic_core==2.50.2
 Pygments==2.21.0
-PyMuPDF==2.1
 pypdf==7.1.1
 pytest==9.2.0
 python-dotenv==1.2.4
 python-multipart==0.0.33
+reportlab==5.1.2
 SQLAlchemy==2.0.55
 starlette==1.10.0
 typing-inspection==0.4.4

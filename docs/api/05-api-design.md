@@ -287,3 +287,7 @@ Checkout và History lấy detail cùng lịch sử success của tài khoản t
 - `GET /api/v1/posts/{post_id}/comments/{comment_id}/locate`: Định vị trực tiếp `root_comment_id` và `is_reply` cho deep link `/posts/{post_id}?comment={comment_id}`.
 - `POST /api/v1/posts/{post_id}/comments`: Hỗ trợ `parent_comment_id` (tự động đưa về thread 1 cấp và lưu `reply_to_comment_id`, `reply_to_user_id`), kiểm tra cùng bài viết (422), kiểm tra idempotency `request_id` (409 nếu lệch parent), tạo notification reply trong cùng transaction (không trùng với notification chủ bài viết).
 - `PUT /api/v1/comments/{comment_id}/reactions`: Bổ sung `reaction` notification cho tác giả comment (dedupe theo `(comment_id, actor_user_id)`, không tự thông báo, không cộng EXP).
+
+### MVP v1.0.0 API Freeze
+
+- Toàn bộ 93 đường dẫn API trên `app.main:app` đã được đóng băng cho bản phát hành MVP v1.0.0 và đồng bộ 1:1 với `docs/api/05-openapi.yaml` (bao gồm `/api/v1/admin/orders/{order_id}/receipt.pdf` và `?format=png` sử dụng ReportLab/Pillow).

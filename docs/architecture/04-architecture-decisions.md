@@ -311,3 +311,20 @@ CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute 
   4. **H07.4 Notifications:** Them reply notification (`type='comment'`, `payload.action='reply'`, khong trung khi reply target dong thoi la chu bai viet) va comment reaction notification (`dedupe_key=comment-reaction:{cid}:{uid}`, khong EXP). Hoan thien badge kiem duyet cu the trong `NotificationsDropdown.jsx`.
   5. **H07.5 Post Detail & Share:** Bo sung route `/posts/{UUID}` (`PostDetailPage.jsx`), endpoint `/locate`, canonical share link `/posts/{UUID}`, van giu ho tro deep link cu `/#post-UUID`.
   6. **Learning Check:** `PENDING OWNER`.
+
+
+## ADR-Release-v1.0.0: MIT License, Release Archive Exclusions & License Scope (`chore/official-release-v1`)
+
+- **Trang thai:** Da chuan bi tren nhanh `chore/official-release-v1` (Feature Freeze MVP v1.0.0).
+- **Quyet dinh:**
+  1. **Giay phep ma nguon mo (`LICENSE`):** Ap dung **MIT License**, `Copyright (c) 2026 lebaokhang123` cho ma nguon AuraMeme.
+  2. **Loai tru khoi Release Archive (`.gitattributes` `export-ignore`):** Khong dua `AGENTS.md`, `run.bat` va `run_qa.bat` vao source release archives (`git archive`), nhung van giu nguyen cac tep nay trong workspace phat trien local.
+  3. **Kiem ke pham vi License & Third-party:**
+     - **Thay the PyMuPDF (AGPL-3.0):** Da loai bo hoan toan `PyMuPDF` khoi runtime, tests va dependency manifests (`pyproject.toml`, `requirements-ci.txt`). Thay the bang **ReportLab** (`BSD`, sinh PDF A4 Roboto Unicode) va **Pillow** (`MIT-CMU`, render PNG preview `?format=png` cho Admin), ket hop `pypdf` (`BSD-3-Clause`) trong test.
+     - Frontend/Backend permissive dependencies: React 19 / Vite 7 / jsPDF (MIT), Playwright (Apache-2.0), FastAPI / Pydantic / SQLAlchemy / Alembic / charset-normalizer (MIT), ReportLab / Uvicorn / httpx / pypdf (BSD / BSD-3-Clause), Pillow (MIT-CMU), Roboto TTF nhung (Apache-2.0), Lucian UX/UI Prompt adaptations (MIT, Seokwoooo).
+     - `psycopg` / `psycopg-binary`: `LGPL-3.0-only`.
+     - **Media & Demo Assets (`frontend/ASSET_SOURCES.md`, `frontend/public/third-party-notices.txt`):** Giay phep MIT cua ma nguon khong cap quyen thuong hieu hoac ban quyen ben thu ba doi voi logo thanh toan (`paypal.png`, `credit_card.png`), anh demo (`khang.jpg`, `kien.jpg`, `gigachad.jpg`), hoac tham chieu Stitch. Bo 70 meme + 5 background Vault rieng tu va `backend/demo.local` khong nam trong repository cong khai. Quet toan bo Git history: khong phat hien credential/secret that.
+  4. **Chinh sach kiem thu Workspace vs Release Archive:**
+     - **Workspace / CI (`pytest -m "not integration" -q`):** Chay day du bao gom `tests/test_launcher.py` (yeu cau `run.bat` trong workspace phat trien, khong che giau loi neu thieu `run.bat`).
+     - **Distribution / Release Archive (`pytest -m "not integration" --ignore=tests/test_launcher.py -q`):** Bo qua `tests/test_launcher.py` khi chay tu source archive vi `run.bat` duoc loai tru chu dich qua `.gitattributes` `export-ignore`.
+  5. **Learning Check:** `PENDING OWNER`.

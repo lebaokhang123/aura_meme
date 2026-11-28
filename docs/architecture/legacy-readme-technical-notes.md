@@ -42,3 +42,12 @@ Tài liệu này lưu trữ toàn bộ các ghi chú kỹ thuật nội bộ, ch
 - Frontend build & unit test: Đảm bảo mã nguồn React biên dịch sạch và vượt qua các bài kiểm tra giao diện.
 - Browser regression test: Kiểm thử tự động với Playwright headless Chromium.
 - Nghiêm cấm can thiệp hoặc tự ý chạy migration phá hủy trên cơ sở dữ liệu production/demo.
+
+---
+
+## 5. Chuẩn bị phát hành MVP v1.0.0 (`chore/official-release-v1`)
+
+- Mã nguồn phát hành dưới giấy phép **MIT License** (`Copyright (c) 2026 lebaokhang123`).
+- `.gitattributes` loại trừ `AGENTS.md`, `run.bat` và `run_qa.bat` khỏi Git release archives (`export-ignore`) nhưng vẫn giữ đầy đủ trong workspace phát triển.
+- Đã thay thế `PyMuPDF` (AGPL-3.0) bằng `ReportLab` (BSD) và `Pillow` (MIT-CMU) cho sinh PDF và PNG preview biên lai; `psycopg`/`psycopg-binary` dùng `LGPL-3.0-only`; phạm vi third-party media/branding ghi nhận tại `frontend/ASSET_SOURCES.md` và `frontend/public/third-party-notices.txt`.
+- Kiểm thử từ source archive dùng `pytest -m "not integration" --ignore=tests/test_launcher.py -q` (do `run.bat` không nằm trong archive); workspace/CI vẫn chạy đầy đủ `tests/test_launcher.py`.

@@ -1178,11 +1178,10 @@ def admin_read_order_receipt_pdf(
         raise AuthError(500, 'RENDER_ERROR', 'Unable to generate receipt PDF.')
 
     if format == 'png':
-        import fitz
-        doc = fitz.open(stream=pdf_bytes, filetype='pdf')
-        page = doc.load_page(0)
-        pix = page.get_pixmap(dpi=180)
-        png_bytes = pix.tobytes('png')
+        from .receipt_pdf import generate_receipt_png_bytes
+        png_bytes = generate_receipt_png_bytes(order_dict, username=username, recent_successful_orders=recent_dicts, dpi=180)
+        if not png_bytes:
+            raise AuthError(500, 'RENDER_ERROR', 'Unable to generate receipt PNG.')
         return Response(
             content=png_bytes,
             media_type='image/png',

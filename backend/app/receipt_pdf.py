@@ -1,36 +1,54 @@
 """Authoritative backend A4 PDF receipt renderer matching frontend/src/receipt-pdf.js.
 
-Uses PyMuPDF (fitz) with the embedded Apache-2.0 Google Roboto Regular & Bold Unicode TTF fonts
-so Vietnamese diacritics, layout, issuer metadata, and sandbox disclaimers match the web PDF.
+Uses ReportLab (BSD) for PDF generation and Pillow (MIT-CMU) for PNG preview rendering,
+both using the embedded Apache-2.0 Google Roboto Regular & Bold Unicode TTF fonts so
+Vietnamese diacritics, layout, issuer metadata, and sandbox disclaimers match the web PDF.
 """
 from __future__ import annotations
 
 import base64
 from datetime import datetime, timezone
 from functools import lru_cache
+from io import BytesIO
 from pathlib import Path
 import re
 from typing import Any
 
-import pymupdf as fitz
+from PIL import Image, ImageDraw, ImageFont
+from reportlab.lib.colors import Color
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
 
 MM = 72.0 / 25.4
-A4_WIDTH_PT = 210.0 * MM
-A4_HEIGHT_PT = 297.0 * MM
+A4_WIDTH_MM = 210.0
+A4_HEIGHT_MM = 297.0
+A4_WIDTH_PT = A4_WIDTH_MM * MM
+A4_HEIGHT_PT = A4_HEIGHT_MM * MM
 
 ROBOTO_JS_PATH = Path(__file__).resolve().parents[2] / "frontend" / "src" / "fonts" / "roboto-fonts.js"
 
+_FONTS_REGISTERED = False
+
 
 @lru_cache(maxsize=1)
-def _load_roboto_fonts() -> tuple[bytes, bytes, fitz.Font, fitz.Font]:
+def _load_roboto_font_bytes() -> tuple[bytes, bytes]:
     content = ROBOTO_JS_PATH.read_text(encoding="utf-8")
     reg_match = re.search(r'ROBOTO_REGULAR_B64\s*=\s*"([^"]+)"', content)
     bold_match = re.search(r'ROBOTO_BOLD_B64\s*=\s*"([^"]+)"', content)
     if not reg_match or not bold_match:
         raise RuntimeError("Unable to load embedded Roboto fonts from roboto-fonts.js")
-    reg_bytes = base64.b64decode(reg_match.group(1))
-    bold_bytes = base64.b64decode(bold_match.group(1))
-    return reg_bytes, bold_bytes, fitz.Font(fontbuffer=reg_bytes), fitz.Font(fontbuffer=bold_bytes)
+    return base64.b64decode(reg_match.group(1)), base64.b64decode(bold_match.group(1))
+
+
+def _ensure_reportlab_fonts() -> None:
+    global _FONTS_REGISTERED
+    if _FONTS_REGISTERED:
+        return
+    reg_bytes, bold_bytes = _load_roboto_font_bytes()
+    pdfmetrics.registerFont(TTFont("Roboto", BytesIO(reg_bytes)))
+    pdfmetrics.registerFont(TTFont("RobotoBold", BytesIO(bold_bytes)))
+    _FONTS_REGISTERED = True
 
 
 def resolve_payment_method_label(
@@ -80,51 +98,21 @@ def format_receipt_date(val: Any) -> str:
     return dt.strftime("%d/%m/%Y %H:%M:%S")
 
 
-def _rgb(r: int, g: int, b: int) -> tuple[float, float, float]:
-    return (r / 255.0, g / 255.0, b / 255.0)
-
-
-def _draw_text(
-    page: fitz.Page,
-    text: str,
-    x_mm: float,
-    y_mm: float,
-    *,
-    bold: bool = False,
-    size: float = 8.5,
-    color: tuple[int, int, int] = (17, 24, 39),
-    align: str = "left",
-) -> None:
-    _, _, font_reg, font_bold = _load_roboto_fonts()
-    font_obj = font_bold if bold else font_reg
-    font_name = "RobotoBold" if bold else "Roboto"
-    s = str(text or "")
-    w = font_obj.text_length(s, fontsize=size)
-    x_pt = x_mm * MM
-    if align == "right":
-        x_pt -= w
-    elif align == "center":
-        x_pt -= w / 2.0
-    page.insert_text(
-        fitz.Point(x_pt, y_mm * MM),
-        s,
-        fontname=font_name,
-        fontsize=size,
-        color=_rgb(*color),
-    )
+def _rl_color(rgb: tuple[int, int, int]) -> Color:
+    return Color(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
 
 
 def _wrap_text(text: str, max_width_mm: float, *, bold: bool = False, size: float = 6.5) -> list[str]:
-    _, _, font_reg, font_bold = _load_roboto_fonts()
-    font_obj = font_bold if bold else font_reg
+    _ensure_reportlab_fonts()
+    font_name = "RobotoBold" if bold else "Roboto"
     max_pt = max_width_mm * MM
     s = str(text or "")
-    if font_obj.text_length(s, fontsize=size) <= max_pt:
+    if pdfmetrics.stringWidth(s, font_name, size) <= max_pt:
         return [s]
     lines: list[str] = []
     cur = ""
     for ch in s:
-        if font_obj.text_length(cur + ch, fontsize=size) > max_pt and cur:
+        if pdfmetrics.stringWidth(cur + ch, font_name, size) > max_pt and cur:
             lines.append(cur)
             cur = ch
         else:
@@ -134,21 +122,18 @@ def _wrap_text(text: str, max_width_mm: float, *, bold: bool = False, size: floa
     return lines or ["—"]
 
 
-def generate_receipt_pdf_bytes(
+def _build_receipt_pages(
     order: dict[str, Any],
     *,
     username: str = "user",
     recent_successful_orders: list[dict[str, Any]] | None = None,
-) -> bytes | None:
-    """Generate a single/multi-page A4 PDF receipt identical in content & structure to receipt-pdf.js.
-
-    Returns None if order status is not 'success' or 'completed'.
-    """
+) -> list[list[tuple[Any, ...]]] | None:
+    """Build declarative A4 drawing operations for each page of the receipt."""
     status = str(order.get("status") or "").lower()
     if status not in ("success", "completed"):
         return None
 
-    reg_bytes, bold_bytes, _, _ = _load_roboto_fonts()
+    _ensure_reportlab_fonts()
 
     order_code = str(order.get("order_code") or order.get("orderCode") or "AM-ORDER")
     tier = str(order.get("tier") or "plus").lower().replace("aura ", "")
@@ -179,40 +164,72 @@ def generate_receipt_pdf_bytes(
     date_formatted = format_receipt_date(raw_date)
     date_only = date_formatted.split(" ")[0]
 
-    doc = fitz.open()
+    pages: list[list[tuple[Any, ...]]] = [[]]
+    page = pages[0]
 
-    def new_styled_page() -> fitz.Page:
-        p = doc.new_page(width=A4_WIDTH_PT, height=A4_HEIGHT_PT)
-        p.insert_font(fontname="Roboto", fontbuffer=reg_bytes)
-        p.insert_font(fontname="RobotoBold", fontbuffer=bold_bytes)
-        return p
+    def draw_text(
+        p: list[tuple[Any, ...]],
+        text: str,
+        x_mm: float,
+        y_mm: float,
+        *,
+        bold: bool = False,
+        size: float = 8.5,
+        color: tuple[int, int, int] = (17, 24, 39),
+        align: str = "left",
+    ) -> None:
+        p.append(("text", str(text or ""), x_mm, y_mm, bold, size, color, align))
 
-    page = new_styled_page()
+    def draw_rect(
+        p: list[tuple[Any, ...]],
+        x1_mm: float,
+        y1_mm: float,
+        x2_mm: float,
+        y2_mm: float,
+        *,
+        stroke: tuple[int, int, int] | None = None,
+        fill: tuple[int, int, int] | None = None,
+        width_mm: float = 0.25,
+        radius_mm: float = 0.0,
+    ) -> None:
+        p.append(("rect", x1_mm, y1_mm, x2_mm, y2_mm, stroke, fill, width_mm, radius_mm))
+
+    def draw_line(
+        p: list[tuple[Any, ...]],
+        x1_mm: float,
+        y1_mm: float,
+        x2_mm: float,
+        y2_mm: float,
+        *,
+        color: tuple[int, int, int],
+        width_mm: float = 0.25,
+    ) -> None:
+        p.append(("line", x1_mm, y1_mm, x2_mm, y2_mm, color, width_mm))
+
     accent_color = (245, 158, 11) if is_prime else (6, 182, 212)
 
     # 1. HEADER
-    _draw_text(page, "AURAMEME", 20, 26, bold=True, size=22, color=(17, 24, 39))
-    _draw_text(page, "AuraMeme Community", 20, 31.5, bold=False, size=8.5, color=(107, 114, 128))
-    _draw_text(page, "https://aurameme.com", 20, 36, bold=False, size=8.5, color=(107, 114, 128))
+    draw_text(page, "AURAMEME", 20, 26, bold=True, size=22, color=(17, 24, 39))
+    draw_text(page, "AuraMeme Community", 20, 31.5, bold=False, size=8.5, color=(107, 114, 128))
+    draw_text(page, "https://aurameme.com", 20, 36, bold=False, size=8.5, color=(107, 114, 128))
 
-    _draw_text(page, "BIÊN LAI THANH TOÁN", 190, 25, bold=True, size=18, color=(17, 24, 39), align="right")
-    _draw_text(page, "PAYMENT RECEIPT", 190, 30, bold=False, size=8.5, color=(107, 114, 128), align="right")
+    draw_text(page, "BIÊN LAI THANH TOÁN", 190, 25, bold=True, size=18, color=(17, 24, 39), align="right")
+    draw_text(page, "PAYMENT RECEIPT", 190, 30, bold=False, size=8.5, color=(107, 114, 128), align="right")
 
     # PAID Badge
-    badge_rect = fitz.Rect(146 * MM, 33.5 * MM, 190 * MM, 40 * MM)
-    page.draw_rect(badge_rect, color=_rgb(16, 185, 129), fill=_rgb(236, 253, 245), width=0.3 * MM, radius=0.15)
-    _draw_text(page, "PAID / ĐÃ THANH TOÁN", 168, 38, bold=True, size=7.5, color=(4, 120, 87), align="center")
+    draw_rect(page, 146, 33.5, 190, 40, stroke=(16, 185, 129), fill=(236, 253, 245), width_mm=0.3, radius_mm=1.0)
+    draw_text(page, "PAID / ĐÃ THANH TOÁN", 168, 38, bold=True, size=7.5, color=(4, 120, 87), align="center")
 
-    page.draw_line(fitz.Point(20 * MM, 43 * MM), fitz.Point(190 * MM, 43 * MM), color=_rgb(229, 231, 235), width=0.3 * MM)
+    draw_line(page, 20, 43, 190, 43, color=(229, 231, 235), width_mm=0.3)
 
     # 2. METADATA SECTION
-    _draw_text(page, "ĐƠN VỊ PHÁT HÀNH / ISSUED BY", 20, 49.5, bold=True, size=7.5, color=(156, 163, 175))
-    _draw_text(page, "AuraSpark Global Inc.", 20, 56, bold=True, size=9.5, color=(31, 41, 55))
-    _draw_text(page, "AuraMeme Community", 20, 61.5, bold=False, size=8.5, color=(75, 85, 99))
-    _draw_text(page, "Hỗ trợ / Support: thothayvtv38@gmail.com", 20, 67, bold=False, size=8.5, color=(75, 85, 99))
-    _draw_text(page, "Dự án phi thương mại", 20, 73, bold=False, size=7.5, color=(156, 163, 175))
+    draw_text(page, "ĐƠN VỊ PHÁT HÀNH / ISSUED BY", 20, 49.5, bold=True, size=7.5, color=(156, 163, 175))
+    draw_text(page, "AuraSpark Global Inc.", 20, 56, bold=True, size=9.5, color=(31, 41, 55))
+    draw_text(page, "AuraMeme Community", 20, 61.5, bold=False, size=8.5, color=(75, 85, 99))
+    draw_text(page, "Hỗ trợ / Support: thothayvtv38@gmail.com", 20, 67, bold=False, size=8.5, color=(75, 85, 99))
+    draw_text(page, "Dự án phi thương mại", 20, 73, bold=False, size=7.5, color=(156, 163, 175))
 
-    _draw_text(page, "THÔNG TIN GIAO DỊCH / TRANSACTION DETAILS", 105, 49.5, bold=True, size=7.5, color=(156, 163, 175))
+    draw_text(page, "THÔNG TIN GIAO DỊCH / TRANSACTION DETAILS", 105, 49.5, bold=True, size=7.5, color=(156, 163, 175))
     meta_rows = [
         ("Mã đơn hàng / Order Code:", order_code),
         ("Ngày thanh toán / Date:", date_formatted),
@@ -222,44 +239,42 @@ def generate_receipt_pdf_bytes(
     ]
     for idx, (lbl, val) in enumerate(meta_rows):
         cur_y = 56 + idx * 5.5
-        _draw_text(page, lbl, 105, cur_y, bold=False, size=8, color=(107, 114, 128))
+        draw_text(page, lbl, 105, cur_y, bold=False, size=8, color=(107, 114, 128))
         val_size = 7.0 if len(val) > 28 else (7.5 if len(val) > 22 else 8.0)
-        _draw_text(page, val, 190, cur_y, bold=True, size=val_size, color=(17, 24, 39), align="right")
+        draw_text(page, val, 190, cur_y, bold=True, size=val_size, color=(17, 24, 39), align="right")
 
     # 3. HIGHLIGHT PAYMENT SUMMARY BLOCK
-    summary_rect = fitz.Rect(20 * MM, 88 * MM, 190 * MM, 103 * MM)
-    page.draw_rect(summary_rect, color=_rgb(229, 231, 235), fill=_rgb(249, 250, 251), width=0.3 * MM)
-    accent_rect = fitz.Rect(20 * MM, 88 * MM, 23 * MM, 103 * MM)
-    page.draw_rect(accent_rect, color=_rgb(*accent_color), fill=_rgb(*accent_color))
+    draw_rect(page, 20, 88, 190, 103, stroke=(229, 231, 235), fill=(249, 250, 251), width_mm=0.3)
+    draw_rect(page, 20, 88, 23, 103, stroke=accent_color, fill=accent_color, width_mm=0.3)
 
-    _draw_text(page, f"{amount_usd_formatted} paid on {date_only}", 27, 97.5, bold=True, size=12, color=(17, 24, 39))
-    _draw_text(page, f"Giá tham khảo: {amount_vnd_formatted}", 186, 97.5, bold=False, size=8.5, color=(107, 114, 128), align="right")
+    draw_text(page, f"{amount_usd_formatted} paid on {date_only}", 27, 97.5, bold=True, size=12, color=(17, 24, 39))
+    draw_text(page, f"Giá tham khảo: {amount_vnd_formatted}", 186, 97.5, bold=False, size=8.5, color=(107, 114, 128), align="right")
 
     # 4. ITEMIZED SERVICES TABLE
     table_y = 112.0
-    page.draw_rect(fitz.Rect(20 * MM, table_y * MM, 190 * MM, (table_y + 7.5) * MM), color=None, fill=_rgb(243, 244, 246))
-    page.draw_line(fitz.Point(20 * MM, table_y * MM), fitz.Point(190 * MM, table_y * MM), color=_rgb(209, 213, 219), width=0.25 * MM)
-    page.draw_line(fitz.Point(20 * MM, (table_y + 7.5) * MM), fitz.Point(190 * MM, (table_y + 7.5) * MM), color=_rgb(209, 213, 219), width=0.25 * MM)
+    draw_rect(page, 20, table_y, 190, table_y + 7.5, fill=(243, 244, 246))
+    draw_line(page, 20, table_y, 190, table_y, color=(209, 213, 219), width_mm=0.25)
+    draw_line(page, 20, table_y + 7.5, 190, table_y + 7.5, color=(209, 213, 219), width_mm=0.25)
 
-    _draw_text(page, "DỊCH VỤ / DESCRIPTION", 23, table_y + 5.2, bold=True, size=7.2, color=(75, 85, 99))
-    _draw_text(page, "THỜI HẠN / DURATION", 80, table_y + 5.2, bold=True, size=7.2, color=(75, 85, 99))
-    _draw_text(page, "SL / QTY", 120, table_y + 5.2, bold=True, size=7.2, color=(75, 85, 99), align="center")
-    _draw_text(page, "ĐƠN GIÁ / PRICE", 153, table_y + 5.2, bold=True, size=7.2, color=(75, 85, 99), align="right")
-    _draw_text(page, "THÀNH TIỀN / AMOUNT", 188, table_y + 5.2, bold=True, size=7.2, color=(75, 85, 99), align="right")
+    draw_text(page, "DỊCH VỤ / DESCRIPTION", 23, table_y + 5.2, bold=True, size=7.2, color=(75, 85, 99))
+    draw_text(page, "THỜI HẠN / DURATION", 80, table_y + 5.2, bold=True, size=7.2, color=(75, 85, 99))
+    draw_text(page, "SL / QTY", 120, table_y + 5.2, bold=True, size=7.2, color=(75, 85, 99), align="center")
+    draw_text(page, "ĐƠN GIÁ / PRICE", 153, table_y + 5.2, bold=True, size=7.2, color=(75, 85, 99), align="right")
+    draw_text(page, "THÀNH TIỀN / AMOUNT", 188, table_y + 5.2, bold=True, size=7.2, color=(75, 85, 99), align="right")
 
     row_y = table_y + 7.5
-    _draw_text(page, f"Gói hội viên {tier_title}", 23, row_y + 5.5, bold=True, size=9, color=(17, 24, 39))
+    draw_text(page, f"Gói hội viên {tier_title}", 23, row_y + 5.5, bold=True, size=9, color=(17, 24, 39))
     tier_benefit = (
         "Hội viên 365 ngày · Dấu ấn Aura Prime hoàng kim"
         if is_prime
         else "Hội viên 30 ngày · Dấu ấn Aura Plus xanh ngọc"
     )
-    _draw_text(page, f"{tier_title} Subscription · {tier_benefit}", 23, row_y + 10.5, bold=False, size=7.5, color=(107, 114, 128))
-    _draw_text(page, f"{duration_days} ngày ({duration_days}d)", 80, row_y + 7, bold=False, size=8, color=(55, 65, 81))
-    _draw_text(page, "1", 120, row_y + 7, bold=False, size=8, color=(55, 65, 81), align="center")
-    _draw_text(page, amount_usd_formatted, 153, row_y + 7, bold=False, size=8, color=(55, 65, 81), align="right")
-    _draw_text(page, amount_usd_formatted, 188, row_y + 7, bold=True, size=8, color=(17, 24, 39), align="right")
-    page.draw_line(fitz.Point(20 * MM, (row_y + 15) * MM), fitz.Point(190 * MM, (row_y + 15) * MM), color=_rgb(229, 231, 235), width=0.25 * MM)
+    draw_text(page, f"{tier_title} Subscription · {tier_benefit}", 23, row_y + 10.5, bold=False, size=7.5, color=(107, 114, 128))
+    draw_text(page, f"{duration_days} ngày ({duration_days}d)", 80, row_y + 7, bold=False, size=8, color=(55, 65, 81))
+    draw_text(page, "1", 120, row_y + 7, bold=False, size=8, color=(55, 65, 81), align="center")
+    draw_text(page, amount_usd_formatted, 153, row_y + 7, bold=False, size=8, color=(55, 65, 81), align="right")
+    draw_text(page, amount_usd_formatted, 188, row_y + 7, bold=True, size=8, color=(17, 24, 39), align="right")
+    draw_line(page, 20, row_y + 15, 190, row_y + 15, color=(229, 231, 235), width_mm=0.25)
 
     # 5. TOTALS SECTION
     total_start_y = row_y + 20
@@ -270,24 +285,24 @@ def generate_receipt_pdf_bytes(
     ]
     for idx, (lbl, val, is_final, col) in enumerate(totals):
         cur_y = total_start_y + idx * 5.5
-        _draw_text(page, lbl, 112, cur_y, bold=is_final, size=9 if is_final else 8, color=col)
-        _draw_text(page, val, 187, cur_y, bold=is_final, size=9 if is_final else 8, color=col, align="right")
+        draw_text(page, lbl, 112, cur_y, bold=is_final, size=9 if is_final else 8, color=col)
+        draw_text(page, val, 187, cur_y, bold=is_final, size=9 if is_final else 8, color=col, align="right")
 
-    _draw_text(page, f"Giá tham khảo: ~{amount_vnd_formatted}", 187, total_start_y + 19, bold=False, size=7.5, color=(156, 163, 175), align="right")
+    draw_text(page, f"Giá tham khảo: ~{amount_vnd_formatted}", 187, total_start_y + 19, bold=False, size=7.5, color=(156, 163, 175), align="right")
 
     # 6. PAYMENT HISTORY SECTION (up to 10 recent successful orders)
     hist_y = total_start_y + 27
-    _draw_text(page, "LỊCH SỬ THANH TOÁN / PAYMENT HISTORY (10 GẦN NHẤT / LATEST 10)", 20, hist_y, bold=True, size=8.5, color=(31, 41, 55))
-    page.draw_line(fitz.Point(20 * MM, (hist_y + 2.5) * MM), fitz.Point(190 * MM, (hist_y + 2.5) * MM), color=_rgb(209, 213, 219), width=0.25 * MM)
+    draw_text(page, "LỊCH SỬ THANH TOÁN / PAYMENT HISTORY (10 GẦN NHẤT / LATEST 10)", 20, hist_y, bold=True, size=8.5, color=(31, 41, 55))
+    draw_line(page, 20, hist_y + 2.5, 190, hist_y + 2.5, color=(209, 213, 219), width_mm=0.25)
 
-    def draw_hist_header(p: fitz.Page, start_y: float) -> None:
-        p.draw_rect(fitz.Rect(20 * MM, (start_y + 3) * MM, 190 * MM, (start_y + 9) * MM), color=None, fill=_rgb(249, 250, 251))
-        _draw_text(p, "PHƯƠNG THỨC / METHOD", 23, start_y + 7.2, bold=True, size=6.8, color=(107, 114, 128))
-        _draw_text(p, "NGÀY / DATE", 62, start_y + 7.2, bold=True, size=6.8, color=(107, 114, 128))
-        _draw_text(p, "SỐ TIỀN / AMOUNT", 113, start_y + 7.2, bold=True, size=6.8, color=(107, 114, 128), align="right")
-        _draw_text(p, "TRẠNG THÁI / STATUS", 132, start_y + 7.2, bold=True, size=6.8, color=(107, 114, 128), align="center")
-        _draw_text(p, "MÃ THAM CHIẾU / REF", 188, start_y + 7.2, bold=True, size=6.8, color=(107, 114, 128), align="right")
-        p.draw_line(fitz.Point(20 * MM, (start_y + 9) * MM), fitz.Point(190 * MM, (start_y + 9) * MM), color=_rgb(243, 244, 246), width=0.2 * MM)
+    def draw_hist_header(p: list[tuple[Any, ...]], start_y: float) -> None:
+        draw_rect(p, 20, start_y + 3, 190, start_y + 9, fill=(249, 250, 251))
+        draw_text(p, "PHƯƠNG THỨC / METHOD", 23, start_y + 7.2, bold=True, size=6.8, color=(107, 114, 128))
+        draw_text(p, "NGÀY / DATE", 62, start_y + 7.2, bold=True, size=6.8, color=(107, 114, 128))
+        draw_text(p, "SỐ TIỀN / AMOUNT", 113, start_y + 7.2, bold=True, size=6.8, color=(107, 114, 128), align="right")
+        draw_text(p, "TRẠNG THÁI / STATUS", 132, start_y + 7.2, bold=True, size=6.8, color=(107, 114, 128), align="center")
+        draw_text(p, "MÃ THAM CHIẾU / REF", 188, start_y + 7.2, bold=True, size=6.8, color=(107, 114, 128), align="right")
+        draw_line(p, 20, start_y + 9, 190, start_y + 9, color=(243, 244, 246), width_mm=0.2)
 
     draw_hist_header(page, hist_y)
 
@@ -329,44 +344,37 @@ def generate_receipt_pdf_bytes(
         row_h = max(5.8, len(ref_lines) * 2.7 + 3.0)
 
         if cur_y + row_h > 260:
-            page = new_styled_page()
+            page = []
+            pages.append(page)
             cur_y = 20.0
-            _draw_text(page, "LỊCH SỬ THANH TOÁN / PAYMENT HISTORY (Tiếp theo / Continued)", 20, cur_y, bold=True, size=8.5, color=(31, 41, 55))
-            page.draw_line(fitz.Point(20 * MM, (cur_y + 2.5) * MM), fitz.Point(190 * MM, (cur_y + 2.5) * MM), color=_rgb(209, 213, 219), width=0.25 * MM)
+            draw_text(page, "LỊCH SỬ THANH TOÁN / PAYMENT HISTORY (Tiếp theo / Continued)", 20, cur_y, bold=True, size=8.5, color=(31, 41, 55))
+            draw_line(page, 20, cur_y + 2.5, 190, cur_y + 2.5, color=(209, 213, 219), width_mm=0.25)
             draw_hist_header(page, cur_y)
             cur_y += 9.0
 
         text_y = cur_y + 4.2
-        _draw_text(page, h_provider, 23, text_y, bold=False, size=7.0, color=(55, 65, 81))
-        _draw_text(page, h_date, 62, text_y, bold=False, size=7.2, color=(55, 65, 81))
-        _draw_text(page, h_amount, 113, text_y, bold=False, size=7.5, color=(55, 65, 81), align="right")
-        _draw_text(page, "HOÀN TẤT", 132, text_y, bold=True, size=7.2, color=(4, 120, 87), align="center")
+        draw_text(page, h_provider, 23, text_y, bold=False, size=7.0, color=(55, 65, 81))
+        draw_text(page, h_date, 62, text_y, bold=False, size=7.2, color=(55, 65, 81))
+        draw_text(page, h_amount, 113, text_y, bold=False, size=7.5, color=(55, 65, 81), align="right")
+        draw_text(page, "HOÀN TẤT", 132, text_y, bold=True, size=7.2, color=(4, 120, 87), align="center")
 
         for l_idx, line_str in enumerate(ref_lines):
-            _draw_text(page, line_str, 188, text_y + l_idx * 2.7, bold=False, size=6.5, color=(75, 85, 99), align="right")
+            draw_text(page, line_str, 188, text_y + l_idx * 2.7, bold=False, size=6.5, color=(75, 85, 99), align="right")
 
-        page.draw_line(fitz.Point(20 * MM, (cur_y + row_h) * MM), fitz.Point(190 * MM, (cur_y + row_h) * MM), color=_rgb(229, 231, 235), width=0.2 * MM)
+        draw_line(page, 20, cur_y + row_h, 190, cur_y + row_h, color=(229, 231, 235), width_mm=0.2)
         cur_y += row_h
 
     # 7. FOOTER ON ALL PAGES
-    total_pages = len(doc)
-    for p_idx in range(total_pages):
-        p = doc[p_idx]
-        p.draw_line(fitz.Point(20 * MM, 268 * MM), fitz.Point(190 * MM, 268 * MM), color=_rgb(229, 231, 235), width=0.2 * MM)
-        _draw_text(
-            p,
-            (
-                "Mô phỏng PayPal nội bộ — Không có giá trị xác nhận thanh toán thực tế."
-                if order.get("provider") == "paypal_sandbox" and txn_ref.startswith(("SIM-", "MOCK-"))
-                else "Biên lai giao dịch thử nghiệm/mô phỏng — Không có giá trị xác nhận thanh toán thực tế."
-            ),
-            20,
-            273.5,
-            bold=False,
-            size=7.5,
-            color=(156, 163, 175),
-        )
-        _draw_text(
+    total_pages = len(pages)
+    disclaimer_primary = (
+        "Mô phỏng PayPal nội bộ — Không có giá trị xác nhận thanh toán thực tế."
+        if order.get("provider") == "paypal_sandbox" and txn_ref.startswith(("SIM-", "MOCK-"))
+        else "Biên lai giao dịch thử nghiệm/mô phỏng — Không có giá trị xác nhận thanh toán thực tế."
+    )
+    for p_idx, p in enumerate(pages):
+        draw_line(p, 20, 268, 190, 268, color=(229, 231, 235), width_mm=0.2)
+        draw_text(p, disclaimer_primary, 20, 273.5, bold=False, size=7.5, color=(156, 163, 175))
+        draw_text(
             p,
             "Sandbox transaction receipt — For development and verification purposes only.",
             20,
@@ -375,7 +383,7 @@ def generate_receipt_pdf_bytes(
             size=7.5,
             color=(156, 163, 175),
         )
-        _draw_text(
+        draw_text(
             p,
             f"Trang {p_idx + 1} / {total_pages}  (Page {p_idx + 1} of {total_pages})",
             190,
@@ -386,6 +394,125 @@ def generate_receipt_pdf_bytes(
             align="right",
         )
 
-    pdf_bytes = doc.tobytes(garbage=3, deflate=True)
-    doc.close()
-    return pdf_bytes
+    return pages
+
+
+def generate_receipt_pdf_bytes(
+    order: dict[str, Any],
+    *,
+    username: str = "user",
+    recent_successful_orders: list[dict[str, Any]] | None = None,
+) -> bytes | None:
+    """Generate a single/multi-page A4 PDF receipt using ReportLab (BSD license)."""
+    pages = _build_receipt_pages(order, username=username, recent_successful_orders=recent_successful_orders)
+    if pages is None:
+        return None
+
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=(A4_WIDTH_PT, A4_HEIGHT_PT), pageCompression=1)
+    c.setTitle(f"AuraMeme Receipt {order.get('order_code') or order.get('orderCode') or ''}".strip())
+    c.setAuthor("AuraMeme Community")
+
+    for p_idx, ops in enumerate(pages):
+        if p_idx > 0:
+            c.showPage()
+        for op in ops:
+            kind = op[0]
+            if kind == "rect":
+                _, x1, y1, x2, y2, stroke, fill, width_mm, radius_mm = op
+                x_pt = x1 * MM
+                y_pt = (A4_HEIGHT_MM - y2) * MM
+                w_pt = (x2 - x1) * MM
+                h_pt = (y2 - y1) * MM
+                c.setLineWidth(width_mm * MM)
+                if stroke is not None:
+                    c.setStrokeColor(_rl_color(stroke))
+                if fill is not None:
+                    c.setFillColor(_rl_color(fill))
+                do_stroke = 1 if stroke is not None else 0
+                do_fill = 1 if fill is not None else 0
+                if radius_mm > 0:
+                    c.roundRect(x_pt, y_pt, w_pt, h_pt, radius_mm * MM, stroke=do_stroke, fill=do_fill)
+                else:
+                    c.rect(x_pt, y_pt, w_pt, h_pt, stroke=do_stroke, fill=do_fill)
+            elif kind == "line":
+                _, x1, y1, x2, y2, color, width_mm = op
+                c.setStrokeColor(_rl_color(color))
+                c.setLineWidth(width_mm * MM)
+                c.line(x1 * MM, (A4_HEIGHT_MM - y1) * MM, x2 * MM, (A4_HEIGHT_MM - y2) * MM)
+            elif kind == "text":
+                _, text, x_mm, y_mm, bold, size, color, align = op
+                font_name = "RobotoBold" if bold else "Roboto"
+                c.setFont(font_name, size)
+                c.setFillColor(_rl_color(color))
+                x_pt = x_mm * MM
+                y_pt = (A4_HEIGHT_MM - y_mm) * MM
+                if align == "right":
+                    c.drawRightString(x_pt, y_pt, text)
+                elif align == "center":
+                    c.drawCentredString(x_pt, y_pt, text)
+                else:
+                    c.drawString(x_pt, y_pt, text)
+
+    c.save()
+    return buf.getvalue()
+
+
+def generate_receipt_png_bytes(
+    order: dict[str, Any],
+    *,
+    username: str = "user",
+    recent_successful_orders: list[dict[str, Any]] | None = None,
+    dpi: int = 180,
+) -> bytes | None:
+    """Render page 1 of the A4 receipt to PNG using Pillow (MIT-CMU license)."""
+    pages = _build_receipt_pages(order, username=username, recent_successful_orders=recent_successful_orders)
+    if not pages:
+        return None
+
+    px_per_mm = dpi / 25.4
+    px_per_pt = dpi / 72.0
+    width_px = round(A4_WIDTH_MM * px_per_mm)
+    height_px = round(A4_HEIGHT_MM * px_per_mm)
+
+    img = Image.new("RGB", (width_px, height_px), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+
+    reg_bytes, bold_bytes = _load_roboto_font_bytes()
+
+    @lru_cache(maxsize=32)
+    def _pil_font(bold: bool, size_pt: float) -> ImageFont.FreeTypeFont:
+        data = bold_bytes if bold else reg_bytes
+        return ImageFont.truetype(BytesIO(data), size=max(1, round(size_pt * px_per_pt)))
+
+    for op in pages[0]:
+        kind = op[0]
+        if kind == "rect":
+            _, x1, y1, x2, y2, stroke, fill, width_mm, radius_mm = op
+            box = (x1 * px_per_mm, y1 * px_per_mm, x2 * px_per_mm, y2 * px_per_mm)
+            w_px = max(1, round(width_mm * px_per_mm)) if stroke is not None else 0
+            if radius_mm > 0:
+                draw.rounded_rectangle(box, radius=round(radius_mm * px_per_mm), fill=fill, outline=stroke, width=w_px)
+            else:
+                draw.rectangle(box, fill=fill, outline=stroke, width=w_px)
+        elif kind == "line":
+            _, x1, y1, x2, y2, color, width_mm = op
+            draw.line(
+                (x1 * px_per_mm, y1 * px_per_mm, x2 * px_per_mm, y2 * px_per_mm),
+                fill=color,
+                width=max(1, round(width_mm * px_per_mm)),
+            )
+        elif kind == "text":
+            _, text, x_mm, y_mm, bold, size, color, align = op
+            anchor = "rs" if align == "right" else ("ms" if align == "center" else "ls")
+            draw.text(
+                (x_mm * px_per_mm, y_mm * px_per_mm),
+                text,
+                font=_pil_font(bold, size),
+                fill=color,
+                anchor=anchor,
+            )
+
+    out = BytesIO()
+    img.save(out, format="PNG")
+    return out.getvalue()
