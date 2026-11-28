@@ -317,7 +317,7 @@ CLI dry-run tách các mục đã có, có thể cấp và bị chặn. Execute 
 
 - **Trang thai:** Da chuan bi tren nhanh `chore/official-release-v1` (Feature Freeze MVP v1.0.0).
 - **Quyet dinh:**
-  1. **Giay phep ma nguon mo (`LICENSE`):** Ap dung **MIT License**, `Copyright (c) 2026 Lê Bảo Khang (lebaokhang123)` cho ma nguon AuraMeme.
+  1. **Giay phep ma nguon mo (`LICENSE`):** Ap dung **MIT License**, `Copyright (c) 2026 lebaokhang123` cho ma nguon AuraMeme.
   2. **Loai tru khoi Release Archive (`.gitattributes` `export-ignore`):** Khong dua `AGENTS.md`, `run.bat` va `run_qa.bat` vao source release archives (`git archive`), nhung van giu nguyen cac tep nay trong workspace phat trien local.
   3. **Kiem ke pham vi License & Third-party:**
      - **Thay the PyMuPDF (AGPL-3.0):** Da loai bo hoan toan `PyMuPDF` khoi runtime, tests va dependency manifests (`pyproject.toml`, `requirements-ci.txt`). Thay the bang **ReportLab** (`BSD`, sinh PDF A4 Roboto Unicode) va **Pillow** (`MIT-CMU`, render PNG preview `?format=png` cho Admin), ket hop `pypdf` (`BSD-3-Clause`) trong test.
