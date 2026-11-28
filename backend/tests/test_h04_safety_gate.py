@@ -19,7 +19,7 @@ def _mock_docker_ok(cmd, **kwargs):
     raise AssertionError(f"Unexpected subprocess command: {cmd}")
 
 
-def _mock_engine_factory(db_name="aurameme_test", revision="0019_asset_lifecycle_tombstone", has_user=1, has_post=1):
+def _mock_engine_factory(db_name="aurameme_test", revision="0020_follow_notifications", has_user=1, has_post=1):
     conn = MagicMock()
 
     def execute(stmt, params=None):
@@ -50,7 +50,7 @@ def test_verify_isolated_postgres_accepts_valid_env(tmp_path, monkeypatch):
         manifest,
     )
     assert info["database"] == "aurameme_test"
-    assert info["alembic_revision"] == "0019_asset_lifecycle_tombstone"
+    assert info["alembic_revision"] == "0020_follow_notifications"
     assert info["fixture_verified"] is True
 
 

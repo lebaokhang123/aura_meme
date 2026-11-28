@@ -596,15 +596,15 @@ Table notifications {
   id uuid [not null, pk]
   recipient_user_id uuid [not null]
   actor_user_id uuid
-  type text [not null]
-  target_type text [not null]
+  type text [not null, note: "reaction | comment | moderation | announcement | follow"]
+  target_type text [not null, note: "post | comment | system | user"]
   target_id uuid
   payload jsonb [not null]
   created_at timestamptz [not null]
   read_at timestamptz
   dedupe_key text [unique]
 
-  Note: 'P2 | Hệ thống thông báo cá nhân'
+  Note: 'P2 | Hệ thống thông báo cá nhân (bao gồm follow notification từ migration 0020)'
 }
 
 Table subscription_orders {

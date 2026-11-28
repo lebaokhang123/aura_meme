@@ -13,7 +13,7 @@ from app.aura_lock import lock_aura_mutation
 from app.auth import CSRF_HEADER, ERRORS, delete_cookie, session_cookie, user_private
 from app.auth_schemas import LoginInput, RegisterInput, UserPrivate
 from app.auth_schemas import ErrorResponse
-from app.blog import page_rows
+from app.blog import build_search_filter, page_rows
 from app.blog_schemas import NonemptyPatch, Pagination, StrictInput
 from app.models import AdminAuditLog, AuthSession, Profile, Role, User, UserRole
 from app.permissions import authenticated_account, require_account_csrf, require_role
@@ -124,9 +124,8 @@ def list_users(page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=1
     statement = select(User, Profile).join(Profile, Profile.user_id == User.id)
     if status is not None:
         statement = statement.where(User.status == status)
-    if search is not None:
-        statement = statement.where(or_(User.username.icontains(search, autoescape=True),
-            User.email.icontains(search, autoescape=True), Profile.display_name.icontains(search, autoescape=True)))
+    if (clause := build_search_filter(search, (User.email, Profile.display_name), username_column=User.username)) is not None:
+        statement = statement.where(clause)
     if role is not None:
         statement = statement.where(User.id.in_(select(UserRole.user_id).join(Role).where(Role.code == role)))
     ordering = {"username_asc": (User.username, User.id), "username_desc": (User.username.desc(), User.id.desc()),

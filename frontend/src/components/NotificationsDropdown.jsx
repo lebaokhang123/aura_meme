@@ -6,6 +6,81 @@ import { usePreferences } from '../PreferencesContext.jsx';
 
 const symbol = name => <span className="material-symbols-outlined" aria-hidden="true">{name}</span>;
 
+function describeNotification(notif, t) {
+  const actor = notif.actor;
+  const title = notif.payload?.title;
+  const body = notif.payload?.body;
+  const reactionType = notif.payload?.reaction_type;
+  const postTitle = notif.payload?.post_title;
+  const commentText = notif.payload?.comment_body || notif.payload?.comment_text || notif.payload?.content || '';
+  const reason = notif.payload?.reason;
+
+  let iconName = 'notifications';
+  let actorName = '';
+  let notifTitle = '';
+  let notifSnippet = '';
+  let reasonLabel = t('Lý do kiểm duyệt:', 'Moderation reason:');
+
+  if (notif.type === 'reaction') {
+    iconName = reactionType === 'fire' ? 'local_fire_department' : 'favorite';
+    actorName = actor?.display_name || actor?.username || t('Thành viên AuraMeme', 'AuraMeme Member');
+    if (notif.target_type === 'comment') {
+      notifTitle = t('Đã thả biểu cảm vào bình luận của bạn', 'Reacted to your comment');
+      notifSnippet = commentText || body || (postTitle ? `"${postTitle}"` : '');
+    } else {
+      notifTitle = t('Đã thả biểu cảm vào bài viết của bạn', 'Reacted to your post');
+      notifSnippet = postTitle ? `"${postTitle}"` : '';
+    }
+  } else if (notif.type === 'comment') {
+    iconName = 'chat_bubble';
+    actorName = actor?.display_name || actor?.username || t('Thành viên AuraMeme', 'AuraMeme Member');
+    notifTitle = t('Đã bình luận vào bài viết của bạn', 'Commented on your post');
+    notifSnippet = commentText || body || (postTitle ? `"${postTitle}"` : '');
+  } else if (notif.type === 'follow') {
+    iconName = 'person_add';
+    actorName = actor?.display_name || actor?.username || t('Thành viên AuraMeme', 'AuraMeme Member');
+    notifTitle = t('Đã bắt đầu theo dõi bạn.', 'Started following you.');
+    const handle = actor?.username || notif.payload?.follower_username;
+    notifSnippet = handle ? `@${handle}` : '';
+  } else if (notif.type === 'moderation') {
+    iconName = 'shield';
+    actorName = actor?.display_name || t('Ban Quản Trị AuraMeme', 'AuraMeme Moderation Team');
+    const action = notif.payload?.action;
+    if (notif.target_type === 'post' && action === 'hidden') {
+      notifTitle = t('Đã ẩn bài viết của bạn.', 'Your post was hidden.');
+      reasonLabel = t('Lý do ẩn:', 'Hide reason:');
+    } else if (notif.target_type === 'post' && action === 'deleted') {
+      notifTitle = t('Đã xóa bài viết của bạn.', 'Your post was deleted.');
+      reasonLabel = t('Lý do xóa:', 'Deletion reason:');
+    } else if (notif.target_type === 'comment' && action === 'hidden') {
+      notifTitle = t('Đã ẩn bình luận của bạn.', 'Your comment was hidden.');
+      reasonLabel = t('Lý do ẩn:', 'Hide reason:');
+    } else if (notif.target_type === 'comment' && action === 'deleted') {
+      notifTitle = t('Đã xóa bình luận của bạn.', 'Your comment was deleted.');
+      reasonLabel = t('Lý do xóa:', 'Deletion reason:');
+    } else if (action === 'deleted') {
+      notifTitle = t('Nội dung đã bị xóa bởi Quản trị viên.', 'Content deleted by Moderator.');
+      reasonLabel = t('Lý do xóa:', 'Deletion reason:');
+    } else {
+      notifTitle = t('Nội dung đã được kiểm duyệt bởi Quản trị viên.', 'Content moderated by Moderator.');
+    }
+    notifSnippet = reason
+      ? `${t('Lý do:', 'Reason:')} ${reason}`
+      : (notif.payload?.target_title ? `"${notif.payload.target_title}"` : (commentText || (postTitle ? `"${postTitle}"` : '')));
+  } else if (notif.type === 'announcement') {
+    iconName = 'campaign';
+    actorName = actor?.display_name || t('Hệ thống AuraMeme', 'AuraMeme System');
+    notifTitle = title || t('Thông báo từ Hệ Thống AuraMeme', 'Announcement from AuraMeme System');
+    notifSnippet = body || '';
+  } else {
+    actorName = actor?.display_name || t('Hệ thống AuraMeme', 'AuraMeme System');
+    notifTitle = title || t('Thông báo', 'Notification');
+    notifSnippet = body || '';
+  }
+
+  return { iconName, actorName, notifTitle, notifSnippet, commentText, reasonLabel };
+}
+
 function formatRelativeTime(dateString, t) {
   try {
     const diff = Math.max(0, Math.floor((Date.now() - Date.parse(dateString)) / 1000));
@@ -312,48 +387,7 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
           ) : (
             <>
               {items.map(notif => {
-                const actor = notif.actor;
-                const title = notif.payload?.title;
-                const body = notif.payload?.body;
-                const reactionType = notif.payload?.reaction_type;
-                const postTitle = notif.payload?.post_title;
-                const reason = notif.payload?.reason;
-
-                let iconName = 'notifications';
-                let actorName = '';
-                let notifTitle = '';
-                let notifSnippet = '';
-
-                if (notif.type === 'reaction') {
-                  iconName = reactionType === 'fire' ? 'local_fire_department' : 'favorite';
-                  actorName = actor?.display_name || actor?.username || t('Thành viên AuraMeme', 'AuraMeme Member');
-                  notifTitle = t(
-                    `Đã thả biểu cảm ${reactionType ? `(${reactionType})` : ''} vào bài viết của bạn`,
-                    `Reacted to your post`
-                  );
-                  notifSnippet = postTitle ? `"${postTitle}"` : '';
-                } else if (notif.type === 'comment') {
-                  iconName = 'chat_bubble';
-                  actorName = actor?.display_name || actor?.username || t('Thành viên AuraMeme', 'AuraMeme Member');
-                  notifTitle = t('Đã bình luận vào bài viết của bạn', 'Commented on your post');
-                  notifSnippet = notif.payload?.comment_text || notif.payload?.content || body || (postTitle ? `"${postTitle}"` : '');
-                } else if (notif.type === 'moderation') {
-                  iconName = 'shield';
-                  actorName = actor?.display_name || t('Ban Quản Trị AuraMeme', 'AuraMeme Moderation Team');
-                  notifTitle = notif.payload?.action === 'deleted'
-                    ? t('Nội dung đã bị xóa bởi Quản trị viên', 'Content deleted by Moderator')
-                    : t('Nội dung đã được kiểm duyệt bởi Quản trị viên', 'Content moderated by Moderator');
-                  notifSnippet = reason ? `${t('Lý do:', 'Reason:')} ${reason}` : (notif.payload?.target_title ? `"${notif.payload.target_title}"` : (postTitle ? `"${postTitle}"` : ''));
-                } else if (notif.type === 'announcement') {
-                  iconName = 'campaign';
-                  actorName = actor?.display_name || t('Hệ thống AuraMeme', 'AuraMeme System');
-                  notifTitle = title || t('Thông báo từ Hệ Thống AuraMeme', 'Announcement from AuraMeme System');
-                  notifSnippet = body || '';
-                } else {
-                  actorName = actor?.display_name || t('Hệ thống AuraMeme', 'AuraMeme System');
-                  notifTitle = title || t('Thông báo', 'Notification');
-                  notifSnippet = body || '';
-                }
+                const { iconName, actorName, notifTitle, notifSnippet } = describeNotification(notif, t);
 
                 return (
                   <div
@@ -531,30 +565,34 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
                 </p>
               )}
 
-              {selectedNotif.type === 'reaction' && (
-                <p className="notification-modal-content">
-                  {t(
-                    `Đã thả biểu cảm ${selectedNotif.payload?.reaction_type ? `(${selectedNotif.payload.reaction_type})` : ''} vào bài viết của bạn.`,
-                    `Reacted to your post.`
-                  )}
-                </p>
-              )}
-
-              {selectedNotif.type === 'comment' && (
-                <p className="notification-modal-content">
-                  {t(
-                    `Đã để lại bình luận trên bài viết của bạn.`,
-                    `Commented on your post.`
-                  )}
-                </p>
-              )}
-
-              {selectedNotif.payload?.reason && (
-                <div className="notification-modal-reason">
-                  <strong>{t('Lý do kiểm duyệt:', 'Moderation reason:')}</strong>
-                  <span>{selectedNotif.payload.reason}</span>
-                </div>
-              )}
+              {(() => {
+                const desc = describeNotification(selectedNotif, t);
+                return (
+                  <>
+                    {(selectedNotif.type === 'reaction' || selectedNotif.type === 'comment' || selectedNotif.type === 'moderation' || selectedNotif.type === 'follow') && (
+                      <p className="notification-modal-content">
+                        {desc.notifTitle}
+                      </p>
+                    )}
+                    {desc.commentText && (
+                      <div className="notification-modal-target">
+                        <span className="text-xs text-outline font-medium">
+                          {t('Nội dung bình luận:', 'Comment content:')}
+                        </span>
+                        <p className="notification-modal-target-quote">
+                          "{desc.commentText}"
+                        </p>
+                      </div>
+                    )}
+                    {selectedNotif.payload?.reason && (
+                      <div className="notification-modal-reason">
+                        <strong>{desc.reasonLabel}</strong>
+                        <span>{selectedNotif.payload.reason}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {selectedNotif.payload?.post_title && (
                 <div className="notification-modal-target">
@@ -569,7 +607,21 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
             </div>
 
             <div className="notification-modal-footer">
-              {(selectedNotif.target_type === 'post' && selectedNotif.target_id) ? (
+              {selectedNotif.type === 'follow' && (selectedNotif.actor?.username || selectedNotif.payload?.follower_username) ? (
+                <button
+                  type="button"
+                  className="notification-modal-action-btn"
+                  onClick={() => {
+                    const uname = selectedNotif.actor?.username || selectedNotif.payload?.follower_username;
+                    handleCloseModal();
+                    onClose?.();
+                    location.assign(`/u/${encodeURIComponent(uname)}`);
+                  }}
+                >
+                  {symbol('arrow_outward')}
+                  <span>{t('Xem trang cá nhân', 'View profile')}</span>
+                </button>
+              ) : (selectedNotif.target_type === 'post' && selectedNotif.target_id && selectedNotif.type !== 'moderation') ? (
                 <button
                   type="button"
                   className="notification-modal-action-btn"

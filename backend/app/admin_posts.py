@@ -1,7 +1,8 @@
 """Admin post moderation and metadata-only audit browsing; no content renderer."""
-from datetime import datetime
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Literal
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import String, cast, not_, or_, select
@@ -9,7 +10,7 @@ from sqlalchemy import String, cast, not_, or_, select
 from app.admin_users import require_admin_mutation
 from app.auth import CSRF_HEADER, ERRORS
 from app.auth_schemas import ErrorResponse
-from app.blog import page_rows, post_dto, validate_post
+from app.blog import build_search_filter, page_rows, post_dto, validate_post
 from app.blog_schemas import Pagination, PostPage, PostPatch, PostResponse
 from app.models import AdminAuditLog, Category, Notification, Post, Profile, User
 from app.permissions import require_role
@@ -93,23 +94,40 @@ def locked_post(db, post_id):
     return post
 
 
+VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
 @router.get("/posts", response_model=PostPage, operation_id="adminListPosts",
             responses={code: ERRORS[code] for code in (401, 403, 422, 429, 500)})
 def list_admin_posts(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                       search: str | None = Query(None, max_length=100), status: str | None = None,
                       category: str | None = None,
+                      date_from: date | None = Query(None),
+                      date_to: date | None = Query(None),
                       sort: Literal["created_desc", "created_asc", "title_asc"] = "created_desc",
                       account=Depends(require_role("ADMIN"))):
     if any(value is not None and "\x00" in value for value in (search, status, category)):
         raise AuthError(422, "VALIDATION_ERROR", "Invalid query text.")
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise AuthError(422, "VALIDATION_ERROR", "date_from must not be after date_to.")
     statement = select(Post, User, Profile, Category).join(User, User.id == Post.author_id).join(
         Profile, Profile.user_id == User.id).join(Category, Category.id == Post.category_id)
-    if search is not None:
-        statement = statement.where(or_(Post.title.icontains(search, autoescape=True), Post.content.icontains(search, autoescape=True)))
+    if (clause := build_search_filter(
+        search,
+        (Post.title, Post.content, Profile.display_name, Category.name, Category.slug),
+        username_column=User.username,
+    )) is not None:
+        statement = statement.where(clause)
     if status is not None:
         statement = statement.where(Post.status == status)
     if category is not None:
         statement = statement.where(Category.slug == category)
+    if date_from is not None:
+        start_utc = datetime.combine(date_from, time.min, tzinfo=VN_TZ).astimezone(timezone.utc)
+        statement = statement.where(Post.created_at >= start_utc)
+    if date_to is not None:
+        end_utc = datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=VN_TZ).astimezone(timezone.utc)
+        statement = statement.where(Post.created_at < end_utc)
     ordering = {"created_desc": (Post.created_at.desc(), Post.id.desc()),
                 "created_asc": (Post.created_at, Post.id), "title_asc": (Post.title, Post.id)}
     rows, pagination = page_rows(account.db, statement.order_by(*ordering[sort]), page, page_size)

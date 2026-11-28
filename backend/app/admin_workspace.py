@@ -21,7 +21,7 @@ from starlette.requests import ClientDisconnect
 from app.admin_users import KHANG_DEV_ID, require_admin_mutation
 from app.auth import CSRF_HEADER, ERRORS
 from app.auth_schemas import ErrorResponse
-from app.blog import page_rows
+from app.blog import build_search_filter, page_rows
 from app.blog_schemas import Pagination, StrictInput
 from app.comments import CommentResponse, comment_dto
 from app.config import CatalogSettings
@@ -397,9 +397,14 @@ def comments(
 ):
     if search is not None and '\x00' in search:
         raise AuthError(422, 'VALIDATION_ERROR', 'Invalid query text.')
-    statement = select(Comment, User, Profile).join(User, User.id == Comment.author_id).join(Profile, Profile.user_id == User.id)
-    if search is not None:
-        statement = statement.where(Comment.body.icontains(search, autoescape=True))
+    statement = (
+        select(Comment, User, Profile)
+        .join(User, User.id == Comment.author_id)
+        .join(Profile, Profile.user_id == User.id)
+        .join(Post, Post.id == Comment.post_id)
+    )
+    if (clause := build_search_filter(search, (Comment.body, Profile.display_name, Post.title), username_column=User.username)) is not None:
+        statement = statement.where(clause)
     if status is not None:
         statement = statement.where(Comment.status == status)
     if post_id is not None:

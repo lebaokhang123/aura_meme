@@ -571,8 +571,8 @@ class Notification(Base):
         Index("ix_notifications_recipient_created", "recipient_user_id", "created_at"),
         Index("ix_notifications_recipient_read", "recipient_user_id", "read_at"),
         UniqueConstraint("dedupe_key", name="uq_notifications_dedupe_key"),
-        CheckConstraint("type IN ('reaction','comment','moderation','announcement')", name="notification_type"),
-        CheckConstraint("target_type IN ('post','comment','system')", name="notification_target_type"),
+        CheckConstraint("type IN ('reaction','comment','moderation','announcement','follow')", name="notification_type"),
+        CheckConstraint("target_type IN ('post','comment','system','user')", name="notification_target_type"),
     )
 
 
@@ -686,7 +686,7 @@ class UserFollow(Base):
     )
 
 
-DEMO_SCHEMA_HEAD = "0019_asset_lifecycle_tombstone"
+DEMO_SCHEMA_HEAD = "0020_follow_notifications"
 
 
 def reviewed_metadata(revision):
