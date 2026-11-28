@@ -148,17 +148,17 @@ test('Task 8: User B navigates from Home/Comment to User A Public Profile (read-
   await page.locator('[data-cookie-ess]').click();
   await expect(page.locator('[data-cookie-reopen]')).toBeVisible({ timeout: 6000 });
 
-  // Verify author avatar & name are clickable links to /profile/khang_dev
+  // Verify author avatar & name are clickable links to /u/khang_dev
   const card = page.locator('article[data-post-id]').first();
-  await expect(card.locator('a[href="/profile/khang_dev"]').first()).toBeVisible();
+  await expect(card.locator('a[href="/u/khang_dev"]').first()).toBeVisible();
 
-  // Open comments and verify comment author is also clickable link to /profile/kien_dev
+  // Open comments and verify comment author is also clickable link to /u/kien_dev
   await card.getByRole('button', { name: 'Bình luận' }).click();
-  await expect(card.locator('[data-comment-id] a[href="/profile/kien_dev"]').first()).toBeVisible();
+  await expect(card.locator('[data-comment-id] a[href="/u/kien_dev"]').first()).toBeVisible();
 
   // Click author display name -> opens Khang Dev's public profile
-  await card.locator('a[href="/profile/khang_dev"]', { hasText: 'Khang Dev' }).click();
-  await expect(page).toHaveURL(/\/profile\/khang_dev$/);
+  await card.locator('a[href="/u/khang_dev"]', { hasText: 'Khang Dev' }).click();
+  await expect(page).toHaveURL(/\/u\/khang_dev$/);
 
   // Verify public identity: display name, @username, Sáng Thế Thần badge, Aura Prime badge, follower count 0
   await expect(page.locator('.am-profile-name h1')).toHaveText('Khang Dev');
