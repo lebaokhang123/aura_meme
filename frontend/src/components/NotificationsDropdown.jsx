@@ -387,6 +387,7 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
           ) : (
             <>
               {items.map(notif => {
+                const actor = notif.actor;
                 const { iconName, actorName, notifTitle, notifSnippet } = describeNotification(notif, t);
 
                 return (
@@ -504,6 +505,8 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
                     ? 'chat_bubble'
                     : selectedNotif.type === 'moderation'
                     ? 'shield'
+                    : selectedNotif.type === 'follow'
+                    ? 'person_add'
                     : 'campaign'
                 )}
                 <span>
@@ -513,6 +516,8 @@ export function NotificationsDropdown({ onClose, onUnreadChange }) {
                     ? t('Bình luận', 'Comment')
                     : selectedNotif.type === 'moderation'
                     ? t('Kiểm duyệt', 'Moderation')
+                    : selectedNotif.type === 'follow'
+                    ? t('Theo dõi', 'Follow')
                     : t('Thông báo hệ thống', 'System Announcement')}
                 </span>
               </span>
